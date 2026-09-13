@@ -180,10 +180,66 @@
     font-size:11px;letter-spacing:2px;color:rgba(200,230,255,0.55);pointer-events:none;
   }
 
-  @media (max-width:700px){
+  /* ---------- Touch controls (shown only on touch-capable devices) ---------- */
+  html.touch-device, html.touch-device body{ touch-action:none; overscroll-behavior:none; }
+  #touchControls{position:fixed;inset:0;pointer-events:none;z-index:35;display:none;}
+  #touchControls.active{display:block;}
+  .joy-zone{
+    position:absolute;
+    width:clamp(92px,24vw,132px);height:clamp(92px,24vw,132px);
+    border-radius:50%;
+    border:2px solid rgba(47,243,255,0.45);background:rgba(8,14,30,0.35);
+    pointer-events:all;touch-action:none;
+    box-shadow:0 0 16px rgba(47,243,255,0.2) inset;
+  }
+  #joyLeft{left:clamp(14px,3vw,26px);bottom:clamp(14px,3vw,26px);}
+  #joyRight{right:clamp(120px,26vw,190px);bottom:clamp(14px,3vw,26px);}
+  .joy-knob{
+    position:absolute;width:44%;height:44%;left:50%;top:50%;transform:translate(-50%,-50%);
+    border-radius:50%;background:rgba(47,243,255,0.3);border:2px solid var(--neon-cyan);
+    box-shadow:0 0 14px rgba(47,243,255,0.65);pointer-events:none;
+  }
+  .joy-label{
+    position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);
+    font-size:9px;letter-spacing:2px;color:rgba(200,230,255,0.6);white-space:nowrap;
+  }
+  .touch-btn{
+    position:absolute;pointer-events:all;touch-action:none;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;text-align:center;
+    font-size:10px;letter-spacing:1px;color:#eafcff;border:2px solid var(--neon-cyan);
+    background:rgba(47,243,255,0.15);box-shadow:0 0 12px rgba(47,243,255,0.5);
+    -webkit-user-select:none;user-select:none;transition:background .1s, box-shadow .1s, transform .1s;
+  }
+  .touch-btn.active{transform:scale(0.92);background:rgba(47,243,255,0.4);box-shadow:0 0 24px rgba(47,243,255,0.9);}
+  #btnFire{
+    right:clamp(12px,3vw,24px);bottom:clamp(12px,3vw,24px);
+    width:clamp(70px,16vw,96px);height:clamp(70px,16vw,96px);
+    border-color:var(--neon-pink);color:var(--neon-pink);
+    background:rgba(255,62,165,0.15);box-shadow:0 0 16px rgba(255,62,165,0.55);
+  }
+  #btnFire.active{background:rgba(255,62,165,0.45);box-shadow:0 0 26px rgba(255,62,165,0.95);}
+  #btnThrust{
+    right:clamp(12px,3vw,24px);bottom:calc(clamp(12px,3vw,24px) + clamp(70px,16vw,96px) + 12px);
+    width:clamp(50px,11vw,66px);height:clamp(50px,11vw,66px);
+  }
+  #btnBoost{
+    right:calc(clamp(12px,3vw,24px) + clamp(50px,11vw,66px) + 10px);
+    bottom:calc(clamp(12px,3vw,24px) + clamp(70px,16vw,96px) + 12px);
+    width:clamp(50px,11vw,66px);height:clamp(50px,11vw,66px);
+    border-color:var(--neon-orange);color:var(--neon-orange);
+    background:rgba(255,157,47,0.15);box-shadow:0 0 14px rgba(255,157,47,0.5);
+  }
+  #btnBoost.active{background:rgba(255,157,47,0.45);box-shadow:0 0 22px rgba(255,157,47,0.9);}
+  #rotateHint{
+    position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;
+    background:rgba(2,3,10,0.94);color:#eafcff;text-align:center;padding:24px;
+    font-size:15px;letter-spacing:2px;
+  }
+  @media (max-width:700px) and (orientation:portrait){
     .controls-grid{grid-template-columns:1fr;}
     .bar-outer{width:150px;}
     .hud-corner{min-width:170px;padding:10px 12px;}
+    html.touch-device #rotateHint.active{display:flex;}
   }
 </style>
 </head>
@@ -196,7 +252,7 @@
   <div class="overlay-panel">
     <h1 class="neon-title">VOIDRUNNER</h1>
     <div class="overlay-sub">ORBITAL ASSAULT &mdash; HOVER-DRIVE &bull; SPACE-FLIGHT &bull; PLASMA COMBAT</div>
-    <div class="controls-grid">
+    <div class="controls-grid" id="controlsKeyboard">
       <div class="controls-block">
         <h3>HOVER-DRIVE MODE</h3>
         <ul>
@@ -219,6 +275,37 @@
           <li><span class="key">SPACE</span>Thrusters (Launch/Land)</li>
           <li><span class="key">SHIFT</span>Quantum Boost</li>
           <li><span class="key">CLICK</span>Fire Plasma Cannons</li>
+        </ul>
+      </div>
+      <div class="controls-block">
+        <h3>POWER-UPS</h3>
+        <ul>
+          <li><span class="key">GOLD</span>Overcharge Triple-Shot</li>
+          <li><span class="key">CYAN</span>Void Shield Invulnerability</li>
+          <li><span class="key">PINK</span>Quantum Speed Boost</li>
+        </ul>
+      </div>
+    </div>
+    <div class="controls-grid" id="controlsTouch" style="display:none;">
+      <div class="controls-block">
+        <h3>LEFT STICK</h3>
+        <ul>
+          <li><span class="key">UP/DN</span>Accelerate / Brake, Pitch</li>
+          <li><span class="key">L / R</span>Steer &amp; Drift, Roll</li>
+        </ul>
+      </div>
+      <div class="controls-block">
+        <h3>RIGHT STICK</h3>
+        <ul>
+          <li><span class="key">AIM</span>Flight Steering / Crosshair</li>
+        </ul>
+      </div>
+      <div class="controls-block">
+        <h3>BUTTONS</h3>
+        <ul>
+          <li><span class="key">THRUST</span>Launch / Land</li>
+          <li><span class="key">BOOST</span>Quantum Boost</li>
+          <li><span class="key">FIRE</span>Fire Plasma Cannons</li>
         </ul>
       </div>
       <div class="controls-block">
@@ -290,6 +377,22 @@
 
 <div id="damageFlash"></div>
 <div id="hint" style="display:none;">SPACE = THRUSTERS &nbsp;|&nbsp; SHIFT = BOOST &nbsp;|&nbsp; CLICK = FIRE</div>
+
+<!-- ================= TOUCH CONTROLS (auto-shown on touch devices) ================= -->
+<div id="touchControls">
+  <div class="joy-zone" id="joyLeft">
+    <div class="joy-knob" id="joyLeftKnob"></div>
+    <div class="joy-label">MOVE / STEER</div>
+  </div>
+  <div class="joy-zone" id="joyRight">
+    <div class="joy-knob" id="joyRightKnob"></div>
+    <div class="joy-label">AIM / STEER</div>
+  </div>
+  <div class="touch-btn" id="btnBoost">BOOST</div>
+  <div class="touch-btn" id="btnThrust">THRUST</div>
+  <div class="touch-btn" id="btnFire">FIRE</div>
+</div>
+<div id="rotateHint">ROTATE YOUR DEVICE<br>TO LANDSCAPE FOR THE BEST EXPERIENCE</div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
@@ -680,7 +783,132 @@ window.addEventListener('mousedown', (e)=>{ if(e.button===0) mouseDown = true; }
 window.addEventListener('mouseup', (e)=>{ if(e.button===0) mouseDown = false; });
 window.addEventListener('blur', ()=>{ for(const k in keys) keys[k]=false; mouseDown=false; });
 
-function isDown(...codes){ return codes.some(c=>keys[c]); }
+const touchKeys = {}; // set by the on-screen joystick/buttons; kept separate so it never clobbers real keyboard state
+function isDown(...codes){ return codes.some(c=>keys[c]||touchKeys[c]); }
+
+/* ---------------------------------------------------------------------------------
+   Touch controls: dual virtual joysticks + action buttons, feeding the exact same
+   `keys` / mouseNormX / mouseNormY / mouseDown / spaceEdge state that keyboard and
+   mouse drive, so the gameplay code above needs no touch-specific branching.
+   --------------------------------------------------------------------------------- */
+const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+if(isTouchDevice) document.documentElement.classList.add('touch-device');
+
+class VirtualJoystick{
+  constructor(zoneEl, knobEl, deadzone){
+    this.zoneEl = zoneEl;
+    this.knobEl = knobEl;
+    this.deadzone = deadzone || 0.15;
+    this.x = 0; this.y = 0;
+    this.touchId = null;
+
+    const start = (e)=>{
+      e.preventDefault();
+      if(this.touchId!==null) return;
+      const t = e.changedTouches[0];
+      this.touchId = t.identifier;
+      this.updateFromTouch(t);
+    };
+    const move = (e)=>{
+      e.preventDefault();
+      for(const t of e.changedTouches){
+        if(t.identifier===this.touchId){ this.updateFromTouch(t); break; }
+      }
+    };
+    const end = (e)=>{
+      e.preventDefault();
+      for(const t of e.changedTouches){
+        if(t.identifier===this.touchId){
+          this.touchId = null; this.x = 0; this.y = 0;
+          this.knobEl.style.transform = 'translate(-50%,-50%)';
+          break;
+        }
+      }
+    };
+    zoneEl.addEventListener('touchstart', start, {passive:false});
+    zoneEl.addEventListener('touchmove', move, {passive:false});
+    zoneEl.addEventListener('touchend', end, {passive:false});
+    zoneEl.addEventListener('touchcancel', end, {passive:false});
+  }
+  updateFromTouch(t){
+    const rect = this.zoneEl.getBoundingClientRect();
+    const r = rect.width/2;
+    let dx = t.clientX - (rect.left+r);
+    let dy = t.clientY - (rect.top+r);
+    const dist = Math.sqrt(dx*dx+dy*dy);
+    if(dist > r){ dx = dx/dist*r; dy = dy/dist*r; }
+    this.x = clamp(dx/r, -1, 1);
+    this.y = clamp(dy/r, -1, 1);
+    this.knobEl.style.transform = `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+  }
+  getX(){ return Math.abs(this.x) < this.deadzone ? 0 : this.x; }
+  getY(){ return Math.abs(this.y) < this.deadzone ? 0 : this.y; }
+}
+
+const leftStick = new VirtualJoystick(document.getElementById('joyLeft'), document.getElementById('joyLeftKnob'));
+const rightStick = new VirtualJoystick(document.getElementById('joyRight'), document.getElementById('joyRightKnob'));
+
+function bindTouchButton(el, onDown, onUp){
+  const down = (e)=>{ e.preventDefault(); el.classList.add('active'); if(onDown) onDown(); };
+  const up = (e)=>{ e.preventDefault(); el.classList.remove('active'); if(onUp) onUp(); };
+  el.addEventListener('touchstart', down, {passive:false});
+  el.addEventListener('touchend', up, {passive:false});
+  el.addEventListener('touchcancel', up, {passive:false});
+}
+
+bindTouchButton(document.getElementById('btnFire'),
+  ()=>{ mouseDown = true; },
+  ()=>{ mouseDown = false; });
+bindTouchButton(document.getElementById('btnThrust'),
+  ()=>{ spaceEdge = true; });
+bindTouchButton(document.getElementById('btnBoost'),
+  ()=>{ touchKeys['ShiftLeft'] = true; },
+  ()=>{ touchKeys['ShiftLeft'] = false; });
+
+// Steering deadzone before a stick tilt registers as a directional key press.
+const TOUCH_STEER_THRESHOLD = 0.28;
+
+function updateTouchInput(){
+  if(!isTouchDevice) return;
+
+  const lx = leftStick.getX(), ly = leftStick.getY();
+  touchKeys['KeyW'] = ly < -TOUCH_STEER_THRESHOLD;
+  touchKeys['KeyS'] = ly >  TOUCH_STEER_THRESHOLD;
+  touchKeys['KeyA'] = lx < -TOUCH_STEER_THRESHOLD;
+  touchKeys['KeyD'] = lx >  TOUCH_STEER_THRESHOLD;
+
+  const rx = rightStick.getX(), ry = rightStick.getY();
+  mouseNormX = rx;
+  mouseNormY = ry;
+  const cx = window.innerWidth/2, cy = window.innerHeight/2;
+  const deflect = 60;
+  crosshairEl.style.transform = `translate(${cx+rx*deflect}px, ${cy+ry*deflect}px)`;
+}
+
+function showTouchControls(){
+  if(!isTouchDevice) return;
+  document.getElementById('touchControls').classList.add('active');
+  updateRotateHint();
+}
+function hideTouchControls(){
+  document.getElementById('touchControls').classList.remove('active');
+  document.getElementById('rotateHint').classList.remove('active');
+}
+function updateRotateHint(){
+  if(!isTouchDevice || gameState!=='playing'){
+    document.getElementById('rotateHint').classList.remove('active');
+    return;
+  }
+  const portrait = window.innerHeight > window.innerWidth;
+  document.getElementById('rotateHint').classList.toggle('active', portrait);
+}
+window.addEventListener('resize', updateRotateHint);
+window.addEventListener('orientationchange', updateRotateHint);
+
+if(isTouchDevice){
+  document.getElementById('controlsKeyboard').style.display = 'none';
+  document.getElementById('controlsTouch').style.display = 'grid';
+}
 
 /* ---------------------------------------------------------------------------------
    Enemies
@@ -1330,6 +1558,7 @@ function triggerGameOver(){
   crosshairEl.style.display = 'none';
   canvas.classList.remove('playing');
   document.getElementById('hint').style.display = 'none';
+  hideTouchControls();
 }
 
 function startGame(){
@@ -1338,9 +1567,10 @@ function startGame(){
   document.getElementById('hud').classList.add('active');
   crosshairEl.style.display = 'block';
   canvas.classList.add('playing');
-  document.getElementById('hint').style.display = 'block';
+  document.getElementById('hint').style.display = isTouchDevice ? 'none' : 'block';
   resetGame();
   gameState = 'playing';
+  showTouchControls();
 }
 
 document.getElementById('launchBtn').addEventListener('click', startGame);
@@ -1352,6 +1582,7 @@ document.getElementById('retryBtn').addEventListener('click', startGame);
 const clock = new THREE.Clock();
 
 function updateGameplay(dt){
+  updateTouchInput();
   updatePlayer(dt);
 
   for(const enemy of enemies) enemy.update(dt, player);
