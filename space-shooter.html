@@ -396,11 +396,60 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>
+/* ---------------------------------------------------------------------------------
+   Startup guard: if the primary CDN failed to load THREE (blocked network,
+   ad-blocker, offline, etc.) automatically retry a second CDN, and if that
+   also fails -- or anything else throws during setup -- show a clear on-screen
+   message instead of leaving the Launch Game button silently unresponsive.
+   --------------------------------------------------------------------------------- */
+function showFatalError(msg){
+  const el = document.createElement('div');
+  el.id = 'fatalError';
+  el.style.cssText = 'position:fixed;inset:0;z-index:999;display:flex;align-items:center;'+
+    'justify-content:center;background:rgba(2,3,10,0.96);color:#ff8080;'+
+    'font-family:Consolas,"Courier New",monospace;text-align:center;padding:30px;';
+  el.innerHTML =
+    '<div style="max-width:520px;">'+
+      '<div style="font-size:22px;letter-spacing:3px;color:#ff3ea5;margin-bottom:16px;text-shadow:0 0 10px #ff3ea5;">UNABLE TO START</div>'+
+      '<div style="font-size:14px;line-height:1.6;">'+msg+'</div>'+
+      '<div style="margin-top:18px;font-size:12px;color:#9fd0ff;letter-spacing:1px;">'+
+        'Check your internet connection, or disable any ad-blocker / script-blocking '+
+        'extension for this page, then reload.'+
+      '</div>'+
+    '</div>';
+  document.body.appendChild(el);
+}
+function startWithThree(){
+  try{
+    initGame();
+  }catch(err){
+    console.error(err);
+    showFatalError('A script error prevented the game from starting:<br><code>'+(err&&err.message?err.message:err)+'</code>');
+  }
+}
+function loadFallbackThreeAndStart(){
+  const s = document.createElement('script');
+  s.src = 'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js';
+  s.onload = function(){
+    if(typeof THREE==='undefined'){
+      showFatalError('The 3D engine (three.js) loaded but failed to initialize.');
+      return;
+    }
+    startWithThree();
+  };
+  s.onerror = function(){
+    showFatalError('The 3D engine (three.js) could not be loaded from any CDN.');
+  };
+  document.head.appendChild(s);
+}
+
 /* =====================================================================================
    VOIDRUNNER: ORBITAL ASSAULT
    A self-contained Three.js arcade space shooter combining hover-driving and
    free-flight dogfighting on and around a floating space-station platform.
+   Everything below runs inside initGame(), only once THREE is confirmed loaded.
    ===================================================================================== */
+function initGame(){
 
 /* ---------------------------------------------------------------------------------
    Small math helpers
@@ -1638,6 +1687,13 @@ function animate(){
   renderer.render(scene, camera);
 }
 animate();
+} // end initGame()
+
+if(typeof THREE==='undefined'){
+  loadFallbackThreeAndStart();
+} else {
+  startWithThree();
+}
 </script>
 </body>
 </html>
