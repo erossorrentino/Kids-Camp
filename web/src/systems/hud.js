@@ -16,7 +16,15 @@ export class HUD {
       crosshair: document.getElementById('crosshair'),
       prompt: document.getElementById('prompt'),
       radioTag: document.getElementById('radioTag'),
+      cash: document.getElementById('cashDisplay'),
+      missionPanel: document.getElementById('missionPanel'),
+      missionTitle: document.getElementById('missionTitle'),
+      missionDetail: document.getElementById('missionDetail'),
+      missionTimerFill: document.getElementById('missionTimerFill'),
+      missionOffer: document.getElementById('missionOffer'),
+      toast: document.getElementById('toast'),
     };
+    this._toastTimer = null;
     this.mmCtx = this.el.minimap.getContext('2d');
     for (let i = 0; i < 5; i++) {
       const d = document.createElement('div');
@@ -34,6 +42,39 @@ export class HUD {
   setRadioTag(text) {
     if (text) { this.el.radioTag.textContent = `📻 ${text}`; this.el.radioTag.classList.add('show'); }
     else this.el.radioTag.classList.remove('show');
+  }
+
+  setCash(amount) {
+    this.el.cash.textContent = `$${Math.round(amount).toLocaleString()}`;
+  }
+
+  updateMissions(status) {
+    if (status.mode === 'ACTIVE') {
+      this.el.missionPanel.classList.add('show');
+      this.el.missionOffer.classList.remove('show');
+      this.el.missionTitle.textContent = status.title;
+      this.el.missionDetail.textContent = status.progressText
+        ? `${status.detail} — ${status.progressText}`
+        : `${status.detail} — ${Math.ceil(status.timeLeft)}s`;
+      const frac = status.timeLimit ? status.timeLeft / status.timeLimit : 1;
+      this.el.missionTimerFill.style.width = `${Math.max(0, Math.min(1, frac)) * 100}%`;
+    } else {
+      this.el.missionPanel.classList.remove('show');
+    }
+
+    if (status.mode === 'OFFER') {
+      this.el.missionOffer.innerHTML = `<b>${status.title}</b> — ${status.detail} · $${status.reward} &nbsp; [Press M to accept]`;
+      this.el.missionOffer.classList.add('show');
+    } else if (status.mode !== 'ACTIVE') {
+      this.el.missionOffer.classList.remove('show');
+    }
+  }
+
+  showToast(text, kind = 'success', ms = 3500) {
+    this.el.toast.textContent = text;
+    this.el.toast.className = `show ${kind}`;
+    clearTimeout(this._toastTimer);
+    this._toastTimer = setTimeout(() => { this.el.toast.classList.remove('show'); }, ms);
   }
 
   update(state) {
@@ -69,7 +110,7 @@ export class HUD {
     this._drawMinimap(state);
   }
 
-  _drawMinimap({ player, world, ai, wanted, heading, position }) {
+  _drawMinimap({ player, world, ai, wanted, heading, position, missions }) {
     const ctx = this.mmCtx;
     const size = this.el.minimap.width;
     const scale = size / MINIMAP_RANGE;
@@ -107,6 +148,21 @@ export class HUD {
     }
     if (wanted) {
       for (const p of wanted.police) dot(p.vehicle.mesh.position.x, p.vehicle.mesh.position.z, '#3d6bff', 3);
+    }
+
+    if (missions?.active?.type === 'DELIVERY') {
+      const t = missions.active.target;
+      let x = (t.x - px) * scale, z = (t.z - pz) * scale;
+      const dist = Math.hypot(x, z);
+      const maxR = size / 2 - 6;
+      if (dist > maxR) { x = (x / dist) * maxR; z = (z / dist) * maxR; }
+      ctx.fillStyle = '#ffd23f';
+      ctx.strokeStyle = '#000';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.arc(x, z, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
     }
 
     ctx.restore();

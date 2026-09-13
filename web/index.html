@@ -40,9 +40,17 @@
 
     <canvas id="minimap" width="180" height="180"></canvas>
 
+    <div id="cashDisplay">$0</div>
+
     <div id="speedo"></div>
 
     <div id="stateIndicator">IDLE</div>
+
+    <div id="missionPanel">
+      <div id="missionTitle"></div>
+      <div id="missionDetail"></div>
+      <div id="missionTimerBar"><div id="missionTimerFill"></div></div>
+    </div>
 
     <div id="crosshair">
       <div class="ch ch-t"></div>
@@ -51,9 +59,13 @@
       <div class="ch ch-r"></div>
     </div>
 
+    <div id="missionOffer"></div>
+
     <div id="prompt"></div>
 
     <div id="radioTag"></div>
+
+    <div id="toast"></div>
   </div>
 
   <div id="startOverlay">
@@ -66,6 +78,7 @@
       <li><b>LMB</b> shoot &nbsp; <b>RMB</b> aim &nbsp; <b>R</b> reload</li>
       <li><b>T</b> radio &nbsp; <b>C</b> paint &nbsp; <b>N</b> neon underglow &nbsp; (while driving)</li>
       <li><b>Q/E</b> yaw (aircraft) &nbsp; watch for slick roads when it rains</li>
+      <li><b>M</b> accept a contract when one's offered &nbsp; earn cash, avoid the hospital bill</li>
     </ul>
     <button id="startBtn">Click to Play</button>
   </div>

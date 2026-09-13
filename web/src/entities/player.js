@@ -60,6 +60,12 @@ export class Player {
     this.health = Math.max(0, this.health);
   }
 
+  respawn() {
+    this.health = PLAYER.health;
+    this.armor = PLAYER.armor;
+    this.velocityY = 0;
+  }
+
   update(dt, input, cameraRig, world) {
     const sprint = input.isDown('ShiftLeft') || input.isDown('ShiftRight');
     const aiming = input.isMouseDown(2);

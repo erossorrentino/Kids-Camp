@@ -143,3 +143,14 @@ export const AI = {
   policeSpeedBase: 8,
   policeSpeedPerStar: 2.2,
 };
+
+export const MISSIONS = {
+  offerCooldown: 6,     // seconds idle before a new offer appears
+  offerExpiry: 14,      // seconds an unaccepted offer stays valid
+  types: {
+    DELIVERY: { timeLimit: 75, minDist: 90, maxDist: 220, rewardRange: [400, 900] },
+    DEMOLITION: { timeLimit: 70, targetCount: 3, rewardRange: [600, 1100] },
+    HITMAN: { timeLimit: 80, targetCount: 4, rewardRange: [550, 1000] },
+    SURVIVAL: { duration: 45, rewardRange: [350, 700] },
+  },
+};

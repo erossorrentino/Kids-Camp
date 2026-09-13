@@ -32,6 +32,7 @@ npm, not a CDN) so the game has no runtime network dependency.
   underglow (all while driving)
 - Helicopter: **Q/E** yaw. Jet: **A/D** roll (banks turn the plane),
   **Arrow keys** or **Q/E** pitch/yaw, **W/S** throttle
+- **M** accept a contract when one's offered (bottom of screen)
 
 ## Code layout
 
@@ -54,6 +55,7 @@ src/
   systems/hud.js          DOM/canvas HUD + minimap
   systems/audio.js        synthesized (no audio files) spatial SFX + 4 labeled radio stations
   systems/particles.js    pooled sprite particles (smoke, muzzle flash, explosions)
+  systems/missions.js     contract offers (delivery/demolition/hitman/survival), cash rewards
 ```
 
 ## Systems added on top of the original prototype
@@ -79,6 +81,16 @@ src/
 - **Pedestrian flee behavior**: any gunshot or explosion within earshot
   spooks nearby pedestrians into sprinting away from the source for a few
   seconds (`AIManager.notifyGunfire`).
+- **Contracts, cash, and death consequences** (`systems/missions.js`): the
+  game periodically offers one contract at a time — a delivery (reach a
+  marked drop point), a demolition derby (destroy N vehicles), a contract
+  hit (eliminate N hostiles), or a "heat wave" (survive N seconds) — each
+  with a cash reward and a time limit. Accept with **M**; progress and a
+  countdown show in a HUD panel, and the delivery target also appears as a
+  beacon in the world and a blip on the minimap. Cash persists across
+  reloads via `localStorage`. Dying now actually costs you: it clears your
+  wanted level, drops a cut of your cash (a "hospital bill"), and respawns
+  you on foot at the plaza — see `Game._onPlayerDeath`.
 
 ## Known limitations
 

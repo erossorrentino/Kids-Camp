@@ -11,11 +11,13 @@ import { WantedSystem } from './systems/wanted.js';
 import { AudioManager } from './systems/audio.js';
 import { ParticleSystem } from './systems/particles.js';
 import { WeatherSystem } from './systems/weather.js';
+import { MissionManager } from './systems/missions.js';
 import { HUD } from './systems/hud.js';
 import { CameraRig } from './systems/camera.js';
 
 const MODE = { FOOT: 'FOOT', CAR: 'CAR', BIKE: 'BIKE', HELI: 'HELI', JET: 'JET' };
 const DRIVING_MODES = new Set([MODE.CAR, MODE.BIKE]);
+const CASH_STORAGE_KEY = 'neonHorizonCash';
 
 export class Game {
   constructor(canvas) {
@@ -33,6 +35,7 @@ export class Game {
     this.audio = new AudioManager(this.camera, this.scene);
     this.particles = new ParticleSystem(this.scene);
     this.weather = new WeatherSystem(this.scene, this.sun, this.audio);
+    this.missions = new MissionManager(this.scene);
     this.hud = new HUD();
 
     this._spawnVehicles();
@@ -41,6 +44,8 @@ export class Game {
     this.engineHandle = null;
     this.tireHandle = null;
     this._smokeTimer = 0;
+    this._playerDead = false;
+    this.cash = this._loadCash();
 
     this.clock = new THREE.Clock();
     window.addEventListener('resize', () => this._onResize());
@@ -94,6 +99,34 @@ export class Game {
       ...this.aiManager.traffic.map((t) => t.vehicle),
       ...this.wanted.police.map((p) => p.vehicle),
     ];
+  }
+
+  _loadCash() {
+    const stored = Number(localStorage.getItem(CASH_STORAGE_KEY));
+    return Number.isFinite(stored) && stored > 0 ? stored : 500; // small starting stake
+  }
+
+  addCash(amount) {
+    this.cash += amount;
+    localStorage.setItem(CASH_STORAGE_KEY, String(Math.round(this.cash)));
+  }
+
+  // Dying costs a "hospital bill" (a cut of your cash), clears heat, and
+  // drops you back at the plaza on foot — GTA-style consequence for a death
+  // that otherwise had none.
+  _onPlayerDeath() {
+    if (this.controlMode.mode !== MODE.FOOT) this._exitVehicle();
+    this.player.mesh.position.set(0, 0, 6);
+    this.player.respawn();
+    this.player.setVisible(true);
+
+    const fine = Math.min(this.cash, Math.round(this.cash * 0.1) + 50);
+    this.addCash(-fine);
+    this.wanted.stars = 0;
+    for (const p of this.wanted.police) p.dispose(this.scene);
+    this.wanted.police = [];
+
+    this.hud.showToast(`Hospitalized — lost $${fine}`, 'fail', 4000);
   }
 
   _onResize() {
@@ -276,14 +309,34 @@ export class Game {
     weather.update(dt, activePos);
     this._scanVehicleDestructions();
 
+    if (input.wasPressed('KeyM')) this.missions.acceptOffer();
+    const missionEvent = this.missions.update(dt, activePos, player.health > 0);
+    if (missionEvent) {
+      if (missionEvent.success) {
+        this.addCash(missionEvent.reward);
+        hud.showToast(`${missionEvent.title} complete! +$${missionEvent.reward}`, 'success');
+      } else {
+        hud.showToast(`${missionEvent.title} failed`, 'fail');
+      }
+    }
+
+    if (player.health <= 0 && !this._playerDead) {
+      this._playerDead = true;
+      this._onPlayerDeath();
+    } else if (player.health > 0) {
+      this._playerDead = false;
+    }
+
     this._updateSunFollow(activePos);
     particles.update(dt);
     audio.update(dt);
 
+    hud.setCash(this.cash);
+    hud.updateMissions(this.missions.status());
     hud.update({
       player, weaponSystem, wanted, world, ai: aiManager,
       controlMode: this.controlMode, speedKmh, heading, position: activePos,
-      weather,
+      weather, missions: this.missions,
     });
   }
 
@@ -296,6 +349,7 @@ export class Game {
       if (v.destroyed && !v._explodedFx) {
         v._explodedFx = true;
         this.explodeAt(v.mesh.position.clone(), EXPLOSION.radius, EXPLOSION.vehicleDamage);
+        this.missions.notifyVehicleDestroyed();
       }
     }
   }
@@ -327,7 +381,10 @@ export class Game {
     for (const enemy of this.aiManager.enemies) {
       if (!enemy.alive) continue;
       const d = enemy.mesh.position.distanceTo(position);
-      if (d < radius) enemy.takeDamage(EXPLOSION.actorDamage * (1 - d / radius));
+      if (d < radius) {
+        enemy.takeDamage(EXPLOSION.actorDamage * (1 - d / radius));
+        if (!enemy.alive) this.missions.notifyEnemyKilled();
+      }
     }
     for (const ped of [...this.aiManager.pedestrians]) {
       if (ped.mesh.position.distanceTo(position) < radius * 0.6) {
@@ -354,7 +411,10 @@ export class Game {
       const enemy = hit.object.userData.ref;
       enemy.takeDamage(damage);
       this.wanted.reportCrime(1);
-      if (!enemy.alive) this.particles.spawnExplosion(hit.point);
+      if (!enemy.alive) {
+        this.particles.spawnExplosion(hit.point);
+        this.missions.notifyEnemyKilled();
+      }
     } else if (kind === 'pedestrian') {
       const ped = hit.object.userData.ref;
       this.aiManager.pedestrians = this.aiManager.pedestrians.filter((p) => p !== ped);

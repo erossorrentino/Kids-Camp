@@ -28,9 +28,39 @@ html, body {
 
 #minimap { position: absolute; left: 18px; top: 18px; border-radius: 8px; border: 2px solid rgba(255,255,255,0.35); background: #1a1e24; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
 
+#cashDisplay { position: absolute; left: 18px; top: 208px; font-size: 18px; font-weight: 700; color: #7CFC00; background: rgba(0,0,0,0.4); padding: 5px 12px; border-radius: 6px; letter-spacing: 0.5px; }
+
 #speedo { position: absolute; right: 18px; top: 18px; font-size: 22px; font-weight: 700; background: rgba(0,0,0,0.4); padding: 6px 14px; border-radius: 6px; min-width: 90px; text-align: center; }
 
 #stateIndicator { position: absolute; left: 50%; top: 18px; transform: translateX(-50%); font-size: 12px; letter-spacing: 2px; background: rgba(0,0,0,0.4); padding: 4px 12px; border-radius: 12px; }
+
+#missionPanel {
+  position: absolute; left: 50%; top: 54px; transform: translateX(-50%); width: 260px; text-align: center;
+  background: rgba(10,12,16,0.6); border: 1px solid rgba(255,210,63,0.4); border-radius: 8px; padding: 8px 14px;
+  opacity: 0; transition: opacity 0.25s;
+}
+#missionPanel.show { opacity: 1; }
+#missionTitle { font-size: 13px; font-weight: 700; letter-spacing: 1px; color: #ffd23f; }
+#missionDetail { font-size: 12px; color: #dfe6ee; margin-top: 2px; }
+#missionTimerBar { height: 5px; background: rgba(255,255,255,0.15); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+#missionTimerFill { height: 100%; width: 100%; background: #ffd23f; transition: width 0.2s linear; }
+
+#missionOffer {
+  position: absolute; left: 50%; bottom: 130px; transform: translateX(-50%); text-align: center;
+  background: rgba(0,0,0,0.6); border: 1px solid rgba(255,210,63,0.5); border-radius: 6px; padding: 8px 16px;
+  font-size: 13px; opacity: 0; transition: opacity 0.2s;
+}
+#missionOffer.show { opacity: 1; }
+#missionOffer b { color: #ffd23f; }
+
+#toast {
+  position: absolute; left: 50%; top: 120px; transform: translateX(-50%); font-size: 16px; font-weight: 700;
+  padding: 10px 22px; border-radius: 8px; background: rgba(0,0,0,0.7); opacity: 0; transition: opacity 0.3s;
+  text-align: center; white-space: nowrap;
+}
+#toast.show { opacity: 1; }
+#toast.success { color: #7CFC00; }
+#toast.fail { color: #ff5533; }
 
 #crosshair { position: absolute; left: 50%; top: 50%; width: 28px; height: 28px; transform: translate(-50%,-50%); opacity: 0; transition: opacity 0.15s; }
 #crosshair.show { opacity: 1; }
