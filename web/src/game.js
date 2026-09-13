@@ -101,14 +101,24 @@ export class Game {
     ];
   }
 
+  // localStorage can throw (privacy mode, a sandboxed embed) or just not
+  // persist — either way the game must still run, just without save/load.
   _loadCash() {
-    const stored = Number(localStorage.getItem(CASH_STORAGE_KEY));
-    return Number.isFinite(stored) && stored > 0 ? stored : 500; // small starting stake
+    try {
+      const stored = Number(localStorage.getItem(CASH_STORAGE_KEY));
+      return Number.isFinite(stored) && stored > 0 ? stored : 500; // small starting stake
+    } catch {
+      return 500;
+    }
   }
 
   addCash(amount) {
     this.cash += amount;
-    localStorage.setItem(CASH_STORAGE_KEY, String(Math.round(this.cash)));
+    try {
+      localStorage.setItem(CASH_STORAGE_KEY, String(Math.round(this.cash)));
+    } catch {
+      // no persistence available in this context; the session still works
+    }
   }
 
   // Dying costs a "hospital bill" (a cut of your cash), clears heat, and
