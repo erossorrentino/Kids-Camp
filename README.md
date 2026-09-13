@@ -56,8 +56,8 @@ to build the rest of the scene around.
 
 | Catalog  | Count | Source |
 |----------|-------|--------|
-| Vehicles | 1,050 | `Assets/StreamingAssets/Data/vehicles.json` |
-| Weapons  | 820   | `Assets/StreamingAssets/Data/weapons.json` |
+| Vehicles | 1,200 | `Assets/StreamingAssets/Data/vehicles.json` |
+| Weapons  | 900   | `Assets/StreamingAssets/Data/weapons.json` |
 | Heists   | 2,010 | `Assets/StreamingAssets/Data/heists.json` |
 
 Regenerate or resize any of these with `python3 tools/generate_data.py`
@@ -70,6 +70,31 @@ is a few hundred dollars, black-market heavy ordnance runs into the
 hundreds of thousands). All vehicle/weapon/gang names are invented, the
 same way GTA uses "Pegassi" instead of Ferrari -- no real brand or
 trademarked names are used anywhere in the catalogs.
+
+### Fun / exotic tier
+
+On top of the realistic catalog, there's a pricier novelty tier of both
+vehicles and weapons:
+
+- **245 exotic vehicles**: `FlyingCar` ($2.5M-$9M, actually flies),
+  `StealthSuperCar` (radar-invisible supercar, up to $9.5M),
+  `RocketDragster` (nitro-boosted one-seaters up to 600 km/h),
+  `AmphibiousHyperCar` (drives on water), `HoverBike`, `MonsterTruck`
+  (crushes obstacles), and `ArmoredLimo`. All purchasable at dealerships
+  like anything else, just at halo prices. See `FUN_VEHICLE_CATEGORIES`
+  and their `specialTags` in the generator/`VehicleDefinition`.
+- **346 laser/energy weapons**: `LaserPistol`, `LaserRifle`, `PulseSMG`,
+  `PlasmaShotgun`, `PlasmaCannon`, `RailGun`, `IonBlaster`,
+  `FreezeRayGun`, `ChainLightningStaff` -- all black-market only, priced
+  well above their ballistic equivalents, and three of them are
+  mechanically distinct rather than just reskinned damage numbers (see
+  `PlayerCombat.cs`): the **chain lightning staff** arcs to up to 2
+  nearby targets on hit, the **freeze ray** disables a pedestrian
+  non-lethally instead of taking them down (and doesn't add wanted
+  heat), and the **ion blaster**'s EMP disables law enforcement without
+  counting as an armed assault. `WeaponDefinition.energyWeapon` and
+  `.specialEffect` are exposed as data so VFX/animation work (laser
+  beam visuals, muzzle glow, etc.) can hook in once real art exists.
 
 ## Wanted system (1-10 stars)
 

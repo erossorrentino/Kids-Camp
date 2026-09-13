@@ -20,6 +20,7 @@ namespace CrimeCity.NPC
         [SerializeField] private float witnessRadius = 15f;
 
         public bool IsDown { get; private set; }
+        public bool IsFrozen { get; private set; }
         public int CarriedCash { get; private set; }
 
         private NavMeshAgent _agent;
@@ -33,7 +34,7 @@ namespace CrimeCity.NPC
 
         private void Update()
         {
-            if (IsDown) return;
+            if (IsDown || IsFrozen) return;
 
             _wanderTimer -= Time.deltaTime;
             if (_wanderTimer <= 0f)
@@ -64,6 +65,22 @@ namespace CrimeCity.NPC
             {
                 WantedSystem.Instance?.ReportWitnessedKill();
             }
+        }
+
+        /// <summary>Non-lethal: used by FreezeRayGun-style weapons. Doesn't count as a witnessed kill or feed the wanted system.</summary>
+        public void Freeze(float seconds)
+        {
+            if (IsDown) return;
+            IsFrozen = true;
+            _agent.isStopped = true;
+            CancelInvoke(nameof(Unfreeze));
+            Invoke(nameof(Unfreeze), seconds);
+        }
+
+        private void Unfreeze()
+        {
+            IsFrozen = false;
+            if (!IsDown) _agent.isStopped = false;
         }
 
         public bool TryRob(out int amountStolen)

@@ -39,6 +39,10 @@ namespace CrimeCity.Data
         public int magazineSize;
         public bool requiresBlackMarket;
         public bool legalToCarryOpenly;
+        /// <summary>True for laser/plasma/rail/ion-style sci-fi weapons (see WEAPON_SPECIAL_EFFECT in generate_data.py).</summary>
+        public bool energyWeapon;
+        /// <summary>Flavor/gameplay hook, e.g. "piercing_beam", "freeze", "chain_lightning", "emp_disable". Empty for ordinary firearms.</summary>
+        public string specialEffect;
     }
 
     [Serializable]
