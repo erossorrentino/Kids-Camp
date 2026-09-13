@@ -1,0 +1,60 @@
+* { box-sizing: border-box; }
+html, body {
+  margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+  background: #0a0c10; font-family: 'Segoe UI', Arial, sans-serif; color: #eee;
+}
+#viewport { position: fixed; inset: 0; display: block; outline: none; }
+
+#hud { position: fixed; inset: 0; pointer-events: none; user-select: none; }
+
+#bars { position: absolute; left: 18px; bottom: 18px; width: 220px; }
+.bar-row { display: flex; align-items: center; margin-bottom: 6px; }
+.bar-label { width: 24px; font-weight: 700; font-size: 12px; text-shadow: 0 1px 2px #000; }
+.bar-track { flex: 1; height: 14px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.25); border-radius: 3px; overflow: hidden; }
+.bar-fill { height: 100%; width: 100%; transition: width 0.15s linear; }
+.bar-fill.health { background: linear-gradient(90deg,#7CFC00,#2ecc40); }
+.bar-fill.armor { background: linear-gradient(90deg,#4aa3ff,#1f6fd6); }
+
+#stars { position: absolute; left: 18px; bottom: 78px; display: flex; gap: 3px; }
+#stars .star { width: 18px; height: 18px; opacity: 0.25; filter: drop-shadow(0 1px 1px #000); }
+#stars .star.on { opacity: 1; }
+#stars .star svg { width: 100%; height: 100%; }
+
+#weaponPanel { position: absolute; right: 18px; bottom: 18px; display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.45); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); }
+#weaponIcon { width: 34px; height: 18px; border-radius: 3px; background: #999; box-shadow: inset 0 0 4px rgba(0,0,0,0.6); }
+#weaponInfo { text-align: right; }
+#weaponName { font-weight: 700; font-size: 13px; letter-spacing: 0.5px; }
+#ammoCount { font-size: 15px; font-variant-numeric: tabular-nums; }
+
+#minimap { position: absolute; left: 18px; top: 18px; border-radius: 8px; border: 2px solid rgba(255,255,255,0.35); background: #1a1e24; box-shadow: 0 2px 10px rgba(0,0,0,0.5); }
+
+#speedo { position: absolute; right: 18px; top: 18px; font-size: 22px; font-weight: 700; background: rgba(0,0,0,0.4); padding: 6px 14px; border-radius: 6px; min-width: 90px; text-align: center; }
+
+#stateIndicator { position: absolute; left: 50%; top: 18px; transform: translateX(-50%); font-size: 12px; letter-spacing: 2px; background: rgba(0,0,0,0.4); padding: 4px 12px; border-radius: 12px; }
+
+#crosshair { position: absolute; left: 50%; top: 50%; width: 28px; height: 28px; transform: translate(-50%,-50%); opacity: 0; transition: opacity 0.15s; }
+#crosshair.show { opacity: 1; }
+#crosshair .ch { position: absolute; background: #eafff0; box-shadow: 0 0 2px #000; }
+#crosshair .ch-t, #crosshair .ch-b { width: 2px; height: 8px; left: 13px; }
+#crosshair .ch-l, #crosshair .ch-r { width: 8px; height: 2px; top: 13px; }
+#crosshair .ch-t { top: 0; }
+#crosshair .ch-b { bottom: 0; }
+#crosshair .ch-l { left: 0; }
+#crosshair .ch-r { right: 0; }
+
+#prompt { position: absolute; left: 50%; bottom: 90px; transform: translateX(-50%); background: rgba(0,0,0,0.55); padding: 8px 16px; border-radius: 6px; font-size: 14px; opacity: 0; transition: opacity 0.2s; }
+#prompt.show { opacity: 1; }
+
+#radioTag { position: absolute; right: 18px; bottom: 70px; font-size: 12px; background: rgba(0,0,0,0.4); padding: 4px 10px; border-radius: 4px; opacity: 0; transition: opacity 0.3s; }
+#radioTag.show { opacity: 1; }
+
+#startOverlay {
+  position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at center, #1b2230 0%, #05070a 100%); text-align: center; z-index: 10;
+}
+#startOverlay h1 { font-size: 48px; letter-spacing: 6px; margin: 0 0 4px; color: #ffd23f; text-shadow: 0 2px 12px rgba(255,180,0,0.4); }
+#startOverlay p { margin: 0 0 20px; color: #9aa4b2; }
+#startOverlay ul { list-style: none; padding: 0; margin: 0 0 26px; color: #cfd6e0; font-size: 14px; line-height: 1.9; }
+#startOverlay button { font-size: 18px; padding: 12px 32px; border-radius: 6px; border: none; background: #ffd23f; color: #201a00; font-weight: 700; cursor: pointer; letter-spacing: 1px; }
+#startOverlay button:hover { background: #ffdd66; }
+#startOverlay.hidden { display: none; }
