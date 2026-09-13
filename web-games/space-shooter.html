@@ -14,9 +14,10 @@
     background: #000107;
     font-family: 'Rajdhani', sans-serif;
     -webkit-user-select: none; user-select: none; touch-action: none;
+    -webkit-touch-callout: none; overscroll-behavior: none;
   }
   .font-hud { font-family: 'Orbitron', sans-serif; }
-  #game-canvas { display: block; position: fixed; top: 0; left: 0; width: 100%; height: 100%; }
+  #game-canvas { display: block; position: fixed; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; }
 
   .hud-panel {
     background: linear-gradient(135deg, rgba(4,12,28,0.55), rgba(4,12,28,0.25));
@@ -96,10 +97,12 @@
     position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 20;
   }
   #hud { z-index: 10; pointer-events: none; }
+  #hud .pointer-events-auto { pointer-events: auto; }
   #vignette { z-index: 30; }
   #menu-screen, #pause-screen, #gameover-screen {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
   }
+  button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 </style>
 </head>
 <body class="bg-black text-slate-100">
@@ -151,9 +154,14 @@
   <div class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-6 h-6 border border-cyan-400/40 rounded-full"></div>
 
   <!-- pause hint -->
-  <div class="absolute bottom-3 left-3 sm:bottom-5 sm:left-5 hud-panel rounded-md px-3 py-1.5 font-hud text-[9px] sm:text-[10px] text-slate-300 tracking-widest">
+  <div class="absolute bottom-3 left-3 sm:bottom-5 sm:left-5 hud-panel rounded-md px-3 py-1.5 font-hud text-[9px] sm:text-[10px] text-slate-300 tracking-widest hidden sm:block">
     [ESC / P] PAUSE &nbsp;•&nbsp; MOUSE/TOUCH MOVE &nbsp;•&nbsp; CLICK/SPACE FIRE
   </div>
+
+  <!-- touch pause button (also usable with mouse) -->
+  <button id="pause-btn" class="pointer-events-auto absolute bottom-3 right-3 sm:bottom-5 sm:right-5 hud-panel rounded-md w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center text-cyan-200 active:scale-95" style="touch-action:manipulation;">
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+  </button>
 </div>
 
 <!-- ============ MAIN MENU ============ -->
@@ -166,9 +174,10 @@
 
     <div class="text-left w-full text-sm text-slate-300 space-y-1.5 border-t border-white/10 pt-4">
       <p class="font-hud text-xs text-purple-300 tracking-widest mb-2">MISSION BRIEFING</p>
-      <p>🖱 / 👆 &nbsp;Move ship — glide toward cursor / finger</p>
+      <p>🖱 / 👆 &nbsp;Move ship — glide toward cursor / finger (ship hovers above your finger)</p>
       <p>⌨ &nbsp;WASD or Arrow Keys — fallback controls</p>
-      <p>🖱 Click / Touch / Space — fire plasma cannons</p>
+      <p>🖱 Click / Touch / Space — fire plasma cannons (auto-fires while held)</p>
+      <p>⏸ &nbsp;Tap the pause icon (bottom-right) or press ESC / P</p>
       <p>💠 Collect wireframe pods: <span class="text-sky-400">Shield</span>, <span class="text-emerald-400">Triple Shot</span>, <span class="text-yellow-400">Hyper-Drive</span></p>
       <p>☄️ Survive the asteroid storm. Destroy hostiles. Beat your high score.</p>
     </div>
@@ -1271,28 +1280,52 @@ let pointerActive = false;
 let firing = false;
 const keys = {};
 
-function screenToTarget(clientX, clientY) {
+const TOUCH_FINGER_OFFSET_PX = 110; // keeps the ship visible above the fingertip instead of hidden under it
+function screenToTarget(clientX, clientY, yOffsetPx) {
   const nx = (clientX / window.innerWidth) * 2 - 1;
-  const ny = (clientY / window.innerHeight) * 2 - 1;
+  const ny = ((clientY - (yOffsetPx || 0)) / window.innerHeight) * 2 - 1;
   player.target.x = THREE.MathUtils.clamp(nx * boundHalfW, -boundHalfW, boundHalfW);
   player.target.y = THREE.MathUtils.clamp(-ny * boundHalfH * 0.65 - 1.0, -boundHalfH, boundHalfH*0.5);
 }
+let activeTouchId = null;
+
 window.addEventListener('mousemove', (e) => {
+  if (gameState !== 'playing') return;
   pointerActive = true;
-  screenToTarget(e.clientX, e.clientY);
+  screenToTarget(e.clientX, e.clientY, 0);
 });
-window.addEventListener('mousedown', (e) => { if (e.button === 0) firing = true; });
+window.addEventListener('mousedown', (e) => { if (e.button === 0 && gameState === 'playing') firing = true; });
 window.addEventListener('mouseup', (e) => { if (e.button === 0) firing = false; });
-window.addEventListener('touchstart', (e) => {
+
+canvas.addEventListener('touchstart', (e) => {
+  if (gameState !== 'playing') return;
+  e.preventDefault();
+  const t = e.changedTouches[0];
+  activeTouchId = t.identifier;
   pointerActive = true; firing = true;
-  const t = e.touches[0];
-  screenToTarget(t.clientX, t.clientY);
-}, { passive: true });
-window.addEventListener('touchmove', (e) => {
-  const t = e.touches[0];
-  screenToTarget(t.clientX, t.clientY);
-}, { passive: true });
-window.addEventListener('touchend', () => { firing = false; }, { passive: true });
+  screenToTarget(t.clientX, t.clientY, TOUCH_FINGER_OFFSET_PX);
+}, { passive: false });
+canvas.addEventListener('touchmove', (e) => {
+  if (gameState !== 'playing') return;
+  e.preventDefault();
+  for (const t of e.changedTouches) {
+    if (t.identifier === activeTouchId) {
+      screenToTarget(t.clientX, t.clientY, TOUCH_FINGER_OFFSET_PX);
+      break;
+    }
+  }
+}, { passive: false });
+function handleTouchEnd(e) {
+  for (const t of e.changedTouches) {
+    if (t.identifier === activeTouchId) {
+      activeTouchId = null;
+      firing = false;
+      break;
+    }
+  }
+}
+canvas.addEventListener('touchend', handleTouchEnd, { passive: true });
+canvas.addEventListener('touchcancel', handleTouchEnd, { passive: true });
 
 window.addEventListener('keydown', (e) => {
   keys[e.code] = true;
@@ -1533,6 +1566,7 @@ el('resume-btn').addEventListener('click', togglePause);
 el('restart-from-pause-btn').addEventListener('click', startGame);
 el('retry-btn').addEventListener('click', startGame);
 el('menu-btn-2').addEventListener('click', backToMenu);
+el('pause-btn').addEventListener('click', () => { if (gameState === 'playing' || gameState === 'paused') togglePause(); });
 el('menu-highscore').textContent = getHighScore();
 
 /* =========================================================================================
