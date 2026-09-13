@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CAMERA, WORLD_SEED, VEHICLE, HELI, JET } from './config.js';
+import { CAMERA, WORLD_SEED, VEHICLE, BIKE, HELI, JET, EXPLOSION } from './config.js';
 import { Input } from './input.js';
 import { CityWorld } from './world/city.js';
 import { Player, PlayerState } from './entities/player.js';
@@ -10,10 +10,12 @@ import { AIManager } from './entities/ai/manager.js';
 import { WantedSystem } from './systems/wanted.js';
 import { AudioManager } from './systems/audio.js';
 import { ParticleSystem } from './systems/particles.js';
+import { WeatherSystem } from './systems/weather.js';
 import { HUD } from './systems/hud.js';
 import { CameraRig } from './systems/camera.js';
 
-const MODE = { FOOT: 'FOOT', CAR: 'CAR', HELI: 'HELI', JET: 'JET' };
+const MODE = { FOOT: 'FOOT', CAR: 'CAR', BIKE: 'BIKE', HELI: 'HELI', JET: 'JET' };
+const DRIVING_MODES = new Set([MODE.CAR, MODE.BIKE]);
 
 export class Game {
   constructor(canvas) {
@@ -30,6 +32,7 @@ export class Game {
     this.wanted = new WantedSystem(this.scene);
     this.audio = new AudioManager(this.camera, this.scene);
     this.particles = new ParticleSystem(this.scene);
+    this.weather = new WeatherSystem(this.scene, this.sun, this.audio);
     this.hud = new HUD();
 
     this._spawnVehicles();
@@ -77,8 +80,20 @@ export class Game {
 
   _spawnVehicles() {
     this.starterCar = new Vehicle(this.scene, { position: new THREE.Vector3(14, 0, 20), color: 0xd23a3a, isPlayerStarter: true });
+    this.bike = new Vehicle(this.scene, { position: new THREE.Vector3(20, 0, 8), color: 0x161616, stats: BIKE, isBike: true, isPlayerStarter: true });
     this.heli = new Helicopter(this.scene, new THREE.Vector3(-18, 0.4, 30));
     this.jet = new Jet(this.scene, new THREE.Vector3(30, 1, -10));
+  }
+
+  // Every drivable ground vehicle the world knows about — used for explosion
+  // splash damage and destruction bookkeeping. Aircraft aren't included; they
+  // aren't destructible in this prototype.
+  _allVehicles() {
+    return [
+      this.starterCar, this.bike,
+      ...this.aiManager.traffic.map((t) => t.vehicle),
+      ...this.wanted.police.map((p) => p.vehicle),
+    ];
   }
 
   _onResize() {
@@ -103,6 +118,7 @@ export class Game {
     const p = this.player.mesh.position;
     const candidates = [
       { obj: this.starterCar, type: MODE.CAR, range: VEHICLE.enterRange },
+      { obj: this.bike, type: MODE.BIKE, range: BIKE.enterRange },
       { obj: this.heli, type: MODE.HELI, range: HELI.enterRange },
       { obj: this.jet, type: MODE.JET, range: JET.enterRange },
     ];
@@ -111,7 +127,7 @@ export class Game {
     }
     let best = null, bestDist = Infinity;
     for (const c of candidates) {
-      if (c.obj.occupied) continue;
+      if (c.obj.occupied || c.obj.destroyed) continue;
       const d = p.distanceTo(c.obj.mesh.position);
       if (d < c.range && d < bestDist) { best = c; bestDist = d; }
     }
@@ -121,7 +137,7 @@ export class Game {
   _enterVehicle(candidate) {
     const { obj, type, trafficRef } = candidate;
     if (trafficRef) this.aiManager.traffic = this.aiManager.traffic.filter((t) => t !== trafficRef);
-    if (type === MODE.CAR && !obj.isPlayerStarter && !obj.reportedTheft) {
+    if (DRIVING_MODES.has(type) && !obj.isPlayerStarter && !obj.reportedTheft) {
       obj.reportedTheft = true;
       this.wanted.reportCrime(1);
     }
@@ -130,7 +146,7 @@ export class Game {
     this.player.setVisible(false);
 
     this.engineHandle = this.audio.attachLoop(obj.mesh, 'engine', { volume: 0.5, refDistance: 16 });
-    if (type === MODE.CAR) this.tireHandle = this.audio.attachLoop(obj.mesh, 'tireScreech', { volume: 0.6, refDistance: 8 });
+    if (DRIVING_MODES.has(type)) this.tireHandle = this.audio.attachLoop(obj.mesh, 'tireScreech', { volume: 0.6, refDistance: 8 });
   }
 
   _exitVehicle() {
@@ -151,7 +167,7 @@ export class Game {
 
   // --- main update ---------------------------------------------------------
   _update(dt) {
-    const { input, cameraRig, world, player, weaponSystem, aiManager, wanted, audio, particles, hud } = this;
+    const { input, cameraRig, world, player, weaponSystem, aiManager, wanted, audio, particles, weather, hud } = this;
 
     if (this.input.wasPressed('KeyE')) {
       if (this.controlMode.mode === MODE.FOOT) {
@@ -165,6 +181,7 @@ export class Game {
     let activePos = player.mesh.position;
     let speedKmh = 0;
     let heading = player.heading;
+    const traction = weather.traction;
 
     if (this.controlMode.mode === MODE.FOOT) {
       const aiming = input.isMouseDown(2);
@@ -175,23 +192,32 @@ export class Game {
 
       const targets = [
         ...world.getBuildingMeshes(),
+        ...world.getPropMeshes(),
         ...aiManager.enemyMeshes,
         ...aiManager.pedestrians.map((p) => p.mesh),
         ...aiManager.traffic.map((t) => t.vehicle.mesh),
       ];
-      weaponSystem.update(dt, input, this.camera, targets, (hit, dmg) => this._onWeaponHit(hit, dmg), audio);
+      weaponSystem.update(
+        dt, input, this.camera, targets,
+        (hit, dmg) => this._onWeaponHit(hit, dmg), audio,
+        (pos, radius, dmg) => this.explodeAt(pos, radius, dmg)
+      );
+      if (weaponSystem.firedThisFrame) aiManager.notifyGunfire(player.mesh.position, 24);
 
       const candidate = this._findInteractable();
       hud.setPrompt(candidate ? 'Press E to enter vehicle' : null);
       activePos = player.mesh.position;
       heading = player.heading;
-    } else if (this.controlMode.mode === MODE.CAR) {
+    } else if (DRIVING_MODES.has(this.controlMode.mode)) {
       const vehicle = this.controlMode.vehicle;
-      const { collided } = vehicle.update(dt, input, world);
+      const { collided } = vehicle.update(dt, input, world, undefined, traction);
       if (collided) particles.spawnSmoke(vehicle.mesh.position, { color: 0x777777, size: 0.5, life: 0.5, spread: 1.5, rise: 0.5 });
-      cameraRig.updateChase(vehicle, dt, { dist: 8, height: 3.2 });
+      this._smashNearbyProps(vehicle);
+      const chaseDist = vehicle.isBike ? 5.5 : 8;
+      const chaseHeight = vehicle.isBike ? 2.4 : 3.2;
+      cameraRig.updateChase(vehicle, dt, { dist: chaseDist, height: chaseHeight });
 
-      const speedFrac = Math.abs(vehicle.speed) / VEHICLE.maxSpeed;
+      const speedFrac = Math.abs(vehicle.speed) / vehicle.stats.maxSpeed;
       audio.setLoopIntensity(this.engineHandle, 0.15 + 0.85 * speedFrac, 0.7 + 0.6 * speedFrac);
       audio.setLoopIntensity(this.tireHandle, vehicle.isDrifting ? vehicle.driftIntensity : 0);
 
@@ -212,10 +238,14 @@ export class Game {
         const label = audio.toggleRadio();
         hud.setRadioTag(label === 'OFF' ? null : label);
       }
+      if (input.wasPressed('KeyC')) vehicle.cycleColor();
+      if (input.wasPressed('KeyN')) vehicle.toggleNeon();
+
       speedKmh = Math.abs(vehicle.speed) * 3.6;
       activePos = vehicle.mesh.position;
       heading = vehicle.heading;
-      hud.setPrompt('Press E to exit');
+      hud.setPrompt(vehicle.destroyed ? 'Vehicle destroyed — press E to get out' : 'Press E to exit');
+      if (vehicle.destroyed) this._exitVehicle();
     } else if (this.controlMode.mode === MODE.HELI) {
       const heli = this.controlMode.vehicle;
       heli.update(dt, input);
@@ -241,8 +271,10 @@ export class Game {
 
     world.update(activePos.x, activePos.z);
     aiManager.syncWithWorld(world);
-    aiManager.update(dt, world, player.mesh.position, (enemy, dmg) => this._onEnemyFire(enemy, dmg));
-    wanted.update(dt, world, player, activePos, this.controlMode);
+    aiManager.update(dt, world, player.mesh.position, (enemy, dmg) => this._onEnemyFire(enemy, dmg), traction);
+    wanted.update(dt, world, player, activePos, this.controlMode, traction);
+    weather.update(dt, activePos);
+    this._scanVehicleDestructions();
 
     this._updateSunFollow(activePos);
     particles.update(dt);
@@ -251,7 +283,64 @@ export class Game {
     hud.update({
       player, weaponSystem, wanted, world, ai: aiManager,
       controlMode: this.controlMode, speedKmh, heading, position: activePos,
+      weather,
     });
+  }
+
+  // A vehicle's health can hit zero from ramming, gunfire, or splash damage
+  // from another explosion — wherever it happens, catch the transition here
+  // so every source of destruction gets the same one-time blast + FX, and a
+  // vehicle killed by a blast can itself chain into the next explosion.
+  _scanVehicleDestructions() {
+    for (const v of this._allVehicles()) {
+      if (v.destroyed && !v._explodedFx) {
+        v._explodedFx = true;
+        this.explodeAt(v.mesh.position.clone(), EXPLOSION.radius, EXPLOSION.vehicleDamage);
+      }
+    }
+  }
+
+  // Driving into a barrier/crate at any real speed smashes it in one hit —
+  // arcade-style destructible set-dressing rather than a rigid collider.
+  _smashNearbyProps(vehicle) {
+    if (Math.abs(vehicle.speed) < 3) return;
+    for (const prop of this.world.getPropsNear(vehicle.mesh.position.x, vehicle.mesh.position.z, vehicle.halfLength + 1.2)) {
+      if (prop.takeDamage(999)) {
+        this.particles.spawnSmoke(prop.mesh.position, { color: 0x9a8a6a, size: 0.5, life: 0.6, spread: 1.4, rise: 0.3 });
+        vehicle.speed *= 0.92;
+      }
+    }
+  }
+
+  // Splash damage + FX at a point: used for rocket impacts and any vehicle
+  // that just died (ramming, gunfire, or a earlier chained blast).
+  explodeAt(position, radius = EXPLOSION.radius, vehicleDamage = EXPLOSION.vehicleDamage) {
+    this.particles.spawnExplosion(position);
+    this.audio.playExplosion(position);
+    this.aiManager.notifyGunfire(position, radius * 2.5);
+
+    for (const v of this._allVehicles()) {
+      if (v.destroyed) continue;
+      const d = v.mesh.position.distanceTo(position);
+      if (d < radius) v.takeDamage(vehicleDamage * (1 - d / radius));
+    }
+    for (const enemy of this.aiManager.enemies) {
+      if (!enemy.alive) continue;
+      const d = enemy.mesh.position.distanceTo(position);
+      if (d < radius) enemy.takeDamage(EXPLOSION.actorDamage * (1 - d / radius));
+    }
+    for (const ped of [...this.aiManager.pedestrians]) {
+      if (ped.mesh.position.distanceTo(position) < radius * 0.6) {
+        this.aiManager.pedestrians = this.aiManager.pedestrians.filter((p) => p !== ped);
+        ped.dispose(this.scene);
+      }
+    }
+    for (const prop of this.world.getPropsNear(position.x, position.z, radius)) prop.takeDamage(999);
+
+    const dPlayer = this.player.mesh.position.distanceTo(position);
+    if (this.controlMode.mode === MODE.FOOT && dPlayer < radius) {
+      this.player.takeDamage(EXPLOSION.actorDamage * 0.6 * (1 - dPlayer / radius));
+    }
   }
 
   _updateSunFollow(pos) {
@@ -271,6 +360,15 @@ export class Game {
       this.aiManager.pedestrians = this.aiManager.pedestrians.filter((p) => p !== ped);
       ped.dispose(this.scene);
       this.wanted.reportCrime(1);
+    } else if (kind === 'vehicle') {
+      const vehicle = hit.object.userData.ref;
+      vehicle.takeDamage(damage);
+      this.wanted.reportCrime(1);
+    } else if (kind === 'prop') {
+      const prop = hit.object.userData.ref;
+      if (prop.takeDamage(damage)) {
+        this.particles.spawnSmoke(hit.point, { color: 0x9a8a6a, size: 0.5, life: 0.6, spread: 1.2, rise: 0.3 });
+      }
     }
     this.particles.spawnSmoke(hit.point, { color: 0x8a1010, size: 0.25, life: 0.35, spread: 0.4, rise: 0.2 });
   }
@@ -278,5 +376,6 @@ export class Game {
   _onEnemyFire(enemy, damage) {
     this.player.takeDamage(damage);
     this.particles.spawnMuzzleFlash(enemy.mesh.position.clone().add(new THREE.Vector3(0, 1.1, 0)), 0xffaa55);
+    this.aiManager.notifyGunfire(enemy.mesh.position, 20);
   }
 }

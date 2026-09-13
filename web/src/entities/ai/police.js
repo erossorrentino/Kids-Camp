@@ -11,7 +11,8 @@ export class PoliceAI {
     this.lightPhase = Math.random() * Math.PI * 2;
   }
 
-  update(dt, world, targetPos, targetVelocity, stars) {
+  update(dt, world, targetPos, targetVelocity, stars, traction = 1) {
+    if (this.vehicle.destroyed) return;
     const speedFrac = Math.min(1, (AI.policeSpeedBase + AI.policeSpeedPerStar * stars) / 42);
     let aimPoint = targetPos;
     if (stars >= 3 && targetVelocity) {
@@ -20,7 +21,7 @@ export class PoliceAI {
         z: targetPos.z + targetVelocity.z * 0.6,
       };
     }
-    this.vehicle.driveTowards(dt, world, aimPoint, speedFrac);
+    this.vehicle.driveTowards(dt, world, aimPoint, speedFrac, undefined, traction);
 
     this.lightPhase += dt * 8;
     const flash = Math.sin(this.lightPhase) > 0;

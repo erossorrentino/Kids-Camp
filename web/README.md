@@ -1,8 +1,11 @@
-# Crime City — Three.js Open World Prototype
+# Neon Horizon — Three.js Open World Prototype
 
 A single-page, dependency-free (besides a vendored Three.js) open-world
-prototype: procedural streaming city, on-foot + vehicle + helicopter + jet
-controllers, shooting, ambient AI, and a wanted/police pursuit system.
+prototype: procedural streaming city, on-foot + car + bike + helicopter + jet
+controllers, a 5-weapon arsenal (including a rocket launcher and railgun),
+ambient AI that reacts to gunfire, dynamic rain with slick-road physics,
+destructible props, chain-reaction vehicle explosions, and a wanted/police
+pursuit system.
 
 ## Running it
 
@@ -22,9 +25,11 @@ npm, not a CDN) so the game has no runtime network dependency.
 - **WASD** move / drive / fly, **Shift** sprint (heli: ascend), **Space**
   jump (heli: descend)
 - **Mouse** look (third person, orbit/aim), **RMB** aim down sights
-- **E** enter/exit vehicles, aircraft
-- **1/2/3** or mouse wheel: switch weapon, **LMB** fire, **R** reload
-- **T** toggle radio station (while driving)
+- **E** enter/exit a car, bike, helicopter, or jet
+- **1-5** or mouse wheel: switch weapon (pistol/rifle/shotgun/rocket
+  launcher/railgun), **LMB** fire, **R** reload
+- **T** toggle radio station, **C** cycle paint color, **N** cycle neon
+  underglow (all while driving)
 - Helicopter: **Q/E** yaw. Jet: **A/D** roll (banks turn the plane),
   **Arrow keys** or **Q/E** pitch/yaw, **W/S** throttle
 
@@ -36,19 +41,44 @@ src/
   input.js              keyboard/mouse/pointer-lock state
   game.js                orchestrator: control-mode state machine, wiring
   main.js                boot entry point
-  world/city.js          chunked procedural city streaming (instanced buildings, roads)
+  world/city.js          chunked procedural city streaming (instanced buildings, roads, destructible props)
   world/collision.js     shared AABB collision helpers
   entities/player.js      capsule controller, gravity/jump, anim state machine
-  entities/vehicle.js     arcade car physics (drift, collisions), shared by traffic/police AI
+  entities/vehicle.js     arcade car+bike physics (drift, wet-road traction, health/destruction), shared by traffic/police AI
   entities/aircraft.js    helicopter + jet flight models
-  entities/weapons.js     inventory, raycast shooting, impact pooling
-  entities/ai/            pedestrians, traffic, hostile NPCs, police pursuit
+  entities/weapons.js     inventory, hitscan/pierce/projectile weapons, impact pooling
+  entities/ai/            pedestrians (flee gunfire), traffic, hostile NPCs, police pursuit
   systems/wanted.js       1-5 star wanted meter + police spawner
+  systems/weather.js      clear/rain cycle: fog, lighting, rain particles, wet-road traction
   systems/camera.js       third-person orbit/aim + vehicle chase camera rig
   systems/hud.js          DOM/canvas HUD + minimap
-  systems/audio.js        synthesized (no audio files) spatial SFX + radio
+  systems/audio.js        synthesized (no audio files) spatial SFX + 4 labeled radio stations
   systems/particles.js    pooled sprite particles (smoke, muzzle flash, explosions)
 ```
+
+## Systems added on top of the original prototype
+
+- **Weather**: cycles clear/rain on a timer, lerping sky color, fog, and sun
+  intensity; rain lowers vehicle traction (`WeatherSystem.traction`), making
+  turns/braking looser and drifts trigger more easily — see `systems/weather.js`.
+- **Rocket launcher & railgun**: the rocket fires a real simulated projectile
+  that flies until it hits something (or times out) and then does splash
+  damage; the railgun pierces through the first target into a second one
+  behind it. See `WeaponSystem._spawnProjectile` / `_updateProjectiles`.
+- **Destructible props**: roadside barrier/crate meshes generated per city
+  chunk (`world/city.js`'s `Prop` class) that vehicles smash through at
+  speed and weapons can destroy.
+- **Chain-reaction explosions**: any vehicle's health can hit zero from
+  ramming, gunfire, or another explosion's splash damage; `Game._scanVehicleDestructions`
+  catches that transition once per vehicle and detonates it, which can
+  itself damage nearby vehicles into exploding on a later frame.
+- **Superbike**: a second drivable vehicle (`BIKE` stats in `config.js`) —
+  faster, more agile, less durable than the starter car.
+- **Vehicle customization**: cycle paint color and a neon underglow color
+  while driving any car/bike.
+- **Pedestrian flee behavior**: any gunshot or explosion within earshot
+  spooks nearby pedestrians into sprinting away from the source for a few
+  seconds (`AIManager.notifyGunfire`).
 
 ## Known limitations
 
@@ -56,4 +86,9 @@ This is a prototype, not a finished game: characters/vehicles are primitive
 geometry (no rigged models/animations — see the console-loggable state
 machine in `entities/player.js` as the hook point for one later), there's no
 persistence/save system, and balancing (weapon damage, wanted decay, AI
-difficulty) is a first pass tuned in `src/config.js`.
+difficulty) is a first pass tuned in `src/config.js`. It's also
+single-player and client-only: there's no multiplayer/crews/heists netcode,
+no economy/stock-market/smartphone UI, and no new terrain biomes (beaches,
+mountains, airfields) — all of those would need backend infrastructure or
+large new art/terrain systems beyond what a coding session can add to an
+existing client-side prototype.

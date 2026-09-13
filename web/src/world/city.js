@@ -1,10 +1,36 @@
 import * as THREE from 'three';
-import { CITY } from '../config.js';
+import { CITY, PROPS } from '../config.js';
 import { rngForChunk, pick, randRange } from '../utils/rng.js';
 
 const ROAD_COLOR = 0x2b2e33;
 const SIDEWALK_COLOR = 0xb9bec4;
 const LINE_COLOR = 0xdcc23a;
+
+// A destructible roadside prop (barrier/crate): one hit from a vehicle,
+// explosion, or heavy enough gunfire clears it out of the way.
+class Prop {
+  constructor(mesh, health) {
+    this.mesh = mesh;
+    this.maxHealth = health;
+    this.health = health;
+    this.destroyed = false;
+    mesh.userData.kind = 'prop';
+    mesh.userData.ref = this;
+  }
+
+  // Returns true the moment this call is what destroys it (so the caller
+  // can spawn a one-time debris/explosion effect).
+  takeDamage(amount) {
+    if (this.destroyed) return false;
+    this.health -= amount;
+    if (this.health <= 0) {
+      this.destroyed = true;
+      this.mesh.visible = false;
+      return true;
+    }
+    return false;
+  }
+}
 
 function makeRoadMaterials() {
   return {
@@ -24,6 +50,7 @@ class Chunk {
     this.colliders = [];
     this.sidewalkLoop = [];
     this.roadLanes = [];
+    this.props = [];
     this._build(world);
   }
 
@@ -78,6 +105,23 @@ class Chunk {
     ];
 
     if (isSpawnPlaza) return; // keep the starting block clear for vehicles
+
+    // --- destructible roadside props (barriers/crates), individual meshes
+    // since each needs its own health/destroyed state ---
+    for (let i = 0; i < PROPS.perChunk; i++) {
+      const alongXEdge = rng() < 0.5;
+      const px = alongXEdge ? ox + RW + randRange(rng, 2, B - 2) : ox + RW + 1;
+      const pz = alongXEdge ? oz + RW + 1 : oz + RW + randRange(rng, 2, B - 2);
+      const isBarrier = rng() < 0.5;
+      const geo = isBarrier ? new THREE.BoxGeometry(1.4, 0.9, 0.5) : new THREE.BoxGeometry(1, 1, 1);
+      const mat = new THREE.MeshStandardMaterial({ color: isBarrier ? 0xd97a1f : 0x8a6a45, roughness: 0.85 });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(px, isBarrier ? 0.45 : 0.5, pz);
+      mesh.rotation.y = rng() * Math.PI;
+      mesh.castShadow = true;
+      this.group.add(mesh);
+      this.props.push(new Prop(mesh, PROPS.health));
+    }
 
     // --- buildings, instanced per chunk ---
     const lotSize = B / lotsPerSide;
@@ -214,6 +258,25 @@ export class CityWorld {
   getBuildingMeshes() {
     const out = [];
     for (const chunk of this.chunks.values()) if (chunk.buildingMesh) out.push(chunk.buildingMesh);
+    return out;
+  }
+
+  getPropsNear(x, z, radius) {
+    const out = [];
+    for (const chunk of this.chunks.values()) {
+      for (const prop of chunk.props) {
+        if (prop.destroyed) continue;
+        if (prop.mesh.position.distanceTo({ x, y: prop.mesh.position.y, z }) < radius) out.push(prop);
+      }
+    }
+    return out;
+  }
+
+  getPropMeshes() {
+    const out = [];
+    for (const chunk of this.chunks.values()) {
+      for (const prop of chunk.props) if (!prop.destroyed) out.push(prop.mesh);
+    }
     return out;
   }
 

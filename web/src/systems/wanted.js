@@ -22,7 +22,14 @@ export class WantedSystem {
     this._decayAccum = 0;
   }
 
-  update(dt, world, player, activePos, controlMode) {
+  update(dt, world, player, activePos, controlMode, traction = 1) {
+    // destroyed cruisers stop counting as pursuers so a fresh one spawns in
+    const wrecked = this.police.filter((p) => p.vehicle.destroyed);
+    if (wrecked.length) {
+      this.police = this.police.filter((p) => !p.vehicle.destroyed);
+      for (const p of wrecked) setTimeout(() => p.dispose(this.scene), 4000); // leave the wreck visible briefly
+    }
+
     // decay: only once every pursuing unit is out of sight range
     const nearestDist = this.police.reduce((m, p) => Math.min(m, p.distanceTo(activePos)), Infinity);
     if (this.stars > 0 && nearestDist > SIGHT_RANGE) {
@@ -45,7 +52,7 @@ export class WantedSystem {
       : new THREE.Vector3();
 
     for (const p of this.police) {
-      p.update(dt, world, activePos, playerVel, this.stars);
+      p.update(dt, world, activePos, playerVel, this.stars, traction);
       if (isDriving && p.distanceTo(activePos) < RAM_RANGE) {
         controlMode.vehicle.speed *= 0.85; // ram impact bleeds player speed
         p.vehicle.speed *= 0.7;

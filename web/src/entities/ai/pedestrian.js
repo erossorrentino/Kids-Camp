@@ -2,15 +2,21 @@ import * as THREE from 'three';
 import { resolveCircleVsBoxes } from '../../world/collision.js';
 
 const SPEED = 1.4;
+const FLEE_SPEED = 4.2;
+const FLEE_DURATION = 3.5;
 const RADIUS = 0.35;
 
 // Wanders the sidewalk loop of its home chunk; turns around if it walks into
-// a building (collision resolver pushes it back, which we detect and react to).
+// a building (collision resolver pushes it back, which we detect and react
+// to). A nearby gunshot spooks it into sprinting straight away from the
+// threat for a few seconds before it resumes its normal route.
 export class Pedestrian {
   constructor(scene, loop, startIdx = 0) {
     this.loop = loop;
     this.targetIdx = startIdx;
     this.dir = 1;
+    this.fleeTimer = 0;
+    this.fleeHeading = 0;
 
     this.mesh = new THREE.Group();
     const body = new THREE.Mesh(
@@ -30,23 +36,41 @@ export class Pedestrian {
     this.alive = true;
   }
 
+  // Called by AIManager.notifyGunfire when a shot lands within earshot.
+  spookFrom(sourcePos) {
+    const dx = this.mesh.position.x - sourcePos.x;
+    const dz = this.mesh.position.z - sourcePos.z;
+    this.fleeHeading = Math.atan2(dx, dz);
+    this.fleeTimer = FLEE_DURATION;
+  }
+
   update(dt, world) {
-    const target = this.loop[this.targetIdx];
-    const dx = target.x - this.mesh.position.x;
-    const dz = target.z - this.mesh.position.z;
-    const dist = Math.hypot(dx, dz);
-    if (dist < 1.5) {
-      this.targetIdx = (this.targetIdx + this.dir + this.loop.length) % this.loop.length;
+    let heading, speed;
+    if (this.fleeTimer > 0) {
+      this.fleeTimer -= dt;
+      heading = this.fleeHeading;
+      speed = FLEE_SPEED;
+    } else {
+      const target = this.loop[this.targetIdx];
+      const dx = target.x - this.mesh.position.x;
+      const dz = target.z - this.mesh.position.z;
+      if (Math.hypot(dx, dz) < 1.5) {
+        this.targetIdx = (this.targetIdx + this.dir + this.loop.length) % this.loop.length;
+      }
+      heading = Math.atan2(dx, dz);
+      speed = SPEED;
     }
 
-    const heading = Math.atan2(dx, dz);
-    let nx = this.mesh.position.x + Math.sin(heading) * SPEED * dt;
-    let nz = this.mesh.position.z + Math.cos(heading) * SPEED * dt;
+    let nx = this.mesh.position.x + Math.sin(heading) * speed * dt;
+    let nz = this.mesh.position.z + Math.cos(heading) * speed * dt;
 
     const colliders = world.getCollidersNear(this.mesh.position.x, this.mesh.position.z, 10);
     const resolved = resolveCircleVsBoxes(nx, nz, RADIUS, colliders);
     const pushedBack = Math.hypot(resolved.x - nx, resolved.z - nz) > 0.05;
-    if (pushedBack) this.dir *= -1; // hit a building barrier — turn around
+    if (pushedBack) {
+      if (this.fleeTimer > 0) this.fleeHeading += Math.PI / 2; // deflect off the obstacle instead of freezing
+      else this.dir *= -1; // hit a building barrier — turn around
+    }
 
     this.mesh.position.x = resolved.x;
     this.mesh.position.z = resolved.z;

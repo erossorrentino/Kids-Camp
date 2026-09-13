@@ -19,9 +19,10 @@ export class AudioManager {
       tireScreech: this._loopNoise(0.4, 3200, true),
     };
     this.radioStations = [
-      this._chordLoop([220, 277, 330]),
-      this._chordLoop([196, 246, 294]),
-      this._chordLoop([164, 207, 246]),
+      { name: 'SYNTHWAVE FM', buffer: this._synthwaveLoop() },
+      { name: 'DOWNTOWN HIP-HOP', buffer: this._hiphopLoop() },
+      { name: 'ROCK 105', buffer: this._rockLoop() },
+      { name: 'TALK RADIO', buffer: this._talkRadioLoop() },
     ];
     this._loopSounds = [];
     this.radioIndex = -1;
@@ -68,17 +69,79 @@ export class AudioManager {
     return this._bufferFromSamples(samples, sr);
   }
 
-  _chordLoop(freqs) {
+  // Four station "genres", each a self-looping synthesized texture — there
+  // are no audio files anywhere in this game, everything is generated here.
+  _synthwaveLoop() {
     const sr = this.ctxSampleRate();
     const duration = 4;
     const n = Math.floor(duration * sr);
     const samples = new Float32Array(n);
+    const chord = [220, 277, 330, 440];
+    const stepLen = duration / 16;
     for (let i = 0; i < n; i++) {
       const t = i / sr;
-      let v = 0;
-      for (const f of freqs) v += Math.sin(2 * Math.PI * f * t) * 0.2;
-      v *= 0.6 + 0.4 * Math.sin(2 * Math.PI * 0.5 * t);
-      samples[i] = v;
+      const step = Math.floor(t / stepLen) % chord.length;
+      const f = chord[step];
+      let v = Math.sin(2 * Math.PI * f * t) * 0.5 + Math.sin(2 * Math.PI * f * 1.003 * t) * 0.3;
+      v += Math.sin(2 * Math.PI * (f / 2) * t) * 0.25; // sub bass
+      const gate = 0.5 + 0.5 * Math.sin(Math.PI * ((t % stepLen) / stepLen));
+      samples[i] = v * gate * 0.5;
+    }
+    return this._bufferFromSamples(samples, sr);
+  }
+
+  _hiphopLoop() {
+    const sr = this.ctxSampleRate();
+    const duration = 4;
+    const n = Math.floor(duration * sr);
+    const samples = new Float32Array(n);
+    const beatLen = duration / 8;
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      const beatT = t % beatLen;
+      const kick = Math.sin(2 * Math.PI * 55 * beatT) * Math.exp(-beatT * 18);
+      const hatPhase = t % (beatLen / 2);
+      const hat = (Math.random() * 2 - 1) * Math.exp(-hatPhase * 60) * 0.15;
+      samples[i] = kick * 0.8 + hat;
+    }
+    return this._bufferFromSamples(samples, sr);
+  }
+
+  _rockLoop() {
+    const sr = this.ctxSampleRate();
+    const duration = 4;
+    const n = Math.floor(duration * sr);
+    const samples = new Float32Array(n);
+    const root = 110, fifth = root * 1.5;
+    const noteLen = duration / 16;
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      const saw = (f) => 2 * ((f * t) % 1) - 1;
+      let v = (saw(root) + saw(root * 2) * 0.5 + saw(fifth)) * 0.35;
+      v += (Math.random() * 2 - 1) * 0.08; // grit
+      v = Math.tanh(v * 2.2); // soft-clip distortion
+      const gateT = t % noteLen;
+      const gate = gateT < noteLen * 0.85 ? 1 : 0.2;
+      samples[i] = v * gate * 0.4;
+    }
+    return this._bufferFromSamples(samples, sr);
+  }
+
+  _talkRadioLoop() {
+    const sr = this.ctxSampleRate();
+    const duration = 5;
+    const n = Math.floor(duration * sr);
+    const samples = new Float32Array(n);
+    let last = 0;
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      const cutoff = 500 + 300 * Math.sin(t * 3.1); // shifting formant-ish tone
+      const rc = 1 / (2 * Math.PI * cutoff);
+      const alpha = (1 / sr) / (rc + 1 / sr);
+      const raw = Math.random() * 2 - 1;
+      last += alpha * (raw - last);
+      const cadence = Math.max(0, Math.sin(t * 2.2)) * Math.max(0, Math.sin(t * 0.7 + 1));
+      samples[i] = last * cadence * 1.8;
     }
     return this._bufferFromSamples(samples, sr);
   }
@@ -145,11 +208,12 @@ export class AudioManager {
     this.radioIndex = (this.radioIndex + 1) % (this.radioStations.length + 1);
     if (this.radioSound.isPlaying) this.radioSound.stop();
     if (this.radioIndex < this.radioStations.length) {
-      this.radioSound.setBuffer(this.radioStations[this.radioIndex]);
+      const station = this.radioStations[this.radioIndex];
+      this.radioSound.setBuffer(station.buffer);
       this.radioSound.setLoop(true);
       this.radioSound.setVolume(0.35);
       this.radioSound.play();
-      return `STATION ${this.radioIndex + 1}`;
+      return station.name;
     }
     return 'OFF';
   }

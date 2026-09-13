@@ -37,7 +37,7 @@ export class HUD {
   }
 
   update(state) {
-    const { player, weaponSystem, wanted, controlMode, speedKmh, world } = state;
+    const { player, weaponSystem, wanted, controlMode, speedKmh, weather } = state;
 
     this.el.health.style.width = `${Math.max(0, player.health)}%`;
     this.el.armor.style.width = `${Math.max(0, player.armor)}%`;
@@ -57,12 +57,13 @@ export class HUD {
       this.el.crosshair.classList.remove('show');
     }
 
+    const weatherTag = weather?.isWet ? ' · RAIN' : '';
     if (controlMode.mode === 'FOOT') {
       this.el.speedo.textContent = '';
-      this.el.state.textContent = player.state;
+      this.el.state.textContent = player.state + weatherTag;
     } else {
       this.el.speedo.textContent = `${Math.round(speedKmh)} km/h`;
-      this.el.state.textContent = controlMode.mode;
+      this.el.state.textContent = controlMode.mode + weatherTag;
     }
 
     this._drawMinimap(state);
@@ -101,7 +102,7 @@ export class HUD {
     };
 
     if (ai) {
-      for (const t of ai.traffic) dot(t.vehicle.mesh.position.x, t.vehicle.mesh.position.z, '#888', 2);
+      for (const t of ai.traffic) dot(t.vehicle.mesh.position.x, t.vehicle.mesh.position.z, t.vehicle.destroyed ? '#552211' : '#888', 2);
       for (const e of ai.enemies) if (e.alive) dot(e.mesh.position.x, e.mesh.position.z, '#ff5533', 3);
     }
     if (wanted) {

@@ -20,7 +20,8 @@ export class TrafficAI {
     this.vehicle.mesh.rotation.y = this.vehicle.heading;
   }
 
-  update(dt, world, obstacles) {
+  update(dt, world, obstacles, traction = 1) {
+    if (this.vehicle.destroyed) return;
     const target = this.forward ? this.lane.to : this.lane.from;
     const pos = this.vehicle.mesh.position;
 
@@ -34,7 +35,7 @@ export class TrafficAI {
       if (ahead > 0 && ahead < BRAKE_DISTANCE && lateral < 2.5) { blocked = true; break; }
     }
 
-    const dist = this.vehicle.driveTowards(dt, world, target, blocked ? 0 : 0.5);
+    const dist = this.vehicle.driveTowards(dt, world, target, blocked ? 0 : 0.5, undefined, traction);
     if (blocked) this.vehicle.speed *= 0.8; // hard brake on top of the throttle cut
     if (dist < 3) this.forward = !this.forward;
   }

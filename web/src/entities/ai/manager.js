@@ -56,11 +56,23 @@ export class AIManager {
     }
   }
 
-  update(dt, world, playerPos, onEnemyFire) {
+  update(dt, world, playerPos, onEnemyFire, traction = 1) {
     for (const ped of this.pedestrians) ped.update(dt, world);
 
     const obstacleMeshes = this.traffic.map((t) => t.vehicle.mesh);
-    for (const car of this.traffic) car.update(dt, world, obstacleMeshes);
+    for (const car of this.traffic) car.update(dt, world, obstacleMeshes, traction);
+
+    // destroyed traffic cars stay put as wrecks for a few seconds, then get
+    // cleaned up so the active list doesn't grow forever
+    const now = performance.now();
+    for (const t of this.traffic) {
+      if (t.vehicle.destroyed && t._wreckedAt === undefined) t._wreckedAt = now;
+    }
+    this.traffic = this.traffic.filter((t) => {
+      if (!t.vehicle.destroyed) return true;
+      if (now - t._wreckedAt > 6000) { t.dispose(this.scene); return false; }
+      return true;
+    });
 
     this.enemies = this.enemies.filter((e) => e.alive);
     for (const enemy of this.enemies) enemy.update(dt, world, playerPos, onEnemyFire);
@@ -72,6 +84,13 @@ export class AIManager {
       const r = THREE.MathUtils.lerp(ENEMY_SPAWN_RADIUS[0], ENEMY_SPAWN_RADIUS[1], Math.random());
       const pos = new THREE.Vector3(playerPos.x + Math.sin(angle) * r, 0, playerPos.z + Math.cos(angle) * r);
       this.enemies.push(new EnemyAI(this.scene, pos));
+    }
+  }
+
+  // Spooks any pedestrian within earshot of a gunshot into fleeing the source.
+  notifyGunfire(position, radius = 20) {
+    for (const ped of this.pedestrians) {
+      if (ped.mesh.position.distanceTo(position) < radius) ped.spookFrom(position);
     }
   }
 

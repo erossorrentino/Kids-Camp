@@ -82,7 +82,51 @@ export const WEAPONS = [
   { id: 'pistol', name: 'PISTOL', color: 0x555555, damage: 18, fireRate: 3.2, maxAmmo: 60, spread: 0.012 },
   { id: 'rifle', name: 'RIFLE', color: 0x3a5a2f, damage: 26, fireRate: 8, maxAmmo: 180, spread: 0.02 },
   { id: 'shotgun', name: 'SHOTGUN', color: 0x6a4a2a, damage: 12, fireRate: 1.4, maxAmmo: 40, spread: 0.09, pellets: 6 },
+  {
+    id: 'rocket', name: 'ROCKET LAUNCHER', color: 0x2a2a2a, damage: 130, fireRate: 0.8, maxAmmo: 8,
+    spread: 0.004, projectile: true, projectileSpeed: 55, splashRadius: 7, blastDamage: 90,
+  },
+  {
+    id: 'railgun', name: 'RAILGUN', color: 0x33d6ff, damage: 210, fireRate: 0.7, maxAmmo: 12,
+    spread: 0.0015, pierce: true,
+  },
 ];
+
+export const VEHICLE_HEALTH = 120;
+export const EXPLOSION = {
+  radius: 8,
+  vehicleDamage: 90,
+  actorDamage: 70,
+};
+
+export const BIKE = {
+  enterRange: 4,
+  maxSpeed: 52,
+  reverseMaxSpeed: 8,
+  accel: 22,
+  brake: 22,
+  friction: 5,
+  turnRate: 3.4,
+  driftThreshold: 0.4,
+  driftGripLoss: 0.7,
+  bodyRestitution: 0.25,
+  health: 70,
+};
+
+export const PROPS = {
+  perChunk: 3,
+  health: 40,
+};
+
+export const WEATHER = {
+  clearDuration: [30, 55],   // seconds, randomized range per phase
+  rainDuration: [20, 40],
+  transitionTime: 6,
+  rainDropCount: 1400,
+  rainFallSpeed: 26,
+  wetTraction: 0.6,          // multiplier on grip while roads are wet (1 = dry)
+  thunderChance: 0.15,       // per-second chance of a thunderclap while raining
+};
 
 export const WANTED = {
   maxStars: 5,
