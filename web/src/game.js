@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { CAMERA, WORLD_SEED, VEHICLE, BIKE, HELI, JET, EXPLOSION } from './config.js';
 import { Input } from './input.js';
+import { TouchControls } from './systems/touchControls.js';
 import { CityWorld } from './world/city.js';
 import { Player, PlayerState } from './entities/player.js';
 import { Vehicle } from './entities/vehicle.js';
@@ -26,6 +27,7 @@ export class Game {
     this._initSceneAndLights();
 
     this.input = new Input(canvas);
+    this.touchControls = new TouchControls(this.input);
     this.cameraRig = new CameraRig(this.camera);
     this.world = new CityWorld(this.scene, WORLD_SEED);
     this.player = new Player(this.scene);
@@ -212,7 +214,7 @@ export class Game {
   _update(dt) {
     const { input, cameraRig, world, player, weaponSystem, aiManager, wanted, audio, particles, weather, hud } = this;
 
-    if (this.input.wasPressed('KeyE')) {
+    if (this.input.wasPressed('KeyF')) {
       if (this.controlMode.mode === MODE.FOOT) {
         const candidate = this._findInteractable();
         if (candidate) this._enterVehicle(candidate);
@@ -248,7 +250,7 @@ export class Game {
       if (weaponSystem.firedThisFrame) aiManager.notifyGunfire(player.mesh.position, 24);
 
       const candidate = this._findInteractable();
-      hud.setPrompt(candidate ? 'Press E to enter vehicle' : null);
+      hud.setPrompt(candidate ? 'Press F to enter vehicle' : null);
       activePos = player.mesh.position;
       heading = player.heading;
     } else if (DRIVING_MODES.has(this.controlMode.mode)) {
@@ -287,7 +289,7 @@ export class Game {
       speedKmh = Math.abs(vehicle.speed) * 3.6;
       activePos = vehicle.mesh.position;
       heading = vehicle.heading;
-      hud.setPrompt(vehicle.destroyed ? 'Vehicle destroyed — press E to get out' : 'Press E to exit');
+      hud.setPrompt(vehicle.destroyed ? 'Vehicle destroyed — press F to get out' : 'Press F to exit');
       if (vehicle.destroyed) this._exitVehicle();
     } else if (this.controlMode.mode === MODE.HELI) {
       const heli = this.controlMode.vehicle;
@@ -297,7 +299,7 @@ export class Game {
       speedKmh = heli.speed * 3.6;
       activePos = heli.mesh.position;
       heading = heli.heading;
-      hud.setPrompt('Press E to exit');
+      hud.setPrompt('Press F to exit');
     } else if (this.controlMode.mode === MODE.JET) {
       const jet = this.controlMode.vehicle;
       jet.update(dt, input);
@@ -306,7 +308,7 @@ export class Game {
       speedKmh = jet.speed * 3.6;
       activePos = jet.mesh.position;
       heading = jet.heading;
-      hud.setPrompt(jet.stalling ? 'STALLING — nose down! (Press E to exit)' : 'Press E to exit');
+      hud.setPrompt(jet.stalling ? 'STALLING — nose down! (Press F to exit)' : 'Press F to exit');
     }
 
     if (this.controlMode.mode !== MODE.HELI) this.heli.update(dt, input);

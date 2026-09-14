@@ -1,4 +1,4 @@
-# Neon Horizon — Three.js Open World Prototype
+# Crime Shooter — Three.js Open World Prototype
 
 A single-page, dependency-free (besides a vendored Three.js) open-world
 prototype: procedural streaming city, on-foot + car + bike + helicopter + jet
@@ -25,7 +25,7 @@ npm, not a CDN) so the game has no runtime network dependency.
 - **WASD** move / drive / fly, **Shift** sprint (heli: ascend), **Space**
   jump (heli: descend)
 - **Mouse** look (third person, orbit/aim), **RMB** aim down sights
-- **E** enter/exit a car, bike, helicopter, or jet
+- **F** enter/exit a car, bike, helicopter, or jet
 - **1-5** or mouse wheel: switch weapon (pistol/rifle/shotgun/rocket
   launcher/railgun), **LMB** fire, **R** reload
 - **T** toggle radio station, **C** cycle paint color, **N** cycle neon
@@ -33,6 +33,15 @@ npm, not a CDN) so the game has no runtime network dependency.
 - Helicopter: **Q/E** yaw. Jet: **A/D** roll (banks turn the plane),
   **Arrow keys** or **Q/E** pitch/yaw, **W/S** throttle
 - **M** accept a contract when one's offered (bottom of screen)
+
+### Touch / mobile
+
+Fully playable on a touchscreen — a virtual joystick (bottom-left) drives
+movement, dragging anywhere else on screen looks around, and an on-screen
+button cluster covers fire/aim/jump/boost/use/reload/weapon-cycle plus a
+utility row for radio/paint/neon/yaw. Touch controls show automatically on
+touch-capable devices (`systems/touchControls.js`); pointer lock is skipped
+on those devices since it isn't meaningful for touch.
 
 ## Code layout
 
@@ -56,6 +65,7 @@ src/
   systems/audio.js        synthesized (no audio files) spatial SFX + 4 labeled radio stations
   systems/particles.js    pooled sprite particles (smoke, muzzle flash, explosions)
   systems/missions.js     contract offers (delivery/demolition/hitman/survival), cash rewards
+  systems/touchControls.js  virtual joystick, drag-look, and on-screen action buttons
 ```
 
 ## Systems added on top of the original prototype

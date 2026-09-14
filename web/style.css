@@ -1,9 +1,10 @@
-* { box-sizing: border-box; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body {
   margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
   background: #0a0c10; font-family: 'Segoe UI', Arial, sans-serif; color: #eee;
+  overscroll-behavior: none; touch-action: none; -webkit-user-select: none; user-select: none;
 }
-#viewport { position: fixed; inset: 0; display: block; outline: none; }
+#viewport { position: fixed; inset: 0; display: block; outline: none; touch-action: none; }
 
 #hud { position: fixed; inset: 0; pointer-events: none; user-select: none; }
 
@@ -85,6 +86,72 @@ html, body {
 #startOverlay h1 { font-size: 48px; letter-spacing: 6px; margin: 0 0 4px; color: #ffd23f; text-shadow: 0 2px 12px rgba(255,180,0,0.4); }
 #startOverlay p { margin: 0 0 20px; color: #9aa4b2; }
 #startOverlay ul { list-style: none; padding: 0; margin: 0 0 26px; color: #cfd6e0; font-size: 14px; line-height: 1.9; }
+#touchHint { display: none; color: #ffd23f; }
 #startOverlay button { font-size: 18px; padding: 12px 32px; border-radius: 6px; border: none; background: #ffd23f; color: #201a00; font-weight: 700; cursor: pointer; letter-spacing: 1px; }
 #startOverlay button:hover { background: #ffdd66; }
 #startOverlay.hidden { display: none; }
+
+#rotateHint {
+  display: none; position: fixed; inset: 0; z-index: 20; background: #05070a; color: #ffd23f;
+  align-items: center; justify-content: center; text-align: center; font-size: 22px;
+  padding: 32px; font-weight: 700;
+}
+@media (pointer: coarse) and (orientation: portrait) {
+  #rotateHint { display: flex; }
+}
+
+/* --- touch controls ------------------------------------------------- */
+#touchControls { display: none; position: fixed; inset: 0; z-index: 5; }
+#touchControls.show { display: block; }
+
+#lookZone { position: absolute; inset: 0; z-index: 1; touch-action: none; }
+
+#joyBase {
+  position: absolute; left: max(20px, env(safe-area-inset-left)); bottom: max(110px, calc(110px + env(safe-area-inset-bottom)));
+  width: 108px; height: 108px; border-radius: 50%; z-index: 3; touch-action: none;
+  background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.28);
+}
+#joyKnob {
+  position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px;
+  border-radius: 50%; background: rgba(255,210,63,0.35); border: 2px solid rgba(255,210,63,0.7);
+  transition: transform 0.06s linear;
+}
+
+/* One auto-sizing column anchored by its bottom-right corner only, so the
+   util row and the action buttons stack naturally above each other without
+   hand-guessed pixel offsets (which broke on short landscape phone heights). */
+#touchActionCluster {
+  position: absolute; right: max(16px, env(safe-area-inset-right)); bottom: max(84px, calc(84px + env(safe-area-inset-bottom)));
+  z-index: 3; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+}
+
+#touchButtons { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+#touchButtons .tbtn-row { display: flex; gap: 8px; }
+.tbtn {
+  position: relative; min-width: 58px; height: 46px; padding: 0 10px; border-radius: 12px;
+  background: rgba(20,22,28,0.55); border: 1px solid rgba(255,255,255,0.3); color: #eee;
+  font: 700 11px/1 'Segoe UI', Arial, sans-serif; letter-spacing: 0.5px; touch-action: none;
+}
+.tbtn:active, .tbtn.active { background: rgba(255,210,63,0.35); border-color: #ffd23f; }
+.tbtn-fire { width: 74px; height: 74px; border-radius: 50%; font-size: 13px; background: rgba(180,40,30,0.5); border-color: rgba(255,120,90,0.7); }
+.tbtn-fire:active { background: rgba(255,90,60,0.7); }
+.tbtn-k { position: absolute; top: -6px; left: -6px; width: 16px; height: 16px; border-radius: 50%; background: #ffd23f; color: #201a00; font-size: 10px; display: flex; align-items: center; justify-content: center; }
+
+#touchUtilRow { display: flex; gap: 6px; flex-wrap: nowrap; justify-content: flex-end; }
+.ubtn {
+  min-width: 40px; height: 30px; padding: 0 7px; border-radius: 15px; background: rgba(20,22,28,0.5);
+  border: 1px solid rgba(255,255,255,0.25); color: #cfd6e0; font: 700 10px/1 'Segoe UI', Arial, sans-serif;
+  letter-spacing: 0.5px; touch-action: none; white-space: nowrap;
+}
+.ubtn:active { background: rgba(255,210,63,0.3); color: #201a00; }
+
+@media (max-height: 420px) {
+  #touchActionCluster { bottom: max(70px, calc(70px + env(safe-area-inset-bottom))); gap: 5px; }
+  #touchButtons { gap: 5px; }
+  #touchButtons .tbtn-row { gap: 5px; }
+  .tbtn { min-width: 46px; height: 36px; font-size: 10px; }
+  .tbtn-fire { width: 56px; height: 56px; }
+  .ubtn { height: 24px; min-width: 34px; font-size: 9px; }
+  #joyBase { bottom: max(80px, calc(80px + env(safe-area-inset-bottom))); width: 88px; height: 88px; }
+  #joyKnob { width: 42px; height: 42px; margin: -21px 0 0 -21px; }
+}

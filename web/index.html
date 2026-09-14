@@ -2,8 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Neon Horizon — Open World Prototype</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Crime Shooter</title>
 <link rel="stylesheet" href="style.css" />
 <script type="importmap">
 {
@@ -68,19 +68,49 @@
     <div id="toast"></div>
   </div>
 
+  <div id="touchControls">
+    <div id="joyBase"><div id="joyKnob"></div></div>
+    <div id="lookZone"></div>
+    <div id="touchActionCluster">
+      <div id="touchUtilRow">
+        <button id="btnRadio" class="ubtn" type="button">RADIO</button>
+        <button id="btnPaint" class="ubtn" type="button">PAINT</button>
+        <button id="btnNeon" class="ubtn" type="button">NEON</button>
+        <button id="btnYawL" class="ubtn" type="button">◀ YAW</button>
+        <button id="btnYawR" class="ubtn" type="button">YAW ▶</button>
+      </div>
+      <div id="touchButtons">
+        <div class="tbtn-row">
+          <button id="btnUse" class="tbtn" type="button"><span class="tbtn-k">F</span>USE</button>
+          <button id="btnReload" class="tbtn" type="button"><span class="tbtn-k">R</span>RELOAD</button>
+          <button id="btnWeapon" class="tbtn" type="button">WPN</button>
+          <button id="btnBoost" class="tbtn" type="button">BOOST</button>
+        </div>
+        <div class="tbtn-row">
+          <button id="btnJump" class="tbtn" type="button">JUMP</button>
+          <button id="btnAim" class="tbtn" type="button">AIM</button>
+          <button id="btnFire" class="tbtn tbtn-fire" type="button">FIRE</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="rotateHint">Rotate to landscape for the best experience</div>
+
   <div id="startOverlay">
-    <h1>NEON HORIZON</h1>
+    <h1>CRIME SHOOTER</h1>
     <p>Open-world Three.js prototype</p>
     <ul>
       <li><b>WASD</b> move / drive / fly &nbsp; <b>Shift</b> sprint (heli: ascend)</li>
       <li><b>Mouse</b> look &nbsp; <b>Space</b> jump (heli: descend)</li>
-      <li><b>E</b> enter / exit vehicle or bike &nbsp; <b>1-5</b> or wheel switch weapon</li>
+      <li><b>F</b> enter / exit vehicle or bike &nbsp; <b>1-5</b> or wheel switch weapon</li>
       <li><b>LMB</b> shoot &nbsp; <b>RMB</b> aim &nbsp; <b>R</b> reload</li>
       <li><b>T</b> radio &nbsp; <b>C</b> paint &nbsp; <b>N</b> neon underglow &nbsp; (while driving)</li>
       <li><b>Q/E</b> yaw (aircraft) &nbsp; watch for slick roads when it rains</li>
       <li><b>M</b> accept a contract when one's offered &nbsp; earn cash, avoid the hospital bill</li>
+      <li id="touchHint"><b>Touch:</b> left joystick to move, drag anywhere else to look</li>
     </ul>
-    <button id="startBtn">Click to Play</button>
+    <button id="startBtn">Tap to Play</button>
   </div>
 
   <script type="module" src="src/main.js"></script>
