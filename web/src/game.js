@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from '../vendor/three/three.module.js';
 import { CAMERA, WORLD_SEED, VEHICLE, BIKE, HELI, JET, EXPLOSION } from './config.js';
 import { Input } from './input.js';
 import { TouchControls } from './systems/touchControls.js';

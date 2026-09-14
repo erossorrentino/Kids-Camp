@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from '../../vendor/three/three.module.js';
 import { WEATHER, CAMERA } from '../config.js';
 
 const CLEAR_SKY = new THREE.Color(0x9fc3e0);

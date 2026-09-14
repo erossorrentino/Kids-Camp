@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from '../../vendor/three/three.module.js';
 import { WANTED, AI } from '../config.js';
 import { PoliceAI } from '../entities/ai/police.js';
 

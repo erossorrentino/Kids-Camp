@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from '../../vendor/three/three.module.js';
 
 // All sound effects here are synthesized at runtime with the Web Audio API
 // (noise bursts, filtered oscillators) rather than loaded from files, so the

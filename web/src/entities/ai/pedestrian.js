@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from '../../../vendor/three/three.module.js';
 import { resolveCircleVsBoxes } from '../../world/collision.js';
 
 const SPEED = 1.4;

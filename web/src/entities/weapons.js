@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from '../../vendor/three/three.module.js';
 import { WEAPONS } from '../config.js';
 import { Pool } from '../utils/pool.js';
 

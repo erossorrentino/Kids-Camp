@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from '../../vendor/three/three.module.js';
 import { CAMERA } from '../config.js';
 
 // Single camera rig that reconfigures itself per control mode instead of

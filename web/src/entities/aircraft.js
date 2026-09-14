@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from '../../vendor/three/three.module.js';
 import { HELI, JET } from '../config.js';
 
 const GRAVITY = 9.8;

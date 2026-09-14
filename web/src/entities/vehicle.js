@@ -1,4 +1,4 @@
-import * as THREE from 'three';
+import * as THREE from '../../vendor/three/three.module.js';
 import { VEHICLE, VEHICLE_HEALTH } from '../config.js';
 import { resolveVehicleVsBoxes } from '../world/collision.js';
 
