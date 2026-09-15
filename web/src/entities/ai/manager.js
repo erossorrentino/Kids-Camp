@@ -94,7 +94,7 @@ export class AIManager {
     }
   }
 
-  get enemyMeshes() { return this.enemies.filter((e) => e.alive).map((e) => e.bodyMesh); }
+  get enemyMeshes() { return this.enemies.filter((e) => e.alive).map((e) => e.mesh); }
 
-  enemyForMesh(mesh) { return this.enemies.find((e) => e.bodyMesh === mesh); }
+  enemyForMesh(mesh) { return this.enemies.find((e) => e.mesh === mesh); }
 }

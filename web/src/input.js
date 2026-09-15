@@ -9,6 +9,12 @@ export const isTouchDevice = window.matchMedia
   ? window.matchMedia('(pointer: coarse)').matches
   : ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 
+// Movement is primarily arrow keys + Space; WASD still works as an alias so
+// either scheme drives the same isDown() checks everywhere (on foot, driving,
+// flying) without every call site needing to know about both.
+const ARROW_ALIAS = { KeyW: 'ArrowUp', KeyS: 'ArrowDown', KeyA: 'ArrowLeft', KeyD: 'ArrowRight' };
+const NAV_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space']);
+
 export class Input {
   constructor(domElement) {
     this.dom = domElement;
@@ -20,7 +26,10 @@ export class Input {
     this.mouseButtons = new Set();
     this.pointerLocked = false;
 
-    window.addEventListener('keydown', (e) => this.setKey(e.code, true));
+    window.addEventListener('keydown', (e) => {
+      if (NAV_KEYS.has(e.code)) e.preventDefault(); // stop arrow/space page scroll
+      this.setKey(e.code, true);
+    });
     window.addEventListener('keyup', (e) => this.setKey(e.code, false));
 
     if (!isTouchDevice) {
@@ -40,7 +49,11 @@ export class Input {
     domElement.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
-  isDown(code) { return this.keys.has(code); }
+  isDown(code) {
+    if (this.keys.has(code)) return true;
+    const alias = ARROW_ALIAS[code];
+    return alias ? this.keys.has(alias) : false;
+  }
   wasPressed(code) { return this.justPressed.has(code); }
   isMouseDown(btn) { return this.mouseButtons.has(btn); }
 

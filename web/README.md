@@ -22,8 +22,8 @@ npm, not a CDN) so the game has no runtime network dependency.
 
 ## Controls
 
-- **WASD** move / drive / fly, **Shift** sprint (heli: ascend), **Space**
-  jump (heli: descend)
+- **Arrow keys** (or WASD) move / drive / fly, **Shift** sprint (heli: ascend),
+  **Space** jump (heli: descend)
 - **Mouse** look (third person, orbit/aim), **RMB** aim down sights
 - **F** enter/exit a car, bike, helicopter, or jet
 - **1-5** or mouse wheel: switch weapon (pistol/rifle/shotgun/rocket
