@@ -29,8 +29,8 @@
   /* All HUD/menu copy defaults to bright white for maximum readability against
      space; colored Tailwind text-* classes (when loaded) override this for
      specific accents like bar labels, while values/body copy stay white. */
-  #hud, #menu-screen, #pause-screen, #gameover-screen { color: #ffffff; }
-  #hud p, #hud div, #hud span, #menu-screen p, #pause-screen p, #gameover-screen p {
+  #hud, #menu-screen, #pause-screen, #gameover-screen, #shop-screen { color: #ffffff; }
+  #hud p, #hud div, #hud span, #menu-screen p, #pause-screen p, #gameover-screen p, #shop-screen p, #shop-screen div {
     text-shadow: 0 1px 3px rgba(0,0,0,0.9), 0 0 10px rgba(0,0,0,0.6);
   }
   #game-canvas { display: block; position: fixed; top: 0; left: 0; width: 100%; height: 100%; touch-action: none; }
@@ -52,7 +52,6 @@
   .bar-fill { height: 100%; transition: width 0.12s linear; border-radius: 1px; }
   .bar-shield { background: linear-gradient(90deg,#0891b2,#38bdf8,#7dd3fc); box-shadow: 0 0 12px #38bdf8, 0 0 4px #fff inset; }
   .bar-shield.critical { animation: pulseRed 0.35s infinite alternate; }
-  .bar-energy { background: linear-gradient(90deg,#166534,#22c55e,#86efac); box-shadow: 0 0 12px #22c55e; }
 
   @keyframes pulseRed {
     from { background: linear-gradient(90deg,#7f1d1d,#ef4444,#fca5a5); box-shadow: 0 0 6px #ef4444; }
@@ -109,13 +108,13 @@
      overlay behavior even if the Tailwind CDN script is slow, blocked, or
      fails to load -- Tailwind utility classes still enhance visuals on top. */
   .hidden { display: none !important; }
-  #hud, #menu-screen, #pause-screen, #gameover-screen, #vignette {
+  #hud, #menu-screen, #pause-screen, #gameover-screen, #shop-screen, #vignette {
     position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 20;
   }
   #hud { z-index: 10; pointer-events: none; }
   #hud .pointer-events-auto { pointer-events: auto; }
   #vignette { z-index: 30; }
-  #menu-screen, #pause-screen, #gameover-screen {
+  #menu-screen, #pause-screen, #gameover-screen, #shop-screen {
     display: flex; flex-direction: column; align-items: center; justify-content: center;
   }
   button { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
@@ -128,9 +127,9 @@
 
 <!-- ============ HUD (Gameplay) ============ -->
 <div id="hud" class="fixed inset-0 pointer-events-none hidden">
-  <!-- Top bar: shield + energy -->
+  <!-- Top bar: shield -->
   <div class="absolute top-0 left-0 right-0 p-3 sm:p-5 flex flex-col sm:flex-row gap-3 sm:gap-6 items-stretch sm:items-start">
-    <div class="hud-panel rounded-md px-3 py-2 flex-1 max-w-sm">
+    <div class="hud-panel rounded-md px-3 py-2 flex-1 max-w-md">
       <div class="flex justify-between items-center mb-1">
         <span class="font-hud text-[10px] sm:text-xs text-sky-300 tracking-widest">HULL / SHIELD</span>
         <span id="shield-pct" class="font-hud text-[10px] sm:text-xs text-white">100%</span>
@@ -139,23 +138,16 @@
         <div id="shield-bar" class="bar-fill bar-shield" style="width:100%"></div>
       </div>
     </div>
-    <div class="hud-panel rounded-md px-3 py-2 flex-1 max-w-sm">
-      <div class="flex justify-between items-center mb-1">
-        <span id="energy-label" class="font-hud text-[10px] sm:text-xs text-emerald-300 tracking-widest">WEAPON ENERGY</span>
-        <span id="energy-pct" class="font-hud text-[10px] sm:text-xs text-white">READY</span>
-      </div>
-      <div class="bar-track rounded h-3 sm:h-4">
-        <div id="energy-bar" class="bar-fill bar-energy" style="width:100%"></div>
-      </div>
-    </div>
   </div>
 
-  <!-- Score / speed top-right -->
+  <!-- Score / speed / credits top-right -->
   <div class="absolute top-3 right-3 sm:top-5 sm:right-5 hud-panel rounded-md px-4 py-2 text-right">
-    <div class="font-hud text-[10px] sm:text-xs text-purple-300 tracking-widest">SCORE</div>
+    <div class="font-hud text-[10px] sm:text-xs text-purple-300 tracking-widest">ASTEROIDS</div>
     <div id="score-val" class="font-hud text-xl sm:text-2xl text-white leading-none mb-1">0</div>
     <div class="font-hud text-[10px] sm:text-xs text-cyan-300 tracking-widest">SPEED</div>
-    <div id="speed-val" class="font-hud text-lg sm:text-xl text-white leading-none">000 <span class="text-xs">km/s</span></div>
+    <div id="speed-val" class="font-hud text-lg sm:text-xl text-white leading-none mb-1">000 <span class="text-xs">km/s</span></div>
+    <div class="font-hud text-[10px] sm:text-xs text-yellow-300 tracking-widest">CREDITS</div>
+    <div id="credits-val" class="font-hud text-lg sm:text-xl text-yellow-200 leading-none">0</div>
   </div>
 
   <!-- active power-up chip -->
@@ -186,19 +178,41 @@
     <h1 class="neon-title text-4xl sm:text-6xl font-black mb-2">VOID RUNNER</h1>
     <p class="text-cyan-100 tracking-[0.3em] text-xs sm:text-sm mb-8 font-hud">3D DEEP SPACE COMBAT</p>
 
-    <button id="start-btn" class="menu-btn text-white px-10 py-3 rounded-md text-lg mb-6 w-full">START GAME</button>
+    <button id="start-btn" class="menu-btn text-white px-10 py-3 rounded-md text-lg mb-3 w-full">START GAME</button>
+    <button id="shop-open-btn" class="menu-btn text-white px-10 py-3 rounded-md text-lg mb-6 w-full">SHOP</button>
 
     <div class="text-left w-full text-sm text-white space-y-1.5 border-t border-white/20 pt-4">
       <p class="font-hud text-xs text-purple-300 tracking-widest mb-2">MISSION BRIEFING</p>
       <p>🖱 / 👆 &nbsp;Move ship — glide toward cursor / finger (ship hovers above your finger)</p>
       <p>⌨ &nbsp;WASD or Arrow Keys — fallback controls</p>
-      <p>🖱 Click / Touch / Space — fire plasma cannons (auto-fires while held)</p>
+      <p>🖱 Click / Touch / Space — fire plasma cannons (one shot per press)</p>
       <p>⏸ &nbsp;Tap the pause icon (bottom-right) or press ESC / P</p>
       <p>💠 Collect wireframe pods: <span class="text-sky-300">Shield</span>, <span class="text-emerald-300">Triple Shot</span>, <span class="text-yellow-300">Hyper-Drive</span></p>
-      <p>☄️ Survive the asteroid storm. Destroy hostiles. Beat your high score.</p>
+      <p>☄️ Break asteroids for credits. Spend them in the Shop on new ships and powers.</p>
     </div>
 
-    <div class="mt-6 text-xs text-white font-hud">HIGH SCORE: <span id="menu-highscore" class="text-yellow-300">0</span></div>
+    <div class="mt-6 w-full flex justify-between text-xs text-white font-hud">
+      <span>HIGH SCORE: <span id="menu-highscore" class="text-yellow-300">0</span></span>
+      <span>CREDITS: <span id="menu-credits" class="text-yellow-300">0</span></span>
+    </div>
+  </div>
+</div>
+
+<!-- ============ SHOP SCREEN ============ -->
+<div id="shop-screen" class="fixed inset-0 hidden flex-col items-center justify-center z-20 bg-black/80">
+  <div class="fade-panel hud-panel rounded-xl px-6 py-8 sm:px-10 sm:py-10 flex flex-col items-center max-w-2xl mx-4 w-full max-h-[90vh] overflow-y-auto">
+    <h2 class="font-hud text-2xl sm:text-3xl text-yellow-300 tracking-widest mb-1">SHIP SHOP</h2>
+    <p class="text-white text-xs font-hud tracking-widest mb-4">CREDITS: <span id="shop-credits" class="text-yellow-300">0</span></p>
+
+    <div class="flex gap-2 mb-4">
+      <button id="shop-tab-ships" class="menu-btn text-white px-6 py-2 rounded-md text-sm">SHIPS</button>
+      <button id="shop-tab-powers" class="menu-btn text-white px-6 py-2 rounded-md text-sm">POWERS</button>
+    </div>
+
+    <div id="shop-ships-list" class="w-full grid grid-cols-1 sm:grid-cols-3 gap-3 mb-2"></div>
+    <div id="shop-powers-list" class="hidden w-full grid grid-cols-1 sm:grid-cols-3 gap-3 mb-2"></div>
+
+    <button id="shop-close-btn" class="menu-btn text-white px-10 py-3 rounded-md text-lg w-full mt-4">BACK</button>
   </div>
 </div>
 
@@ -219,7 +233,7 @@
 
     <div class="grid grid-cols-2 gap-4 w-full mb-6">
       <div class="hud-panel rounded-md py-3">
-        <div class="font-hud text-[10px] text-purple-300 tracking-widest">FINAL SCORE</div>
+        <div class="font-hud text-[10px] text-purple-300 tracking-widest">ASTEROIDS DESTROYED</div>
         <div id="final-score" class="font-hud text-2xl text-white">0</div>
       </div>
       <div class="hud-panel rounded-md py-3">
@@ -227,7 +241,8 @@
         <div id="final-kills" class="font-hud text-2xl text-white">0</div>
       </div>
     </div>
-    <div class="font-hud text-sm text-yellow-300 mb-8">HIGH SCORE: <span id="final-highscore">0</span> <span id="new-record" class="hidden text-emerald-400 ml-2">★ NEW RECORD</span></div>
+    <div class="font-hud text-sm text-yellow-300 mb-2">HIGH SCORE: <span id="final-highscore">0</span> <span id="new-record" class="hidden text-emerald-400 ml-2">★ NEW RECORD</span></div>
+    <div class="font-hud text-sm text-white mb-8">CREDITS EARNED: <span id="final-credits" class="text-yellow-200">0</span></div>
 
     <button id="retry-btn" class="menu-btn text-white px-10 py-3 rounded-md text-lg w-full mb-3">TRY AGAIN</button>
     <button id="menu-btn-2" class="menu-btn text-white px-10 py-3 rounded-md text-lg w-full">MAIN MENU</button>
@@ -265,8 +280,52 @@ const CFG = {
   shieldMax: 100,
   tripleShotDuration: 10,
   hyperDriveDuration: 6,
-  hitInvulnTime: 0.9
+  hitInvulnTime: 0.9,
+  creditsPerAsteroid: 5
 };
+
+/* =========================================================================================
+   SHOP: ships & powers, purchasable with credits earned from destroying asteroids
+========================================================================================= */
+const SHOP_SHIPS = [
+  { id: 'interceptor', name: 'Interceptor', price: 0, desc: 'Balanced starter craft.', hull: 0xf0f5fb, dark: 0x53627a, accent: 0x38bdf8, cockpit: 0x22d3ee, shieldMod: 1.0, turnMod: 1.0 },
+  { id: 'vanguard', name: 'Vanguard', price: 150, desc: 'Heavy plating. +30% shield, slower turns.', hull: 0xffcfa8, dark: 0x7a4a2a, accent: 0xff7a3d, cockpit: 0xffb066, shieldMod: 1.3, turnMod: 0.8 },
+  { id: 'phantom', name: 'Phantom', price: 200, desc: 'Light frame. Faster turns, -15% shield.', hull: 0xe3d1ff, dark: 0x5a3a7a, accent: 0xa855f7, cockpit: 0xd8b4fe, shieldMod: 0.85, turnMod: 1.35 }
+];
+const SHOP_POWERS = [
+  { id: 'hull', name: 'Reinforced Hull', price: 100, desc: '+25 max shield capacity.' },
+  { id: 'cannons', name: 'Overcharged Cannons', price: 120, desc: '25% faster fire rate.' },
+  { id: 'salvage', name: 'Salvage Drone', price: 130, desc: '+50% credits from asteroids.' }
+];
+const SAVE_KEYS = {
+  highScore: 'voidRunnerHighScore',
+  credits: 'voidRunnerCredits',
+  ownedShips: 'voidRunnerOwnedShips',
+  ownedPowers: 'voidRunnerOwnedPowers',
+  equippedShip: 'voidRunnerEquippedShip'
+};
+function loadCredits() { return parseInt(localStorage.getItem(SAVE_KEYS.credits) || '0', 10); }
+function saveCredits(v) { localStorage.setItem(SAVE_KEYS.credits, String(v)); }
+function loadOwnedShips() { try { return JSON.parse(localStorage.getItem(SAVE_KEYS.ownedShips) || '["interceptor"]'); } catch (e) { return ['interceptor']; } }
+function saveOwnedShips(arr) { localStorage.setItem(SAVE_KEYS.ownedShips, JSON.stringify(arr)); }
+function loadOwnedPowers() { try { return JSON.parse(localStorage.getItem(SAVE_KEYS.ownedPowers) || '[]'); } catch (e) { return []; } }
+function saveOwnedPowers(arr) { localStorage.setItem(SAVE_KEYS.ownedPowers, JSON.stringify(arr)); }
+function loadEquippedShip() { return localStorage.getItem(SAVE_KEYS.equippedShip) || 'interceptor'; }
+function saveEquippedShip(id) { localStorage.setItem(SAVE_KEYS.equippedShip, id); }
+
+let credits = loadCredits();
+let ownedShips = loadOwnedShips();
+let ownedPowers = loadOwnedPowers();
+let equippedShipId = loadEquippedShip();
+
+function earnCredits(amount) {
+  const mult = ownedPowers.includes('salvage') ? 1.5 : 1;
+  const gained = Math.round(amount * mult);
+  credits += gained;
+  runCreditsEarned += gained;
+  saveCredits(credits);
+}
+function getEquippedShip() { return SHOP_SHIPS.find(s => s.id === equippedShipId) || SHOP_SHIPS[0]; }
 
 /* =========================================================================================
    RENDERER / SCENE / CAMERA
@@ -591,6 +650,18 @@ const engineOriginR = new THREE.Vector3();
 ship.position.set(0, -1.2, 0);
 scene.add(ship);
 
+function applyShipVisuals(shipCfg) {
+  shipMetal.color.setHex(shipCfg.hull);
+  shipMetal.emissive.setHex(shipCfg.accent);
+  shipMetalDark.color.setHex(shipCfg.dark);
+  shipMetalDark.emissive.setHex(shipCfg.accent);
+  cockpitMat.color.setHex(shipCfg.cockpit);
+  cockpitMat.emissive.setHex(shipCfg.accent);
+  wingAccent.color.setHex(shipCfg.dark);
+  wingAccent.emissive.setHex(shipCfg.accent);
+}
+applyShipVisuals(getEquippedShip());
+
 /* =========================================================================================
    ENGINE THRUSTER PARTICLES
 ========================================================================================= */
@@ -822,13 +893,10 @@ function updateSplashes(dt) {
    OBJECT POOL FACTORY HELPERS
 ========================================================================================= */
 function makeLaserMesh(color) {
-  const geo = new THREE.CylinderGeometry(0.045, 0.045, 1.1, 6);
+  const geo = new THREE.CylinderGeometry(0.06, 0.06, 1.1, 6);
   const mat = new THREE.MeshBasicMaterial({ color });
   const mesh = new THREE.Mesh(geo, mat);
   mesh.rotation.x = Math.PI / 2;
-  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTexSoft, color, transparent: true, opacity: 0.85, depthWrite: false, blending: THREE.AdditiveBlending }));
-  glow.scale.set(0.5, 0.5, 1);
-  mesh.add(glow);
   return mesh;
 }
 
@@ -841,24 +909,93 @@ const playerLasers = [];
     const mesh = makeLaserMesh(0x39ff6e);
     mesh.visible = false;
     scene.add(mesh);
-    playerLasers.push({ mesh, active: false, vel: new THREE.Vector3(), life: 0, dmg: 1, angle: 0 });
+    playerLasers.push({ mesh, active: false, vel: new THREE.Vector3(), life: 0, dmg: 1, angle: 0, prevPos: new THREE.Vector3() });
   }
 }
 let wingToggle = false;
+
+// Swept point-vs-segment distance so fast projectiles can't tunnel through small
+// targets between frames (a laser can move several units per frame at high speed).
+const _segAB = new THREE.Vector3();
+const _segAP = new THREE.Vector3();
+const _segClosest = new THREE.Vector3();
+function distSqPointToSegment(p, a, b) {
+  _segAB.subVectors(b, a);
+  const lenSq = _segAB.lengthSq();
+  let t = lenSq > 1e-8 ? _segAP.subVectors(p, a).dot(_segAB) / lenSq : 0;
+  t = THREE.MathUtils.clamp(t, 0, 1);
+  _segClosest.copy(a).addScaledVector(_segAB, t);
+  return _segClosest.distanceToSquared(p);
+}
 const _tmpV1 = new THREE.Vector3(), _tmpV2 = new THREE.Vector3(), _tmpV3 = new THREE.Vector3(), _shieldWorldPos = new THREE.Vector3();
+
+// Soft lock-on / aim assist: the chase-cam's screen-to-world aim is only a flat-plane
+// approximation, so a shot that visually looks aimed at a nearby target can still miss
+// it in world space. If an asteroid is within a small radius of the ship's own X/Y, snap
+// the shot onto a true intercept course for that target instead of firing dead ahead.
+const LOCK_ON_RADIUS = 7.5;
+const LOCK_ON_KEEP_RADIUS = 10.5; // wider tolerance to STAY locked once acquired, so damage
+                                   // focuses on one target instead of scattering across many
+const _lockDir = new THREE.Vector3();
+let currentLockTarget = null;
+function findLockOnTarget(originPos) {
+  if (currentLockTarget && currentLockTarget.active && currentLockTarget.mesh.position.z <= -3 && currentLockTarget.mesh.position.z >= CFG.worldFar) {
+    const dx = currentLockTarget.mesh.position.x - originPos.x;
+    const dy = currentLockTarget.mesh.position.y - originPos.y;
+    if (dx*dx + dy*dy < LOCK_ON_KEEP_RADIUS*LOCK_ON_KEEP_RADIUS) return currentLockTarget;
+  }
+  let best = null, bestDistSq = LOCK_ON_RADIUS * LOCK_ON_RADIUS;
+  for (let i = 0; i < asteroids.length; i++) {
+    const A = asteroids[i];
+    if (!A.active) continue;
+    if (A.mesh.position.z > -3 || A.mesh.position.z < CFG.worldFar) continue;
+    const dx = A.mesh.position.x - originPos.x;
+    const dy = A.mesh.position.y - originPos.y;
+    const dSq = dx*dx + dy*dy;
+    if (dSq < bestDistSq) { bestDistSq = dSq; best = A; }
+  }
+  currentLockTarget = best;
+  return best;
+}
+function computeInterceptDir(originPos, targetPos, targetVz, laserSpeed, outDir) {
+  const dx = targetPos.x - originPos.x;
+  const dy = targetPos.y - originPos.y;
+  const dz = targetPos.z - originPos.z;
+  const a = targetVz*targetVz - laserSpeed*laserSpeed;
+  const b = 2*dz*targetVz;
+  const c = dx*dx + dy*dy + dz*dz;
+  let t;
+  if (Math.abs(a) < 1e-6) {
+    if (Math.abs(b) < 1e-6) return false;
+    t = -c / b;
+  } else {
+    const disc = b*b - 4*a*c;
+    if (disc < 0) return false;
+    const sq = Math.sqrt(disc);
+    const t1 = (-b + sq) / (2*a);
+    const t2 = (-b - sq) / (2*a);
+    t = (t1 > 0 && t2 > 0) ? Math.min(t1, t2) : Math.max(t1, t2);
+  }
+  if (!(t > 0) || !isFinite(t)) return false;
+  outDir.set(dx, dy, dz + targetVz * t);
+  if (outDir.lengthSq() < 1e-8) return false;
+  outDir.normalize();
+  return true;
+}
+
 function fireLasers() {
   const triple = powerups.triple.active;
   const shots = [];
   if (triple) {
     ship.getWorldPosition(_tmpV1);
-    shots.push({ pos: _tmpV1.clone(), angle: 0 });
-    wingTipL.getWorldPosition(_tmpV2); shots.push({ pos: _tmpV2.clone(), angle: -0.16 });
-    wingTipR.getWorldPosition(_tmpV3); shots.push({ pos: _tmpV3.clone(), angle: 0.16 });
+    shots.push({ pos: _tmpV1.clone(), angle: 0, lockOn: true });
+    wingTipL.getWorldPosition(_tmpV2); shots.push({ pos: _tmpV2.clone(), angle: -0.16, lockOn: false });
+    wingTipR.getWorldPosition(_tmpV3); shots.push({ pos: _tmpV3.clone(), angle: 0.16, lockOn: false });
   } else {
     wingToggle = !wingToggle;
     const origin = new THREE.Vector3();
     (wingToggle ? wingTipL : wingTipR).getWorldPosition(origin);
-    shots.push({ pos: origin, angle: 0 });
+    shots.push({ pos: origin, angle: 0, lockOn: true });
   }
   for (const shot of shots) {
     for (let i = 0; i < playerLasers.length; i++) {
@@ -867,9 +1004,23 @@ function fireLasers() {
         L.active = true;
         L.mesh.visible = true;
         L.mesh.position.copy(shot.pos);
-        L.mesh.rotation.y = shot.angle;
+        L.prevPos.copy(shot.pos);
         const speed = CFG.laserSpeed;
-        L.vel.set(Math.sin(shot.angle) * speed, 0, -Math.cos(shot.angle) * speed);
+        let gotLock = false;
+        if (shot.lockOn) {
+          const target = findLockOnTarget(shot.pos);
+          const targetVz = target ? (target.speed + CFG.baseScroll) : 0;
+          if (target && computeInterceptDir(shot.pos, target.mesh.position, targetVz, speed, _lockDir)) {
+            L.vel.copy(_lockDir).multiplyScalar(speed);
+            L.mesh.lookAt(shot.pos.clone().add(_lockDir));
+            L.mesh.rotateX(-Math.PI / 2);
+            gotLock = true;
+          }
+        }
+        if (!gotLock) {
+          L.mesh.rotation.set(Math.PI / 2, shot.angle, 0);
+          L.vel.set(Math.sin(shot.angle) * speed, 0, -Math.cos(shot.angle) * speed);
+        }
         L.life = CFG.laserLife;
         break;
       }
@@ -882,18 +1033,22 @@ function updatePlayerLasers(dt) {
   for (let i = 0; i < playerLasers.length; i++) {
     const L = playerLasers[i];
     if (!L.active) continue;
+    L.prevPos.copy(L.mesh.position);
     L.mesh.position.addScaledVector(L.vel, dt);
     L.life -= dt;
     if (L.life <= 0 || L.mesh.position.z < CFG.worldFar) {
       L.active = false; L.mesh.visible = false;
       continue;
     }
-    // collisions vs asteroids
+    // collisions vs asteroids -- swept along this frame's travel segment so a
+    // fast-moving laser can't tunnel past a small target between frames
     let hit = false;
     for (let a = 0; a < asteroids.length && !hit; a++) {
       const A = asteroids[a];
       if (!A.active) continue;
-      if (L.mesh.position.distanceToSquared(A.mesh.position) < (A.radius*0.85)*(A.radius*0.85)) {
+      const thresh = A.radius*1.2 + 1.0;
+      const d2 = distSqPointToSegment(A.mesh.position, L.prevPos, L.mesh.position);
+      if (d2 < thresh*thresh) {
         hit = true;
         damageAsteroid(A);
         spawnSplash(L.mesh.position, 0x39ff88, 1.2);
@@ -908,7 +1063,7 @@ function updatePlayerLasers(dt) {
           const sh = E.shields[s];
           if (!sh.alive) continue;
           sh.mesh.getWorldPosition(_shieldWorldPos);
-          if (L.mesh.position.distanceToSquared(_shieldWorldPos) < 0.85*0.85) {
+          if (distSqPointToSegment(_shieldWorldPos, L.prevPos, L.mesh.position) < 0.85*0.85) {
             hit = true;
             sh.hp -= 1;
             spawnSplash(_shieldWorldPos, 0xff66ff, 0.9);
@@ -918,7 +1073,7 @@ function updatePlayerLasers(dt) {
         }
       }
       if (hit) break;
-      if (L.mesh.position.distanceToSquared(E.mesh.position) < E.radius*E.radius) {
+      if (distSqPointToSegment(E.mesh.position, L.prevPos, L.mesh.position) < E.radius*E.radius) {
         hit = true;
         damageEnemy(E, L.dmg);
         spawnSplash(L.mesh.position, E.type === 'A' ? 0xff3355 : 0xb84dff, 1.3);
@@ -938,7 +1093,7 @@ const enemyLasers = [];
     mesh.scale.set(0.7,0.7,0.7);
     mesh.visible = false;
     scene.add(mesh);
-    enemyLasers.push({ mesh, active: false, vel: new THREE.Vector3(), life: 0 });
+    enemyLasers.push({ mesh, active: false, vel: new THREE.Vector3(), life: 0, prevPos: new THREE.Vector3() });
   }
 }
 function fireEnemyLaser(origin, dir) {
@@ -948,6 +1103,7 @@ function fireEnemyLaser(origin, dir) {
       L.active = true;
       L.mesh.visible = true;
       L.mesh.position.copy(origin);
+      L.prevPos.copy(origin);
       L.mesh.lookAt(origin.clone().add(dir));
       L.mesh.rotateX(Math.PI/2);
       L.vel.copy(dir).multiplyScalar(CFG.enemyLaserSpeed);
@@ -961,10 +1117,11 @@ function updateEnemyLasers(dt) {
   for (let i = 0; i < enemyLasers.length; i++) {
     const L = enemyLasers[i];
     if (!L.active) continue;
+    L.prevPos.copy(L.mesh.position);
     L.mesh.position.addScaledVector(L.vel, dt);
     L.life -= dt;
     if (L.life <= 0 || L.mesh.position.z > 20) { L.active = false; L.mesh.visible = false; continue; }
-    if (!player.invulnTimer && L.mesh.position.distanceToSquared(shipPos) < 0.85*0.85) {
+    if (!player.invulnTimer && distSqPointToSegment(shipPos, L.prevPos, L.mesh.position) < 0.85*0.85) {
       L.active = false; L.mesh.visible = false;
       damagePlayer(10, L.mesh.position);
     }
@@ -985,9 +1142,17 @@ function respawnAsteroid(A, initial) {
   });
   const mesh = new THREE.Mesh(ASTEROID_GEO_VARIANTS[geoIdx], mat);
   mesh.castShadow = true; mesh.receiveShadow = true;
+  // Most asteroids spawn inside the ship's actual reachable flight corridor so aimed
+  // shots can connect; a minority spawn wider purely for background field density.
+  const inLane = Math.random() < 0.8;
+  const x = inLane
+    ? THREE.MathUtils.lerp(-boundHalfW*0.9, boundHalfW*0.9, Math.random())
+    : THREE.MathUtils.lerp(-boundHalfW*2.2, boundHalfW*2.2, Math.random());
+  const y = inLane
+    ? THREE.MathUtils.lerp(-boundHalfH*0.9, boundHalfH*0.45, Math.random())
+    : THREE.MathUtils.lerp(-14, 22, Math.random());
   mesh.position.set(
-    THREE.MathUtils.lerp(-boundHalfW*2.4, boundHalfW*2.4, Math.random()),
-    THREE.MathUtils.lerp(-14, 22, Math.random()),
+    x, y,
     initial ? THREE.MathUtils.lerp(CFG.worldFar, -10, Math.random()) : THREE.MathUtils.lerp(CFG.worldFar-40, CFG.worldFar, Math.random())
   );
   mesh.scale.setScalar(THREE.MathUtils.lerp(0.7, 1.6, Math.random()));
@@ -1009,7 +1174,8 @@ function damageAsteroid(A) {
   if (A.hp <= 0) {
     explosions.burst(A.mesh.position, 0xa08868, 60, 3, 14);
     spawnDebris(A.mesh.position, A.speed);
-    score += 10;
+    asteroidsDestroyed++;
+    earnCredits(CFG.creditsPerAsteroid);
     A.active = false;
     scene.remove(A.mesh);
     respawnAsteroid(A, false);
@@ -1169,7 +1335,6 @@ function damageEnemy(E, dmg) {
   if (E.hp <= 0) {
     const color = E.type === 'A' ? 0xff2b4d : 0xb84dff;
     explosions.burst(E.mesh.position, color, 100, 4, 20);
-    score += E.type === 'A' ? 25 : 75;
     kills++;
     E.active = false;
     E.mesh.visible = false;
@@ -1261,13 +1426,12 @@ function updatePowerups(dt, scroll) {
     if (P.pos.distanceToSquared(ship.position) < 1.1*1.1) {
       collectPowerup(P.kind);
       P.active = false; P.mesh.visible = false;
-      score += 5;
     }
   }
 }
 function collectPowerup(kind) {
   if (kind === 'shield') {
-    player.shield = Math.min(CFG.shieldMax, player.shield + CFG.shieldMax * 0.5);
+    player.shield = Math.min(player.shieldMax, player.shield + player.shieldMax * 0.5);
   } else if (kind === 'triple') {
     powerups.triple.active = true;
     powerups.triple.timer = CFG.tripleShotDuration;
@@ -1284,10 +1448,12 @@ function collectPowerup(kind) {
 ========================================================================================= */
 const player = {
   shield: CFG.shieldMax,
+  shieldMax: CFG.shieldMax,
+  fireCooldown: 0,
+  turnMod: 1,
   target: new THREE.Vector2(0, -1.2),
   velEst: new THREE.Vector2(0, 0),
   prevPos: new THREE.Vector2(0, -1.2),
-  fireCooldown: 0,
   invulnTimer: 0,
   hitInvuln: 0
 };
@@ -1297,15 +1463,35 @@ const powerups = {
 };
 
 let pointerActive = false;
-let firing = false;
+let boostPulseTimer = 0;
 const keys = {};
 
+function tryFire() {
+  if (gameState !== 'playing') return;
+  if (player.fireCooldown > 0) return;
+  const fireRateMult = ownedPowers.includes('cannons') ? 0.75 : 1;
+  player.fireCooldown = CFG.fireCooldownBase * fireRateMult;
+  fireLasers();
+  boostPulseTimer = 0.18;
+}
+
 const TOUCH_FINGER_OFFSET_PX = 110; // keeps the ship visible above the fingertip instead of hidden under it
+// Raycast from the camera through the cursor onto the ship's own movement plane (z=0)
+// so wherever the player points visually corresponds to where the ship actually ends
+// up in world space -- a naive linear screen-to-world scale doesn't match the camera's
+// real perspective, so shots would never reliably land where they visually appeared aimed.
+const _aimRaycaster = new THREE.Raycaster();
+const _aimNdc = new THREE.Vector2();
+const _aimPlane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 40);
+const _aimHit = new THREE.Vector3();
 function screenToTarget(clientX, clientY, yOffsetPx) {
-  const nx = (clientX / window.innerWidth) * 2 - 1;
-  const ny = ((clientY - (yOffsetPx || 0)) / window.innerHeight) * 2 - 1;
-  player.target.x = THREE.MathUtils.clamp(nx * boundHalfW, -boundHalfW, boundHalfW);
-  player.target.y = THREE.MathUtils.clamp(-ny * boundHalfH * 0.65 - 1.0, -boundHalfH, boundHalfH*0.5);
+  _aimNdc.x = (clientX / window.innerWidth) * 2 - 1;
+  _aimNdc.y = -((clientY - (yOffsetPx || 0)) / window.innerHeight) * 2 + 1;
+  _aimRaycaster.setFromCamera(_aimNdc, camera);
+  if (_aimRaycaster.ray.intersectPlane(_aimPlane, _aimHit)) {
+    player.target.x = THREE.MathUtils.clamp(_aimHit.x, -boundHalfW, boundHalfW);
+    player.target.y = THREE.MathUtils.clamp(_aimHit.y, -boundHalfH, boundHalfH*0.5);
+  }
 }
 let activeTouchId = null;
 
@@ -1314,16 +1500,16 @@ window.addEventListener('mousemove', (e) => {
   pointerActive = true;
   screenToTarget(e.clientX, e.clientY, 0);
 });
-window.addEventListener('mousedown', (e) => { if (e.button === 0 && gameState === 'playing') firing = true; });
-window.addEventListener('mouseup', (e) => { if (e.button === 0) firing = false; });
+window.addEventListener('mousedown', (e) => { if (e.button === 0) tryFire(); });
 
 canvas.addEventListener('touchstart', (e) => {
   if (gameState !== 'playing') return;
   e.preventDefault();
   const t = e.changedTouches[0];
   activeTouchId = t.identifier;
-  pointerActive = true; firing = true;
+  pointerActive = true;
   screenToTarget(t.clientX, t.clientY, TOUCH_FINGER_OFFSET_PX);
+  tryFire();
 }, { passive: false });
 canvas.addEventListener('touchmove', (e) => {
   if (gameState !== 'playing') return;
@@ -1339,7 +1525,6 @@ function handleTouchEnd(e) {
   for (const t of e.changedTouches) {
     if (t.identifier === activeTouchId) {
       activeTouchId = null;
-      firing = false;
       break;
     }
   }
@@ -1349,12 +1534,11 @@ canvas.addEventListener('touchcancel', handleTouchEnd, { passive: true });
 
 window.addEventListener('keydown', (e) => {
   keys[e.code] = true;
-  if (e.code === 'Space') firing = true;
+  if (e.code === 'Space' && !e.repeat) tryFire();
   if (e.code === 'Escape' || e.code === 'KeyP') togglePause();
 });
 window.addEventListener('keyup', (e) => {
   keys[e.code] = false;
-  if (e.code === 'Space') firing = false;
 });
 
 function updatePlayerMovement(dt) {
@@ -1381,7 +1565,7 @@ function updatePlayerMovement(dt) {
   const targetYaw = THREE.MathUtils.clamp(-player.velEst.x * 0.02, -0.35, 0.35);
   const targetPitch = THREE.MathUtils.clamp(-player.velEst.y * 0.045, -0.6, 0.6);
 
-  const rt = 1 - Math.pow(0.0001, dt * 1.6);
+  const rt = 1 - Math.pow(0.0001, dt * 1.6 * player.turnMod);
   ship.rotation.z = THREE.MathUtils.lerp(ship.rotation.z, targetRoll, rt);
   ship.rotation.y = THREE.MathUtils.lerp(ship.rotation.y, targetYaw, rt);
   ship.rotation.x = THREE.MathUtils.lerp(ship.rotation.x, targetPitch, rt);
@@ -1454,8 +1638,7 @@ function playSfxPowerup() { beep(660, 0.18, 'sine', 0.06); beep(990, 0.18, 'sine
 ========================================================================================= */
 const el = (id) => document.getElementById(id);
 const shieldBar = el('shield-bar'), shieldPct = el('shield-pct');
-const energyBar = el('energy-bar'), energyPct = el('energy-pct'), energyLabel = el('energy-label');
-const scoreVal = el('score-val'), speedVal = el('speed-val');
+const scoreVal = el('score-val'), speedVal = el('speed-val'), creditsVal = el('credits-val');
 const criticalText = el('critical-text');
 const vignette = el('vignette');
 const powerupChip = el('powerup-chip');
@@ -1479,23 +1662,16 @@ function flashPowerupChip(kind) {
   powerupChip.classList.remove('hidden');
 }
 function updateHUD(dt, scroll) {
-  const pct = Math.max(0, player.shield / CFG.shieldMax);
+  const pct = Math.max(0, player.shield / player.shieldMax);
   shieldBar.style.width = (pct*100).toFixed(0) + '%';
   shieldPct.textContent = Math.round(pct*100) + '%';
   const critical = pct < 0.3;
   shieldBar.classList.toggle('critical', critical);
   criticalText.classList.toggle('hidden', !critical);
 
-  let energyFraction, energyText;
-  if (powerups.triple.active) { energyFraction = powerups.triple.timer / CFG.tripleShotDuration; energyText = 'TRIPLE SHOT'; }
-  else if (powerups.hyper.active) { energyFraction = powerups.hyper.timer / CFG.hyperDriveDuration; energyText = 'HYPER-DRIVE'; }
-  else { energyFraction = 1 - (player.fireCooldown / CFG.fireCooldownBase); energyText = firing ? 'FIRING' : 'WEAPON ENERGY'; }
-  energyBar.style.width = Math.max(0, Math.min(1,energyFraction))*100 + '%';
-  energyLabel.textContent = energyText;
-  energyPct.textContent = (powerups.triple.active || powerups.hyper.active) ? Math.ceil(Math.max(0,energyFraction * (powerups.triple.active?CFG.tripleShotDuration:CFG.hyperDriveDuration))) + 's' : 'READY';
-
-  scoreVal.textContent = Math.floor(score);
+  scoreVal.textContent = Math.floor(asteroidsDestroyed);
   speedVal.innerHTML = Math.round(scroll) + ' <span class="text-xs">km/s</span>';
+  creditsVal.textContent = Math.floor(credits);
 
   if (chipTimer > 0) {
     chipTimer -= dt;
@@ -1507,17 +1683,20 @@ function updateHUD(dt, scroll) {
    GAME STATE MACHINE
 ========================================================================================= */
 let gameState = 'menu'; // menu | playing | paused | gameover
-let score = 0, kills = 0, elapsed = 0;
+let asteroidsDestroyed = 0, kills = 0, elapsed = 0, runCreditsEarned = 0;
 let enemySpawnTimer = 2, powerupSpawnTimer = 6;
-const HIGH_SCORE_KEY = 'voidRunnerHighScore';
 
-function getHighScore() { return parseInt(localStorage.getItem(HIGH_SCORE_KEY) || '0', 10); }
-function setHighScore(v) { localStorage.setItem(HIGH_SCORE_KEY, String(v)); }
+function getHighScore() { return parseInt(localStorage.getItem(SAVE_KEYS.highScore) || '0', 10); }
+function setHighScore(v) { localStorage.setItem(SAVE_KEYS.highScore, String(v)); }
 
 function resetGameVariables() {
-  score = 0; kills = 0; elapsed = 0;
+  asteroidsDestroyed = 0; kills = 0; elapsed = 0; runCreditsEarned = 0;
   enemySpawnTimer = 2; powerupSpawnTimer = 6;
-  player.shield = CFG.shieldMax;
+  const shipCfg = getEquippedShip();
+  player.shieldMax = Math.round(CFG.shieldMax * shipCfg.shieldMod) + (ownedPowers.includes('hull') ? 25 : 0);
+  player.shield = player.shieldMax;
+  player.turnMod = shipCfg.turnMod;
+  applyShipVisuals(shipCfg);
   player.target.set(0, -1.2);
   player.fireCooldown = 0; player.invulnTimer = 0; player.hitInvuln = 0;
   ship.position.set(0, -1.2, 0);
@@ -1526,6 +1705,7 @@ function resetGameVariables() {
   powerups.hyper.active = false; powerups.hyper.timer = 0;
   warpFactor = 0;
   wingToggle = false;
+  currentLockTarget = null;
   for (const A of asteroids) { A.active = false; scene.remove(A.mesh); }
   for (const A of asteroids) respawnAsteroid(A, true);
   for (const E of enemies) { E.active = false; E.mesh && (E.mesh.visible = false); }
@@ -1538,14 +1718,14 @@ function resetGameVariables() {
 }
 
 function showScreen(id) {
-  for (const s of ['menu-screen','pause-screen','gameover-screen']) {
+  for (const s of ['menu-screen','pause-screen','gameover-screen','shop-screen']) {
     const node = el(s);
     if (s === id) { node.classList.remove('hidden'); node.classList.add('flex'); }
     else { node.classList.add('hidden'); node.classList.remove('flex'); }
   }
 }
 function hideAllScreens() {
-  for (const s of ['menu-screen','pause-screen','gameover-screen']) {
+  for (const s of ['menu-screen','pause-screen','gameover-screen','shop-screen']) {
     const node = el(s);
     node.classList.add('hidden'); node.classList.remove('flex');
   }
@@ -1566,11 +1746,12 @@ function endGame() {
   gameState = 'gameover';
   el('hud').classList.add('hidden');
   const hs = getHighScore();
-  const isNew = score > hs;
-  if (isNew) setHighScore(Math.floor(score));
-  el('final-score').textContent = Math.floor(score);
+  const isNew = asteroidsDestroyed > hs;
+  if (isNew) setHighScore(Math.floor(asteroidsDestroyed));
+  el('final-score').textContent = Math.floor(asteroidsDestroyed);
   el('final-kills').textContent = kills;
-  el('final-highscore').textContent = Math.max(hs, Math.floor(score));
+  el('final-credits').textContent = Math.floor(runCreditsEarned);
+  el('final-highscore').textContent = Math.max(hs, Math.floor(asteroidsDestroyed));
   el('new-record').classList.toggle('hidden', !isNew);
   showScreen('gameover-screen');
 }
@@ -1578,6 +1759,7 @@ function backToMenu() {
   gameState = 'menu';
   el('hud').classList.add('hidden');
   el('menu-highscore').textContent = getHighScore();
+  el('menu-credits').textContent = Math.floor(credits);
   showScreen('menu-screen');
 }
 
@@ -1588,6 +1770,86 @@ el('retry-btn').addEventListener('click', startGame);
 el('menu-btn-2').addEventListener('click', backToMenu);
 el('pause-btn').addEventListener('click', () => { if (gameState === 'playing' || gameState === 'paused') togglePause(); });
 el('menu-highscore').textContent = getHighScore();
+el('menu-credits').textContent = Math.floor(credits);
+
+/* =========================================================================================
+   SHOP UI
+========================================================================================= */
+const shopShipsList = el('shop-ships-list');
+const shopPowersList = el('shop-powers-list');
+const shopCreditsEl = el('shop-credits');
+const shopTabShips = el('shop-tab-ships');
+const shopTabPowers = el('shop-tab-powers');
+
+function renderShop() {
+  shopCreditsEl.textContent = Math.floor(credits);
+
+  shopShipsList.innerHTML = SHOP_SHIPS.map(s => {
+    const owned = ownedShips.includes(s.id);
+    const equipped = equippedShipId === s.id;
+    const hex = '#' + s.accent.toString(16).padStart(6, '0');
+    let action;
+    if (equipped) action = `<div class="menu-btn text-emerald-300 px-4 py-1.5 rounded text-xs text-center">EQUIPPED</div>`;
+    else if (owned) action = `<button data-equip-ship="${s.id}" class="menu-btn text-white px-4 py-1.5 rounded text-xs w-full">EQUIP</button>`;
+    else action = `<button data-buy-ship="${s.id}" ${credits < s.price ? 'disabled' : ''} class="menu-btn text-white px-4 py-1.5 rounded text-xs w-full ${credits < s.price ? 'opacity-40 cursor-not-allowed' : ''}">BUY — ${s.price}c</button>`;
+    return `<div class="hud-panel rounded-md p-3 flex flex-col gap-2" style="border-color:${hex}88">
+      <div class="font-hud text-sm text-white">${s.name}</div>
+      <div class="text-xs text-white/80 flex-1">${s.desc}</div>
+      ${action}
+    </div>`;
+  }).join('');
+
+  shopPowersList.innerHTML = SHOP_POWERS.map(p => {
+    const owned = ownedPowers.includes(p.id);
+    let action;
+    if (owned) action = `<div class="menu-btn text-emerald-300 px-4 py-1.5 rounded text-xs text-center">OWNED</div>`;
+    else action = `<button data-buy-power="${p.id}" ${credits < p.price ? 'disabled' : ''} class="menu-btn text-white px-4 py-1.5 rounded text-xs w-full ${credits < p.price ? 'opacity-40 cursor-not-allowed' : ''}">BUY — ${p.price}c</button>`;
+    return `<div class="hud-panel rounded-md p-3 flex flex-col gap-2">
+      <div class="font-hud text-sm text-white">${p.name}</div>
+      <div class="text-xs text-white/80 flex-1">${p.desc}</div>
+      ${action}
+    </div>`;
+  }).join('');
+
+  shopShipsList.querySelectorAll('[data-buy-ship]').forEach(btn => btn.addEventListener('click', () => {
+    const id = btn.getAttribute('data-buy-ship');
+    const s = SHOP_SHIPS.find(x => x.id === id);
+    if (!s || credits < s.price || ownedShips.includes(id)) return;
+    credits -= s.price; saveCredits(credits);
+    ownedShips.push(id); saveOwnedShips(ownedShips);
+    equippedShipId = id; saveEquippedShip(id);
+    applyShipVisuals(s);
+    playSfxPowerup();
+    renderShop();
+  }));
+  shopShipsList.querySelectorAll('[data-equip-ship]').forEach(btn => btn.addEventListener('click', () => {
+    const id = btn.getAttribute('data-equip-ship');
+    equippedShipId = id; saveEquippedShip(id);
+    applyShipVisuals(SHOP_SHIPS.find(x => x.id === id));
+    renderShop();
+  }));
+  shopPowersList.querySelectorAll('[data-buy-power]').forEach(btn => btn.addEventListener('click', () => {
+    const id = btn.getAttribute('data-buy-power');
+    const p = SHOP_POWERS.find(x => x.id === id);
+    if (!p || credits < p.price || ownedPowers.includes(id)) return;
+    credits -= p.price; saveCredits(credits);
+    ownedPowers.push(id); saveOwnedPowers(ownedPowers);
+    playSfxPowerup();
+    renderShop();
+  }));
+}
+function openShop() {
+  renderShop();
+  showScreen('shop-screen');
+}
+function setShopTab(tab) {
+  shopShipsList.classList.toggle('hidden', tab !== 'ships');
+  shopPowersList.classList.toggle('hidden', tab !== 'powers');
+}
+el('shop-open-btn').addEventListener('click', openShop);
+el('shop-close-btn').addEventListener('click', backToMenu);
+shopTabShips.addEventListener('click', () => setShopTab('ships'));
+shopTabPowers.addEventListener('click', () => setShopTab('powers'));
 
 /* =========================================================================================
    DIFFICULTY / SPAWNING
@@ -1659,10 +1921,7 @@ function animate() {
     updateCamera(dt);
 
     player.fireCooldown -= dt;
-    if (firing && player.fireCooldown <= 0) {
-      player.fireCooldown = CFG.fireCooldownBase;
-      fireLasers();
-    }
+    if (boostPulseTimer > 0) boostPulseTimer -= dt;
 
     updatePlayerLasers(dt);
     updateEnemyLasers(dt);
@@ -1673,7 +1932,7 @@ function animate() {
     updatePowerupTimers(dt);
     updateSpawning(dt);
 
-    const throttleBoost = firing || powerups.hyper.active;
+    const throttleBoost = boostPulseTimer > 0 || powerups.hyper.active;
     engineGlowL.getWorldPosition(engineOriginL);
     engineGlowR.getWorldPosition(engineOriginR);
     thruster.emit(engineOriginL, 1, throttleBoost);
