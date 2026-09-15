@@ -59,6 +59,9 @@ export class Game {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.camera = new THREE.PerspectiveCamera(CAMERA.fov, window.innerWidth / window.innerHeight, CAMERA.near, CAMERA.far);
   }
 
@@ -67,10 +70,10 @@ export class Game {
     this.scene.background = new THREE.Color(0x9fc3e0);
     this.scene.fog = new THREE.Fog(0x9fc3e0, 140, CAMERA.far * 0.9);
 
-    const ambient = new THREE.HemisphereLight(0xbfd9ff, 0x3a3a2a, 0.7);
+    const ambient = new THREE.HemisphereLight(0xbfd9ff, 0x3a3a2a, 0.85);
     this.scene.add(ambient);
 
-    const sun = new THREE.DirectionalLight(0xfff2d8, 1.1);
+    const sun = new THREE.DirectionalLight(0xfff2d8, 1.9);
     sun.position.set(120, 180, 80);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);

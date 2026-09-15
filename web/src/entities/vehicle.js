@@ -7,11 +7,25 @@ const HALF_WIDTH = 1.0;
 const BIKE_HALF_LENGTH = 1.5;
 const BIKE_HALF_WIDTH = 0.32;
 
+function buildRim(radius) {
+  const rim = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius, radius, 0.06, 8),
+    new THREE.MeshStandardMaterial({ color: 0xc8ccd0, roughness: 0.25, metalness: 0.9 })
+  );
+  return rim;
+}
+
 function buildCarMesh(color) {
   const group = new THREE.Group();
+  const glassMat = new THREE.MeshStandardMaterial({
+    color: 0x0c1620, roughness: 0.08, metalness: 0.4, transparent: true, opacity: 0.55,
+  });
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.5, metalness: 0.4 });
+  const chromeMat = new THREE.MeshStandardMaterial({ color: 0xd8dce0, roughness: 0.2, metalness: 0.85 });
+
   const body = new THREE.Mesh(
     new THREE.BoxGeometry(HALF_WIDTH * 2, 1.1, HALF_LENGTH * 2),
-    new THREE.MeshStandardMaterial({ color, roughness: 0.4, metalness: 0.3 })
+    new THREE.MeshStandardMaterial({ color, roughness: 0.32, metalness: 0.55 })
   );
   body.position.y = 0.75;
   body.castShadow = true;
@@ -19,10 +33,53 @@ function buildCarMesh(color) {
 
   const cabin = new THREE.Mesh(
     new THREE.BoxGeometry(HALF_WIDTH * 1.6, 0.6, HALF_LENGTH * 1.1),
-    new THREE.MeshStandardMaterial({ color: 0x1a1d22, roughness: 0.2, metalness: 0.1 })
+    new THREE.MeshStandardMaterial({ color: 0x1a1d22, roughness: 0.35, metalness: 0.4 })
   );
   cabin.position.set(0, 1.35, -0.1);
+  cabin.castShadow = true;
   group.add(cabin);
+
+  // windshield + rear window + side glass, tinted and slightly inset from the cabin shell
+  const windshield = new THREE.Mesh(new THREE.BoxGeometry(HALF_WIDTH * 1.5, 0.52, 0.04), glassMat);
+  windshield.position.set(0, 1.35, HALF_LENGTH * 1.1 * 0.5 - 0.15);
+  windshield.rotation.x = -0.25;
+  group.add(windshield);
+
+  const rearWindow = windshield.clone();
+  rearWindow.position.z = -HALF_LENGTH * 1.1 * 0.5 - 0.05;
+  rearWindow.rotation.x = 0.3;
+  group.add(rearWindow);
+
+  const sideGlassGeo = new THREE.BoxGeometry(0.04, 0.42, HALF_LENGTH * 0.95);
+  const sideGlassL = new THREE.Mesh(sideGlassGeo, glassMat);
+  sideGlassL.position.set(-HALF_WIDTH * 0.8 - 0.02, 1.36, -0.1);
+  group.add(sideGlassL);
+  const sideGlassR = sideGlassL.clone();
+  sideGlassR.position.x = HALF_WIDTH * 0.8 + 0.02;
+  group.add(sideGlassR);
+
+  // side mirrors
+  for (const s of [-1, 1]) {
+    const mirror = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.2), trimMat);
+    mirror.position.set(s * (HALF_WIDTH + 0.08), 1.15, HALF_LENGTH * 0.55);
+    group.add(mirror);
+  }
+
+  // front bumper + headlights
+  const bumperFront = new THREE.Mesh(new THREE.BoxGeometry(HALF_WIDTH * 2.05, 0.28, 0.12), trimMat);
+  bumperFront.position.set(0, 0.42, HALF_LENGTH - 0.02);
+  group.add(bumperFront);
+  const bumperRear = bumperFront.clone();
+  bumperRear.position.z = -HALF_LENGTH + 0.02;
+  group.add(bumperRear);
+
+  const headlightGeo = new THREE.BoxGeometry(0.32, 0.16, 0.05);
+  const headlightMat = new THREE.MeshStandardMaterial({ color: 0xfff6d8, emissive: 0xfff2b0, emissiveIntensity: 1.6, roughness: 0.3 });
+  for (const s of [-1, 1]) {
+    const hl = new THREE.Mesh(headlightGeo, headlightMat);
+    hl.position.set(s * (HALF_WIDTH - 0.28), 0.78, HALF_LENGTH - 0.01);
+    group.add(hl);
+  }
 
   const wheels = [];
   const wheelGeo = new THREE.CylinderGeometry(0.38, 0.38, 0.3, 12);
@@ -37,14 +94,22 @@ function buildCarMesh(color) {
     w.position.set(x, y, z);
     w.castShadow = true;
     group.add(w);
+    const rim = buildRim(0.2);
+    rim.rotation.z = Math.PI / 2;
+    rim.position.set(x + (x < 0 ? 0.1 : -0.1), y, z);
+    group.add(rim);
     wheels.push({ mesh: w, front: i < 2 });
   });
 
-  const tailLights = new THREE.Mesh(
-    new THREE.BoxGeometry(HALF_WIDTH * 1.9, 0.2, 0.05),
-    new THREE.MeshBasicMaterial({ color: 0x330000 })
-  );
-  tailLights.position.set(0, 0.8, HALF_LENGTH - 0.02);
+  const tailLightMat = new THREE.MeshStandardMaterial({ color: 0x330000, emissive: 0xaa1010, emissiveIntensity: 1.2, roughness: 0.4 });
+  const tailLightGeo = new THREE.BoxGeometry(HALF_WIDTH * 0.7, 0.18, 0.05);
+  const tailLights = new THREE.Group();
+  tailLights.material = tailLightMat; // shared by both lamp meshes below; toggled for braking
+  for (const s of [-1, 1]) {
+    const tl = new THREE.Mesh(tailLightGeo, tailLightMat);
+    tl.position.set(s * HALF_WIDTH * 0.55, 0.8, -HALF_LENGTH + 0.02);
+    tailLights.add(tl);
+  }
   group.add(tailLights);
 
   const neon = new THREE.Mesh(
@@ -78,10 +143,24 @@ function buildBikeMesh(color) {
 
   const handlebar = new THREE.Mesh(
     new THREE.BoxGeometry(BIKE_HALF_WIDTH * 2.4, 0.08, 0.08),
-    new THREE.MeshStandardMaterial({ color: 0x222222 })
+    new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.4, metalness: 0.6 })
   );
   handlebar.position.set(0, 0.95, BIKE_HALF_LENGTH - 0.2);
   group.add(handlebar);
+
+  const headlight = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.11, 0.11, 0.08, 12),
+    new THREE.MeshStandardMaterial({ color: 0xfff6d8, emissive: 0xfff2b0, emissiveIntensity: 1.6, roughness: 0.3 })
+  );
+  headlight.rotation.x = Math.PI / 2;
+  headlight.position.set(0, 0.75, BIKE_HALF_LENGTH - 0.05);
+  group.add(headlight);
+
+  const exhaustMat = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.3, metalness: 0.85 });
+  const exhaust = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.07, BIKE_HALF_LENGTH * 0.9, 8), exhaustMat);
+  exhaust.rotation.x = Math.PI / 2;
+  exhaust.position.set(BIKE_HALF_WIDTH + 0.06, 0.42, -0.3);
+  group.add(exhaust);
 
   const wheels = [];
   const wheelGeo = new THREE.CylinderGeometry(0.42, 0.42, 0.22, 14);
@@ -92,12 +171,16 @@ function buildBikeMesh(color) {
     w.position.set(x, y, z);
     w.castShadow = true;
     group.add(w);
+    const rim = buildRim(0.2);
+    rim.rotation.z = Math.PI / 2;
+    rim.position.set(x, y, z);
+    group.add(rim);
     wheels.push({ mesh: w, front });
   });
 
   const tailLights = new THREE.Mesh(
     new THREE.BoxGeometry(BIKE_HALF_WIDTH * 1.8, 0.15, 0.05),
-    new THREE.MeshBasicMaterial({ color: 0x330000 })
+    new THREE.MeshStandardMaterial({ color: 0x330000, emissive: 0xaa1010, emissiveIntensity: 1.2, roughness: 0.4 })
   );
   tailLights.position.set(0, 0.7, -BIKE_HALF_LENGTH + 0.02);
   group.add(tailLights);

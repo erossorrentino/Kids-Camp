@@ -6,6 +6,134 @@ const ROAD_COLOR = 0x2b2e33;
 const SIDEWALK_COLOR = 0xb9bec4;
 const LINE_COLOR = 0xdcc23a;
 
+// --- Procedural surface textures, generated once at module load and reused
+// (via RepeatWrapping) across every chunk instead of per-chunk canvases. ---
+
+function makeAsphaltTexture() {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#2b2e33';
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 2200; i++) {
+    const x = Math.random() * size, y = Math.random() * size;
+    const v = Math.random() * 22 - 11;
+    ctx.fillStyle = `rgba(${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${Math.abs(v) / 90})`;
+    ctx.fillRect(x, y, 1.4, 1.4);
+  }
+  ctx.strokeStyle = 'rgba(10,10,12,0.5)';
+  ctx.lineWidth = 1.2;
+  for (let i = 0; i < 10; i++) {
+    ctx.beginPath();
+    let x = Math.random() * size, y = Math.random() * size;
+    ctx.moveTo(x, y);
+    for (let s = 0; s < 5; s++) {
+      x += (Math.random() - 0.5) * 60;
+      y += (Math.random() - 0.5) * 60;
+      ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+function makeSidewalkTexture() {
+  const size = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#b9bec4';
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 1400; i++) {
+    const x = Math.random() * size, y = Math.random() * size;
+    const v = Math.random() * 26 - 13;
+    ctx.fillStyle = `rgba(${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${Math.abs(v) / 100})`;
+    ctx.fillRect(x, y, 1.2, 1.2);
+  }
+  ctx.strokeStyle = 'rgba(90,94,100,0.6)';
+  ctx.lineWidth = 2;
+  const divisions = 4;
+  for (let i = 1; i < divisions; i++) {
+    const p = (i / divisions) * size;
+    ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, size); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0, p); ctx.lineTo(size, p); ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  return tex;
+}
+
+// Grid-of-windows facade, tiled across every building box face via repeat;
+// a handful of panes are drawn "lit" for variety.
+function makeFacadeTexture() {
+  const w = 256, h = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#9aa0a8';
+  ctx.fillRect(0, 0, w, h);
+  for (let i = 0; i < 2600; i++) {
+    const x = Math.random() * w, y = Math.random() * h;
+    const v = Math.random() * 18 - 9;
+    ctx.fillStyle = `rgba(${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${Math.abs(v) / 110})`;
+    ctx.fillRect(x, y, 1.3, 1.3);
+  }
+
+  const cols = 4, rows = 8;
+  const padX = w / cols, padY = h / rows;
+  const winW = padX * 0.62, winH = padY * 0.56;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      const x = c * padX + (padX - winW) / 2;
+      const y = r * padY + (padY - winH) / 2;
+      const lit = Math.random() < 0.16;
+      ctx.fillStyle = lit ? '#e8c877' : '#3d4a56';
+      ctx.fillRect(x, y, winW, winH);
+      ctx.strokeStyle = 'rgba(20,22,26,0.55)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x, y, winW, winH);
+    }
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(2, 4);
+  return tex;
+}
+
+// Emissive window-grid overlay used only on near chunks (see LOD note below):
+// same panel layout as the facade above, but drawn transparent-except-lit so
+// it can sit on a MeshBasicMaterial plane and glow independent of scene light.
+function makeWindowGlowTexture() {
+  const w = 256, h = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  const cols = 4, rows = 8;
+  const padX = w / cols, padY = h / rows;
+  const winW = padX * 0.62, winH = padY * 0.56;
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      if (Math.random() < 0.35) continue; // most panes stay unlit/transparent
+      const x = c * padX + (padX - winW) / 2;
+      const y = r * padY + (padY - winH) / 2;
+      ctx.fillStyle = Math.random() < 0.7 ? '#fff2b0' : '#bfe6ff';
+      ctx.fillRect(x, y, winW, winH);
+    }
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+const facadeTexture = makeFacadeTexture();
+const windowGlowTexture = makeWindowGlowTexture();
+
 // A destructible roadside prop (barrier/crate): one hit from a vehicle,
 // explosion, or heavy enough gunfire clears it out of the way.
 class Prop {
@@ -33,9 +161,16 @@ class Prop {
 }
 
 function makeRoadMaterials() {
+  const { chunkSize: S, roadWidth: RW } = CITY;
+  const asphalt = makeAsphaltTexture();
+  asphalt.repeat.set(S / 8, S / 8);
+  const sidewalkTex = makeSidewalkTexture();
+  const B = S - RW;
+  sidewalkTex.repeat.set(B / 6, B / 6);
+
   return {
-    road: new THREE.MeshStandardMaterial({ color: ROAD_COLOR, roughness: 0.95 }),
-    sidewalk: new THREE.MeshStandardMaterial({ color: SIDEWALK_COLOR, roughness: 0.9 }),
+    road: new THREE.MeshStandardMaterial({ map: asphalt, roughness: 0.95 }),
+    sidewalk: new THREE.MeshStandardMaterial({ map: sidewalkTex, roughness: 0.9 }),
     line: new THREE.MeshBasicMaterial({ color: LINE_COLOR }),
   };
 }
@@ -141,7 +276,7 @@ class Chunk {
 
     if (lots.length === 0) return;
     const geo = new THREE.BoxGeometry(1, 1, 1);
-    const mat = new THREE.MeshStandardMaterial({ roughness: 0.7, metalness: 0.05 });
+    const mat = new THREE.MeshStandardMaterial({ map: facadeTexture, roughness: 0.75, metalness: 0.05 });
     const inst = new THREE.InstancedMesh(geo, mat, lots.length);
     inst.castShadow = true;
     inst.receiveShadow = true;
@@ -170,19 +305,18 @@ class Chunk {
     this.group.add(inst);
     this.buildingMesh = inst;
 
-    // LOD detail: near chunks get a thin emissive "window" strip per building,
-    // far chunks stay as plain boxes to save draw calls / fill rate.
+    // LOD detail: near chunks get a glowing window-grid overlay on their front
+    // face, far chunks stay as plain textured boxes to save draw calls / fill rate.
     const distChunks = Math.max(Math.abs(this.cx), Math.abs(this.cz));
     if (distChunks <= 1 && lots.length > 0) {
       const winGeo = new THREE.PlaneGeometry(1, 1);
-      const winMat = new THREE.MeshBasicMaterial({ color: 0xfff2b0, transparent: true, opacity: 0.85 });
+      const winMat = new THREE.MeshBasicMaterial({ map: windowGlowTexture, transparent: true, opacity: 0.9 });
       const winInst = new THREE.InstancedMesh(winGeo, winMat, lots.length);
       lots.forEach((lot, i) => {
-        const stripH = lot.h * 0.7;
         m4.compose(
           new THREE.Vector3(lot.x, lot.h * 0.5, lot.z + lot.d / 2 + 0.02),
           new THREE.Quaternion(),
-          new THREE.Vector3(lot.w * 0.6, stripH, 1)
+          new THREE.Vector3(lot.w * 0.8, lot.h * 0.9, 1)
         );
         winInst.setMatrixAt(i, m4);
       });
