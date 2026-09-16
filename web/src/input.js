@@ -9,10 +9,11 @@ export const isTouchDevice = window.matchMedia
   ? window.matchMedia('(pointer: coarse)').matches
   : ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 
-// Movement is primarily arrow keys + Space; WASD still works as an alias so
-// either scheme drives the same isDown() checks everywhere (on foot, driving,
-// flying) without every call site needing to know about both.
-const ARROW_ALIAS = { KeyW: 'ArrowUp', KeyS: 'ArrowDown', KeyA: 'ArrowLeft', KeyD: 'ArrowRight' };
+// Arrow keys are the primary movement scheme (plus Space); WASD keeps
+// working too. This is NOT a blanket alias on isDown() — the jet already
+// binds arrow keys to yaw/pitch independently of its WASD throttle/roll, so
+// callers that need "WASD or arrows" (on-foot movement, car steering, heli
+// pitch/roll) check both codes explicitly instead, via isDownAny().
 const NAV_KEYS = new Set(['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space']);
 
 export class Input {
@@ -49,11 +50,11 @@ export class Input {
     domElement.addEventListener('contextmenu', (e) => e.preventDefault());
   }
 
-  isDown(code) {
-    if (this.keys.has(code)) return true;
-    const alias = ARROW_ALIAS[code];
-    return alias ? this.keys.has(alias) : false;
-  }
+  isDown(code) { return this.keys.has(code); }
+
+  // True if any of the given key codes is held (e.g. isDownAny('KeyW', 'ArrowUp')).
+  isDownAny(...codes) { return codes.some((c) => this.keys.has(c)); }
+
   wasPressed(code) { return this.justPressed.has(code); }
   isMouseDown(btn) { return this.mouseButtons.has(btn); }
 

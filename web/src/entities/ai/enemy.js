@@ -8,9 +8,12 @@ const STOP_RANGE = 14;
 const FIRE_COOLDOWN = 1.1;
 const RADIUS = 0.4;
 
-const SKIN_TONES = [0xc78a5a, 0x9a7a63, 0x7a5a45, 0xecc19c];
-const IDLE_SHIRT = 0x3a3230;
-const CHASE_SHIRT = 0xa02020;
+const SKIN_TONES = [0xc78a5a, 0x9a7a63, 0x7a5a45, 0xecc19c, 0x5c4536, 0xd8a878];
+// Muted/worn "hostile" palette — varied enough that every enemy looks like a
+// different person, while staying dark/dull so the group still reads as
+// one faction rather than random pedestrian colors.
+const SHIRT_TONES = [0x3a3230, 0x4a2a2a, 0x2a3a2e, 0x33343a, 0x4a3c22, 0x28282c];
+const PANTS_TONES = [0x1a1a1c, 0x22201e, 0x1c2420, 0x24201c];
 
 export const EnemyState = { IDLE: 'IDLE', CHASING: 'CHASING' };
 
@@ -21,14 +24,14 @@ export class EnemyAI {
     this.mesh = new THREE.Group();
     const body = buildHumanoid({
       skin: SKIN_TONES[Math.floor(Math.random() * SKIN_TONES.length)],
-      shirt: IDLE_SHIRT,
-      pants: 0x1a1a1c,
+      shirt: SHIRT_TONES[Math.floor(Math.random() * SHIRT_TONES.length)],
+      pants: PANTS_TONES[Math.floor(Math.random() * PANTS_TONES.length)],
       shoes: 0x0c0c0c,
-      hair: [0x0c0c0c, 0x2a1e16, 0x1c140f][Math.floor(Math.random() * 3)],
-      hairStyle: ['short', 'buzz', 'bald'][Math.floor(Math.random() * 3)],
+      hair: [0x0c0c0c, 0x2a1e16, 0x1c140f, 0x5a4a3a][Math.floor(Math.random() * 4)],
+      hairStyle: ['short', 'buzz', 'bald', 'full'][Math.floor(Math.random() * 4)],
       eyeColor: '#241a14',
-      stubble: true,
-      scale: 1.03,
+      stubble: Math.random() < 0.6,
+      scale: 0.97 + Math.random() * 0.12,
     });
     this.mesh.add(body.root);
     this.body = body;
@@ -36,6 +39,19 @@ export class EnemyAI {
     tagHumanoid(body, 'enemy', this);
     this.mesh.position.copy(position);
     scene.add(this.mesh);
+
+    // "spotted you" cue: a small glowing marker over the head instead of
+    // recoloring the body, so each enemy's randomized look stays visible
+    // even mid-chase (an all-red tint on a dark shirt washed out the variety).
+    this.alertIcon = new THREE.Mesh(
+      new THREE.SphereGeometry(0.055, 8, 8),
+      new THREE.MeshBasicMaterial({ color: 0xff2020 })
+    );
+    this.alertIcon.position.copy(body.head.position);
+    this.alertIcon.position.y += 0.26; // just above the head, same local space as head/hair
+    this.alertIcon.visible = false;
+    body.shoulders.add(this.alertIcon);
+    this._alertPhase = Math.random() * Math.PI * 2;
 
     this.state = EnemyState.IDLE;
     this.health = 60;
@@ -52,7 +68,13 @@ export class EnemyAI {
     if (dist < AI.enemyDetectionRadius) this.state = EnemyState.CHASING;
     else if (dist > AI.enemyDetectionRadius * 1.6) this.state = EnemyState.IDLE;
 
-    this.bodyMesh.material.color.setHex(this.state === EnemyState.CHASING ? CHASE_SHIRT : IDLE_SHIRT);
+    const chasing = this.state === EnemyState.CHASING;
+    this.alertIcon.visible = chasing;
+    if (chasing) {
+      this._alertPhase += dt * 6;
+      const pulse = 1 + Math.sin(this._alertPhase) * 0.25;
+      this.alertIcon.scale.setScalar(pulse);
+    }
 
     let moving = false;
     if (this.state === EnemyState.CHASING) {

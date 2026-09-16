@@ -76,8 +76,10 @@ export class Helicopter {
 
     const ascend = input.isDown('ShiftLeft') || input.isDown('ShiftRight') ? 1 : 0;
     const descend = input.isDown('Space') ? 1 : 0;
-    const pitchIn = (input.isDown('KeyW') ? -1 : 0) + (input.isDown('KeyS') ? 1 : 0);
-    const rollIn = (input.isDown('KeyA') ? -1 : 0) + (input.isDown('KeyD') ? 1 : 0);
+    const pitchIn = (input.isDownAny('KeyW', 'ArrowUp') ? -1 : 0) + (input.isDownAny('KeyS', 'ArrowDown') ? 1 : 0);
+    // roll right (banking toward screen-right) needs a negative rollIn from
+    // the right key — same convention fix as the car's steer, see vehicle.js.
+    const rollIn = (input.isDownAny('KeyA', 'ArrowLeft') ? 1 : 0) + (input.isDownAny('KeyD', 'ArrowRight') ? -1 : 0);
     const yawIn = (input.isDown('KeyQ') ? -1 : 0) + (input.isDown('KeyE') ? 1 : 0);
 
     const targetPitch = pitchIn * 0.35;

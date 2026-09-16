@@ -422,6 +422,7 @@ export class Game {
 
   _onWeaponHit(hit, damage) {
     const kind = hit.object.userData?.kind;
+    if (kind === 'enemy' || kind === 'pedestrian' || kind === 'vehicle') this.hud.flashHitMarker();
     if (kind === 'enemy') {
       const enemy = hit.object.userData.ref;
       enemy.takeDamage(damage);

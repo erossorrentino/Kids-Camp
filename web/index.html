@@ -13,11 +13,11 @@
     <div id="bars">
       <div class="bar-row">
         <span class="bar-label">HP</span>
-        <div class="bar-track"><div id="healthBar" class="bar-fill health"></div></div>
+        <div class="bar-track"><div id="healthBar" class="bar-fill health"></div><span id="healthNum" class="bar-num">100</span></div>
       </div>
       <div class="bar-row">
         <span class="bar-label">AR</span>
-        <div class="bar-track"><div id="armorBar" class="bar-fill armor"></div></div>
+        <div class="bar-track"><div id="armorBar" class="bar-fill armor"></div><span id="armorNum" class="bar-num">50</span></div>
       </div>
     </div>
 
@@ -31,9 +31,12 @@
       </div>
     </div>
 
-    <canvas id="minimap" width="180" height="180"></canvas>
+    <div id="mapPanel">
+      <div id="mapLabel">MAP</div>
+      <canvas id="minimap" width="180" height="180"></canvas>
+    </div>
 
-    <div id="cashDisplay">$0</div>
+    <div id="cashDisplay"><span id="cashIcon">$</span><span id="cashAmount">0</span></div>
 
     <div id="speedo"></div>
 
@@ -50,6 +53,13 @@
       <div class="ch ch-b"></div>
       <div class="ch ch-l"></div>
       <div class="ch ch-r"></div>
+      <div class="ch-dot"></div>
+    </div>
+    <div id="hitMarker">
+      <div class="hm hm-1"></div>
+      <div class="hm hm-2"></div>
+      <div class="hm hm-3"></div>
+      <div class="hm hm-4"></div>
     </div>
 
     <div id="missionOffer"></div>
@@ -91,19 +101,31 @@
   <div id="rotateHint">Rotate to landscape for the best experience</div>
 
   <div id="startOverlay">
-    <h1>CRIME SHOOTER</h1>
-    <p>Open-world Three.js prototype</p>
-    <ul>
-      <li><b>Arrow keys</b> (or WASD) move / drive / fly &nbsp; <b>Shift</b> sprint (heli: ascend)</li>
-      <li><b>Mouse</b> look &nbsp; <b>Space</b> jump (heli: descend)</li>
-      <li><b>F</b> enter / exit vehicle or bike &nbsp; <b>1-5</b> or wheel switch weapon</li>
-      <li><b>LMB</b> shoot &nbsp; <b>RMB</b> aim &nbsp; <b>R</b> reload</li>
-      <li><b>T</b> radio &nbsp; <b>C</b> paint &nbsp; <b>N</b> neon underglow &nbsp; (while driving)</li>
-      <li><b>Q/E</b> yaw (aircraft) &nbsp; watch for slick roads when it rains</li>
-      <li><b>M</b> accept a contract when one's offered &nbsp; earn cash, avoid the hospital bill</li>
-      <li id="touchHint"><b>Touch:</b> left joystick to move, drag anywhere else to look</li>
-    </ul>
-    <button id="startBtn">Tap to Play</button>
+    <div id="startBg"><div id="startGrid"></div><div id="startGlow"></div></div>
+    <div id="startContent">
+      <div id="titleWrap">
+        <h1>CRIME<span>SHOOTER</span></h1>
+        <p class="tagline">Open-world chaos, right in your browser</p>
+      </div>
+
+      <div id="controlsGrid">
+        <div class="ctrl"><span class="keycap keycap-wide">↑↓←→</span><span>Move / Drive / Fly</span></div>
+        <div class="ctrl"><span class="keycap">Shift</span><span>Sprint (heli: ascend)</span></div>
+        <div class="ctrl"><span class="keycap">Mouse</span><span>Look around</span></div>
+        <div class="ctrl"><span class="keycap">Space</span><span>Jump (heli: descend)</span></div>
+        <div class="ctrl"><span class="keycap">F</span><span>Enter / exit vehicle</span></div>
+        <div class="ctrl"><span class="keycap">1-5</span><span>Switch weapon</span></div>
+        <div class="ctrl"><span class="keycap">LMB</span><span>Shoot</span></div>
+        <div class="ctrl"><span class="keycap">RMB</span><span>Aim down sights</span></div>
+        <div class="ctrl"><span class="keycap">R</span><span>Reload</span></div>
+        <div class="ctrl"><span class="keycap keycap-wide">T·C·N</span><span>Radio / Paint / Neon</span></div>
+        <div class="ctrl"><span class="keycap keycap-wide">Q·E</span><span>Yaw (aircraft)</span></div>
+        <div class="ctrl"><span class="keycap">M</span><span>Accept contract</span></div>
+      </div>
+
+      <div id="touchHint">📱 Left joystick to move, drag anywhere else to look</div>
+      <button id="startBtn"><span id="startBtnGlyph">▶</span> TAP TO PLAY</button>
+    </div>
   </div>
 
   <script type="module" src="src/main.js"></script>

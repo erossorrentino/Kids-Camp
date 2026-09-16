@@ -64,14 +64,16 @@ export class Player {
     const aiming = input.isMouseDown(2);
 
     let ix = 0, iz = 0;
-    if (input.isDown('KeyW')) iz += 1;
-    if (input.isDown('KeyS')) iz -= 1;
-    if (input.isDown('KeyD')) ix += 1;
-    if (input.isDown('KeyA')) ix -= 1;
+    if (input.isDownAny('KeyW', 'ArrowUp')) iz += 1;
+    if (input.isDownAny('KeyS', 'ArrowDown')) iz -= 1;
+    if (input.isDownAny('KeyD', 'ArrowRight')) ix += 1;
+    if (input.isDownAny('KeyA', 'ArrowLeft')) ix -= 1;
     const moving = ix !== 0 || iz !== 0;
 
     const fwd = cameraRig.flatForward || new THREE.Vector3(0, 0, 1);
-    const right = new THREE.Vector3(fwd.z, 0, -fwd.x);
+    // True screen-right relative to the camera's forward (cross(forward, up))
+    // — was previously inverted, which made D/→ strafe left on screen.
+    const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
     const moveDir = new THREE.Vector3()
       .addScaledVector(fwd, iz)
       .addScaledVector(right, ix);

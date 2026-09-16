@@ -1,6 +1,7 @@
 import * as THREE from '../../vendor/three/three.module.js';
 import { WEAPONS } from '../config.js';
 import { Pool } from '../utils/pool.js';
+import { buildGunMesh } from './gun.js';
 
 const IMPACT_POOL_SIZE = 48;
 const IMPACT_LIFETIME = 4;
@@ -19,19 +20,13 @@ export class WeaponSystem {
     this.raycaster.far = HITSCAN_RANGE;
     this._projectiles = [];
 
-    this.weaponMesh = new THREE.Mesh(
-      new THREE.BoxGeometry(0.12, 0.12, 0.4),
-      new THREE.MeshStandardMaterial({ color: this.current.color })
-    );
-    this.player.handAnchor.add(this.weaponMesh);
-
     this.muzzleFlash = new THREE.Mesh(
       new THREE.SphereGeometry(0.1, 6, 6),
       new THREE.MeshBasicMaterial({ color: 0xffdd66, transparent: true, opacity: 0 })
     );
-    this.muzzleFlash.position.z = 0.25;
-    this.weaponMesh.add(this.muzzleFlash);
     this._muzzleTimer = 0;
+    this.weaponMesh = null;
+    this._buildWeaponMesh();
 
     this._impacts = new Pool(() => {
       const m = new THREE.Mesh(
@@ -47,10 +42,23 @@ export class WeaponSystem {
 
   get current() { return this.inventory[this.index]; }
 
+  // Builds the detailed mesh for whatever weapon is currently equipped and
+  // (re)parents the muzzle flash to its barrel tip. Called once at startup
+  // and again on every weapon switch, since each gun has a different shape
+  // rather than being one box re-tinted per weapon.
+  _buildWeaponMesh() {
+    if (this.weaponMesh) this.player.handAnchor.remove(this.weaponMesh);
+    const { group, muzzle } = buildGunMesh(this.current.id);
+    this.weaponMesh = group;
+    this.player.handAnchor.add(this.weaponMesh);
+    muzzle.add(this.muzzleFlash);
+    this.muzzleFlash.position.set(0, 0, 0);
+  }
+
   switchTo(idx) {
     if (idx < 0 || idx >= this.inventory.length || idx === this.index) return;
     this.index = idx;
-    this.weaponMesh.material.color.setHex(this.current.color);
+    this._buildWeaponMesh();
   }
 
   cycle(dir) {

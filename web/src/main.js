@@ -30,7 +30,7 @@ const canvas = document.getElementById('viewport');
 const overlay = document.getElementById('startOverlay');
 const startBtn = document.getElementById('startBtn');
 
-document.getElementById('touchHint').style.display = isTouchDevice ? 'list-item' : 'none';
+document.getElementById('touchHint').style.display = isTouchDevice ? 'block' : 'none';
 
 // The button listener is attached before anything risky (WebGL/audio/module
 // work) runs, so a click always does *something* even if game setup fails.

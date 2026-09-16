@@ -6,6 +6,8 @@ export class HUD {
     this.el = {
       health: document.getElementById('healthBar'),
       armor: document.getElementById('armorBar'),
+      healthNum: document.getElementById('healthNum'),
+      armorNum: document.getElementById('armorNum'),
       stars: document.getElementById('stars'),
       weaponIcon: document.getElementById('weaponIcon'),
       weaponName: document.getElementById('weaponName'),
@@ -14,9 +16,10 @@ export class HUD {
       speedo: document.getElementById('speedo'),
       state: document.getElementById('stateIndicator'),
       crosshair: document.getElementById('crosshair'),
+      hitMarker: document.getElementById('hitMarker'),
       prompt: document.getElementById('prompt'),
       radioTag: document.getElementById('radioTag'),
-      cash: document.getElementById('cashDisplay'),
+      cash: document.getElementById('cashAmount'),
       missionPanel: document.getElementById('missionPanel'),
       missionTitle: document.getElementById('missionTitle'),
       missionDetail: document.getElementById('missionDetail'),
@@ -34,6 +37,14 @@ export class HUD {
     }
   }
 
+  // Brief red-X flash at the crosshair confirming a shot actually connected.
+  flashHitMarker() {
+    const el = this.el.hitMarker;
+    el.classList.remove('show');
+    void el.offsetWidth; // restart the CSS animation even on rapid repeat hits
+    el.classList.add('show');
+  }
+
   setPrompt(text) {
     if (text) { this.el.prompt.textContent = text; this.el.prompt.classList.add('show'); }
     else this.el.prompt.classList.remove('show');
@@ -45,7 +56,7 @@ export class HUD {
   }
 
   setCash(amount) {
-    this.el.cash.textContent = `$${Math.round(amount).toLocaleString()}`;
+    this.el.cash.textContent = Math.round(amount).toLocaleString();
   }
 
   updateMissions(status) {
@@ -82,6 +93,8 @@ export class HUD {
 
     this.el.health.style.width = `${Math.max(0, player.health)}%`;
     this.el.armor.style.width = `${Math.max(0, player.armor)}%`;
+    this.el.healthNum.textContent = Math.round(Math.max(0, player.health));
+    this.el.armorNum.textContent = Math.round(Math.max(0, player.armor));
 
     const starEls = this.el.stars.children;
     for (let i = 0; i < 5; i++) starEls[i].classList.toggle('on', i < wanted.stars);

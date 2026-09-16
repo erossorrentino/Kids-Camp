@@ -347,8 +347,11 @@ export class Vehicle {
 
   update(dt, input, world, onDrift, traction = 1) {
     if (!this.occupied) { this._settleWheels(); return { collided: false }; }
-    const throttle = input.isDown('KeyW') ? 1 : input.isDown('KeyS') ? -1 : 0;
-    const steer = (input.isDown('KeyA') ? -1 : 0) + (input.isDown('KeyD') ? 1 : 0);
+    const throttle = input.isDownAny('KeyW', 'ArrowUp') ? 1 : input.isDownAny('KeyS', 'ArrowDown') ? -1 : 0;
+    // heading increases toward -X (screen-left) at heading 0, so turning
+    // right needs a negative steer value from the right key — see the
+    // matching note on player.js's strafe `right` vector.
+    const steer = (input.isDownAny('KeyA', 'ArrowLeft') ? 1 : 0) + (input.isDownAny('KeyD', 'ArrowRight') ? -1 : 0);
     return this._physicsStep(dt, throttle, steer, world, onDrift, 1, traction);
   }
 

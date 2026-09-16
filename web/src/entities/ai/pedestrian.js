@@ -8,7 +8,9 @@ const FLEE_DURATION = 3.5;
 const RADIUS = 0.35;
 
 const SKIN_TONES = [0xd8a878, 0xc78a5a, 0x9a7a63, 0x7a5a45, 0xecc19c, 0x5c4536];
-const SHIRT_COLORS = [0x2f6fbf, 0xb03a3a, 0x3a8a4a, 0xc9a227, 0x5a4a8a, 0x2a2a2e, 0xd67a2a, 0xe0e0e0];
+// Keep the player's exact shirt hue (0x2f6fbf) out of this pool so a random
+// pedestrian never gets mistaken for the player at a glance.
+const SHIRT_COLORS = [0x1a8fc7, 0xb03a3a, 0x3a8a4a, 0xc9a227, 0x5a4a8a, 0x2a2a2e, 0xd67a2a, 0xe0e0e0];
 const PANTS_COLORS = [0x263041, 0x1c1c1e, 0x3a3226, 0x44342a];
 const HAIR_COLORS = [0x1c140f, 0x2a1e16, 0x5a4a3a, 0x8a7a6a, 0x0c0c0c, 0xb08a4a];
 const HAIR_STYLES = ['short', 'buzz', 'full', 'bald'];
