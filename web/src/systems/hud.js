@@ -30,6 +30,12 @@ export class HUD {
       missionList: document.getElementById('missionList'),
       missionMenuClose: document.getElementById('missionMenuClose'),
       toast: document.getElementById('toast'),
+      waypointClear: document.getElementById('waypointClear'),
+      waypointTag: document.getElementById('waypointTag'),
+      shopMenu: document.getElementById('shopMenu'),
+      shopMenuTitle: document.getElementById('shopMenuTitle'),
+      shopList: document.getElementById('shopList'),
+      shopMenuClose: document.getElementById('shopMenuClose'),
     };
     this._toastTimer = null;
     this._playerPos = null;
@@ -48,6 +54,75 @@ export class HUD {
   bindWeapons(weaponSystem) {
     this.weapons = weaponSystem;
     this.el.weaponPanel.addEventListener('click', () => this.weapons.cycle(1));
+  }
+
+  // Tapping/clicking the minimap drops a waypoint at that world position
+  // (map is north-up and never rotates, so the conversion is a direct
+  // inverse of the scale/translate _drawMinimap uses to place dots).
+  bindMinimapTap(onSet) {
+    this.el.minimap.addEventListener('click', (e) => {
+      if (!this._playerPos) return;
+      const rect = this.el.minimap.getBoundingClientRect();
+      const size = this.el.minimap.width;
+      const scale = size / MINIMAP_RANGE;
+      const cx = (e.clientX - rect.left) * (size / rect.width);
+      const cy = (e.clientY - rect.top) * (size / rect.height);
+      const worldX = this._playerPos.x + (cx - size / 2) / scale;
+      const worldZ = this._playerPos.z + (cy - size / 2) / scale;
+      onSet(worldX, worldZ);
+    });
+  }
+
+  bindWaypointClear(onClear) {
+    this.el.waypointClear.addEventListener('click', (e) => {
+      e.stopPropagation();
+      onClear();
+    });
+  }
+
+  // Wires the generic shop modal (see systems/shops.js + Game.purchaseShopItem).
+  // openShopMenu()/closeShopMenu() do the actual show/populate; this just
+  // wires the always-present close affordances once.
+  bindShopMenu() {
+    this.el.shopMenuClose.addEventListener('click', () => this.closeShopMenu());
+    this.el.shopMenu.addEventListener('click', (e) => {
+      if (e.target === this.el.shopMenu) this.closeShopMenu();
+    });
+  }
+
+  openShopMenu(shop, onBuy) {
+    if (document.pointerLockElement) document.exitPointerLock();
+    this.el.shopMenuTitle.textContent = shop.name;
+    const list = this.el.shopList;
+    list.innerHTML = '';
+    for (const item of shop.items) {
+      const row = document.createElement('div');
+      row.className = 'missionRow';
+      const info = document.createElement('div');
+      info.className = 'missionRowInfo';
+      const title = document.createElement('div');
+      title.className = 'missionRowTitle';
+      title.textContent = item.label;
+      info.append(title);
+
+      const pay = document.createElement('div');
+      pay.className = 'missionRowPay';
+      pay.textContent = `$${item.price.toLocaleString()}`;
+
+      const buyBtn = document.createElement('button');
+      buyBtn.type = 'button';
+      buyBtn.className = 'missionStartBtn';
+      buyBtn.textContent = 'BUY';
+      buyBtn.addEventListener('click', () => onBuy(item));
+
+      row.append(info, pay, buyBtn);
+      list.appendChild(row);
+    }
+    this.el.shopMenu.classList.add('show');
+  }
+
+  closeShopMenu() {
+    this.el.shopMenu.classList.remove('show');
   }
 
   // Wires the MISSIONS button + modal to a MissionManager. Missions themselves
@@ -157,8 +232,18 @@ export class HUD {
   }
 
   update(state) {
-    const { player, weaponSystem, wanted, controlMode, speedKmh, weather } = state;
+    const { player, weaponSystem, wanted, controlMode, speedKmh, weather, waypoint } = state;
     this._playerPos = state.position || player.mesh.position;
+
+    if (waypoint) {
+      const d = Math.hypot(waypoint.x - this._playerPos.x, waypoint.z - this._playerPos.z);
+      this.el.waypointTag.textContent = `◆ WAYPOINT ${Math.round(d)}m`;
+      this.el.waypointTag.classList.add('show');
+      this.el.waypointClear.classList.add('show');
+    } else {
+      this.el.waypointTag.classList.remove('show');
+      this.el.waypointClear.classList.remove('show');
+    }
 
     this.el.health.style.width = `${Math.max(0, player.health)}%`;
     this.el.armor.style.width = `${Math.max(0, player.armor)}%`;
@@ -192,7 +277,7 @@ export class HUD {
     this._drawMinimap(state);
   }
 
-  _drawMinimap({ player, world, ai, wanted, heading, position, missions }) {
+  _drawMinimap({ player, world, ai, wanted, heading, position, missions, waypoint, shops }) {
     const ctx = this.mmCtx;
     const size = this.el.minimap.width;
     const scale = size / MINIMAP_RANGE;
@@ -230,6 +315,26 @@ export class HUD {
     }
     if (wanted) {
       for (const p of wanted.police) dot(p.vehicle.mesh.position.x, p.vehicle.mesh.position.z, '#3d6bff', 3);
+    }
+    if (shops) {
+      for (const s of shops) dot(s.position.x, s.position.z, `#${s.color.toString(16).padStart(6, '0')}`, 3);
+    }
+
+    if (waypoint) {
+      let x = (waypoint.x - px) * scale, z = (waypoint.z - pz) * scale;
+      const dist = Math.hypot(x, z);
+      const maxR = size / 2 - 6;
+      if (dist > maxR) { x = (x / dist) * maxR; z = (z / dist) * maxR; }
+      ctx.fillStyle = '#ff3ad6';
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(x, z - 6);
+      ctx.lineTo(x + 5, z + 4);
+      ctx.lineTo(x - 5, z + 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
     }
 
     const showsTargetDot = (missions?.active?.kind === 'delivery' || missions?.active?.kind === 'heist')

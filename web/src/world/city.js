@@ -1,5 +1,5 @@
 import * as THREE from '../../vendor/three/three.module.js';
-import { CITY, PROPS } from '../config.js';
+import { CITY, PROPS, ISLAND } from '../config.js';
 import { rngForChunk, pick, randRange } from '../utils/rng.js';
 
 const ROAD_COLOR = 0x2b2e33;
@@ -360,6 +360,12 @@ export class CityWorld {
         const key = `${cx},${cz}`;
         needed.add(key);
         if (!this.chunks.has(key)) {
+          // Land only exists within the island radius (see config.js's
+          // ISLAND) — beyond it, leave the chunk absent so the ocean plane
+          // shows through instead of more city.
+          const centerX = (cx + 0.5) * CITY.chunkSize;
+          const centerZ = (cz + 0.5) * CITY.chunkSize;
+          if (Math.hypot(centerX, centerZ) > ISLAND.radius) continue;
           const chunk = new Chunk(cx, cz, this);
           this.chunks.set(key, chunk);
           this.container.add(chunk.group);

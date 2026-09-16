@@ -38,14 +38,27 @@ html, body {
 #ammoCount { font-size: 15px; font-variant-numeric: tabular-nums; }
 
 #mapPanel {
-  position: absolute; left: 18px; top: 18px; border-radius: 8px; overflow: hidden;
+  position: fixed; left: 18px; top: 18px; border-radius: 8px; overflow: hidden;
   border: 2px solid rgba(255,255,255,0.35); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+  pointer-events: auto; z-index: 6;
 }
 #mapLabel {
-  background: rgba(10,12,16,0.85); color: #ffd23f; font-size: 10px; font-weight: 700;
-  letter-spacing: 2px; text-align: center; padding: 2px 0;
+  background: rgba(10,12,16,0.85); color: #ffd23f; font-size: 9px; font-weight: 700;
+  letter-spacing: 1px; text-align: center; padding: 2px 4px; border-radius: 6px 6px 0 0; overflow: hidden;
 }
-#minimap { display: block; background: #1a1e24; }
+#minimap { display: block; background: #1a1e24; cursor: crosshair; }
+#waypointClear {
+  position: absolute; top: 22px; right: 4px; width: 20px; height: 20px; border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.4); background: rgba(0,0,0,0.7); color: #ff3ad6;
+  font: 700 11px/1 Arial, sans-serif; cursor: pointer; display: none; align-items: center; justify-content: center;
+  z-index: 7; padding: 0;
+}
+#waypointClear.show { display: flex; }
+#waypointTag {
+  position: absolute; right: 18px; bottom: 118px; font-size: 12px; font-weight: 700; color: #ff3ad6;
+  background: rgba(0,0,0,0.45); padding: 4px 10px; border-radius: 4px; opacity: 0; transition: opacity 0.3s;
+}
+#waypointTag.show { opacity: 1; }
 
 #cashDisplay {
   position: absolute; left: 18px; top: 212px; font-size: 20px; font-weight: 700; color: #7CFC00;
@@ -112,6 +125,23 @@ html, body {
   background: transparent; color: #cfd6e0; font: 700 12px/1 'Segoe UI', Arial, sans-serif; letter-spacing: 1px; cursor: pointer;
 }
 #missionMenuClose:hover { background: rgba(255,255,255,0.08); }
+
+#shopMenu {
+  display: none; position: fixed; inset: 0; z-index: 15;
+  background: rgba(5,7,10,0.75); align-items: center; justify-content: center;
+}
+#shopMenu.show { display: flex; }
+#shopMenuCard {
+  width: min(420px, 92vw); max-height: 80vh; overflow-y: auto; background: #12151c;
+  border: 1px solid rgba(255,210,63,0.4); border-radius: 10px; padding: 18px 20px; color: #eee;
+}
+#shopMenuCard h2 { margin: 0 0 4px; color: #ffd23f; letter-spacing: 2px; font-size: 18px; }
+#shopMenuHint { margin: 0 0 14px; color: #8a94a3; font-size: 12px; }
+#shopMenuClose {
+  margin-top: 14px; width: 100%; padding: 9px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25);
+  background: transparent; color: #cfd6e0; font: 700 12px/1 'Segoe UI', Arial, sans-serif; letter-spacing: 1px; cursor: pointer;
+}
+#shopMenuClose:hover { background: rgba(255,255,255,0.08); }
 
 #toast {
   position: absolute; left: 50%; top: 120px; transform: translateX(-50%); font-size: 16px; font-weight: 700;

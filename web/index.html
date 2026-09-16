@@ -23,11 +23,6 @@
 
     <div id="stars"></div>
 
-    <div id="mapPanel">
-      <div id="mapLabel">MAP</div>
-      <canvas id="minimap" width="180" height="180"></canvas>
-    </div>
-
     <div id="cashDisplay"><span id="cashIcon">$</span><span id="cashAmount">0</span></div>
 
     <div id="speedo"></div>
@@ -69,12 +64,26 @@
       <div id="ammoCount">-- / --</div>
     </div>
   </div>
+  <div id="mapPanel">
+    <div id="mapLabel">MAP — tap to set waypoint</div>
+    <canvas id="minimap" width="180" height="180"></canvas>
+    <button id="waypointClear" type="button">✕</button>
+  </div>
+  <div id="waypointTag"></div>
   <div id="missionMenu">
     <div id="missionMenuCard">
       <h2>CONTRACTS</h2>
       <p id="missionMenuHint">Pick a job. Only one active at a time.</p>
       <div id="missionList"></div>
       <button id="missionMenuClose" type="button">CLOSE</button>
+    </div>
+  </div>
+  <div id="shopMenu">
+    <div id="shopMenuCard">
+      <h2 id="shopMenuTitle">SHOP</h2>
+      <p id="shopMenuHint">Spend cash to gear up.</p>
+      <div id="shopList"></div>
+      <button id="shopMenuClose" type="button">CLOSE</button>
     </div>
   </div>
 
@@ -120,7 +129,8 @@
         <div class="ctrl"><span class="keycap">Shift</span><span>Sprint (heli: ascend)</span></div>
         <div class="ctrl"><span class="keycap">Mouse</span><span>Look around</span></div>
         <div class="ctrl"><span class="keycap">Space</span><span>Jump (heli: descend)</span></div>
-        <div class="ctrl"><span class="keycap">F</span><span>Enter / exit vehicle</span></div>
+        <div class="ctrl"><span class="keycap">F</span><span>Enter vehicle / browse shop</span></div>
+        <div class="ctrl"><span class="keycap keycap-wide">Tap map</span><span>Set a waypoint</span></div>
         <div class="ctrl"><span class="keycap">1-5</span><span>Switch weapon</span></div>
         <div class="ctrl"><span class="keycap">LMB</span><span>Shoot</span></div>
         <div class="ctrl"><span class="keycap">RMB</span><span>Aim down sights</span></div>

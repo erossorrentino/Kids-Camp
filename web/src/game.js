@@ -1,11 +1,13 @@
 import * as THREE from '../vendor/three/three.module.js';
-import { CAMERA, WORLD_SEED, VEHICLE, BIKE, HELI, JET, EXPLOSION } from './config.js';
+import { CAMERA, WORLD_SEED, VEHICLE, BIKE, HELI, JET, BOAT, SUB, WATER, ISLAND, EXPLOSION } from './config.js';
 import { Input } from './input.js';
 import { TouchControls } from './systems/touchControls.js';
 import { CityWorld } from './world/city.js';
 import { Player, PlayerState } from './entities/player.js';
 import { Vehicle } from './entities/vehicle.js';
 import { Helicopter, Jet } from './entities/aircraft.js';
+import { Boat } from './entities/boat.js';
+import { Submarine } from './entities/submarine.js';
 import { WeaponSystem } from './entities/weapons.js';
 import { AIManager } from './entities/ai/manager.js';
 import { WantedSystem } from './systems/wanted.js';
@@ -13,12 +15,15 @@ import { AudioManager } from './systems/audio.js';
 import { ParticleSystem } from './systems/particles.js';
 import { WeatherSystem } from './systems/weather.js';
 import { MissionManager } from './systems/missions.js';
+import { ShopManager } from './systems/shops.js';
+import { buildBeacon } from './systems/beacon.js';
 import { HUD } from './systems/hud.js';
 import { CameraRig } from './systems/camera.js';
 
-const MODE = { FOOT: 'FOOT', CAR: 'CAR', BIKE: 'BIKE', HELI: 'HELI', JET: 'JET' };
+const MODE = { FOOT: 'FOOT', CAR: 'CAR', BIKE: 'BIKE', HELI: 'HELI', JET: 'JET', BOAT: 'BOAT', SUB: 'SUB' };
 const DRIVING_MODES = new Set([MODE.CAR, MODE.BIKE]);
 const CASH_STORAGE_KEY = 'neonHorizonCash';
+const SPAWN_KIND_MODE = { car: MODE.CAR, bike: MODE.BIKE, heli: MODE.HELI, jet: MODE.JET, boat: MODE.BOAT, sub: MODE.SUB };
 
 export class Game {
   constructor(canvas) {
@@ -38,11 +43,18 @@ export class Game {
     this.particles = new ParticleSystem(this.scene);
     this.weather = new WeatherSystem(this.scene, this.sun, this.audio);
     this.missions = new MissionManager(this.scene);
+    this.shops = new ShopManager(this.scene);
     this.hud = new HUD();
     this.hud.bindMissions(this.missions);
     this.hud.bindWeapons(this.weaponSystem);
+    this.hud.bindShopMenu();
+    this.hud.bindMinimapTap((x, z) => this._setWaypoint(new THREE.Vector3(x, 0, z)));
+    this.hud.bindWaypointClear(() => this._clearWaypoint());
 
+    this._initWater();
     this._spawnVehicles();
+    this.boat = null;
+    this.sub = null;
 
     this.controlMode = { mode: MODE.FOOT, vehicle: null };
     this.engineHandle = null;
@@ -50,6 +62,8 @@ export class Game {
     this._smokeTimer = 0;
     this._playerDead = false;
     this.cash = this._loadCash();
+    this.waypoint = null;
+    this._waypointBeacon = null;
 
     this.clock = new THREE.Clock();
     window.addEventListener('resize', () => this._onResize());
@@ -95,6 +109,104 @@ export class Game {
     this.bike = new Vehicle(this.scene, { position: new THREE.Vector3(20, 0, 8), color: 0x161616, stats: BIKE, isBike: true, isPlayerStarter: true });
     this.heli = new Helicopter(this.scene, new THREE.Vector3(-18, 0.4, 30));
     this.jet = new Jet(this.scene, new THREE.Vector3(30, 1, -10));
+  }
+
+  // A single huge flat plane under everything, standing in for the ocean
+  // that surrounds the island (see config.js's ISLAND/WATER — CityWorld only
+  // generates land within ISLAND.radius of the origin).
+  _initWater() {
+    const geo = new THREE.PlaneGeometry(WATER.size, WATER.size);
+    const mat = new THREE.MeshStandardMaterial({ color: WATER.color, roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.92 });
+    const water = new THREE.Mesh(geo, mat);
+    water.rotation.x = -Math.PI / 2;
+    water.position.y = WATER.level;
+    water.receiveShadow = true;
+    this.scene.add(water);
+    this.water = water;
+  }
+
+  // Ground travel (on foot, car, bike) can't cross the shoreline — it slides
+  // along an invisible boundary at the island radius instead. Boats, subs,
+  // and aircraft are untouched, so the sea stays reachable by the vehicles
+  // meant to cross it.
+  _clampToIsland(obj) {
+    const d = Math.hypot(obj.mesh.position.x, obj.mesh.position.z);
+    if (d > ISLAND.radius) {
+      const s = ISLAND.radius / d;
+      obj.mesh.position.x *= s;
+      obj.mesh.position.z *= s;
+      if (typeof obj.speed === 'number') obj.speed *= 0.3;
+    }
+  }
+
+  // --- map waypoint --------------------------------------------------------
+  _setWaypoint(pos) {
+    if (this._waypointBeacon) this.scene.remove(this._waypointBeacon.group);
+    this.waypoint = pos;
+    this._waypointBeacon = buildBeacon(this.scene, pos, 0xff3ad6);
+    this.hud.showToast('Waypoint set', 'success', 1500);
+  }
+
+  _clearWaypoint() {
+    if (this._waypointBeacon) { this.scene.remove(this._waypointBeacon.group); this._waypointBeacon = null; }
+    this.waypoint = null;
+  }
+
+  // --- shops -----------------------------------------------------------
+  purchaseShopItem(shop, item) {
+    if (this.cash < item.price) { this.hud.showToast('Not enough cash', 'fail'); return; }
+    this.addCash(-item.price);
+    if (item.weapon) {
+      if (item.weapon === 'all') {
+        for (const w of this.weaponSystem.inventory) w.ammo = w.maxAmmo;
+      } else {
+        const w = this.weaponSystem.inventory.find((w) => w.id === item.weapon);
+        if (w) w.ammo = w.maxAmmo;
+      }
+      this.hud.showToast(`Bought: ${item.label}`, 'success');
+      this.hud.openShopMenu(shop, (it) => this.purchaseShopItem(shop, it)); // refresh (cash/ammo changed)
+    } else if (item.spawn) {
+      // Vehicle shops "call in" a vehicle and drop the player straight into
+      // the driver's seat — the coastal boat/sub shops launch it out into
+      // open water, well past where the player could ever walk up to it.
+      const vehicle = this._spawnPurchasedVehicle(item.spawn, shop.position);
+      this.hud.closeShopMenu();
+      this.hud.showToast(`${item.label} delivered!`, 'success');
+      this._enterVehicle({ obj: vehicle, type: SPAWN_KIND_MODE[item.spawn] });
+    }
+  }
+
+  _spawnPurchasedVehicle(kind, shopPos) {
+    const outward = shopPos.lengthSq() > 1 ? shopPos.clone().normalize() : new THREE.Vector3(1, 0, 0);
+    const isWater = kind === 'boat' || kind === 'sub';
+    const pos = shopPos.clone().addScaledVector(outward, isWater ? 60 : 8);
+    pos.y = 0;
+
+    if (kind === 'car') {
+      return this._replaceVehicle('starterCar', new Vehicle(this.scene, { position: pos, color: 0xd23a3a, isPlayerStarter: true }));
+    } else if (kind === 'bike') {
+      return this._replaceVehicle('bike', new Vehicle(this.scene, { position: pos, color: 0x161616, stats: BIKE, isBike: true, isPlayerStarter: true }));
+    } else if (kind === 'heli') {
+      pos.y = 0.4;
+      return this._replaceVehicle('heli', new Helicopter(this.scene, pos));
+    } else if (kind === 'jet') {
+      pos.y = 1;
+      return this._replaceVehicle('jet', new Jet(this.scene, pos));
+    } else if (kind === 'boat') {
+      pos.y = WATER.level + 0.1;
+      return this._replaceVehicle('boat', new Boat(this.scene, pos));
+    } else if (kind === 'sub') {
+      pos.y = WATER.level;
+      return this._replaceVehicle('sub', new Submarine(this.scene, pos));
+    }
+    return null;
+  }
+
+  _replaceVehicle(key, obj) {
+    const old = this[key];
+    if (old && old.mesh) this.scene.remove(old.mesh);
+    this[key] = obj;
+    return obj;
   }
 
   // Every drivable ground vehicle the world knows about — used for explosion
@@ -172,6 +284,8 @@ export class Game {
       { obj: this.heli, type: MODE.HELI, range: HELI.enterRange },
       { obj: this.jet, type: MODE.JET, range: JET.enterRange },
     ];
+    if (this.boat) candidates.push({ obj: this.boat, type: MODE.BOAT, range: BOAT.enterRange });
+    if (this.sub) candidates.push({ obj: this.sub, type: MODE.SUB, range: SUB.enterRange });
     for (const t of this.aiManager.traffic) {
       candidates.push({ obj: t.vehicle, type: MODE.CAR, range: VEHICLE.enterRange, trafficRef: t });
     }
@@ -181,7 +295,20 @@ export class Game {
       const d = p.distanceTo(c.obj.mesh.position);
       if (d < c.range && d < bestDist) { best = c; bestDist = d; }
     }
-    return best;
+    return best ? { ...best, dist: bestDist } : null;
+  }
+
+  // Whichever's closer of a nearby shop or a nearby enterable vehicle — F
+  // does whichever this returns, and the on-foot HUD prompt names it.
+  _nearestInteraction() {
+    const p = this.player.mesh.position;
+    const shop = this.shops.findNearby(p, 6);
+    const vehicle = this._findInteractable();
+    const shopDist = shop ? p.distanceTo(shop.position) : Infinity;
+    const vehicleDist = vehicle ? vehicle.dist : Infinity;
+    if (shop && shopDist <= vehicleDist) return { kind: 'shop', shop };
+    if (vehicle) return { kind: 'vehicle', candidate: vehicle };
+    return null;
   }
 
   _enterVehicle(candidate) {
@@ -201,11 +328,12 @@ export class Game {
 
   _exitVehicle() {
     const v = this.controlMode.vehicle;
+    const mode = this.controlMode.mode;
     v.occupied = false;
     const heading = v.heading ?? 0;
     const side = new THREE.Vector3(Math.cos(heading), 0, -Math.sin(heading));
     this.player.mesh.position.copy(v.mesh.position).addScaledVector(side, 3.2);
-    this.player.mesh.position.y = 0;
+    this.player.mesh.position.y = (mode === MODE.BOAT || mode === MODE.SUB) ? WATER.level + 0.05 : 0;
     this.player.setVisible(true);
     this.controlMode = { mode: MODE.FOOT, vehicle: null };
 
@@ -221,8 +349,9 @@ export class Game {
 
     if (this.input.wasPressed('KeyF')) {
       if (this.controlMode.mode === MODE.FOOT) {
-        const candidate = this._findInteractable();
-        if (candidate) this._enterVehicle(candidate);
+        const interaction = this._nearestInteraction();
+        if (interaction?.kind === 'shop') this.hud.openShopMenu(interaction.shop, (item) => this.purchaseShopItem(interaction.shop, item));
+        else if (interaction?.kind === 'vehicle') this._enterVehicle(interaction.candidate);
       } else {
         this._exitVehicle();
       }
@@ -238,6 +367,7 @@ export class Game {
       cameraRig.handleMouseFoot(input, aiming);
       cameraRig.updateFoot(player, dt, aiming);
       player.update(dt, input, cameraRig, world);
+      this._clampToIsland(player);
       if (player.state === PlayerState.RUNNING) weaponSystem.addBloom(dt * 0.6);
 
       const targets = [
@@ -254,13 +384,18 @@ export class Game {
       );
       if (weaponSystem.firedThisFrame) aiManager.notifyGunfire(player.mesh.position, 24);
 
-      const candidate = this._findInteractable();
-      hud.setPrompt(candidate ? 'Press F to enter vehicle' : null);
+      const interaction = this._nearestInteraction();
+      hud.setPrompt(
+        interaction?.kind === 'shop' ? `Press F to browse ${interaction.shop.name}`
+        : interaction?.kind === 'vehicle' ? 'Press F to enter vehicle'
+        : null
+      );
       activePos = player.mesh.position;
       heading = player.heading;
     } else if (DRIVING_MODES.has(this.controlMode.mode)) {
       const vehicle = this.controlMode.vehicle;
       const { collided } = vehicle.update(dt, input, world, undefined, traction);
+      this._clampToIsland(vehicle);
       if (collided) particles.spawnSmoke(vehicle.mesh.position, { color: 0x777777, size: 0.5, life: 0.5, spread: 1.5, rise: 0.5 });
       this._smashNearbyProps(vehicle);
       const chaseDist = vehicle.isBike ? 5.5 : 8;
@@ -314,10 +449,29 @@ export class Game {
       activePos = jet.mesh.position;
       heading = jet.heading;
       hud.setPrompt(jet.stalling ? 'STALLING — nose down! (Press F to exit)' : 'Press F to exit');
+    } else if (this.controlMode.mode === MODE.BOAT) {
+      const boat = this.controlMode.vehicle;
+      boat.update(dt, input);
+      cameraRig.updateChase(boat, dt, { dist: 9, height: 3.4 });
+      audio.setLoopIntensity(this.engineHandle, 0.2 + 0.8 * (Math.abs(boat.speed) / BOAT.maxSpeed), 0.6);
+      speedKmh = Math.abs(boat.speed) * 3.6;
+      activePos = boat.mesh.position;
+      heading = boat.heading;
+      hud.setPrompt('Press F to exit');
+    } else if (this.controlMode.mode === MODE.SUB) {
+      const sub = this.controlMode.vehicle;
+      sub.update(dt, input);
+      cameraRig.updateChase(sub, dt, { dist: 10, height: 3.6 });
+      speedKmh = Math.abs(sub.speed) * 3.6;
+      activePos = sub.mesh.position;
+      heading = sub.heading;
+      hud.setPrompt(`Press F to exit (Depth ${Math.round(sub.depth)}m)`);
     }
 
     if (this.controlMode.mode !== MODE.HELI) this.heli.update(dt, input);
     if (this.controlMode.mode !== MODE.JET) this.jet.update(dt, input);
+    if (this.boat && this.controlMode.mode !== MODE.BOAT) this.boat.update(dt, input);
+    if (this.sub && this.controlMode.mode !== MODE.SUB) this.sub.update(dt, input);
 
     world.update(activePos.x, activePos.z);
     aiManager.syncWithWorld(world);
@@ -325,6 +479,8 @@ export class Game {
     wanted.update(dt, world, player, activePos, this.controlMode, traction);
     weather.update(dt, activePos);
     this._scanVehicleDestructions();
+    this.shops.update(dt);
+    if (this._waypointBeacon) this._waypointBeacon.ring.rotation.z += dt * 1.5;
 
     if (input.wasPressed('KeyM')) hud.toggleMissionMenu();
     const isInVehicle = DRIVING_MODES.has(this.controlMode.mode);
@@ -358,7 +514,7 @@ export class Game {
     hud.update({
       player, weaponSystem, wanted, world, ai: aiManager,
       controlMode: this.controlMode, speedKmh, heading, position: activePos,
-      weather, missions: this.missions,
+      weather, missions: this.missions, waypoint: this.waypoint, shops: this.shops.shops,
     });
   }
 

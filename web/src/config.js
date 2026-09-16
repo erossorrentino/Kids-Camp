@@ -173,3 +173,89 @@ export const MISSIONS = {
     },
   },
 };
+
+// The city sits on an island: CityWorld only generates land within `radius`
+// of the origin (see world/city.js), everything past that is open ocean.
+// Foot/car/bike travel is clamped at the shoreline; boats, subs, and
+// aircraft can freely cross it.
+export const ISLAND = { radius: 480 };
+
+export const WATER = {
+  level: -0.4,       // sea surface height
+  color: 0x1c5f7d,
+  size: 6000,        // the ocean plane's edge length, centered on the origin
+};
+
+export const BOAT = {
+  enterRange: 4,
+  maxSpeed: 30,
+  reverseMaxSpeed: 10,
+  accel: 10,
+  brake: 14,
+  friction: 3,
+  turnRate: 1.6,
+};
+
+export const SUB = {
+  enterRange: 5,
+  maxSpeed: 22,
+  throttleAccel: 9,
+  yawRate: 1.0,
+  ascendSpeed: 6,
+  maxDepth: 30,
+};
+
+// Shops: fixed world markers the player walks/drives up to and presses F on
+// to spend cash. Gun shops restock ammo (every weapon is already carried —
+// see WeaponSystem); the rest spawn ("call in") a vehicle near the shop.
+export const SHOPS = {
+  types: {
+    GUN_SHOP: {
+      name: 'GUN SHOP', color: 0xd94040,
+      items: [
+        { id: 'ammo_pistol', label: 'Pistol ammo refill', price: 150, weapon: 'pistol' },
+        { id: 'ammo_rifle', label: 'Rifle ammo refill', price: 400, weapon: 'rifle' },
+        { id: 'ammo_shotgun', label: 'Shotgun ammo refill', price: 300, weapon: 'shotgun' },
+        { id: 'ammo_rocket', label: 'Rocket ammo refill', price: 1200, weapon: 'rocket' },
+        { id: 'ammo_railgun', label: 'Railgun ammo refill', price: 1800, weapon: 'railgun' },
+        { id: 'ammo_all', label: 'Restock ALL weapons', price: 3000, weapon: 'all' },
+      ],
+    },
+    CAR_SHOP: {
+      name: 'CAR DEALERSHIP', color: 0x3d6bff,
+      items: [
+        { id: 'car_sedan', label: 'Call in a Sedan', price: 1500, spawn: 'car' },
+        { id: 'car_bike', label: 'Call in a Superbike', price: 2500, spawn: 'bike' },
+      ],
+    },
+    BOAT_SHOP: {
+      name: 'BOAT DOCK', color: 0x1fb0c9,
+      items: [{ id: 'boat_speed', label: 'Call in a Speedboat', price: 5000, spawn: 'boat' }],
+    },
+    HELI_SHOP: {
+      name: 'HELIPAD', color: 0xffa62b,
+      items: [{ id: 'heli_std', label: 'Call in a Helicopter', price: 15000, spawn: 'heli' }],
+    },
+    JET_SHOP: {
+      name: 'AIRFIELD', color: 0xff3a3a,
+      items: [{ id: 'jet_fighter', label: 'Call in a Fighter Jet', price: 40000, spawn: 'jet' }],
+    },
+    SUB_SHOP: {
+      name: 'SUB PEN', color: 0x8a5cff,
+      items: [{ id: 'sub_std', label: 'Call in a Submarine', price: 25000, spawn: 'sub' }],
+    },
+  },
+  // Land shops sit in the clear spawn-plaza chunk; transport shops sit on
+  // the shoreline along the 4 cardinal directions, just inside the island
+  // radius, so buying one launches the vehicle straight out into open water.
+  locations: [
+    { type: 'GUN_SHOP', position: [100, 0, 100] },
+    { type: 'GUN_SHOP', position: [30, 0, 100] },
+    { type: 'CAR_SHOP', position: [100, 0, 60] },
+    { type: 'CAR_SHOP', position: [60, 0, 100] },
+    { type: 'BOAT_SHOP', position: [465, 0, 0] },
+    { type: 'SUB_SHOP', position: [-465, 0, 0] },
+    { type: 'HELI_SHOP', position: [0, 0, 465] },
+    { type: 'JET_SHOP', position: [0, 0, -465] },
+  ],
+};
