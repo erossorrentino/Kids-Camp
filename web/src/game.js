@@ -39,6 +39,7 @@ export class Game {
     this.weather = new WeatherSystem(this.scene, this.sun, this.audio);
     this.missions = new MissionManager(this.scene);
     this.hud = new HUD();
+    this.hud.bindMissions(this.missions);
 
     this._spawnVehicles();
 
@@ -324,7 +325,7 @@ export class Game {
     weather.update(dt, activePos);
     this._scanVehicleDestructions();
 
-    if (input.wasPressed('KeyM')) this.missions.acceptOffer();
+    if (input.wasPressed('KeyM')) hud.toggleMissionMenu();
     const missionEvent = this.missions.update(dt, activePos, player.health > 0);
     if (missionEvent) {
       if (missionEvent.success) {

@@ -53,24 +53,60 @@ html, body {
 
 #stateIndicator { position: absolute; left: 50%; top: 18px; transform: translateX(-50%); font-size: 12px; letter-spacing: 2px; background: rgba(0,0,0,0.4); padding: 4px 12px; border-radius: 12px; }
 
+/* Active-mission readout: top-left, stacked under the map/cash so the
+   current objective is always visible without covering the center of the
+   screen. The full mission LIST only ever appears in the #missionMenu modal,
+   opened via the MISSIONS button below. */
 #missionPanel {
-  position: absolute; left: 50%; top: 54px; transform: translateX(-50%); width: 260px; text-align: center;
-  background: rgba(10,12,16,0.6); border: 1px solid rgba(255,210,63,0.4); border-radius: 8px; padding: 8px 14px;
+  position: absolute; left: 18px; top: 302px; width: 220px; text-align: left;
+  background: rgba(10,12,16,0.7); border: 1px solid rgba(255,210,63,0.4); border-radius: 8px; padding: 8px 12px;
   opacity: 0; transition: opacity 0.25s;
 }
 #missionPanel.show { opacity: 1; }
-#missionTitle { font-size: 13px; font-weight: 700; letter-spacing: 1px; color: #ffd23f; }
-#missionDetail { font-size: 12px; color: #dfe6ee; margin-top: 2px; }
+#missionTitle { font-size: 12px; font-weight: 700; letter-spacing: 1px; color: #ffd23f; }
+#missionDetail { font-size: 11px; color: #dfe6ee; margin-top: 2px; }
 #missionTimerBar { height: 5px; background: rgba(255,255,255,0.15); border-radius: 3px; margin-top: 6px; overflow: hidden; }
 #missionTimerFill { height: 100%; width: 100%; background: #ffd23f; transition: width 0.2s linear; }
 
-#missionOffer {
-  position: absolute; left: 50%; bottom: 130px; transform: translateX(-50%); text-align: center;
-  background: rgba(0,0,0,0.6); border: 1px solid rgba(255,210,63,0.5); border-radius: 6px; padding: 8px 16px;
-  font-size: 13px; opacity: 0; transition: opacity 0.2s;
+/* The always-visible entry point — missions themselves stay hidden until
+   the player opens this menu. Sits outside #hud so it can take clicks. */
+#missionBtn {
+  position: fixed; left: 18px; top: 258px; z-index: 6;
+  padding: 7px 14px; border-radius: 6px; border: 1px solid rgba(255,210,63,0.5);
+  background: rgba(10,12,16,0.7); color: #ffd23f; font: 700 12px/1 'Segoe UI', Arial, sans-serif;
+  letter-spacing: 1px; cursor: pointer;
 }
-#missionOffer.show { opacity: 1; }
-#missionOffer b { color: #ffd23f; }
+#missionBtn:hover { background: rgba(255,210,63,0.15); }
+#missionBtn:disabled { opacity: 0.4; cursor: default; }
+
+#missionMenu {
+  display: none; position: fixed; inset: 0; z-index: 15;
+  background: rgba(5,7,10,0.75); align-items: center; justify-content: center;
+}
+#missionMenu.show { display: flex; }
+#missionMenuCard {
+  width: min(420px, 92vw); max-height: 80vh; overflow-y: auto; background: #12151c;
+  border: 1px solid rgba(255,210,63,0.4); border-radius: 10px; padding: 18px 20px; color: #eee;
+}
+#missionMenuCard h2 { margin: 0 0 4px; color: #ffd23f; letter-spacing: 2px; font-size: 18px; }
+#missionMenuHint { margin: 0 0 14px; color: #8a94a3; font-size: 12px; }
+.missionRow {
+  display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.08);
+}
+.missionRowInfo { flex: 1; min-width: 0; }
+.missionRowTitle { font-weight: 700; font-size: 13px; letter-spacing: 0.5px; }
+.missionRowDetail { font-size: 11.5px; color: #9aa4b2; margin-top: 2px; }
+.missionRowPay { font-size: 12px; font-weight: 700; color: #7CFC00; white-space: nowrap; }
+.missionStartBtn {
+  flex: 0 0 auto; padding: 7px 12px; border-radius: 5px; border: none; background: #ffd23f;
+  color: #201a00; font: 700 11px/1 'Segoe UI', Arial, sans-serif; letter-spacing: 0.5px; cursor: pointer;
+}
+.missionStartBtn:hover { background: #ffdd66; }
+#missionMenuClose {
+  margin-top: 14px; width: 100%; padding: 9px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25);
+  background: transparent; color: #cfd6e0; font: 700 12px/1 'Segoe UI', Arial, sans-serif; letter-spacing: 1px; cursor: pointer;
+}
+#missionMenuClose:hover { background: rgba(255,255,255,0.08); }
 
 #toast {
   position: absolute; left: 50%; top: 120px; transform: translateX(-50%); font-size: 16px; font-weight: 700;

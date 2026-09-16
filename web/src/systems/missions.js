@@ -8,11 +8,14 @@ const TITLES = {
   SURVIVAL: 'HEAT WAVE',
 };
 
+const DETAILS = {
+  DELIVERY: (cfg) => `Race a package to a drop point ${cfg.minDist}-${cfg.maxDist}m away`,
+  DEMOLITION: (cfg) => `Destroy ${cfg.targetCount} vehicles before time runs out`,
+  HITMAN: (cfg) => `Eliminate ${cfg.targetCount} hostiles before time runs out`,
+  SURVIVAL: (cfg) => `Stay alive for ${cfg.duration}s`,
+};
+
 function randRange([min, max]) { return THREE.MathUtils.lerp(min, max, Math.random()); }
-function randomType() {
-  const keys = Object.keys(MISSIONS.types);
-  return keys[Math.floor(Math.random() * keys.length)];
-}
 
 function buildBeacon(scene, position) {
   const group = new THREE.Group();
@@ -36,41 +39,59 @@ function buildBeacon(scene, position) {
   return { group, ring };
 }
 
-// Offers one contract at a time (delivery / demolition derby / contract hit /
-// heat wave survival). The player accepts with a keypress while an offer is
-// showing; progress and pass/fail is reported back to Game via update()'s
-// return value so it can award cash and pop a HUD toast.
+// Contracts stay out of the way until the player opens the mission menu and
+// explicitly starts one (see HUD's missionBtn/missionMenu) — no more
+// auto-popping offers cluttering the screen. Progress and pass/fail is
+// reported back to Game via update()'s return value.
 export class MissionManager {
   constructor(scene) {
     this.scene = scene;
-    this.offer = null;
     this.active = null;
-    this._offerCooldown = 3;
     this._beacon = null;
   }
 
-  acceptOffer() {
-    if (!this.offer) return;
-    this.active = this.offer;
-    this.active.timeLeft = this.active.timeLimit; // was counting down the offer-expiry clock until now
-    this.offer = null;
-    if (this.active.type === 'DELIVERY') this._beacon = buildBeacon(this.scene, this.active.target);
+  // Menu contents: the fixed set of contract types with their pay range and
+  // a human-readable blurb, unaffected by whatever's currently active.
+  listAvailable() {
+    return Object.entries(MISSIONS.types).map(([type, cfg]) => ({
+      type,
+      title: TITLES[type],
+      detail: DETAILS[type](cfg),
+      rewardRange: cfg.rewardRange,
+    }));
+  }
+
+  // Explicitly chosen from the mission menu — replaces the old random-offer
+  // + accept-with-keypress flow.
+  start(type, playerPos) {
+    if (this.active) return false;
+    const cfg = MISSIONS.types[type];
+    if (!cfg) return false;
+    const reward = Math.round(randRange(cfg.rewardRange) / 10) * 10;
+    const mission = { type, title: TITLES[type], reward, detail: DETAILS[type](cfg) };
+
+    if (type === 'DELIVERY') {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = randRange([cfg.minDist, cfg.maxDist]);
+      mission.target = new THREE.Vector3(playerPos.x + Math.sin(angle) * dist, 0, playerPos.z + Math.cos(angle) * dist);
+      mission.timeLimit = cfg.timeLimit;
+      this._beacon = buildBeacon(this.scene, mission.target);
+    } else if (type === 'DEMOLITION' || type === 'HITMAN') {
+      mission.targetCount = cfg.targetCount;
+      mission.progress = 0;
+      mission.timeLimit = cfg.timeLimit;
+    } else if (type === 'SURVIVAL') {
+      mission.timeLimit = cfg.duration;
+    }
+    mission.timeLeft = mission.timeLimit;
+    this.active = mission;
+    return true;
   }
 
   // playerAlive: false once health hits 0, used to fail SURVIVAL/any active mission.
   update(dt, playerPos, playerAlive) {
     if (this._beacon) this._beacon.ring.rotation.z += dt * 1.5;
-
-    if (!this.active) {
-      if (this.offer) {
-        this.offer.timeLeft -= dt;
-        if (this.offer.timeLeft <= 0) this.offer = null;
-      } else {
-        this._offerCooldown -= dt;
-        if (this._offerCooldown <= 0) this._generateOffer(playerPos);
-      }
-      return null;
-    }
+    if (!this.active) return null;
 
     this.active.timeLeft -= dt;
     let outcome = null;
@@ -100,56 +121,19 @@ export class MissionManager {
     if (this.active?.type === 'HITMAN') this.active.progress++;
   }
 
-  _generateOffer(playerPos) {
-    const type = randomType();
-    const cfg = MISSIONS.types[type];
-    const reward = Math.round(randRange(cfg.rewardRange) / 10) * 10;
-    const offer = { type, title: TITLES[type], reward, timeLeft: MISSIONS.offerExpiry };
-
-    if (type === 'DELIVERY') {
-      const angle = Math.random() * Math.PI * 2;
-      const dist = randRange([cfg.minDist, cfg.maxDist]);
-      offer.target = new THREE.Vector3(playerPos.x + Math.sin(angle) * dist, 0, playerPos.z + Math.cos(angle) * dist);
-      offer.timeLimit = cfg.timeLimit;
-      offer.detail = `Deliver to the marked drop point (${Math.round(dist)}m)`;
-    } else if (type === 'DEMOLITION') {
-      offer.targetCount = cfg.targetCount;
-      offer.progress = 0;
-      offer.timeLimit = cfg.timeLimit;
-      offer.detail = `Destroy ${cfg.targetCount} vehicles`;
-    } else if (type === 'HITMAN') {
-      offer.targetCount = cfg.targetCount;
-      offer.progress = 0;
-      offer.timeLimit = cfg.timeLimit;
-      offer.detail = `Eliminate ${cfg.targetCount} hostiles`;
-    } else if (type === 'SURVIVAL') {
-      offer.timeLimit = cfg.duration;
-      offer.detail = `Stay alive for ${cfg.duration}s`;
-    }
-    this.offer = offer;
-  }
-
   _resolve(outcome) {
     const mission = this.active;
     this.active = null;
-    this._offerCooldown = MISSIONS.offerCooldown;
     if (this._beacon) { this.scene.remove(this._beacon.group); this._beacon = null; }
-
-    // timeLeft becomes the mission's own timeLimit once accepted (see acceptOffer path below)
     return { type: mission.type, title: mission.title, success: outcome === 'success', reward: outcome === 'success' ? mission.reward : 0 };
   }
 
   // HUD-friendly snapshot; called every frame, cheap to compute.
   status() {
-    if (this.active) {
-      const m = this.active;
-      let progressText = null;
-      if (m.type === 'DEMOLITION' || m.type === 'HITMAN') progressText = `${m.progress}/${m.targetCount}`;
-      return { mode: 'ACTIVE', title: m.title, detail: m.detail, timeLeft: Math.max(0, m.timeLeft), timeLimit: m.timeLimit, progressText };
-    }
-    if (this.offer) {
-      return { mode: 'OFFER', title: this.offer.title, detail: this.offer.detail, reward: this.offer.reward };
-    }
-    return { mode: 'NONE' };
+    if (!this.active) return { mode: 'NONE' };
+    const m = this.active;
+    let progressText = null;
+    if (m.type === 'DEMOLITION' || m.type === 'HITMAN') progressText = `${m.progress}/${m.targetCount}`;
+    return { mode: 'ACTIVE', title: m.title, detail: m.detail, timeLeft: Math.max(0, m.timeLeft), timeLimit: m.timeLimit, progressText };
   }
 }

@@ -145,8 +145,6 @@ export const AI = {
 };
 
 export const MISSIONS = {
-  offerCooldown: 6,     // seconds idle before a new offer appears
-  offerExpiry: 14,      // seconds an unaccepted offer stays valid
   types: {
     DELIVERY: { timeLimit: 75, minDist: 90, maxDist: 220, rewardRange: [400, 900] },
     DEMOLITION: { timeLimit: 70, targetCount: 3, rewardRange: [600, 1100] },

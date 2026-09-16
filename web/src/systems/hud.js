@@ -24,10 +24,14 @@ export class HUD {
       missionTitle: document.getElementById('missionTitle'),
       missionDetail: document.getElementById('missionDetail'),
       missionTimerFill: document.getElementById('missionTimerFill'),
-      missionOffer: document.getElementById('missionOffer'),
+      missionBtn: document.getElementById('missionBtn'),
+      missionMenu: document.getElementById('missionMenu'),
+      missionList: document.getElementById('missionList'),
+      missionMenuClose: document.getElementById('missionMenuClose'),
       toast: document.getElementById('toast'),
     };
     this._toastTimer = null;
+    this._playerPos = null;
     this.mmCtx = this.el.minimap.getContext('2d');
     for (let i = 0; i < 5; i++) {
       const d = document.createElement('div');
@@ -35,6 +39,66 @@ export class HUD {
       d.innerHTML = STAR_SVG;
       this.el.stars.appendChild(d);
     }
+  }
+
+  // Wires the MISSIONS button + modal to a MissionManager. Missions themselves
+  // stay hidden until the player opens this menu and picks one — there's no
+  // more auto-popping offer banner.
+  bindMissions(missionManager) {
+    this.missions = missionManager;
+    this.el.missionBtn.addEventListener('click', () => this.openMissionMenu());
+    this.el.missionMenuClose.addEventListener('click', () => this.closeMissionMenu());
+    this.el.missionMenu.addEventListener('click', (e) => {
+      if (e.target === this.el.missionMenu) this.closeMissionMenu();
+    });
+  }
+
+  toggleMissionMenu() {
+    if (this.el.missionMenu.classList.contains('show')) this.closeMissionMenu();
+    else this.openMissionMenu();
+  }
+
+  openMissionMenu() {
+    if (this.missions.active) return; // finish the current contract first
+    // release mouse-look pointer lock so the cursor reappears to click the
+    // menu — clicking back into the game canvas re-engages it as usual
+    if (document.pointerLockElement) document.exitPointerLock();
+    const list = this.el.missionList;
+    list.innerHTML = '';
+    for (const m of this.missions.listAvailable()) {
+      const row = document.createElement('div');
+      row.className = 'missionRow';
+      const info = document.createElement('div');
+      info.className = 'missionRowInfo';
+      const title = document.createElement('div');
+      title.className = 'missionRowTitle';
+      title.textContent = m.title;
+      const detail = document.createElement('div');
+      detail.className = 'missionRowDetail';
+      detail.textContent = m.detail;
+      info.append(title, detail);
+
+      const pay = document.createElement('div');
+      pay.className = 'missionRowPay';
+      pay.textContent = `$${m.rewardRange[0]}–$${m.rewardRange[1]}`;
+
+      const startBtn = document.createElement('button');
+      startBtn.type = 'button';
+      startBtn.className = 'missionStartBtn';
+      startBtn.textContent = 'START';
+      startBtn.addEventListener('click', () => {
+        this.missions.start(m.type, this._playerPos);
+        this.closeMissionMenu();
+      });
+
+      row.append(info, pay, startBtn);
+      list.appendChild(row);
+    }
+    this.el.missionMenu.classList.add('show');
+  }
+
+  closeMissionMenu() {
+    this.el.missionMenu.classList.remove('show');
   }
 
   // Brief red-X flash at the crosshair confirming a shot actually connected.
@@ -60,9 +124,11 @@ export class HUD {
   }
 
   updateMissions(status) {
-    if (status.mode === 'ACTIVE') {
+    const active = status.mode === 'ACTIVE';
+    this.el.missionBtn.disabled = active;
+    this.el.missionBtn.textContent = active ? '☰ ON A JOB' : '☰ MISSIONS';
+    if (active) {
       this.el.missionPanel.classList.add('show');
-      this.el.missionOffer.classList.remove('show');
       this.el.missionTitle.textContent = status.title;
       this.el.missionDetail.textContent = status.progressText
         ? `${status.detail} — ${status.progressText}`
@@ -71,13 +137,6 @@ export class HUD {
       this.el.missionTimerFill.style.width = `${Math.max(0, Math.min(1, frac)) * 100}%`;
     } else {
       this.el.missionPanel.classList.remove('show');
-    }
-
-    if (status.mode === 'OFFER') {
-      this.el.missionOffer.innerHTML = `<b>${status.title}</b> — ${status.detail} · $${status.reward} &nbsp; [Press M to accept]`;
-      this.el.missionOffer.classList.add('show');
-    } else if (status.mode !== 'ACTIVE') {
-      this.el.missionOffer.classList.remove('show');
     }
   }
 
@@ -90,6 +149,7 @@ export class HUD {
 
   update(state) {
     const { player, weaponSystem, wanted, controlMode, speedKmh, weather } = state;
+    this._playerPos = state.position || player.mesh.position;
 
     this.el.health.style.width = `${Math.max(0, player.health)}%`;
     this.el.armor.style.width = `${Math.max(0, player.armor)}%`;
