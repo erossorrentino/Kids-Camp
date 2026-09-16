@@ -150,5 +150,9 @@ export const MISSIONS = {
     DEMOLITION: { timeLimit: 70, targetCount: 3, rewardRange: [600, 1100] },
     HITMAN: { timeLimit: 80, targetCount: 4, rewardRange: [550, 1000] },
     SURVIVAL: { duration: 45, rewardRange: [350, 700] },
+    // The big score: break into a marked vault, then make it to a getaway
+    // point before time runs out — triggers a serious wanted-heat spike the
+    // instant the vault is hit, unlike the smaller contracts above.
+    HEIST: { timeLimit: 150, minDist: 120, maxDist: 260, escapeMinDist: 90, escapeMaxDist: 180, rewardRange: [250000, 2000000] },
   },
 };

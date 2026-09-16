@@ -6,6 +6,7 @@ const TITLES = {
   DEMOLITION: 'DEMOLITION DERBY',
   HITMAN: 'CONTRACT HIT',
   SURVIVAL: 'HEAT WAVE',
+  HEIST: 'HEIST',
 };
 
 const DETAILS = {
@@ -13,22 +14,28 @@ const DETAILS = {
   DEMOLITION: (cfg) => `Destroy ${cfg.targetCount} vehicles before time runs out`,
   HITMAN: (cfg) => `Eliminate ${cfg.targetCount} hostiles before time runs out`,
   SURVIVAL: (cfg) => `Stay alive for ${cfg.duration}s`,
+  HEIST: (cfg) => `Hit a vault ${cfg.minDist}-${cfg.maxDist}m out, then run the score to a getaway point — triggers major heat`,
+};
+
+const HEIST_PHASE_DETAIL = {
+  rob: 'Break into the marked vault',
+  escape: 'Score in hand — get to the getaway point before the cops box you in!',
 };
 
 function randRange([min, max]) { return THREE.MathUtils.lerp(min, max, Math.random()); }
 
-function buildBeacon(scene, position) {
+function buildBeacon(scene, position, color = 0xffd23f) {
   const group = new THREE.Group();
   const beam = new THREE.Mesh(
     new THREE.CylinderGeometry(1.4, 1.4, 40, 16, 1, true),
-    new THREE.MeshBasicMaterial({ color: 0xffd23f, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false })
+    new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.25, side: THREE.DoubleSide, depthWrite: false })
   );
   beam.position.y = 20;
   group.add(beam);
 
   const ring = new THREE.Mesh(
     new THREE.TorusGeometry(2.2, 0.15, 8, 24),
-    new THREE.MeshBasicMaterial({ color: 0xffd23f })
+    new THREE.MeshBasicMaterial({ color })
   );
   ring.rotation.x = Math.PI / 2;
   ring.position.y = 0.3;
@@ -48,6 +55,16 @@ export class MissionManager {
     this.scene = scene;
     this.active = null;
     this._beacon = null;
+    this._alarmPending = false;
+  }
+
+  // One-shot flag: true exactly once, the frame the heist vault is hit,
+  // so Game can spike wanted heat / show a warning without MissionManager
+  // needing to know about WantedSystem directly.
+  consumeAlarm() {
+    const v = this._alarmPending;
+    this._alarmPending = false;
+    return v;
   }
 
   // Menu contents: the fixed set of contract types with their pay range and
@@ -67,7 +84,8 @@ export class MissionManager {
     if (this.active) return false;
     const cfg = MISSIONS.types[type];
     if (!cfg) return false;
-    const reward = Math.round(randRange(cfg.rewardRange) / 10) * 10;
+    const roundTo = type === 'HEIST' ? 1000 : 10;
+    const reward = Math.round(randRange(cfg.rewardRange) / roundTo) * roundTo;
     const mission = { type, title: TITLES[type], reward, detail: DETAILS[type](cfg) };
 
     if (type === 'DELIVERY') {
@@ -82,6 +100,14 @@ export class MissionManager {
       mission.timeLimit = cfg.timeLimit;
     } else if (type === 'SURVIVAL') {
       mission.timeLimit = cfg.duration;
+    } else if (type === 'HEIST') {
+      const angle = Math.random() * Math.PI * 2;
+      const dist = randRange([cfg.minDist, cfg.maxDist]);
+      mission.phase = 'rob';
+      mission.target = new THREE.Vector3(playerPos.x + Math.sin(angle) * dist, 0, playerPos.z + Math.cos(angle) * dist);
+      mission.timeLimit = cfg.timeLimit;
+      mission.detail = HEIST_PHASE_DETAIL.rob;
+      this._beacon = buildBeacon(this.scene, mission.target, 0xff3a3a);
     }
     mission.timeLeft = mission.timeLimit;
     this.active = mission;
@@ -104,6 +130,15 @@ export class MissionManager {
       else if (this.active.timeLeft <= 0) outcome = 'fail';
     } else if (this.active.type === 'SURVIVAL') {
       if (this.active.timeLeft <= 0) outcome = 'success';
+    } else if (this.active.type === 'HEIST') {
+      const d = Math.hypot(playerPos.x - this.active.target.x, playerPos.z - this.active.target.z);
+      if (this.active.phase === 'rob') {
+        if (d < 6) this._triggerAlarm();
+        else if (this.active.timeLeft <= 0) outcome = 'fail';
+      } else { // escape
+        if (d < 6) outcome = 'success';
+        else if (this.active.timeLeft <= 0) outcome = 'fail';
+      }
     } else { // DEMOLITION / HITMAN
       if (this.active.progress >= this.active.targetCount) outcome = 'success';
       else if (this.active.timeLeft <= 0) outcome = 'fail';
@@ -111,6 +146,21 @@ export class MissionManager {
 
     if (outcome) return this._resolve(outcome);
     return null;
+  }
+
+  // Vault hit: swap the beacon to a fresh getaway point, flag the one-shot
+  // alarm for Game to spike wanted heat on, and switch the HUD blurb.
+  _triggerAlarm() {
+    const cfg = MISSIONS.types.HEIST;
+    const from = this.active.target;
+    const angle = Math.random() * Math.PI * 2;
+    const dist = randRange([cfg.escapeMinDist, cfg.escapeMaxDist]);
+    this.active.target = new THREE.Vector3(from.x + Math.sin(angle) * dist, 0, from.z + Math.cos(angle) * dist);
+    this.active.phase = 'escape';
+    this.active.detail = HEIST_PHASE_DETAIL.escape;
+    this._alarmPending = true;
+    if (this._beacon) this.scene.remove(this._beacon.group);
+    this._beacon = buildBeacon(this.scene, this.active.target, 0xffd23f);
   }
 
   notifyVehicleDestroyed() {

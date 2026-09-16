@@ -80,7 +80,7 @@ export class HUD {
 
       const pay = document.createElement('div');
       pay.className = 'missionRowPay';
-      pay.textContent = `$${m.rewardRange[0]}–$${m.rewardRange[1]}`;
+      pay.textContent = `$${m.rewardRange[0].toLocaleString()}–$${m.rewardRange[1].toLocaleString()}`;
 
       const startBtn = document.createElement('button');
       startBtn.type = 'button';
@@ -223,13 +223,16 @@ export class HUD {
       for (const p of wanted.police) dot(p.vehicle.mesh.position.x, p.vehicle.mesh.position.z, '#3d6bff', 3);
     }
 
-    if (missions?.active?.type === 'DELIVERY') {
+    const showsTargetDot = missions?.active?.type === 'DELIVERY'
+      || (missions?.active?.type === 'HEIST' && missions.active.target);
+    if (showsTargetDot) {
       const t = missions.active.target;
       let x = (t.x - px) * scale, z = (t.z - pz) * scale;
       const dist = Math.hypot(x, z);
       const maxR = size / 2 - 6;
       if (dist > maxR) { x = (x / dist) * maxR; z = (z / dist) * maxR; }
-      ctx.fillStyle = '#ffd23f';
+      const heistRobbing = missions.active.type === 'HEIST' && missions.active.phase === 'rob';
+      ctx.fillStyle = heistRobbing ? '#ff3a3a' : '#ffd23f';
       ctx.strokeStyle = '#000';
       ctx.lineWidth = 1;
       ctx.beginPath();

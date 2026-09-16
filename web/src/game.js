@@ -327,10 +327,14 @@ export class Game {
 
     if (input.wasPressed('KeyM')) hud.toggleMissionMenu();
     const missionEvent = this.missions.update(dt, activePos, player.health > 0);
+    if (this.missions.consumeAlarm()) {
+      this.wanted.reportCrime(3); // hitting the vault is a big enough crime to spike heat hard
+      hud.showToast('ALARM TRIGGERED — GET TO THE GETAWAY POINT!', 'fail', 4000);
+    }
     if (missionEvent) {
       if (missionEvent.success) {
         this.addCash(missionEvent.reward);
-        hud.showToast(`${missionEvent.title} complete! +$${missionEvent.reward}`, 'success');
+        hud.showToast(`${missionEvent.title} complete! +$${missionEvent.reward.toLocaleString()}`, 'success');
       } else {
         hud.showToast(`${missionEvent.title} failed`, 'fail');
       }
