@@ -9,6 +9,7 @@ export class HUD {
       healthNum: document.getElementById('healthNum'),
       armorNum: document.getElementById('armorNum'),
       stars: document.getElementById('stars'),
+      weaponPanel: document.getElementById('weaponPanel'),
       weaponIcon: document.getElementById('weaponIcon'),
       weaponName: document.getElementById('weaponName'),
       ammo: document.getElementById('ammoCount'),
@@ -39,6 +40,14 @@ export class HUD {
       d.innerHTML = STAR_SVG;
       this.el.stars.appendChild(d);
     }
+  }
+
+  // Tapping the weapon/ammo panel cycles to the next owned weapon — same
+  // action as the mouse wheel or the touch WPN button, just discoverable
+  // by tapping the thing that shows your current gun and bullet count.
+  bindWeapons(weaponSystem) {
+    this.weapons = weaponSystem;
+    this.el.weaponPanel.addEventListener('click', () => this.weapons.cycle(1));
   }
 
   // Wires the MISSIONS button + modal to a MissionManager. Missions themselves
@@ -223,15 +232,15 @@ export class HUD {
       for (const p of wanted.police) dot(p.vehicle.mesh.position.x, p.vehicle.mesh.position.z, '#3d6bff', 3);
     }
 
-    const showsTargetDot = missions?.active?.type === 'DELIVERY'
-      || (missions?.active?.type === 'HEIST' && missions.active.target);
+    const showsTargetDot = (missions?.active?.kind === 'delivery' || missions?.active?.kind === 'heist')
+      && missions.active.target;
     if (showsTargetDot) {
       const t = missions.active.target;
       let x = (t.x - px) * scale, z = (t.z - pz) * scale;
       const dist = Math.hypot(x, z);
       const maxR = size / 2 - 6;
       if (dist > maxR) { x = (x / dist) * maxR; z = (z / dist) * maxR; }
-      const heistRobbing = missions.active.type === 'HEIST' && missions.active.phase === 'rob';
+      const heistRobbing = missions.active.kind === 'heist' && missions.active.phase === 'rob';
       ctx.fillStyle = heistRobbing ? '#ff3a3a' : '#ffd23f';
       ctx.strokeStyle = '#000';
       ctx.lineWidth = 1;

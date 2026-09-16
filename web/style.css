@@ -26,7 +26,12 @@ html, body {
 #stars .star.on { opacity: 1; }
 #stars .star svg { width: 100%; height: 100%; }
 
-#weaponPanel { position: absolute; right: 18px; bottom: 18px; display: flex; align-items: center; gap: 10px; background: rgba(0,0,0,0.45); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15); }
+#weaponPanel {
+  position: fixed; right: 18px; bottom: 18px; display: flex; align-items: center; gap: 10px;
+  background: rgba(0,0,0,0.45); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15);
+  pointer-events: auto; cursor: pointer; z-index: 6; transition: background 0.12s, border-color 0.12s;
+}
+#weaponPanel:hover, #weaponPanel:active { background: rgba(255,210,63,0.18); border-color: rgba(255,210,63,0.5); }
 #weaponIcon { width: 34px; height: 18px; border-radius: 3px; background: #999; box-shadow: inset 0 0 4px rgba(0,0,0,0.6); }
 #weaponInfo { text-align: right; }
 #weaponName { font-weight: 700; font-size: 13px; letter-spacing: 0.5px; }

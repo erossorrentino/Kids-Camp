@@ -146,13 +146,30 @@ export const AI = {
 
 export const MISSIONS = {
   types: {
-    DELIVERY: { timeLimit: 75, minDist: 90, maxDist: 220, rewardRange: [400, 900] },
-    DEMOLITION: { timeLimit: 70, targetCount: 3, rewardRange: [600, 1100] },
-    HITMAN: { timeLimit: 80, targetCount: 4, rewardRange: [550, 1000] },
-    SURVIVAL: { duration: 45, rewardRange: [350, 700] },
-    // The big score: break into a marked vault, then make it to a getaway
-    // point before time runs out — triggers a serious wanted-heat spike the
-    // instant the vault is hit, unlike the smaller contracts above.
-    HEIST: { timeLimit: 150, minDist: 120, maxDist: 260, escapeMinDist: 90, escapeMaxDist: 180, rewardRange: [250000, 2000000] },
+    DELIVERY: { kind: 'delivery', timeLimit: 75, minDist: 90, maxDist: 220, rewardRange: [400, 900] },
+    // Same delivery shape, but you must actually be driving when you reach
+    // the drop point — the timer keeps running if you show up on foot.
+    GETAWAY: { kind: 'delivery', requireVehicle: true, timeLimit: 65, minDist: 100, maxDist: 200, rewardRange: [500, 1100] },
+    DEMOLITION: { kind: 'demolitionVehicles', timeLimit: 70, targetCount: 3, rewardRange: [600, 1100] },
+    // Same "destroy N before time's up" shape as DEMOLITION, aimed at street
+    // props (crates/barriers) instead of vehicles.
+    RAMPAGE: { kind: 'demolitionProps', timeLimit: 60, targetCount: 5, rewardRange: [500, 950] },
+    HITMAN: { kind: 'hitman', timeLimit: 80, targetCount: 4, rewardRange: [550, 1000] },
+    SURVIVAL: { kind: 'survival', duration: 45, rewardRange: [350, 700] },
+    // The big scores: break into a marked vault, which triggers a serious
+    // wanted-heat spike and swaps the beacon to a getaway point you need to
+    // reach before time runs out. Three flavors at different risk/reward.
+    HEIST: {
+      kind: 'heist', timeLimit: 150, minDist: 120, maxDist: 260,
+      escapeMinDist: 90, escapeMaxDist: 180, rewardRange: [250000, 2000000], alarmStars: 3,
+    },
+    JEWELRY_STORE: {
+      kind: 'heist', timeLimit: 100, minDist: 60, maxDist: 140,
+      escapeMinDist: 70, escapeMaxDist: 140, rewardRange: [250000, 1200000], alarmStars: 2,
+    },
+    ARMORED_CAR: {
+      kind: 'heist', requireVehicleEscape: true, timeLimit: 130, minDist: 90, maxDist: 200,
+      escapeMinDist: 100, escapeMaxDist: 200, rewardRange: [400000, 2500000], alarmStars: 4,
+    },
   },
 };

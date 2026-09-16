@@ -40,6 +40,7 @@ export class Game {
     this.missions = new MissionManager(this.scene);
     this.hud = new HUD();
     this.hud.bindMissions(this.missions);
+    this.hud.bindWeapons(this.weaponSystem);
 
     this._spawnVehicles();
 
@@ -326,9 +327,10 @@ export class Game {
     this._scanVehicleDestructions();
 
     if (input.wasPressed('KeyM')) hud.toggleMissionMenu();
-    const missionEvent = this.missions.update(dt, activePos, player.health > 0);
+    const isInVehicle = DRIVING_MODES.has(this.controlMode.mode);
+    const missionEvent = this.missions.update(dt, activePos, player.health > 0, isInVehicle);
     if (this.missions.consumeAlarm()) {
-      this.wanted.reportCrime(3); // hitting the vault is a big enough crime to spike heat hard
+      this.wanted.reportCrime(this.missions.alarmStars); // hitting the target is a big enough crime to spike heat hard
       hud.showToast('ALARM TRIGGERED — GET TO THE GETAWAY POINT!', 'fail', 4000);
     }
     if (missionEvent) {
@@ -382,6 +384,7 @@ export class Game {
       if (prop.takeDamage(999)) {
         this.particles.spawnSmoke(prop.mesh.position, { color: 0x9a8a6a, size: 0.5, life: 0.6, spread: 1.4, rise: 0.3 });
         vehicle.speed *= 0.92;
+        this.missions.notifyPropDestroyed();
       }
     }
   }
@@ -412,7 +415,9 @@ export class Game {
         ped.dispose(this.scene);
       }
     }
-    for (const prop of this.world.getPropsNear(position.x, position.z, radius)) prop.takeDamage(999);
+    for (const prop of this.world.getPropsNear(position.x, position.z, radius)) {
+      if (prop.takeDamage(999)) this.missions.notifyPropDestroyed();
+    }
 
     const dPlayer = this.player.mesh.position.distanceTo(position);
     if (this.controlMode.mode === MODE.FOOT && dPlayer < radius) {
@@ -449,6 +454,7 @@ export class Game {
       const prop = hit.object.userData.ref;
       if (prop.takeDamage(damage)) {
         this.particles.spawnSmoke(hit.point, { color: 0x9a8a6a, size: 0.5, life: 0.6, spread: 1.2, rise: 0.3 });
+        this.missions.notifyPropDestroyed();
       }
     }
     this.particles.spawnSmoke(hit.point, { color: 0x8a1010, size: 0.25, life: 0.35, spread: 0.4, rise: 0.2 });
