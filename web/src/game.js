@@ -22,7 +22,10 @@ import { CameraRig } from './systems/camera.js';
 
 const MODE = { FOOT: 'FOOT', CAR: 'CAR', BIKE: 'BIKE', HELI: 'HELI', JET: 'JET', BOAT: 'BOAT', SUB: 'SUB' };
 const DRIVING_MODES = new Set([MODE.CAR, MODE.BIKE]);
-const CASH_STORAGE_KEY = 'neonHorizonCash';
+// Bumped from 'neonHorizonCash' so anyone with a stale save (from before
+// STARTING_CASH was $1.5M) gets the new starting balance instead of an old
+// leftover value.
+const CASH_STORAGE_KEY = 'neonHorizonCashV2';
 const LICENSE_STORAGE_KEY = 'neonHorizonLicense';
 const SPAWN_KIND_MODE = { car: MODE.CAR, bike: MODE.BIKE, heli: MODE.HELI, jet: MODE.JET, boat: MODE.BOAT, sub: MODE.SUB };
 
@@ -140,14 +143,15 @@ export class Game {
     this.beach = beach;
   }
 
-  // Ground travel (on foot, car, bike) can't cross the shoreline — it slides
-  // along an invisible boundary at the island radius instead. Boats, subs,
-  // and aircraft are untouched, so the sea stays reachable by the vehicles
-  // meant to cross it.
-  _clampToIsland(obj) {
+  // Cars/bikes can drive down onto the beach but slide off an invisible
+  // boundary at its outer edge instead of driving into open water — the
+  // player on foot has no boundary at all (see the FOOT branch below), so
+  // they can walk across the sand and swim past it. Boats, subs, and
+  // aircraft are untouched either way.
+  _clampToIsland(obj, radius) {
     const d = Math.hypot(obj.mesh.position.x, obj.mesh.position.z);
-    if (d > ISLAND.radius) {
-      const s = ISLAND.radius / d;
+    if (d > radius) {
+      const s = radius / d;
       obj.mesh.position.x *= s;
       obj.mesh.position.z *= s;
       if (typeof obj.speed === 'number') obj.speed *= 0.3;
@@ -404,7 +408,16 @@ export class Game {
       cameraRig.handleMouseFoot(input, aiming);
       cameraRig.updateFoot(player, dt, aiming);
       player.update(dt, input, cameraRig, world);
-      this._clampToIsland(player);
+      // no clamp here: the player can walk down the beach and swim out past
+      // it into open water (e.g. to reach a boat) — only ground vehicles
+      // are stopped at the shoreline, just below. Past the shoreline, ease
+      // them down toward the waterline so it reads as swimming rather than
+      // walking on an invisible plane above the sea.
+      if (player.grounded) {
+        const distFromCenter = Math.hypot(player.mesh.position.x, player.mesh.position.z);
+        const swimDepth = THREE.MathUtils.clamp((distFromCenter - ISLAND.radius) / (BEACH.outerRadius - ISLAND.radius), 0, 1);
+        player.mesh.position.y = THREE.MathUtils.lerp(0, WATER.level + 0.15, swimDepth);
+      }
       if (player.state === PlayerState.RUNNING) weaponSystem.addBloom(dt * 0.6);
 
       const targets = [
@@ -434,7 +447,7 @@ export class Game {
     } else if (DRIVING_MODES.has(this.controlMode.mode)) {
       const vehicle = this.controlMode.vehicle;
       const { collided } = vehicle.update(dt, input, world, undefined, traction);
-      this._clampToIsland(vehicle);
+      this._clampToIsland(vehicle, BEACH.outerRadius); // cars/bikes can drive onto the sand, not into the sea
       if (collided) particles.spawnSmoke(vehicle.mesh.position, { color: 0x777777, size: 0.5, life: 0.5, spread: 1.5, rise: 0.5 });
       this._smashNearbyProps(vehicle);
       const chaseDist = vehicle.isBike ? 5.5 : 8;

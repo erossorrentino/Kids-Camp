@@ -245,19 +245,18 @@ export const SHOPS = {
       items: [{ id: 'sub_std', label: 'Call in a Submarine (personal submersible)', price: 4500000, spawn: 'sub' }],
     },
   },
-  // Land shops sit on the permanent road strip at the west edge of their
-  // chunk (x in [chunk*120, chunk*120+14]), which CityWorld never puts a
-  // building or prop on regardless of that chunk's random layout — spread
-  // across different districts instead of clustered at spawn. Transport
-  // shops sit on the shoreline along the 4 cardinal directions, just inside
-  // the island radius, so buying one launches the vehicle straight into
-  // open water.
+  // Land shops sit on the sidewalk/plaza of the spawn chunk (0,0) — the one
+  // chunk CityWorld guarantees stays free of buildings and props (see
+  // world/city.js's isSpawnPlaza) — spread out across it, off the actual
+  // road lanes so they never sit in traffic. Transport shops sit on the
+  // shoreline along the 4 cardinal directions, just inside the island
+  // radius, so buying one launches the vehicle straight into open water.
   locations: [
-    { type: 'FIXER', position: [7, 0, 60] },
-    { type: 'GUN_SHOP', position: [247, 0, 180] },
-    { type: 'GUN_SHOP', position: [-353, 0, 300] },
-    { type: 'CAR_SHOP', position: [127, 0, -300] },
-    { type: 'CAR_SHOP', position: [-233, 0, -60] },
+    { type: 'FIXER', position: [25, 0, 100] },
+    { type: 'GUN_SHOP', position: [95, 0, 100] },
+    { type: 'GUN_SHOP', position: [95, 0, 35] },
+    { type: 'CAR_SHOP', position: [55, 0, 65] },
+    { type: 'CAR_SHOP', position: [25, 0, 35] },
     { type: 'BOAT_SHOP', position: [465, 0, 0] },
     { type: 'SUB_SHOP', position: [-465, 0, 0] },
     { type: 'HELI_SHOP', position: [0, 0, 465] },
