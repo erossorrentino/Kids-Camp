@@ -48,11 +48,33 @@ export class WeaponSystem {
   // rather than being one box re-tinted per weapon.
   _buildWeaponMesh() {
     if (this.weaponMesh) this.player.handAnchor.remove(this.weaponMesh);
-    const { group, muzzle } = buildGunMesh(this.current.id);
+    const { group, muzzle } = buildGunMesh(this.current.id, this.current.tint);
     this.weaponMesh = group;
     this.player.handAnchor.add(this.weaponMesh);
     muzzle.add(this.muzzleFlash);
     this.muzzleFlash.position.set(0, 0, 0);
+  }
+
+  // Buying a gun from the procedural GUN_SHOP catalog (see
+  // systems/weaponGenerator.js) re-tunes and re-tints the inventory slot
+  // matching its archetype rather than adding a 6th weapon — you still only
+  // ever carry one pistol/rifle/shotgun/rocket/railgun at a time, just a
+  // better (or just differently painted) one.
+  equipVariant(variant) {
+    const slot = this.inventory.find((w) => w.id === variant.archetype);
+    if (!slot) return;
+    Object.assign(slot, {
+      name: variant.name,
+      tint: variant.tint,
+      damage: variant.damage,
+      fireRate: variant.fireRate,
+      maxAmmo: variant.maxAmmo,
+      spread: variant.spread,
+      pellets: variant.pellets,
+      blastDamage: variant.blastDamage,
+    });
+    slot.ammo = slot.maxAmmo;
+    if (slot === this.current) this._buildWeaponMesh();
   }
 
   switchTo(idx) {

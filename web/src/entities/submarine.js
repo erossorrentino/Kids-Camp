@@ -1,9 +1,9 @@
 import * as THREE from '../../vendor/three/three.module.js';
 import { SUB, WATER } from '../config.js';
 
-function buildSubMesh() {
+function buildSubMesh(tint = 0x2a3f45) {
   const group = new THREE.Group();
-  const hullMat = new THREE.MeshStandardMaterial({ color: 0x2a3f45, roughness: 0.4, metalness: 0.6 });
+  const hullMat = new THREE.MeshStandardMaterial({ color: tint, roughness: 0.4, metalness: 0.6 });
 
   const hull = new THREE.Mesh(new THREE.CapsuleGeometry(1.05, 5.0, 6, 12), hullMat);
   hull.rotation.z = Math.PI / 2;
@@ -47,8 +47,8 @@ function buildSubMesh() {
 // SUB.maxDepth. Only obtainable via a SUB_SHOP. Not destructible, matching
 // the Helicopter/Jet/Boat.
 export class Submarine {
-  constructor(scene, position) {
-    const { group, bubbles } = buildSubMesh();
+  constructor(scene, position, { color, speedMul = 1, handlingMul = 1 } = {}) {
+    const { group, bubbles } = buildSubMesh(color);
     this.mesh = group;
     this.bubbles = bubbles;
     this.mesh.position.copy(position);
@@ -59,6 +59,8 @@ export class Submarine {
     this.depth = 0; // 0 = surfaced, up to SUB.maxDepth
     this.occupied = false;
     this.enterRange = SUB.enterRange;
+    this.speedMul = speedMul;
+    this.handlingMul = handlingMul;
   }
 
   get forward() {
@@ -75,8 +77,9 @@ export class Submarine {
     const ascend = input.isDown('ShiftLeft') || input.isDown('ShiftRight') ? 1 : 0;
     const descend = input.isDown('Space') ? 1 : 0;
 
-    if (throttle > 0) this.speed = Math.min(SUB.maxSpeed, this.speed + SUB.throttleAccel * dt);
-    else if (throttle < 0) this.speed = Math.max(-SUB.maxSpeed * 0.4, this.speed - SUB.throttleAccel * dt);
+    const maxSpeed = SUB.maxSpeed * this.speedMul;
+    if (throttle > 0) this.speed = Math.min(maxSpeed, this.speed + SUB.throttleAccel * this.speedMul * dt);
+    else if (throttle < 0) this.speed = Math.max(-maxSpeed * 0.4, this.speed - SUB.throttleAccel * this.speedMul * dt);
     else {
       const sign = Math.sign(this.speed);
       this.speed -= sign * SUB.throttleAccel * 0.6 * dt;
@@ -84,7 +87,7 @@ export class Submarine {
     }
 
     const turnAuthority = this.speed !== 0 ? 1 : 0.4;
-    this.heading += steer * SUB.yawRate * dt * turnAuthority;
+    this.heading += steer * SUB.yawRate * this.handlingMul * dt * turnAuthority;
     this.depth = THREE.MathUtils.clamp(this.depth + (descend - ascend) * SUB.ascendSpeed * dt, 0, SUB.maxDepth);
 
     const fwd = this.forward;

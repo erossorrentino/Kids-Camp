@@ -1,9 +1,9 @@
 import * as THREE from '../../vendor/three/three.module.js';
 import { BOAT, WATER } from '../config.js';
 
-function buildBoatMesh() {
+function buildBoatMesh(tint = 0xe8e8e8) {
   const group = new THREE.Group();
-  const hullMat = new THREE.MeshStandardMaterial({ color: 0xe8e8e8, roughness: 0.45, metalness: 0.25 });
+  const hullMat = new THREE.MeshStandardMaterial({ color: tint, roughness: 0.45, metalness: 0.25 });
 
   const hull = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.9, 5.0), hullMat);
   hull.position.y = 0.45;
@@ -57,8 +57,8 @@ function buildBoatMesh() {
 // only obtainable via a BOAT_SHOP (see systems/shops.js) — not one of the
 // free starter vehicles. Not destructible, matching the Helicopter/Jet.
 export class Boat {
-  constructor(scene, position) {
-    const { group, wake } = buildBoatMesh();
+  constructor(scene, position, { color, speedMul = 1, handlingMul = 1 } = {}) {
+    const { group, wake } = buildBoatMesh(color);
     this.mesh = group;
     this.wake = wake;
     this.mesh.position.copy(position);
@@ -70,6 +70,8 @@ export class Boat {
     this.occupied = false;
     this.enterRange = BOAT.enterRange;
     this._bobT = Math.random() * 10;
+    this.speedMul = speedMul;
+    this.handlingMul = handlingMul;
   }
 
   get forward() {
@@ -82,12 +84,13 @@ export class Boat {
 
     const throttle = input.isDownAny('KeyW', 'ArrowUp') ? 1 : input.isDownAny('KeyS', 'ArrowDown') ? -1 : 0;
     const steer = (input.isDownAny('KeyA', 'ArrowLeft') ? 1 : 0) + (input.isDownAny('KeyD', 'ArrowRight') ? -1 : 0);
+    const maxSpeed = BOAT.maxSpeed * this.speedMul;
 
     if (throttle > 0) {
-      this.speed = Math.min(BOAT.maxSpeed, this.speed + BOAT.accel * dt);
+      this.speed = Math.min(maxSpeed, this.speed + BOAT.accel * this.speedMul * dt);
     } else if (throttle < 0) {
       if (this.speed > 0.5) this.speed = Math.max(0, this.speed - BOAT.brake * dt);
-      else this.speed = Math.max(-BOAT.reverseMaxSpeed, this.speed - BOAT.accel * dt);
+      else this.speed = Math.max(-BOAT.reverseMaxSpeed * this.speedMul, this.speed - BOAT.accel * this.speedMul * dt);
     } else {
       const sign = Math.sign(this.speed);
       this.speed -= sign * BOAT.friction * dt;
@@ -95,9 +98,9 @@ export class Boat {
     }
 
     this.steerInput = THREE.MathUtils.lerp(this.steerInput, steer, Math.min(1, 8 * dt));
-    const speedFrac = Math.min(1, Math.abs(this.speed) / BOAT.maxSpeed);
+    const speedFrac = Math.min(1, Math.abs(this.speed) / maxSpeed);
     if (Math.abs(this.speed) > 0.05) {
-      this.heading += this.steerInput * BOAT.turnRate * (1 - speedFrac * 0.5) * dt * Math.sign(this.speed);
+      this.heading += this.steerInput * BOAT.turnRate * this.handlingMul * (1 - speedFrac * 0.5) * dt * Math.sign(this.speed);
     }
 
     const fwd = this.forward;

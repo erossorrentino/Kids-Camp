@@ -217,7 +217,23 @@ const BUILDERS = {
   railgun: buildRailgun,
 };
 
-export function buildGunMesh(weaponId) {
+const STEEL_HEX = 0x2b2d30;
+
+// `tint`, when given, recolors every "steel" (gunmetal-default) part of the
+// built mesh — the frame/barrel/receiver on every archetype — to that hex.
+// This is how the 1000-entry procedural gun catalog (see
+// systems/weaponGenerator.js) gives each variant a distinct look without
+// needing a bespoke model per variant: same archetype shape, different finish.
+export function buildGunMesh(weaponId, tint) {
   const builder = BUILDERS[weaponId] || buildPistol;
-  return builder();
+  const built = builder();
+  if (tint != null) {
+    built.group.traverse((obj) => {
+      if (obj.isMesh && obj.material?.color?.getHex() === STEEL_HEX) {
+        obj.material = obj.material.clone();
+        obj.material.color.setHex(tint);
+      }
+    });
+  }
+  return built;
 }

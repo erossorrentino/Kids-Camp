@@ -16,6 +16,7 @@ import { ParticleSystem } from './systems/particles.js';
 import { WeatherSystem } from './systems/weather.js';
 import { MissionManager } from './systems/missions.js';
 import { ShopManager } from './systems/shops.js';
+import { applyVehicleStatMul } from './systems/vehicleGenerator.js';
 import { buildBeacon } from './systems/beacon.js';
 import { HUD } from './systems/hud.js';
 import { CameraRig } from './systems/camera.js';
@@ -172,6 +173,14 @@ export class Game {
   }
 
   // --- shops -----------------------------------------------------------
+  // Every openShopMenu call goes through here so the procedural gun/vehicle
+  // catalogs (see ShopManager.getShopItems) get freshly resampled each time
+  // a shop opens — including the "refresh after purchase" reopens below.
+  _openShop(shop) {
+    const items = this.shops.getShopItems(shop);
+    this.hud.openShopMenu({ ...shop, items }, (it) => this.purchaseShopItem(shop, it));
+  }
+
   purchaseShopItem(shop, item) {
     if (item.license && this.hasLicense) { this.hud.showToast('Already have a license', 'fail'); return; }
     if (this.cash < item.price) { this.hud.showToast('Not enough cash', 'fail'); return; }
@@ -179,7 +188,7 @@ export class Game {
     if (item.license) {
       this._grantLicense();
       this.hud.showToast('Contractor License acquired — contracts unlocked!', 'success', 4000);
-      this.hud.openShopMenu(shop, (it) => this.purchaseShopItem(shop, it)); // refresh (cash changed)
+      this._openShop(shop); // refresh (cash changed)
     } else if (item.weapon) {
       if (item.weapon === 'all') {
         for (const w of this.weaponSystem.inventory) w.ammo = w.maxAmmo;
@@ -188,40 +197,77 @@ export class Game {
         if (w) w.ammo = w.maxAmmo;
       }
       this.hud.showToast(`Bought: ${item.label}`, 'success');
-      this.hud.openShopMenu(shop, (it) => this.purchaseShopItem(shop, it)); // refresh (cash/ammo changed)
+      this._openShop(shop); // refresh (cash/ammo changed)
+    } else if (item.gunVariant) {
+      // A GUN_SHOP catalog pick: re-tunes/re-tints the matching weapon slot
+      // rather than adding a 6th weapon — see WeaponSystem.equipVariant.
+      this.weaponSystem.equipVariant(item.gunVariant);
+      this.hud.showToast(`Equipped: ${item.gunVariant.name}`, 'success', 4000);
+      this.hud.closeShopMenu();
+    } else if (item.gamble) {
+      this._playSlots(item.price, shop);
     } else if (item.spawn) {
       // Vehicle shops "call in" a vehicle and drop the player straight into
       // the driver's seat — the coastal boat/sub shops launch it out into
       // open water, well past where the player could ever walk up to it.
-      const vehicle = this._spawnPurchasedVehicle(item.spawn, shop.position);
+      const vehicle = this._spawnPurchasedVehicle(item.spawn, shop.position, item.vehicleVariant);
       this.hud.closeShopMenu();
       this.hud.showToast(`${item.label} delivered!`, 'success');
       this._enterVehicle({ obj: vehicle, type: SPAWN_KIND_MODE[item.spawn] });
     }
   }
 
-  _spawnPurchasedVehicle(kind, shopPos) {
+  // A weighted slot-machine spin: the bet was already deducted by
+  // purchaseShopItem above, so a payout here is added on top — a multiplier
+  // under 1 (or the 0x "bust") is a net loss, over 1 is a net win. Skewed
+  // toward the house (expected value < 1) like a real casino, with a rare
+  // 20x jackpot to make the high-roller bet worth the risk.
+  _playSlots(bet, shop) {
+    const outcomes = [
+      { mult: 0, weight: 45 }, { mult: 0.5, weight: 20 }, { mult: 1, weight: 14 },
+      { mult: 2, weight: 12 }, { mult: 5, weight: 7 }, { mult: 20, weight: 2 },
+    ];
+    const total = outcomes.reduce((sum, o) => sum + o.weight, 0);
+    let r = Math.random() * total;
+    let mult = 0;
+    for (const o of outcomes) { r -= o.weight; if (r <= 0) { mult = o.mult; break; } }
+    const payout = Math.round(bet * mult);
+    if (payout > 0) this.addCash(payout);
+
+    const net = payout - bet;
+    if (mult >= 20) this.hud.showToast(`JACKPOT! +$${payout.toLocaleString()}`, 'success', 5000);
+    else if (net > 0) this.hud.showToast(`Winner! +$${net.toLocaleString()}`, 'success', 3000);
+    else if (net === 0) this.hud.showToast('Push — bet returned', 'success', 2500);
+    else this.hud.showToast(`No luck. -$${Math.abs(net).toLocaleString()}`, 'fail', 2500);
+    this._openShop(shop); // refresh (cash changed) so the player can spin again
+  }
+
+  _spawnPurchasedVehicle(kind, shopPos, variant) {
     const outward = shopPos.lengthSq() > 1 ? shopPos.clone().normalize() : new THREE.Vector3(1, 0, 0);
     const isWater = kind === 'boat' || kind === 'sub';
     const pos = shopPos.clone().addScaledVector(outward, isWater ? 60 : 8);
     pos.y = 0;
+    const color = variant?.color;
+    const craftOverrides = variant ? { color, speedMul: variant.speedMul, handlingMul: variant.handlingMul } : undefined;
 
     if (kind === 'car') {
-      return this._replaceVehicle('starterCar', new Vehicle(this.scene, { position: pos, color: 0xd23a3a, isPlayerStarter: true }));
+      const stats = variant ? applyVehicleStatMul(VEHICLE, variant) : VEHICLE;
+      return this._replaceVehicle('starterCar', new Vehicle(this.scene, { position: pos, color: color ?? 0xd23a3a, stats, isPlayerStarter: true }));
     } else if (kind === 'bike') {
-      return this._replaceVehicle('bike', new Vehicle(this.scene, { position: pos, color: 0x161616, stats: BIKE, isBike: true, isPlayerStarter: true }));
+      const stats = variant ? applyVehicleStatMul(BIKE, variant) : BIKE;
+      return this._replaceVehicle('bike', new Vehicle(this.scene, { position: pos, color: color ?? 0x161616, stats, isBike: true, isPlayerStarter: true }));
     } else if (kind === 'heli') {
       pos.y = 0.4;
-      return this._replaceVehicle('heli', new Helicopter(this.scene, pos));
+      return this._replaceVehicle('heli', new Helicopter(this.scene, pos, craftOverrides));
     } else if (kind === 'jet') {
       pos.y = 1;
-      return this._replaceVehicle('jet', new Jet(this.scene, pos));
+      return this._replaceVehicle('jet', new Jet(this.scene, pos, craftOverrides));
     } else if (kind === 'boat') {
       pos.y = WATER.level + 0.1;
-      return this._replaceVehicle('boat', new Boat(this.scene, pos));
+      return this._replaceVehicle('boat', new Boat(this.scene, pos, craftOverrides));
     } else if (kind === 'sub') {
       pos.y = WATER.level;
-      return this._replaceVehicle('sub', new Submarine(this.scene, pos));
+      return this._replaceVehicle('sub', new Submarine(this.scene, pos, craftOverrides));
     }
     return null;
   }
@@ -391,7 +437,7 @@ export class Game {
     if (this.input.wasPressed('KeyF')) {
       if (this.controlMode.mode === MODE.FOOT) {
         const interaction = this._nearestInteraction();
-        if (interaction?.kind === 'shop') this.hud.openShopMenu(interaction.shop, (item) => this.purchaseShopItem(interaction.shop, item));
+        if (interaction?.kind === 'shop') this._openShop(interaction.shop);
         else if (interaction?.kind === 'vehicle') this._enterVehicle(interaction.candidate);
       } else {
         this._exitVehicle();

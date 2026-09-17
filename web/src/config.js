@@ -157,12 +157,12 @@ export const STARTING_CASH = 1500000;
 // of the origin (see world/city.js), everything past that is open ocean.
 // Foot/car/bike travel is clamped at the shoreline; boats, subs, and
 // aircraft can freely cross it.
-export const ISLAND = { radius: 480 };
+export const ISLAND = { radius: 1400 };
 
 export const WATER = {
   level: -0.4,       // sea surface height
   color: 0x1c5f7d,
-  size: 6000,        // the ocean plane's edge length, centered on the origin
+  size: 20000,       // the ocean plane's edge length, centered on the origin
 };
 
 // A sandy ring where the island meets the sea: only the part beyond
@@ -244,6 +244,18 @@ export const SHOPS = {
       name: 'SUB PEN', color: 0x8a5cff,
       items: [{ id: 'sub_std', label: 'Call in a Submarine (personal submersible)', price: 4500000, spawn: 'sub' }],
     },
+    // A gambling den rather than a gear shop: its "items" are bets, not
+    // purchases — see Game.purchaseShopItem's `gamble` branch, which spins
+    // a weighted payout instead of granting/spawning anything.
+    CASINO: {
+      name: 'THE GOLDEN VEGA CASINO', color: 0xffd23f,
+      items: [
+        { id: 'slots_100', label: 'Play the slots — bet $100', price: 100, gamble: true },
+        { id: 'slots_1000', label: 'Play the slots — bet $1,000', price: 1000, gamble: true },
+        { id: 'slots_10000', label: 'Play the slots — bet $10,000', price: 10000, gamble: true },
+        { id: 'slots_100000', label: 'Play the slots — bet $100,000 (high roller)', price: 100000, gamble: true },
+      ],
+    },
   },
   // Land shops sit on the sidewalk/plaza of the spawn chunk (0,0) — the one
   // chunk CityWorld guarantees stays free of buildings and props (see
@@ -257,9 +269,10 @@ export const SHOPS = {
     { type: 'GUN_SHOP', position: [95, 0, 35] },
     { type: 'CAR_SHOP', position: [55, 0, 65] },
     { type: 'CAR_SHOP', position: [25, 0, 35] },
-    { type: 'BOAT_SHOP', position: [465, 0, 0] },
-    { type: 'SUB_SHOP', position: [-465, 0, 0] },
-    { type: 'HELI_SHOP', position: [0, 0, 465] },
-    { type: 'JET_SHOP', position: [0, 0, -465] },
+    { type: 'CASINO', position: [-40, 0, 70] },
+    { type: 'BOAT_SHOP', position: [ISLAND.radius - 15, 0, 0] },
+    { type: 'SUB_SHOP', position: [-(ISLAND.radius - 15), 0, 0] },
+    { type: 'HELI_SHOP', position: [0, 0, ISLAND.radius - 15] },
+    { type: 'JET_SHOP', position: [0, 0, -(ISLAND.radius - 15)] },
   ],
 };

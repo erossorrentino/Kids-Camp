@@ -1,7 +1,14 @@
 import * as THREE from '../../vendor/three/three.module.js';
 import { SHOPS } from '../config.js';
+import { generateWeaponVariants, describeWeaponVariant } from './weaponGenerator.js';
+import { generateVehicleVariants, describeVehicleVariant } from './vehicleGenerator.js';
 
 const DEALERSHIP_KINDS = new Set(['CAR_SHOP', 'BOAT_SHOP', 'HELI_SHOP', 'JET_SHOP', 'SUB_SHOP']);
+// Which vehicle-catalog `kind`s a dealership shop type browses (see
+// systems/vehicleGenerator.js) — a car dealership shows both cars and bikes.
+const DEALERSHIP_VEHICLE_KINDS = {
+  CAR_SHOP: ['car', 'bike'], BOAT_SHOP: ['boat'], HELI_SHOP: ['heli'], JET_SHOP: ['jet'], SUB_SHOP: ['sub'],
+};
 
 // A small storefront/dealership building (walls, glass front, an awning +
 // roof sign tinted the shop's color) plus a spinning icon + light beam above
@@ -10,7 +17,8 @@ const DEALERSHIP_KINDS = new Set(['CAR_SHOP', 'BOAT_SHOP', 'HELI_SHOP', 'JET_SHO
 function buildShopMarker(scene, position, color, kind) {
   const group = new THREE.Group();
   const isDealership = DEALERSHIP_KINDS.has(kind);
-  const w = 8, d = isDealership ? 14 : 10, h = isDealership ? 5.5 : 6;
+  const isCasino = kind === 'CASINO';
+  const w = isCasino ? 16 : 8, d = isCasino ? 18 : isDealership ? 14 : 10, h = isCasino ? 9 : isDealership ? 5.5 : 6;
 
   const wallMat = new THREE.MeshStandardMaterial({ color: 0xcfd2d6, roughness: 0.85 });
   const accentMat = new THREE.MeshStandardMaterial({ color, roughness: 0.5, metalness: 0.2 });
@@ -48,6 +56,31 @@ function buildShopMarker(scene, position, color, kind) {
     }
   }
 
+  // A landmark, not just another storefront: a marquee ring of emissive
+  // bulbs around the roofline instead of one sign, plus a second, brighter
+  // beam so it reads as THE place to go from across the island.
+  if (isCasino) {
+    const bulbMat = new THREE.MeshStandardMaterial({ color: 0xfff2b0, emissive: 0xffcc33, emissiveIntensity: 1.4, roughness: 0.4 });
+    const bulbGeo = new THREE.SphereGeometry(0.22, 8, 8);
+    const perimeter = 2 * (w + d) - 8;
+    const bulbCount = Math.round(perimeter / 1.6);
+    for (let i = 0; i < bulbCount; i++) {
+      const t = i / bulbCount;
+      const edge = t * perimeter;
+      let x, z;
+      if (edge < w) { x = -w / 2 + edge; z = -d / 2; }
+      else if (edge < w + d) { x = w / 2; z = -d / 2 + (edge - w); }
+      else if (edge < 2 * w + d) { x = w / 2 - (edge - w - d); z = d / 2; }
+      else { x = -w / 2; z = d / 2 - (edge - 2 * w - d); }
+      const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+      bulb.position.set(x, h + 0.2, z);
+      group.add(bulb);
+    }
+    const marquee = new THREE.Mesh(new THREE.BoxGeometry(w * 0.85, 2.2, 0.4), accentMat);
+    marquee.position.set(0, h * 0.62, d / 2 + 1.4);
+    group.add(marquee);
+  }
+
   // The interactive "you can shop here" cue — kept small/above the roofline
   // so the building itself reads first.
   const icon = new THREE.Mesh(
@@ -69,6 +102,17 @@ function buildShopMarker(scene, position, color, kind) {
   return { group, icon };
 }
 
+// n random, distinct entries from pool (Fisher-Yates partial shuffle).
+function sampleN(pool, n) {
+  const arr = [...pool];
+  const take = Math.min(n, arr.length);
+  for (let i = 0; i < take; i++) {
+    const j = i + Math.floor(Math.random() * (arr.length - i));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr.slice(0, take);
+}
+
 // Fixed-position shops the player interacts with by walking/driving up and
 // pressing F (see Game._findInteractable). Purchases are resolved by Game
 // itself (it owns cash, the weapon inventory, and vehicle spawning) — this
@@ -82,10 +126,40 @@ export class ShopManager {
       const marker = buildShopMarker(scene, position, cfg.color, loc.type);
       return { id: `${loc.type}_${i}`, type: loc.type, name: cfg.name, color: cfg.color, position, items: cfg.items, marker };
     });
+    // Built once at construction (like the 500-entry mission pool): a
+    // 1000-entry gun catalog and a 1500-entry vehicle catalog (see
+    // weaponGenerator.js / vehicleGenerator.js). GUN_SHOPs and dealerships
+    // browse a random sample of these on top of their static items (see
+    // getShopItems) rather than showing all of them in one long list.
+    this.gunCatalog = generateWeaponVariants();
+    this.vehicleCatalog = generateVehicleVariants();
   }
 
   update(dt) {
     for (const s of this.shops) s.marker.icon.rotation.y += dt * 1.2;
+  }
+
+  // Static config items plus (for GUN_SHOP/dealerships) a fresh random
+  // sample of the procedural catalog, reshuffled every time a shop is
+  // opened — same "sample of a big pool, reroll on reopen" pattern as
+  // MissionManager.listAvailable.
+  getShopItems(shop) {
+    const base = SHOPS.types[shop.type].items;
+    if (shop.type === 'GUN_SHOP') {
+      const sample = sampleN(this.gunCatalog, 10);
+      return [...base, ...sample.map((v) => ({
+        id: v.id, label: `${v.name} — ${describeWeaponVariant(v)}`, price: v.price, gunVariant: v,
+      }))];
+    }
+    const kinds = DEALERSHIP_VEHICLE_KINDS[shop.type];
+    if (kinds) {
+      const pool = this.vehicleCatalog.filter((v) => kinds.includes(v.kind));
+      const sample = sampleN(pool, 10);
+      return [...base, ...sample.map((v) => ({
+        id: v.id, label: `${v.name} — ${describeVehicleVariant(v)}`, price: v.price, spawn: v.kind, vehicleVariant: v,
+      }))];
+    }
+    return base;
   }
 
   // Nearest shop within range of a world position, or null.
