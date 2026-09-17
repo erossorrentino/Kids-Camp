@@ -35,20 +35,26 @@ export class TouchControls {
     };
     if (!this.el.container) return;
 
-    if (!isTouchDevice) {
-      this.el.container.style.display = 'none';
-      return;
-    }
-    this.el.container.classList.add('show');
-
     this._joyTouchId = null;
     this._joyKeys = { up: false, down: false, left: false, right: false };
     this._lookTouchId = null;
     this._lookLast = { x: 0, y: 0 };
 
+    // Handlers are always bound, touch device or not — CSS keeps the UI
+    // hidden by default (no .show class) so this costs nothing on a mouse
+    // setup. That way, if a real touch ever lands despite isTouchDevice
+    // reading false (an embedded/WebView misreport), the controls are
+    // already wired and just need revealing (see the fallback below).
     this._bindJoystick();
     this._bindLookZone();
     this._bindButtons(root);
+
+    if (isTouchDevice) {
+      this.el.container.classList.add('show');
+    } else {
+      const revealOnRealTouch = () => this.el.container.classList.add('show');
+      window.addEventListener('touchstart', revealOnRealTouch, { passive: true, once: true });
+    }
   }
 
   _bindJoystick() {

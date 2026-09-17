@@ -3,11 +3,13 @@
 // listeners and the on-screen touch controls both funnel through the same
 // setKey/setMouseButton/addLookDelta/addWheelDelta methods below, so the rest
 // of the game never needs to know which input source is driving it.
-// Prefer "what's the primary pointer" (so a touchscreen laptop with a mouse
-// still gets keyboard/mouse controls) and fall back to raw touch support.
-export const isTouchDevice = window.matchMedia
-  ? window.matchMedia('(pointer: coarse)').matches
-  : ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+// Any touch signal counts — 'pointer: coarse' alone has been seen to
+// misreport inside some embedded/WebView contexts, and getting this wrong
+// means TouchControls never shows up and a touch-only player has no way to
+// move at all, so every check below is deliberately an OR (permissive),
+// never the sole source of truth.
+export const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0
+  || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
 
 // Arrow keys are the primary movement scheme (plus Space); WASD keeps
 // working too. This is NOT a blanket alias on isDown() — the jet already

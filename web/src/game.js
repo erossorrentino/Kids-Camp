@@ -281,16 +281,15 @@ export class Game {
     }
   }
 
-  // Dying costs a "hospital bill" (a cut of your cash), clears heat, and
-  // drops you back at the plaza on foot — GTA-style consequence for a death
-  // that otherwise had none.
+  // Dying costs a flat hospital bill, clears heat, and drops you back at the
+  // plaza on foot — GTA-style consequence for a death that otherwise had none.
   _onPlayerDeath() {
     if (this.controlMode.mode !== MODE.FOOT) this._exitVehicle();
     this.player.mesh.position.set(0, 0, 6);
     this.player.respawn();
     this.player.setVisible(true);
 
-    const fine = Math.min(this.cash, Math.round(this.cash * 0.1) + 50);
+    const fine = Math.min(this.cash, 20);
     this.addCash(-fine);
     this.wanted.stars = 0;
     for (const p of this.wanted.police) p.dispose(this.scene);
