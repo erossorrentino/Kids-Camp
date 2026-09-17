@@ -310,6 +310,7 @@ export class Game {
 
   _tick() {
     const dt = Math.min(0.05, this.clock.getDelta());
+    this.input.update(dt);
     this._update(dt);
     this.renderer.render(this.scene, this.camera);
     this.input.endFrame();

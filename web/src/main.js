@@ -42,7 +42,14 @@ startBtn.addEventListener('click', () => {
     game.start();
     overlay.classList.add('hidden');
     game.audio.resume();
-    if (!isTouchDevice) canvas.requestPointerLock();
+    if (!isTouchDevice) {
+      // Best-effort: a sandboxed embed (e.g. this game running as a Claude
+      // Artifact) can deny Pointer Lock outright. Input's cursor-offset
+      // fallback (see input.js) keeps mouse-look working either way, so a
+      // rejection here just needs to not become an unhandled rejection.
+      const req = canvas.requestPointerLock();
+      if (req && typeof req.catch === 'function') req.catch(() => {});
+    }
   } catch (err) {
     startBtn.disabled = false;
     showFatalError(err);
