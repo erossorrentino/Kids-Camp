@@ -65,17 +65,27 @@
     </div>
   </div>
   <div id="mapPanel">
-    <div id="mapLabel">MAP — tap to set waypoint</div>
+    <div id="mapLabel">MAP — tap to open</div>
     <canvas id="minimap" width="180" height="180"></canvas>
     <button id="waypointClear" type="button">✕</button>
   </div>
   <div id="waypointTag"></div>
+  <div id="fullMap">
+    <div id="fullMapCard">
+      <div id="fullMapHint">Tap anywhere on the island to drop a waypoint</div>
+      <canvas id="fullMapCanvas" width="640" height="640"></canvas>
+      <button id="fullMapClose" type="button">CLOSE</button>
+    </div>
+  </div>
   <div id="missionMenu">
     <div id="missionMenuCard">
       <h2>CONTRACTS</h2>
       <p id="missionMenuHint">Pick a job. Only one active at a time.</p>
       <div id="missionList"></div>
-      <button id="missionMenuClose" type="button">CLOSE</button>
+      <div id="missionMenuButtons">
+        <button id="missionReroll" type="button">🔄 NEW CONTRACTS</button>
+        <button id="missionMenuClose" type="button">CLOSE</button>
+      </div>
     </div>
   </div>
   <div id="shopMenu">

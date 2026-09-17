@@ -120,11 +120,33 @@ html, body {
   color: #201a00; font: 700 11px/1 'Segoe UI', Arial, sans-serif; letter-spacing: 0.5px; cursor: pointer;
 }
 .missionStartBtn:hover { background: #ffdd66; }
-#missionMenuClose {
-  margin-top: 14px; width: 100%; padding: 9px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25);
+#missionMenuButtons { display: flex; gap: 8px; margin-top: 14px; }
+#missionReroll, #missionMenuClose {
+  flex: 1; padding: 9px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25);
   background: transparent; color: #cfd6e0; font: 700 12px/1 'Segoe UI', Arial, sans-serif; letter-spacing: 1px; cursor: pointer;
 }
-#missionMenuClose:hover { background: rgba(255,255,255,0.08); }
+#missionReroll { border-color: rgba(255,210,63,0.5); color: #ffd23f; }
+#missionReroll:hover, #missionMenuClose:hover { background: rgba(255,255,255,0.08); }
+
+#fullMap {
+  display: none; position: fixed; inset: 0; z-index: 16;
+  background: rgba(5,7,10,0.85); align-items: center; justify-content: center;
+}
+#fullMap.show { display: flex; }
+#fullMapCard {
+  background: #12151c; border: 1px solid rgba(255,210,63,0.4); border-radius: 10px;
+  padding: 14px; color: #eee; text-align: center;
+}
+#fullMapHint { margin: 0 0 10px; color: #8a94a3; font-size: 12px; letter-spacing: 0.5px; }
+#fullMapCanvas {
+  display: block; width: min(640px, 86vw); height: min(640px, 86vw); border-radius: 8px;
+  border: 2px solid rgba(255,255,255,0.25); cursor: crosshair; background: #0c2634;
+}
+#fullMapClose {
+  margin-top: 12px; width: 100%; padding: 9px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25);
+  background: transparent; color: #cfd6e0; font: 700 12px/1 'Segoe UI', Arial, sans-serif; letter-spacing: 1px; cursor: pointer;
+}
+#fullMapClose:hover { background: rgba(255,255,255,0.08); }
 
 #shopMenu {
   display: none; position: fixed; inset: 0; z-index: 15;

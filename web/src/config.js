@@ -144,35 +144,14 @@ export const AI = {
   policeSpeedPerStar: 2.2,
 };
 
-export const MISSIONS = {
-  types: {
-    DELIVERY: { kind: 'delivery', timeLimit: 75, minDist: 90, maxDist: 220, rewardRange: [400, 900] },
-    // Same delivery shape, but you must actually be driving when you reach
-    // the drop point — the timer keeps running if you show up on foot.
-    GETAWAY: { kind: 'delivery', requireVehicle: true, timeLimit: 65, minDist: 100, maxDist: 200, rewardRange: [500, 1100] },
-    DEMOLITION: { kind: 'demolitionVehicles', timeLimit: 70, targetCount: 3, rewardRange: [600, 1100] },
-    // Same "destroy N before time's up" shape as DEMOLITION, aimed at street
-    // props (crates/barriers) instead of vehicles.
-    RAMPAGE: { kind: 'demolitionProps', timeLimit: 60, targetCount: 5, rewardRange: [500, 950] },
-    HITMAN: { kind: 'hitman', timeLimit: 80, targetCount: 4, rewardRange: [550, 1000] },
-    SURVIVAL: { kind: 'survival', duration: 45, rewardRange: [350, 700] },
-    // The big scores: break into a marked vault, which triggers a serious
-    // wanted-heat spike and swaps the beacon to a getaway point you need to
-    // reach before time runs out. Three flavors at different risk/reward.
-    HEIST: {
-      kind: 'heist', timeLimit: 150, minDist: 120, maxDist: 260,
-      escapeMinDist: 90, escapeMaxDist: 180, rewardRange: [250000, 2000000], alarmStars: 3,
-    },
-    JEWELRY_STORE: {
-      kind: 'heist', timeLimit: 100, minDist: 60, maxDist: 140,
-      escapeMinDist: 70, escapeMaxDist: 140, rewardRange: [250000, 1200000], alarmStars: 2,
-    },
-    ARMORED_CAR: {
-      kind: 'heist', requireVehicleEscape: true, timeLimit: 130, minDist: 90, maxDist: 200,
-      escapeMinDist: 100, escapeMaxDist: 200, rewardRange: [400000, 2500000], alarmStars: 4,
-    },
-  },
-};
+// The old hand-authored mission list has been replaced by a 500-entry
+// procedurally generated pool — see systems/missionGenerator.js. Every entry
+// still dispatches on one of the `kind`s MissionManager understands
+// (delivery / demolitionVehicles / demolitionProps / hitman / survival / heist).
+
+// Cash you start a fresh save with (see Game._loadCash) — enough to gear up
+// at the shops, but the expensive vehicles still take real jobs to afford.
+export const STARTING_CASH = 1500000;
 
 // The city sits on an island: CityWorld only generates land within `radius`
 // of the origin (see world/city.js), everything past that is open ocean.
@@ -184,6 +163,16 @@ export const WATER = {
   level: -0.4,       // sea surface height
   color: 0x1c5f7d,
   size: 6000,        // the ocean plane's edge length, centered on the origin
+};
+
+// A sandy ring where the island meets the sea: only the part beyond
+// ISLAND.radius is ever actually visible (the land chunks cover the rest),
+// sloping from street level down to the water's surface.
+export const BEACH = {
+  color: 0xd8c39a,
+  innerRadius: ISLAND.radius - 20,
+  outerRadius: ISLAND.radius + 25,
+  level: -0.08,
 };
 
 export const BOAT = {
@@ -207,52 +196,68 @@ export const SUB = {
 
 // Shops: fixed world markers the player walks/drives up to and presses F on
 // to spend cash. Gun shops restock ammo (every weapon is already carried —
-// see WeaponSystem); the rest spawn ("call in") a vehicle near the shop.
+// see WeaponSystem); vehicle shops spawn ("call in") a vehicle near the shop;
+// the fixer sells the one-time CONTRACTOR_LICENSE (see Game.hasLicense) that
+// gates the mission board — no license, no contracts. Prices are pitched at
+// roughly what the real item costs (a small civilian sub, a fighter jet on
+// the private warbird market, a box of pistol ammo, ...), not game-balance
+// round numbers, so the big toys take real jobs to save up for.
 export const SHOPS = {
   types: {
+    FIXER: {
+      name: 'THE FIXER', color: 0x9a2fd9,
+      items: [
+        { id: 'contractor_license', label: 'Contractor License (unlocks contracts)', price: 50000, license: true },
+      ],
+    },
     GUN_SHOP: {
       name: 'GUN SHOP', color: 0xd94040,
       items: [
-        { id: 'ammo_pistol', label: 'Pistol ammo refill', price: 150, weapon: 'pistol' },
-        { id: 'ammo_rifle', label: 'Rifle ammo refill', price: 400, weapon: 'rifle' },
-        { id: 'ammo_shotgun', label: 'Shotgun ammo refill', price: 300, weapon: 'shotgun' },
-        { id: 'ammo_rocket', label: 'Rocket ammo refill', price: 1200, weapon: 'rocket' },
-        { id: 'ammo_railgun', label: 'Railgun ammo refill', price: 1800, weapon: 'railgun' },
-        { id: 'ammo_all', label: 'Restock ALL weapons', price: 3000, weapon: 'all' },
+        { id: 'ammo_pistol', label: 'Pistol ammo (box of 50, 9mm)', price: 35, weapon: 'pistol' },
+        { id: 'ammo_rifle', label: 'Rifle ammo (case, 5.56mm)', price: 280, weapon: 'rifle' },
+        { id: 'ammo_shotgun', label: 'Shotgun shells (box of 25)', price: 60, weapon: 'shotgun' },
+        { id: 'ammo_rocket', label: 'Rocket resupply (military ordnance)', price: 45000, weapon: 'rocket' },
+        { id: 'ammo_railgun', label: 'Railgun slug resupply (experimental)', price: 95000, weapon: 'railgun' },
+        { id: 'ammo_all', label: 'Restock ALL weapons', price: 130000, weapon: 'all' },
       ],
     },
     CAR_SHOP: {
       name: 'CAR DEALERSHIP', color: 0x3d6bff,
       items: [
-        { id: 'car_sedan', label: 'Call in a Sedan', price: 1500, spawn: 'car' },
-        { id: 'car_bike', label: 'Call in a Superbike', price: 2500, spawn: 'bike' },
+        { id: 'car_sedan', label: 'Call in a Sedan (new, MSRP)', price: 35000, spawn: 'car' },
+        { id: 'car_bike', label: 'Call in a Superbike (new, MSRP)', price: 18000, spawn: 'bike' },
       ],
     },
     BOAT_SHOP: {
       name: 'BOAT DOCK', color: 0x1fb0c9,
-      items: [{ id: 'boat_speed', label: 'Call in a Speedboat', price: 5000, spawn: 'boat' }],
+      items: [{ id: 'boat_speed', label: 'Call in a Speedboat (new, 30ft)', price: 250000, spawn: 'boat' }],
     },
     HELI_SHOP: {
       name: 'HELIPAD', color: 0xffa62b,
-      items: [{ id: 'heli_std', label: 'Call in a Helicopter', price: 15000, spawn: 'heli' }],
+      items: [{ id: 'heli_std', label: 'Call in a Helicopter (light turbine)', price: 1800000, spawn: 'heli' }],
     },
     JET_SHOP: {
       name: 'AIRFIELD', color: 0xff3a3a,
-      items: [{ id: 'jet_fighter', label: 'Call in a Fighter Jet', price: 40000, spawn: 'jet' }],
+      items: [{ id: 'jet_fighter', label: 'Call in a Fighter Jet (ex-military, private market)', price: 18000000, spawn: 'jet' }],
     },
     SUB_SHOP: {
       name: 'SUB PEN', color: 0x8a5cff,
-      items: [{ id: 'sub_std', label: 'Call in a Submarine', price: 25000, spawn: 'sub' }],
+      items: [{ id: 'sub_std', label: 'Call in a Submarine (personal submersible)', price: 4500000, spawn: 'sub' }],
     },
   },
-  // Land shops sit in the clear spawn-plaza chunk; transport shops sit on
-  // the shoreline along the 4 cardinal directions, just inside the island
-  // radius, so buying one launches the vehicle straight out into open water.
+  // Land shops sit on the permanent road strip at the west edge of their
+  // chunk (x in [chunk*120, chunk*120+14]), which CityWorld never puts a
+  // building or prop on regardless of that chunk's random layout — spread
+  // across different districts instead of clustered at spawn. Transport
+  // shops sit on the shoreline along the 4 cardinal directions, just inside
+  // the island radius, so buying one launches the vehicle straight into
+  // open water.
   locations: [
-    { type: 'GUN_SHOP', position: [100, 0, 100] },
-    { type: 'GUN_SHOP', position: [30, 0, 100] },
-    { type: 'CAR_SHOP', position: [100, 0, 60] },
-    { type: 'CAR_SHOP', position: [60, 0, 100] },
+    { type: 'FIXER', position: [7, 0, 60] },
+    { type: 'GUN_SHOP', position: [247, 0, 180] },
+    { type: 'GUN_SHOP', position: [-353, 0, 300] },
+    { type: 'CAR_SHOP', position: [127, 0, -300] },
+    { type: 'CAR_SHOP', position: [-233, 0, -60] },
     { type: 'BOAT_SHOP', position: [465, 0, 0] },
     { type: 'SUB_SHOP', position: [-465, 0, 0] },
     { type: 'HELI_SHOP', position: [0, 0, 465] },

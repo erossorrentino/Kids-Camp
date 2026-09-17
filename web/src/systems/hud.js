@@ -1,5 +1,8 @@
+import { ISLAND } from '../config.js';
+
 const STAR_SVG = '<svg viewBox="0 0 24 24"><path fill="#ffd23f" d="M12 2l2.9 6.6 7.1.6-5.4 4.7 1.7 7-6.3-3.9L5.7 21l1.7-7-5.4-4.7 7.1-.6z"/></svg>';
-const MINIMAP_RANGE = 70; // world units shown edge-to-edge
+const MINIMAP_RANGE = 70; // world units shown edge-to-edge on the corner map
+const FULL_MAP_RANGE = 1100; // wide enough to show the whole island + coastline at once
 
 export class HUD {
   constructor() {
@@ -36,10 +39,15 @@ export class HUD {
       shopMenuTitle: document.getElementById('shopMenuTitle'),
       shopList: document.getElementById('shopList'),
       shopMenuClose: document.getElementById('shopMenuClose'),
+      fullMap: document.getElementById('fullMap'),
+      fullMapCanvas: document.getElementById('fullMapCanvas'),
+      fullMapClose: document.getElementById('fullMapClose'),
+      missionReroll: document.getElementById('missionReroll'),
     };
     this._toastTimer = null;
     this._playerPos = null;
     this.mmCtx = this.el.minimap.getContext('2d');
+    this.fmCtx = this.el.fullMapCanvas.getContext('2d');
     for (let i = 0; i < 5; i++) {
       const d = document.createElement('div');
       d.className = 'star';
@@ -56,21 +64,11 @@ export class HUD {
     this.el.weaponPanel.addEventListener('click', () => this.weapons.cycle(1));
   }
 
-  // Tapping/clicking the minimap drops a waypoint at that world position
-  // (map is north-up and never rotates, so the conversion is a direct
-  // inverse of the scale/translate _drawMinimap uses to place dots).
-  bindMinimapTap(onSet) {
-    this.el.minimap.addEventListener('click', (e) => {
-      if (!this._playerPos) return;
-      const rect = this.el.minimap.getBoundingClientRect();
-      const size = this.el.minimap.width;
-      const scale = size / MINIMAP_RANGE;
-      const cx = (e.clientX - rect.left) * (size / rect.width);
-      const cy = (e.clientY - rect.top) * (size / rect.height);
-      const worldX = this._playerPos.x + (cx - size / 2) / scale;
-      const worldZ = this._playerPos.z + (cy - size / 2) / scale;
-      onSet(worldX, worldZ);
-    });
+  // Tapping/clicking the corner map pops the full map open — it's too small
+  // (70m across) to place a waypoint precisely anywhere on an island 960m
+  // wide, so setting one happens on the big map instead (see bindFullMap).
+  bindMinimapTap() {
+    this.el.minimap.addEventListener('click', () => this.openFullMap());
   }
 
   bindWaypointClear(onClear) {
@@ -78,6 +76,36 @@ export class HUD {
       e.stopPropagation();
       onClear();
     });
+  }
+
+  // The full-screen map: tapping/clicking anywhere on it drops a waypoint at
+  // that world position and closes it (map is north-up and never rotates,
+  // so the conversion is a direct inverse of the scale/translate _drawMap
+  // uses to place dots).
+  bindFullMap(onSet) {
+    this.el.fullMapClose.addEventListener('click', () => this.closeFullMap());
+    this.el.fullMap.addEventListener('click', (e) => {
+      if (e.target === this.el.fullMap) { this.closeFullMap(); return; }
+      if (e.target !== this.el.fullMapCanvas || !this._playerPos) return;
+      const rect = this.el.fullMapCanvas.getBoundingClientRect();
+      const size = this.el.fullMapCanvas.width;
+      const scale = size / FULL_MAP_RANGE;
+      const cx = (e.clientX - rect.left) * (size / rect.width);
+      const cy = (e.clientY - rect.top) * (size / rect.height);
+      const worldX = this._playerPos.x + (cx - size / 2) / scale;
+      const worldZ = this._playerPos.z + (cy - size / 2) / scale;
+      onSet(worldX, worldZ);
+      this.closeFullMap();
+    });
+  }
+
+  openFullMap() {
+    if (document.pointerLockElement) document.exitPointerLock();
+    this.el.fullMap.classList.add('show');
+  }
+
+  closeFullMap() {
+    this.el.fullMap.classList.remove('show');
   }
 
   // Wires the generic shop modal (see systems/shops.js + Game.purchaseShopItem).
@@ -127,11 +155,14 @@ export class HUD {
 
   // Wires the MISSIONS button + modal to a MissionManager. Missions themselves
   // stay hidden until the player opens this menu and picks one — there's no
-  // more auto-popping offer banner.
-  bindMissions(missionManager) {
+  // more auto-popping offer banner. canOpen() gates the whole board behind
+  // Game.hasLicense (bought once from a FIXER shop) — see Game.purchaseShopItem.
+  bindMissions(missionManager, canOpen) {
     this.missions = missionManager;
+    this._canOpenMissions = canOpen || (() => true);
     this.el.missionBtn.addEventListener('click', () => this.openMissionMenu());
     this.el.missionMenuClose.addEventListener('click', () => this.closeMissionMenu());
+    this.el.missionReroll.addEventListener('click', () => this._renderMissionList());
     this.el.missionMenu.addEventListener('click', (e) => {
       if (e.target === this.el.missionMenu) this.closeMissionMenu();
     });
@@ -144,9 +175,21 @@ export class HUD {
 
   openMissionMenu() {
     if (this.missions.active) return; // finish the current contract first
+    if (!this._canOpenMissions()) {
+      this.showToast('Buy a Contractor License from THE FIXER first ($50,000)', 'fail', 4000);
+      return;
+    }
     // release mouse-look pointer lock so the cursor reappears to click the
     // menu — clicking back into the game canvas re-engages it as usual
     if (document.pointerLockElement) document.exitPointerLock();
+    this._renderMissionList();
+    this.el.missionMenu.classList.add('show');
+  }
+
+  // A fresh random sample of jobs from the 500-entry pool (see
+  // MissionManager.listAvailable) — called on open and again by the "New
+  // Contracts" button, since listing all 500 at once would be unusable.
+  _renderMissionList() {
     const list = this.el.missionList;
     list.innerHTML = '';
     for (const m of this.missions.listAvailable()) {
@@ -178,7 +221,6 @@ export class HUD {
       row.append(info, pay, startBtn);
       list.appendChild(row);
     }
-    this.el.missionMenu.classList.add('show');
   }
 
   closeMissionMenu() {
@@ -274,25 +316,35 @@ export class HUD {
       this.el.state.textContent = controlMode.mode + weatherTag;
     }
 
-    this._drawMinimap(state);
+    this._drawMapCanvas(this.el.minimap, this.mmCtx, MINIMAP_RANGE, state);
+    if (this.el.fullMap.classList.contains('show')) {
+      this._drawMapCanvas(this.el.fullMapCanvas, this.fmCtx, FULL_MAP_RANGE, state);
+    }
   }
 
-  _drawMinimap({ player, world, ai, wanted, heading, position, missions, waypoint, shops }) {
-    const ctx = this.mmCtx;
-    const size = this.el.minimap.width;
-    const scale = size / MINIMAP_RANGE;
+  // Shared by the corner minimap and the full-screen map (see openFullMap) —
+  // same north-up top-down drawing, just parameterized by canvas + range.
+  _drawMapCanvas(canvas, ctx, range, { player, world, ai, wanted, heading, position, missions, waypoint, shops }) {
+    const size = canvas.width;
+    const scale = size / range;
     const pos = position || player.mesh.position;
     const px = pos.x, pz = pos.z;
 
     ctx.clearRect(0, 0, size, size);
-    ctx.fillStyle = '#1a1e24';
+    ctx.fillStyle = '#0c2634'; // ocean
     ctx.fillRect(0, 0, size, size);
 
     ctx.save();
     ctx.translate(size / 2, size / 2);
 
+    // island silhouette so the map reads as land surrounded by water
+    ctx.fillStyle = '#1e2420';
+    ctx.beginPath();
+    ctx.arc(-px * scale, -pz * scale, ISLAND.radius * scale, 0, Math.PI * 2);
+    ctx.fill();
+
     ctx.fillStyle = '#3a4048';
-    for (const c of world.getCollidersNear(px, pz, MINIMAP_RANGE)) {
+    for (const c of world.getCollidersNear(px, pz, range)) {
       const cx = ((c.minX + c.maxX) / 2 - px) * scale;
       const cz = ((c.minZ + c.maxZ) / 2 - pz) * scale;
       const w = Math.max(2, (c.maxX - c.minX) * scale);

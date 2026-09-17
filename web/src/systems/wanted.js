@@ -22,7 +22,7 @@ export class WantedSystem {
     this._decayAccum = 0;
   }
 
-  update(dt, world, player, activePos, controlMode, traction = 1) {
+  update(dt, world, player, activePos, controlMode, traction = 1, onOfficerFire) {
     // destroyed cruisers stop counting as pursuers so a fresh one spawns in
     const wrecked = this.police.filter((p) => p.vehicle.destroyed);
     if (wrecked.length) {
@@ -52,12 +52,12 @@ export class WantedSystem {
       : new THREE.Vector3();
 
     for (const p of this.police) {
-      p.update(dt, world, activePos, playerVel, this.stars, traction);
+      p.update(dt, world, activePos, playerVel, this.stars, traction, onOfficerFire);
       if (isDriving && p.distanceTo(activePos) < RAM_RANGE) {
         controlMode.vehicle.speed *= 0.85; // ram impact bleeds player speed
         p.vehicle.speed *= 0.7;
-      } else if (controlMode?.mode === 'FOOT' && p.distanceTo(activePos) < RAM_RANGE + 1) {
-        player.takeDamage(4 * dt * 10); // cornered on foot by a cruiser
+      } else if (controlMode?.mode === 'FOOT' && !p.officer && p.distanceTo(activePos) < RAM_RANGE + 1) {
+        player.takeDamage(4 * dt * 10); // cornered on foot by a still-moving cruiser
       }
     }
   }

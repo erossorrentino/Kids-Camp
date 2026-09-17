@@ -1,30 +1,14 @@
 import * as THREE from '../../vendor/three/three.module.js';
-import { MISSIONS } from '../config.js';
+import { generateMissions } from './missionGenerator.js';
 import { buildBeacon } from './beacon.js';
 
-const TITLES = {
-  DELIVERY: 'DELIVERY',
-  GETAWAY: 'GETAWAY DRIVER',
-  DEMOLITION: 'DEMOLITION DERBY',
-  RAMPAGE: 'RAMPAGE',
-  HITMAN: 'CONTRACT HIT',
-  SURVIVAL: 'HEAT WAVE',
-  HEIST: 'HEIST',
-  JEWELRY_STORE: 'JEWELRY STORE HEIST',
-  ARMORED_CAR: 'ARMORED CAR HEIST',
-};
-
-const DETAILS = {
-  DELIVERY: (cfg) => `Race a package to a drop point ${cfg.minDist}-${cfg.maxDist}m away`,
-  GETAWAY: (cfg) => `Drive a package to a drop point ${cfg.minDist}-${cfg.maxDist}m away — must arrive by vehicle`,
-  DEMOLITION: (cfg) => `Destroy ${cfg.targetCount} vehicles before time runs out`,
-  RAMPAGE: (cfg) => `Smash ${cfg.targetCount} street props (crates/barriers) before time runs out`,
-  HITMAN: (cfg) => `Eliminate ${cfg.targetCount} hostiles before time runs out`,
-  SURVIVAL: (cfg) => `Stay alive for ${cfg.duration}s`,
-  HEIST: (cfg) => `Hit a vault ${cfg.minDist}-${cfg.maxDist}m out, then run the score to a getaway point — triggers major heat`,
-  JEWELRY_STORE: (cfg) => `A tighter, faster score ${cfg.minDist}-${cfg.maxDist}m out — less heat, less time`,
-  ARMORED_CAR: (cfg) => `Crack an armored car ${cfg.minDist}-${cfg.maxDist}m out, then escape by vehicle — heaviest heat`,
-};
+// 500 procedurally generated jobs (rob a named bank, hit a cartel stash
+// house, take out a gang lieutenant, ...) — see missionGenerator.js. Built
+// once at module load and looked up by type; the mission menu only ever
+// shows a random sample of these at a time (see listAvailable), refreshed
+// on demand, rather than all 500 in one long scrollable list.
+const POOL = generateMissions(500);
+const POOL_BY_TYPE = new Map(POOL.map((m) => [m.type, m]));
 
 const HEIST_PHASE_DETAIL = {
   rob: 'Break into the marked target',
@@ -43,9 +27,9 @@ function randomTarget(playerPos, minDist, maxDist) {
 // Contracts stay out of the way until the player opens the mission menu and
 // explicitly starts one (see HUD's missionBtn/missionMenu) — no more
 // auto-popping offers cluttering the screen. Progress and pass/fail is
-// reported back to Game via update()'s return value. Every type dispatches
-// on its config's `kind` rather than its own name, so adding a new contract
-// is just a new config entry (see config.js's MISSIONS.types).
+// reported back to Game via update()'s return value. Every job dispatches on
+// its `kind` rather than its own name, so the 500-entry generated pool (see
+// missionGenerator.js) needs no special-casing here at all.
 export class MissionManager {
   constructor(scene) {
     this.scene = scene;
@@ -63,26 +47,29 @@ export class MissionManager {
     return v;
   }
 
-  // Menu contents: the fixed set of contract types with their pay range and
-  // a human-readable blurb, unaffected by whatever's currently active.
-  listAvailable() {
-    return Object.entries(MISSIONS.types).map(([type, cfg]) => ({
-      type,
-      title: TITLES[type],
-      detail: DETAILS[type](cfg),
-      rewardRange: cfg.rewardRange,
-    }));
+  // Menu contents: a random sample of `count` jobs from the 500-entry pool
+  // (not all 500 at once — see systems/missionGenerator.js). Called again
+  // each time the player opens the menu or hits "New Contracts", so the
+  // board effectively rotates.
+  listAvailable(count = 10) {
+    const pool = [...POOL];
+    for (let i = pool.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [pool[i], pool[j]] = [pool[j], pool[i]];
+    }
+    return pool.slice(0, count).map((m) => ({ type: m.type, title: m.title, detail: m.detail, rewardRange: m.cfg.rewardRange }));
   }
 
   // Explicitly chosen from the mission menu — replaces the old random-offer
   // + accept-with-keypress flow.
   start(type, playerPos) {
     if (this.active) return false;
-    const cfg = MISSIONS.types[type];
-    if (!cfg) return false;
+    const entry = POOL_BY_TYPE.get(type);
+    if (!entry) return false;
+    const cfg = entry.cfg;
     const roundTo = cfg.kind === 'heist' ? 1000 : 10;
     const reward = Math.round(randRange(cfg.rewardRange) / roundTo) * roundTo;
-    const mission = { type, kind: cfg.kind, title: TITLES[type], reward, detail: DETAILS[type](cfg), timeLimit: cfg.timeLimit };
+    const mission = { type, kind: cfg.kind, title: entry.title, reward, detail: entry.detail, timeLimit: cfg.timeLimit };
 
     if (cfg.kind === 'delivery') {
       mission.target = randomTarget(playerPos, cfg.minDist, cfg.maxDist);

@@ -1,5 +1,5 @@
 import * as THREE from '../vendor/three/three.module.js';
-import { CAMERA, WORLD_SEED, VEHICLE, BIKE, HELI, JET, BOAT, SUB, WATER, ISLAND, EXPLOSION } from './config.js';
+import { CAMERA, WORLD_SEED, VEHICLE, BIKE, HELI, JET, BOAT, SUB, WATER, BEACH, ISLAND, EXPLOSION, STARTING_CASH } from './config.js';
 import { Input } from './input.js';
 import { TouchControls } from './systems/touchControls.js';
 import { CityWorld } from './world/city.js';
@@ -23,6 +23,7 @@ import { CameraRig } from './systems/camera.js';
 const MODE = { FOOT: 'FOOT', CAR: 'CAR', BIKE: 'BIKE', HELI: 'HELI', JET: 'JET', BOAT: 'BOAT', SUB: 'SUB' };
 const DRIVING_MODES = new Set([MODE.CAR, MODE.BIKE]);
 const CASH_STORAGE_KEY = 'neonHorizonCash';
+const LICENSE_STORAGE_KEY = 'neonHorizonLicense';
 const SPAWN_KIND_MODE = { car: MODE.CAR, bike: MODE.BIKE, heli: MODE.HELI, jet: MODE.JET, boat: MODE.BOAT, sub: MODE.SUB };
 
 export class Game {
@@ -45,10 +46,12 @@ export class Game {
     this.missions = new MissionManager(this.scene);
     this.shops = new ShopManager(this.scene);
     this.hud = new HUD();
-    this.hud.bindMissions(this.missions);
+    this.hasLicense = this._loadLicense();
+    this.hud.bindMissions(this.missions, () => this.hasLicense);
     this.hud.bindWeapons(this.weaponSystem);
     this.hud.bindShopMenu();
-    this.hud.bindMinimapTap((x, z) => this._setWaypoint(new THREE.Vector3(x, 0, z)));
+    this.hud.bindMinimapTap();
+    this.hud.bindFullMap((x, z) => this._setWaypoint(new THREE.Vector3(x, 0, z)));
     this.hud.bindWaypointClear(() => this._clearWaypoint());
 
     this._initWater();
@@ -113,7 +116,10 @@ export class Game {
 
   // A single huge flat plane under everything, standing in for the ocean
   // that surrounds the island (see config.js's ISLAND/WATER — CityWorld only
-  // generates land within ISLAND.radius of the origin).
+  // generates land within ISLAND.radius of the origin), plus a sandy ring at
+  // the shoreline so land doesn't just cut off into open sea. The ring's
+  // inner half sits under the last row of land chunks (invisible); only the
+  // outer half, past ISLAND.radius, actually shows as a beach.
   _initWater() {
     const geo = new THREE.PlaneGeometry(WATER.size, WATER.size);
     const mat = new THREE.MeshStandardMaterial({ color: WATER.color, roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.92 });
@@ -123,6 +129,15 @@ export class Game {
     water.receiveShadow = true;
     this.scene.add(water);
     this.water = water;
+
+    const beachGeo = new THREE.RingGeometry(BEACH.innerRadius, BEACH.outerRadius, 96);
+    const beachMat = new THREE.MeshStandardMaterial({ color: BEACH.color, roughness: 0.95 });
+    const beach = new THREE.Mesh(beachGeo, beachMat);
+    beach.rotation.x = -Math.PI / 2;
+    beach.position.y = BEACH.level;
+    beach.receiveShadow = true;
+    this.scene.add(beach);
+    this.beach = beach;
   }
 
   // Ground travel (on foot, car, bike) can't cross the shoreline — it slides
@@ -154,9 +169,14 @@ export class Game {
 
   // --- shops -----------------------------------------------------------
   purchaseShopItem(shop, item) {
+    if (item.license && this.hasLicense) { this.hud.showToast('Already have a license', 'fail'); return; }
     if (this.cash < item.price) { this.hud.showToast('Not enough cash', 'fail'); return; }
     this.addCash(-item.price);
-    if (item.weapon) {
+    if (item.license) {
+      this._grantLicense();
+      this.hud.showToast('Contractor License acquired — contracts unlocked!', 'success', 4000);
+      this.hud.openShopMenu(shop, (it) => this.purchaseShopItem(shop, it)); // refresh (cash changed)
+    } else if (item.weapon) {
       if (item.weapon === 'all') {
         for (const w of this.weaponSystem.inventory) w.ammo = w.maxAmmo;
       } else {
@@ -225,9 +245,9 @@ export class Game {
   _loadCash() {
     try {
       const stored = Number(localStorage.getItem(CASH_STORAGE_KEY));
-      return Number.isFinite(stored) && stored > 0 ? stored : 500; // small starting stake
+      return Number.isFinite(stored) && stored > 0 ? stored : STARTING_CASH;
     } catch {
-      return 500;
+      return STARTING_CASH;
     }
   }
 
@@ -237,6 +257,23 @@ export class Game {
       localStorage.setItem(CASH_STORAGE_KEY, String(Math.round(this.cash)));
     } catch {
       // no persistence available in this context; the session still works
+    }
+  }
+
+  _loadLicense() {
+    try {
+      return localStorage.getItem(LICENSE_STORAGE_KEY) === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  _grantLicense() {
+    this.hasLicense = true;
+    try {
+      localStorage.setItem(LICENSE_STORAGE_KEY, '1');
+    } catch {
+      // no persistence available in this context; the license still works this session
     }
   }
 
@@ -302,7 +339,7 @@ export class Game {
   // does whichever this returns, and the on-foot HUD prompt names it.
   _nearestInteraction() {
     const p = this.player.mesh.position;
-    const shop = this.shops.findNearby(p, 6);
+    const shop = this.shops.findNearby(p, 10);
     const vehicle = this._findInteractable();
     const shopDist = shop ? p.distanceTo(shop.position) : Infinity;
     const vehicleDist = vehicle ? vehicle.dist : Infinity;
@@ -376,6 +413,8 @@ export class Game {
         ...aiManager.enemyMeshes,
         ...aiManager.pedestrians.map((p) => p.mesh),
         ...aiManager.traffic.map((t) => t.vehicle.mesh),
+        ...wanted.police.map((p) => p.vehicle.mesh),
+        ...wanted.police.filter((p) => p.officer?.alive).map((p) => p.officer.mesh),
       ];
       weaponSystem.update(
         dt, input, this.camera, targets,
@@ -476,7 +515,7 @@ export class Game {
     world.update(activePos.x, activePos.z);
     aiManager.syncWithWorld(world);
     aiManager.update(dt, world, player.mesh.position, (enemy, dmg) => this._onEnemyFire(enemy, dmg), traction);
-    wanted.update(dt, world, player, activePos, this.controlMode, traction);
+    wanted.update(dt, world, player, activePos, this.controlMode, traction, (officer, dmg) => this._onEnemyFire(officer, dmg));
     weather.update(dt, activePos);
     this._scanVehicleDestructions();
     this.shops.update(dt);
@@ -565,6 +604,11 @@ export class Game {
         if (!enemy.alive) this.missions.notifyEnemyKilled();
       }
     }
+    for (const p of this.wanted.police) {
+      if (!p.officer?.alive) continue;
+      const d = p.officer.mesh.position.distanceTo(position);
+      if (d < radius) p.officer.takeDamage(EXPLOSION.actorDamage * (1 - d / radius));
+    }
     for (const ped of [...this.aiManager.pedestrians]) {
       if (ped.mesh.position.distanceTo(position) < radius * 0.6) {
         this.aiManager.pedestrians = this.aiManager.pedestrians.filter((p) => p !== ped);
@@ -588,8 +632,13 @@ export class Game {
 
   _onWeaponHit(hit, damage) {
     const kind = hit.object.userData?.kind;
-    if (kind === 'enemy' || kind === 'pedestrian' || kind === 'vehicle') this.hud.flashHitMarker();
-    if (kind === 'enemy') {
+    if (kind === 'enemy' || kind === 'pedestrian' || kind === 'vehicle' || kind === 'policeOfficer') this.hud.flashHitMarker();
+    if (kind === 'policeOfficer') {
+      const officer = hit.object.userData.ref;
+      officer.takeDamage(damage);
+      this.wanted.reportCrime(2); // shooting a cop is serious
+      if (!officer.alive) this.particles.spawnExplosion(hit.point);
+    } else if (kind === 'enemy') {
       const enemy = hit.object.userData.ref;
       enemy.takeDamage(damage);
       this.wanted.reportCrime(1);
