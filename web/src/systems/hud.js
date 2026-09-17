@@ -30,6 +30,7 @@ export class HUD {
       missionTimerFill: document.getElementById('missionTimerFill'),
       missionBtn: document.getElementById('missionBtn'),
       missionMenu: document.getElementById('missionMenu'),
+      missionMenuHint: document.getElementById('missionMenuHint'),
       missionList: document.getElementById('missionList'),
       missionMenuClose: document.getElementById('missionMenuClose'),
       toast: document.getElementById('toast'),
@@ -155,11 +156,13 @@ export class HUD {
 
   // Wires the MISSIONS button + modal to a MissionManager. Missions themselves
   // stay hidden until the player opens this menu and picks one — there's no
-  // more auto-popping offer banner. canOpen() gates the whole board behind
-  // Game.hasLicense (bought once from a FIXER shop) — see Game.purchaseShopItem.
-  bindMissions(missionManager, canOpen) {
+  // more auto-popping offer banner. Browsing the board is always free;
+  // canStart() gates actually STARTING a job behind Game.hasLicense (bought
+  // once from a FIXER shop) — see Game.purchaseShopItem. You pay for what
+  // you need to do the job, not for the privilege of looking at the list.
+  bindMissions(missionManager, canStart) {
     this.missions = missionManager;
-    this._canOpenMissions = canOpen || (() => true);
+    this._canStartMissions = canStart || (() => true);
     this.el.missionBtn.addEventListener('click', () => this.openMissionMenu());
     this.el.missionMenuClose.addEventListener('click', () => this.closeMissionMenu());
     this.el.missionReroll.addEventListener('click', () => this._renderMissionList());
@@ -175,10 +178,6 @@ export class HUD {
 
   openMissionMenu() {
     if (this.missions.active) return; // finish the current contract first
-    if (!this._canOpenMissions()) {
-      this.showToast('Buy a Contractor License from THE FIXER first ($50,000)', 'fail', 4000);
-      return;
-    }
     // release mouse-look pointer lock so the cursor reappears to click the
     // menu — clicking back into the game canvas re-engages it as usual
     if (document.pointerLockElement) document.exitPointerLock();
@@ -190,6 +189,9 @@ export class HUD {
   // MissionManager.listAvailable) — called on open and again by the "New
   // Contracts" button, since listing all 500 at once would be unusable.
   _renderMissionList() {
+    this.el.missionMenuHint.textContent = this._canStartMissions()
+      ? 'Pick a job. Only one active at a time.'
+      : 'Browse for free — starting a job needs a Contractor License from THE FIXER ($50,000).';
     const list = this.el.missionList;
     list.innerHTML = '';
     for (const m of this.missions.listAvailable()) {
@@ -223,6 +225,10 @@ export class HUD {
       startBtn.className = 'missionStartBtn';
       startBtn.textContent = 'START';
       startBtn.addEventListener('click', () => {
+        if (!this._canStartMissions()) {
+          this.showToast('Buy a Contractor License from THE FIXER first ($50,000)', 'fail', 4000);
+          return; // menu stays open — browsing is free, starting a job isn't
+        }
         this.missions.start(m.type, this._playerPos);
         this.closeMissionMenu();
       });
