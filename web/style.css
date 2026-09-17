@@ -120,6 +120,11 @@ html, body {
   color: #201a00; font: 700 11px/1 'Segoe UI', Arial, sans-serif; letter-spacing: 0.5px; cursor: pointer;
 }
 .missionStartBtn:hover { background: #ffdd66; }
+.missionRowStory { background: rgba(154,47,217,0.1); margin: 0 -8px; padding-left: 8px; padding-right: 8px; border-radius: 4px; }
+.storyBadge {
+  display: inline-block; background: #9a2fd9; color: #fff; font-size: 9px; font-weight: 700;
+  letter-spacing: 1px; padding: 2px 5px; border-radius: 3px; margin-right: 5px; vertical-align: middle;
+}
 #missionMenuButtons { display: flex; gap: 8px; margin-top: 14px; }
 #missionReroll, #missionMenuClose {
   flex: 1; padding: 9px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25);

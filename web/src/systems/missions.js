@@ -1,5 +1,6 @@
 import * as THREE from '../../vendor/three/three.module.js';
 import { generateMissions } from './missionGenerator.js';
+import { STORY_MISSIONS } from './storyMissions.js';
 import { buildBeacon } from './beacon.js';
 
 // 500 procedurally generated jobs (rob a named bank, hit a cartel stash
@@ -9,6 +10,7 @@ import { buildBeacon } from './beacon.js';
 // on demand, rather than all 500 in one long scrollable list.
 const POOL = generateMissions(500);
 const POOL_BY_TYPE = new Map(POOL.map((m) => [m.type, m]));
+const STORY_BY_TYPE = new Map(STORY_MISSIONS.map((m) => [m.type, m]));
 
 const HEIST_PHASE_DETAIL = {
   rob: 'Break into the marked target',
@@ -47,24 +49,27 @@ export class MissionManager {
     return v;
   }
 
-  // Menu contents: a random sample of `count` jobs from the 500-entry pool
-  // (not all 500 at once — see systems/missionGenerator.js). Called again
-  // each time the player opens the menu or hits "New Contracts", so the
-  // board effectively rotates.
+  // Menu contents: Mars's 3 hand-authored story missions, always pinned
+  // first, followed by a random sample of `count` jobs from the 500-entry
+  // generated pool (not all 500 at once — see missionGenerator.js). The
+  // random half is reshuffled every time the player opens the menu or hits
+  // "New Contracts"; the story missions never change.
   listAvailable(count = 10) {
     const pool = [...POOL];
     for (let i = pool.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [pool[i], pool[j]] = [pool[j], pool[i]];
     }
-    return pool.slice(0, count).map((m) => ({ type: m.type, title: m.title, detail: m.detail, rewardRange: m.cfg.rewardRange }));
+    const story = STORY_MISSIONS.map((m) => ({ type: m.type, title: m.title, detail: m.detail, rewardRange: m.cfg.rewardRange, story: true }));
+    const generated = pool.slice(0, count).map((m) => ({ type: m.type, title: m.title, detail: m.detail, rewardRange: m.cfg.rewardRange }));
+    return [...story, ...generated];
   }
 
   // Explicitly chosen from the mission menu — replaces the old random-offer
   // + accept-with-keypress flow.
   start(type, playerPos) {
     if (this.active) return false;
-    const entry = POOL_BY_TYPE.get(type);
+    const entry = STORY_BY_TYPE.get(type) || POOL_BY_TYPE.get(type);
     if (!entry) return false;
     const cfg = entry.cfg;
     const roundTo = cfg.kind === 'heist' ? 1000 : 10;

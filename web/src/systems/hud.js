@@ -194,12 +194,19 @@ export class HUD {
     list.innerHTML = '';
     for (const m of this.missions.listAvailable()) {
       const row = document.createElement('div');
-      row.className = 'missionRow';
+      row.className = m.story ? 'missionRow missionRowStory' : 'missionRow';
       const info = document.createElement('div');
       info.className = 'missionRowInfo';
       const title = document.createElement('div');
       title.className = 'missionRowTitle';
-      title.textContent = m.title;
+      if (m.story) {
+        const badge = document.createElement('span');
+        badge.className = 'storyBadge';
+        badge.textContent = 'STORY';
+        title.append(badge, ` ${m.title}`);
+      } else {
+        title.textContent = m.title;
+      }
       const detail = document.createElement('div');
       detail.className = 'missionRowDetail';
       detail.textContent = m.detail;
@@ -207,7 +214,9 @@ export class HUD {
 
       const pay = document.createElement('div');
       pay.className = 'missionRowPay';
-      pay.textContent = `$${m.rewardRange[0].toLocaleString()}–$${m.rewardRange[1].toLocaleString()}`;
+      pay.textContent = m.rewardRange[0] === m.rewardRange[1]
+        ? `$${m.rewardRange[0].toLocaleString()}`
+        : `$${m.rewardRange[0].toLocaleString()}–$${m.rewardRange[1].toLocaleString()}`;
 
       const startBtn = document.createElement('button');
       startBtn.type = 'button';
