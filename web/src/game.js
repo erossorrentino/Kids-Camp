@@ -20,6 +20,8 @@ import { applyVehicleStatMul } from './systems/vehicleGenerator.js';
 import { buildBeacon } from './systems/beacon.js';
 import { HUD } from './systems/hud.js';
 import { CameraRig } from './systems/camera.js';
+import { PostFX } from './systems/postfx.js';
+import { buildSky } from './world/sky.js';
 
 const MODE = { FOOT: 'FOOT', CAR: 'CAR', BIKE: 'BIKE', HELI: 'HELI', JET: 'JET', BOAT: 'BOAT', SUB: 'SUB' };
 const DRIVING_MODES = new Set([MODE.CAR, MODE.BIKE]);
@@ -46,7 +48,7 @@ export class Game {
     this.wanted = new WantedSystem(this.scene);
     this.audio = new AudioManager(this.camera, this.scene);
     this.particles = new ParticleSystem(this.scene);
-    this.weather = new WeatherSystem(this.scene, this.sun, this.audio);
+    this.weather = new WeatherSystem(this.scene, this.sun, this.audio, this.sky);
     this.missions = new MissionManager(this.scene);
     this.shops = new ShopManager(this.scene);
     this.hud = new HUD();
@@ -82,7 +84,7 @@ export class Game {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMapping = THREE.NoToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.camera = new THREE.PerspectiveCamera(CAMERA.fov, window.innerWidth / window.innerHeight, CAMERA.near, CAMERA.far);
@@ -90,25 +92,38 @@ export class Game {
 
   _initSceneAndLights() {
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x9fc3e0);
-    this.scene.fog = new THREE.Fog(0x9fc3e0, 140, CAMERA.far * 0.9);
+    // The gradient dome (world/sky.js) draws over this every frame, but it's
+    // kept as the actual clear color so there's never a one-frame flash of
+    // black, and it matches the dome's horizon tone so fogged-out geometry
+    // blends into the sky instead of fading to a mismatched flat color.
+    this.scene.background = new THREE.Color(0xcdd9dd);
+    this.scene.fog = new THREE.Fog(0xcdd9dd, 140, CAMERA.far * 0.9);
+    this.sky = buildSky(this.scene);
 
-    const ambient = new THREE.HemisphereLight(0xbfd9ff, 0x3a3a2a, 0.85);
+    const ambient = new THREE.HemisphereLight(0xbfd9ff, 0x3a3a2a, 0.75);
     this.scene.add(ambient);
 
-    const sun = new THREE.DirectionalLight(0xfff2d8, 1.9);
+    const sun = new THREE.DirectionalLight(0xfff0d0, 2.4);
     sun.position.set(120, 180, 80);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);
-    sun.shadow.camera.left = -160;
-    sun.shadow.camera.right = 160;
-    sun.shadow.camera.top = 160;
-    sun.shadow.camera.bottom = -160;
-    sun.shadow.camera.far = 500;
-    sun.shadow.bias = -0.0015;
+    // Tighter than the old ±160 frustum: at the same 2048 map size this
+    // roughly quadruples shadow-texel density right around the player
+    // (where it's actually visible) rather than spreading resolution over
+    // a box wider than the third-person camera ever sees at once.
+    sun.shadow.camera.left = -90;
+    sun.shadow.camera.right = 90;
+    sun.shadow.camera.top = 90;
+    sun.shadow.camera.bottom = -90;
+    sun.shadow.camera.far = 400;
+    sun.shadow.bias = -0.0012;
+    sun.shadow.normalBias = 0.02;
     this.sun = sun;
+    this._sunDir = new THREE.Vector3();
     this.scene.add(sun);
     this.scene.add(sun.target);
+
+    this.postfx = new PostFX(this.renderer, this.scene, this.camera);
   }
 
   _spawnVehicles() {
@@ -348,6 +363,7 @@ export class Game {
     this.camera.aspect = window.innerWidth / window.innerHeight;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.postfx.setSize(window.innerWidth, window.innerHeight);
   }
 
   start() {
@@ -358,7 +374,7 @@ export class Game {
     const dt = Math.min(0.05, this.clock.getDelta());
     this.input.update(dt);
     this._update(dt);
-    this.renderer.render(this.scene, this.camera);
+    this.postfx.render();
     this.input.endFrame();
   }
 
@@ -687,6 +703,8 @@ export class Game {
   _updateSunFollow(pos) {
     this.sun.position.set(pos.x + 120, 180, pos.z + 80);
     this.sun.target.position.set(pos.x, 0, pos.z);
+    this._sunDir.set(120, 180, 80); // fixed offset above == world-space direction to the sun
+    this.sky.update(this.camera.position, this._sunDir);
   }
 
   _onWeaponHit(hit, damage) {

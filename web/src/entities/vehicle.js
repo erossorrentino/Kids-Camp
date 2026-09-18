@@ -63,7 +63,12 @@ function buildCarMesh(color) {
   const archMat = new THREE.MeshStandardMaterial({ color: 0x101012, roughness: 0.75, metalness: 0.1 });
   // Shared across every exterior paint panel (tub/hood/roof/trunk/fenders) so
   // cycling paint color with a single material tint recolors the whole car.
-  const paintMat = new THREE.MeshStandardMaterial({ color, roughness: 0.28, metalness: 0.6 });
+  // MeshPhysicalMaterial's clearcoat layer is what gives real automotive
+  // paint its glassy highlight on top of the base color coat — the cheapest
+  // single change that makes a car stop looking like painted cardboard.
+  const paintMat = new THREE.MeshPhysicalMaterial({
+    color, roughness: 0.35, metalness: 0.7, clearcoat: 1, clearcoatRoughness: 0.08,
+  });
   const stripeMat = new THREE.MeshStandardMaterial({ color: 0xcc2222, roughness: 0.35, metalness: 0.3 });
   const paintPanels = [];
 

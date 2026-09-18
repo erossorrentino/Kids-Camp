@@ -13,10 +13,11 @@ function randRange([min, max]) { return THREE.MathUtils.lerp(min, max, Math.rand
 // physics can make wet roads slicker. Thunder pairs a light flicker with a
 // synthesized clap via AudioManager.
 export class WeatherSystem {
-  constructor(scene, sun, audio) {
+  constructor(scene, sun, audio, sky) {
     this.scene = scene;
     this.sun = sun;
     this.audio = audio;
+    this.sky = sky;
     this.raining = false;
     this.transition = 0; // 0 = fully clear, 1 = fully storm
     this._phaseTimer = randRange(WEATHER.clearDuration);
@@ -51,7 +52,8 @@ export class WeatherSystem {
     this.scene.fog.color.copy(this.scene.background);
     this.scene.fog.near = THREE.MathUtils.lerp(CLEAR_FOG_NEAR, STORM_FOG_NEAR, this.transition);
     this.scene.fog.far = THREE.MathUtils.lerp(CAMERA.far * 0.9, CAMERA.far * 0.5, this.transition);
-    this.sun.intensity = THREE.MathUtils.lerp(1.1, 0.35, this.transition);
+    this.sun.intensity = THREE.MathUtils.lerp(2.4, 0.8, this.transition);
+    if (this.sky) this.sky.setWeather(this.transition);
 
     this.rain.material.opacity = this.transition * 0.7;
     if (this.transition > 0.02) {
@@ -72,7 +74,7 @@ export class WeatherSystem {
 
   _thunder(pos) {
     const original = this.sun.intensity;
-    this.sun.intensity = 2.2;
+    this.sun.intensity = 5;
     setTimeout(() => { this.sun.intensity = original; }, 90);
     if (this.audio) this.audio.playExplosion(new THREE.Vector3(pos.x + (Math.random() - 0.5) * 60, 30, pos.z + (Math.random() - 0.5) * 60));
   }

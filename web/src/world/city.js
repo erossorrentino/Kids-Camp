@@ -9,28 +9,47 @@ const LINE_COLOR = 0xdcc23a;
 // --- Procedural surface textures, generated once at module load and reused
 // (via RepeatWrapping) across every chunk instead of per-chunk canvases. ---
 
+// Anisotropic filtering keeps ground textures sharp at the shallow, grazing
+// viewing angles a driving/on-foot third-person camera sees constantly —
+// without it, roads and sidewalks blur into a flat gray smear a short
+// distance ahead. Three.js clamps this to whatever the GPU actually
+// supports, so it's safe to just ask for a generous value unconditionally.
+const ANISOTROPY = 8;
+
 function makeAsphaltTexture() {
-  const size = 256;
+  const size = 512;
   const canvas = document.createElement('canvas');
   canvas.width = size; canvas.height = size;
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#2b2e33';
   ctx.fillRect(0, 0, size, size);
-  for (let i = 0; i < 2200; i++) {
+  for (let i = 0; i < 7000; i++) {
     const x = Math.random() * size, y = Math.random() * size;
     const v = Math.random() * 22 - 11;
     ctx.fillStyle = `rgba(${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${Math.abs(v) / 90})`;
-    ctx.fillRect(x, y, 1.4, 1.4);
+    ctx.fillRect(x, y, 1.2, 1.2);
+  }
+  // subtle patchwork resurfacing blotches — the kind of tonal variation real
+  // asphalt has that pure speckle noise alone doesn't read as "worn road"
+  for (let i = 0; i < 6; i++) {
+    const x = Math.random() * size, y = Math.random() * size;
+    const r = 40 + Math.random() * 90;
+    const grad = ctx.createRadialGradient(x, y, 0, x, y, r);
+    const tone = Math.random() < 0.5 ? 18 : -14;
+    grad.addColorStop(0, `rgba(${128 + tone},${128 + tone},${132 + tone},0.14)`);
+    grad.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = grad;
+    ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
   }
   ctx.strokeStyle = 'rgba(10,10,12,0.5)';
-  ctx.lineWidth = 1.2;
-  for (let i = 0; i < 10; i++) {
+  ctx.lineWidth = 1.6;
+  for (let i = 0; i < 16; i++) {
     ctx.beginPath();
     let x = Math.random() * size, y = Math.random() * size;
     ctx.moveTo(x, y);
     for (let s = 0; s < 5; s++) {
-      x += (Math.random() - 0.5) * 60;
-      y += (Math.random() - 0.5) * 60;
+      x += (Math.random() - 0.5) * 110;
+      y += (Math.random() - 0.5) * 110;
       ctx.lineTo(x, y);
     }
     ctx.stroke();
@@ -38,25 +57,35 @@ function makeAsphaltTexture() {
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = ANISOTROPY;
   return tex;
 }
 
 function makeSidewalkTexture() {
-  const size = 256;
+  const size = 512;
   const canvas = document.createElement('canvas');
   canvas.width = size; canvas.height = size;
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#b9bec4';
   ctx.fillRect(0, 0, size, size);
-  for (let i = 0; i < 1400; i++) {
+  for (let i = 0; i < 4500; i++) {
     const x = Math.random() * size, y = Math.random() * size;
     const v = Math.random() * 26 - 13;
     ctx.fillStyle = `rgba(${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${Math.abs(v) / 100})`;
-    ctx.fillRect(x, y, 1.2, 1.2);
+    ctx.fillRect(x, y, 1.1, 1.1);
+  }
+  // faint per-slab tint variation so the grid doesn't look like one flat plane
+  const divisions = 4;
+  const cell = size / divisions;
+  for (let r = 0; r < divisions; r++) {
+    for (let c = 0; c < divisions; c++) {
+      const shade = (Math.random() - 0.5) * 10;
+      ctx.fillStyle = `rgba(${shade > 0 ? 255 : 0},${shade > 0 ? 255 : 0},${shade > 0 ? 255 : 0},${Math.abs(shade) / 120})`;
+      ctx.fillRect(c * cell, r * cell, cell, cell);
+    }
   }
   ctx.strokeStyle = 'rgba(90,94,100,0.6)';
-  ctx.lineWidth = 2;
-  const divisions = 4;
+  ctx.lineWidth = 3;
   for (let i = 1; i < divisions; i++) {
     const p = (i / divisions) * size;
     ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, size); ctx.stroke();
@@ -65,23 +94,34 @@ function makeSidewalkTexture() {
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = ANISOTROPY;
   return tex;
 }
 
 // Grid-of-windows facade, tiled across every building box face via repeat;
 // a handful of panes are drawn "lit" for variety.
 function makeFacadeTexture() {
-  const w = 256, h = 512;
+  const w = 512, h = 1024;
   const canvas = document.createElement('canvas');
   canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#9aa0a8';
   ctx.fillRect(0, 0, w, h);
-  for (let i = 0; i < 2600; i++) {
+  for (let i = 0; i < 9000; i++) {
     const x = Math.random() * w, y = Math.random() * h;
     const v = Math.random() * 18 - 9;
     ctx.fillStyle = `rgba(${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${v > 0 ? 255 : 0},${Math.abs(v) / 110})`;
-    ctx.fillRect(x, y, 1.3, 1.3);
+    ctx.fillRect(x, y, 1.1, 1.1);
+  }
+  // vertical rain/weathering streaks below sills — cheap but reads
+  // immediately as "real concrete facade" rather than a flat tinted panel
+  ctx.strokeStyle = 'rgba(20,24,26,0.06)';
+  for (let i = 0; i < 40; i++) {
+    const x = Math.random() * w;
+    const len = 80 + Math.random() * 260;
+    const y0 = Math.random() * (h - len);
+    ctx.lineWidth = 1 + Math.random() * 2.5;
+    ctx.beginPath(); ctx.moveTo(x, y0); ctx.lineTo(x + (Math.random() - 0.5) * 6, y0 + len); ctx.stroke();
   }
 
   const cols = 4, rows = 8;
@@ -92,10 +132,18 @@ function makeFacadeTexture() {
       const x = c * padX + (padX - winW) / 2;
       const y = r * padY + (padY - winH) / 2;
       const lit = Math.random() < 0.16;
-      ctx.fillStyle = lit ? '#e8c877' : '#3d4a56';
+      // a soft vertical gradient per pane instead of a flat fill — reads as
+      // glass catching the sky/interior light rather than a painted square
+      const grad = ctx.createLinearGradient(x, y, x, y + winH);
+      if (lit) { grad.addColorStop(0, '#fff2c4'); grad.addColorStop(1, '#e0a83f'); }
+      else { grad.addColorStop(0, '#4e5c6a'); grad.addColorStop(1, '#2b343d'); }
+      ctx.fillStyle = grad;
       ctx.fillRect(x, y, winW, winH);
-      ctx.strokeStyle = 'rgba(20,22,26,0.55)';
-      ctx.lineWidth = 2;
+      // a thin bright sill/mullion highlight along the top edge
+      ctx.fillStyle = 'rgba(255,255,255,0.12)';
+      ctx.fillRect(x, y, winW, Math.max(1, winH * 0.06));
+      ctx.strokeStyle = 'rgba(20,22,26,0.6)';
+      ctx.lineWidth = 3;
       ctx.strokeRect(x, y, winW, winH);
     }
   }
@@ -103,6 +151,7 @@ function makeFacadeTexture() {
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
   tex.repeat.set(2, 4);
+  tex.anisotropy = ANISOTROPY;
   return tex;
 }
 
@@ -110,7 +159,7 @@ function makeFacadeTexture() {
 // same panel layout as the facade above, but drawn transparent-except-lit so
 // it can sit on a MeshBasicMaterial plane and glow independent of scene light.
 function makeWindowGlowTexture() {
-  const w = 256, h = 512;
+  const w = 512, h = 1024;
   const canvas = document.createElement('canvas');
   canvas.width = w; canvas.height = h;
   const ctx = canvas.getContext('2d');
