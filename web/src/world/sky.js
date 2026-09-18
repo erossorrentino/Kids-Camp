@@ -27,9 +27,16 @@ void main() {
   vec3 col = mix(horizonColor, skyColor, smoothstep(0.0, 0.35, h));
   col = mix(col, zenithColor, smoothstep(0.35, 1.0, h));
 
+  // Kept near LDR (peak ~1.1) and the wide term narrowed (higher falloff
+  // power) — this used to assume the renderer's own ACES tonemapping would
+  // compress it, but the render pipeline now runs untonemapped (see
+  // Game._initRenderer) so this raw value is what the bloom pass sees
+  // directly. Left at the old *3.0/pow(...,6) strength, that wide term
+  // covered a huge swath of sky bright enough to cross the bloom threshold,
+  // reading as a big white haze rather than a sun.
   float sunAmount = max(dot(normalize(vWorldPos), sunDirection), 0.0);
-  col += sunColor * pow(sunAmount, 340.0) * 3.0; // tight bright disc
-  col += sunColor * pow(sunAmount, 6.0) * 0.25;  // wider soft glow
+  col += sunColor * pow(sunAmount, 700.0) * 1.1; // tight bright disc
+  col += sunColor * pow(sunAmount, 30.0) * 0.15; // narrow soft glow right around the disc
 
   gl_FragColor = vec4(col, 1.0);
 }

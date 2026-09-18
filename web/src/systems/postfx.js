@@ -18,7 +18,10 @@ export class PostFX {
     this.composer = new EffectComposer(renderer);
     this.composer.addPass(new RenderPass(scene, camera));
 
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.55, 0.55, 0.86);
+    // threshold is high enough that plain sky/fog brightness never crosses
+    // it (that was reading as a big white haze — see world/sky.js) while
+    // genuinely emissive things (neon, headlights, lit windows) still do.
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 0.5, 0.45, 0.97);
     this.composer.addPass(this.bloom);
     this.composer.addPass(new OutputPass());
   }

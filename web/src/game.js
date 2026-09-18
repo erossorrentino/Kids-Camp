@@ -92,7 +92,16 @@ export class Game {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    this.renderer.toneMapping = THREE.NoToneMapping;
+    // NOT double-tonemapped despite going through both RenderPass and
+    // OutputPass: three.js only applies a material's own tonemapping when
+    // rendering to the default framebuffer (currentRenderTarget === null –
+    // see WebGLProgram's toneMapping parameter), so RenderPass's offscreen
+    // target always renders linear/untonemapped and OutputPass is the one
+    // place the curve gets applied. NoToneMapping here (tried earlier)
+    // removes that only compression step, so anything over 1.0 — lit
+    // facades under the sun, headlights, neon — clips to solid white and
+    // blooms into huge blown-out blobs instead of a tasteful glow.
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.05;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.camera = new THREE.PerspectiveCamera(CAMERA.fov, window.innerWidth / window.innerHeight, CAMERA.near, CAMERA.far);
@@ -111,7 +120,7 @@ export class Game {
     const ambient = new THREE.HemisphereLight(0xbfd9ff, 0x3a3a2a, 0.75);
     this.scene.add(ambient);
 
-    const sun = new THREE.DirectionalLight(0xfff0d0, 2.4);
+    const sun = new THREE.DirectionalLight(0xfff0d0, 1.2);
     sun.position.set(120, 180, 80);
     sun.castShadow = true;
     sun.shadow.mapSize.set(2048, 2048);

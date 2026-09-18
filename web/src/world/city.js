@@ -168,7 +168,7 @@ function makeWindowGlowTexture() {
   const winW = padX * 0.62, winH = padY * 0.56;
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
-      if (Math.random() < 0.35) continue; // most panes stay unlit/transparent
+      if (Math.random() < 0.65) continue; // most panes stay unlit/transparent
       const x = c * padX + (padX - winW) / 2;
       const y = r * padY + (padY - winH) / 2;
       ctx.fillStyle = Math.random() < 0.7 ? '#fff2b0' : '#bfe6ff';

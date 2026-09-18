@@ -52,7 +52,11 @@ export class WeatherSystem {
     this.scene.fog.color.copy(this.scene.background);
     this.scene.fog.near = THREE.MathUtils.lerp(CLEAR_FOG_NEAR, STORM_FOG_NEAR, this.transition);
     this.scene.fog.far = THREE.MathUtils.lerp(CAMERA.far * 0.9, CAMERA.far * 0.5, this.transition);
-    this.sun.intensity = THREE.MathUtils.lerp(2.4, 0.8, this.transition);
+    // Tuned for the correct ACES-tonemapped pipeline (see game.js
+    // _initRenderer) — 2.4 was tuned against a since-fixed NoToneMapping
+    // bug and blew light-colored surfaces out to solid white/haze once
+    // real tonemapping was restored.
+    this.sun.intensity = THREE.MathUtils.lerp(1.2, 0.4, this.transition);
     if (this.sky) this.sky.setWeather(this.transition);
 
     this.rain.material.opacity = this.transition * 0.7;
