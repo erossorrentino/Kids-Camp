@@ -16,11 +16,9 @@
   <main class="layout">
     <section class="board-panel">
       <div class="board-wrap">
-        <div class="path-marker start-marker" id="startMarker">▶ START</div>
-        <div class="board" id="board"></div>
-        <div class="path-marker end-marker" id="endMarker">💵 CASH OUT</div>
+        <canvas id="boardCanvas" width="640" height="700"></canvas>
       </div>
-      <p class="hint" id="hint">Tap a multiplier below, then tap an empty slot to place it. Get 3 of the same to merge into a better one!</p>
+      <p class="hint" id="hint">Tap a multiplier below, then tap an empty slot on the board to place it there. Balls drop from the top and bounce like Plinko — get 3 of the same multiplier to merge into a better one!</p>
     </section>
 
     <aside class="side-panel">
@@ -56,6 +54,7 @@
 
   <div class="toast-stack" id="toastStack"></div>
 
+  <script src="lib/matter.min.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

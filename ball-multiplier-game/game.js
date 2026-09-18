@@ -27,8 +27,54 @@ const CHESTS = [
 
 const SELL_VALUE = TIERS.map(t => Math.round(t.mult * 15));
 const TRAY_MAX = 8;
-const SEGMENT_MS = 420;
-const SAVE_KEY = 'ballMultiplierMergeSave.v1';
+const SAVE_KEY = 'ballMultiplierMergeSave.v2';
+
+/* ---------- Plinko board layout (fixed internal resolution) ---------- */
+
+const BOARD_W = 640;
+const BOARD_H = 700;
+const PEG_RADIUS = 5;
+const SLOT_RADIUS = 26;
+const BALL_RADIUS = 12;
+
+// Multiplier slots spread out across the whole board, not confined to one row.
+const SLOT_FRACS = [
+  { x: 0.20, y: 0.16 },
+  { x: 0.75, y: 0.14 },
+  { x: 0.45, y: 0.24 },
+  { x: 0.12, y: 0.34 },
+  { x: 0.62, y: 0.32 },
+  { x: 0.85, y: 0.42 },
+  { x: 0.30, y: 0.46 },
+  { x: 0.55, y: 0.55 },
+  { x: 0.18, y: 0.62 },
+  { x: 0.72, y: 0.66 },
+];
+
+function buildPegs() {
+  const rows = 14;
+  const topMargin = BOARD_H * 0.07;
+  const bottomMargin = BOARD_H * 0.09;
+  const rowGap = (BOARD_H - topMargin - bottomMargin) / (rows - 1);
+  const sideMargin = BOARD_W * 0.07;
+  const colGap = (BOARD_W - sideMargin * 2) / 9;
+  const pegs = [];
+  for (let r = 0; r < rows; r++) {
+    const y = topMargin + r * rowGap;
+    const even = r % 2 === 0;
+    const count = even ? 10 : 9;
+    for (let c = 0; c < count; c++) {
+      const x = even ? sideMargin + c * colGap : sideMargin + colGap / 2 + c * colGap;
+      pegs.push({ x, y });
+    }
+  }
+  return pegs;
+}
+
+const SLOT_POS = SLOT_FRACS.map(f => ({ x: f.x * BOARD_W, y: f.y * BOARD_H }));
+const PEGS = buildPegs().filter(
+  p => !SLOT_POS.some(s => Math.hypot(s.x - p.x, s.y - p.y) < SLOT_RADIUS + PEG_RADIUS + 10)
+);
 
 /* ---------- State ---------- */
 
@@ -41,10 +87,14 @@ let state = {
 };
 
 let selectedTrayIndex = null;
-let balls = [];
 let lastSpawn = 0;
-let waypoints = [];
+let lastFrame = 0;
 let rafId = null;
+
+let engine = null;
+let balls = [];
+const slotPulses = new Array(SLOT_COUNT).fill(-9999);
+let floatTexts = [];
 
 /* ---------- Persistence ---------- */
 
@@ -114,8 +164,7 @@ function weightedRandomTier(weights) {
 
 const els = {
   money: document.getElementById('moneyDisplay'),
-  board: document.getElementById('board'),
-  boardWrap: document.querySelector('.board-wrap'),
+  canvas: document.getElementById('boardCanvas'),
   hint: document.getElementById('hint'),
   speedSub: document.getElementById('speedSub'),
   valueSub: document.getElementById('valueSub'),
@@ -125,43 +174,12 @@ const els = {
   tray: document.getElementById('tray'),
   toastStack: document.getElementById('toastStack'),
 };
+const ctx = els.canvas.getContext('2d');
 
-/* ---------- Rendering ---------- */
+/* ---------- Rendering (DOM panels) ---------- */
 
 function renderMoney() {
   els.money.textContent = '$' + fmt(state.money);
-}
-
-function renderSlots() {
-  els.board.innerHTML = '';
-  for (let i = 0; i < SLOT_COUNT; i++) {
-    const slotEl = document.createElement('div');
-    slotEl.className = 'slot';
-    slotEl.dataset.index = String(i);
-
-    // Snake layout: bottom row runs right-to-left visually.
-    const row = Math.floor(i / 5);
-    const col = i % 5;
-    const gridCol = row === 0 ? col + 1 : 5 - col;
-    slotEl.style.gridRow = String(row + 1);
-    slotEl.style.gridColumn = String(gridCol);
-
-    const tier = state.slots[i];
-    if (tier !== null) {
-      const tile = document.createElement('div');
-      tile.className = 'tile';
-      tile.style.background = TIERS[tier].color;
-      tile.textContent = TIERS[tier].label;
-      tile.title = 'Click to sell for $' + fmt(SELL_VALUE[tier]);
-      slotEl.appendChild(tile);
-    } else if (selectedTrayIndex !== null) {
-      slotEl.classList.add('selectable');
-    }
-
-    slotEl.addEventListener('click', () => onSlotClick(i));
-    els.board.appendChild(slotEl);
-  }
-  computeWaypoints();
 }
 
 function renderUpgrades() {
@@ -181,7 +199,7 @@ function renderChests() {
     const item = document.createElement('div');
     item.className = 'chest-item';
 
-    const best = chest.weights.reduce((maxIdx, w, idx, arr) => (w > 0 ? idx : maxIdx), -1);
+    const best = chest.weights.reduce((maxIdx, w, idx) => (w > 0 ? idx : maxIdx), -1);
     const oddsLabel = best >= 0 ? `Up to ${TIERS[best].label}` : 'Basic multipliers';
 
     item.innerHTML = `
@@ -219,7 +237,6 @@ function renderTray() {
 
 function renderAll() {
   renderMoney();
-  renderSlots();
   renderUpgrades();
   renderChests();
   renderTray();
@@ -239,7 +256,6 @@ function toast(msg) {
 
 function onTrayClick(idx) {
   selectedTrayIndex = selectedTrayIndex === idx ? null : idx;
-  renderSlots();
   renderTray();
 }
 
@@ -346,115 +362,236 @@ function buyValueUpgrade() {
   save();
 }
 
-/* ---------- Ball animation ---------- */
+/* ---------- Physics (Plinko board) ---------- */
 
-function computeWaypoints() {
-  const wrapRect = els.boardWrap.getBoundingClientRect();
-  const slotEls = els.board.querySelectorAll('.slot');
-  const centers = [];
-  slotEls.forEach(el => {
-    const r = el.getBoundingClientRect();
-    centers.push({
-      x: r.left + r.width / 2 - wrapRect.left,
-      y: r.top + r.height / 2 - wrapRect.top,
+function setupPhysics() {
+  engine = Matter.Engine.create();
+  engine.gravity.y = 1;
+
+  const pegBodies = PEGS.map(p =>
+    Matter.Bodies.circle(p.x, p.y, PEG_RADIUS, { isStatic: true, restitution: 0.5, friction: 0 })
+  );
+
+  const slotBodies = SLOT_POS.map((p, i) => {
+    const body = Matter.Bodies.circle(p.x, p.y, SLOT_RADIUS, { isStatic: true, restitution: 0.55, friction: 0 });
+    body.isSlot = true;
+    body.slotIndex = i;
+    return body;
+  });
+
+  const wallOpts = { isStatic: true, restitution: 0.4, friction: 0 };
+  const leftWall = Matter.Bodies.rectangle(-10, BOARD_H / 2, 20, BOARD_H * 2, wallOpts);
+  const rightWall = Matter.Bodies.rectangle(BOARD_W + 10, BOARD_H / 2, 20, BOARD_H * 2, wallOpts);
+
+  Matter.Composite.add(engine.world, [...pegBodies, ...slotBodies, leftWall, rightWall]);
+
+  Matter.Events.on(engine, 'collisionStart', onCollisionStart);
+}
+
+function onCollisionStart(event) {
+  event.pairs.forEach(({ bodyA, bodyB }) => {
+    let ball = null;
+    let slot = null;
+    if (bodyA.isGameBall && bodyB.isSlot) {
+      ball = bodyA;
+      slot = bodyB;
+    } else if (bodyB.isGameBall && bodyA.isSlot) {
+      ball = bodyB;
+      slot = bodyA;
+    }
+    if (!ball || !slot) return;
+
+    const idx = slot.slotIndex;
+    const tier = state.slots[idx];
+    if (tier === null || ball.gameData.hitSlots.has(idx)) return;
+
+    ball.gameData.hitSlots.add(idx);
+    ball.gameData.value *= TIERS[tier].mult;
+    slotPulses[idx] = performance.now();
+    floatTexts.push({
+      x: slot.position.x,
+      y: slot.position.y - SLOT_RADIUS - 6,
+      text: TIERS[tier].label,
+      color: '#7ee787',
+      start: performance.now(),
     });
   });
-  if (centers.length !== SLOT_COUNT) {
-    waypoints = [];
-    return;
-  }
-  const pre = { x: centers[0].x, y: centers[0].y - 46 };
-  const post = { x: centers[SLOT_COUNT - 1].x, y: centers[SLOT_COUNT - 1].y + 46 };
-  waypoints = [pre, ...centers, post];
 }
 
 function spawnBall() {
-  if (waypoints.length === 0) computeWaypoints();
-  if (waypoints.length === 0) return;
-  const ballEl = document.createElement('div');
-  ballEl.className = 'ball';
-  ballEl.textContent = '$';
-  els.boardWrap.appendChild(ballEl);
-  balls.push({
-    value: startValue(),
-    seg: 0,
-    segStart: performance.now(),
-    el: ballEl,
+  const x = BOARD_W / 2 + (Math.random() - 0.5) * 40;
+  const body = Matter.Bodies.circle(x, 16, BALL_RADIUS, {
+    restitution: 0.6,
+    friction: 0.02,
+    frictionAir: 0.001,
+    density: 0.0025,
   });
+  body.isGameBall = true;
+  body.gameData = { value: startValue(), hitSlots: new Set() };
+  Matter.Composite.add(engine.world, body);
+  balls.push(body);
 }
 
-function showFloatText(pos, text, isMoney) {
-  const el = document.createElement('div');
-  el.className = 'float-text' + (isMoney ? ' money' : '');
-  el.textContent = text;
-  el.style.left = pos.x + 'px';
-  el.style.top = pos.y + 'px';
-  els.boardWrap.appendChild(el);
-  setTimeout(() => el.remove(), 800);
+function cashOutBall(ball, now) {
+  const val = ball.gameData.value;
+  state.money += val;
+  floatTexts.push({ x: ball.position.x, y: BOARD_H - 46, text: '+$' + fmt(val), color: '#ffd700', start: now });
+  Matter.Composite.remove(engine.world, ball);
 }
 
-function updateBalls(now) {
-  for (let i = balls.length - 1; i >= 0; i--) {
-    const ball = balls[i];
-    const from = waypoints[ball.seg];
-    const to = waypoints[ball.seg + 1];
-    if (!from || !to) {
-      ball.el.remove();
-      balls.splice(i, 1);
-      continue;
-    }
-    const t = Math.min(1, (now - ball.segStart) / SEGMENT_MS);
-    const x = from.x + (to.x - from.x) * t;
-    const y = from.y + (to.y - from.y) * t;
-    ball.el.style.left = x + 'px';
-    ball.el.style.top = y + 'px';
+/* ---------- Canvas interaction ---------- */
 
-    if (t >= 1) {
-      const arrivedSlotIndex = ball.seg; // seg N arrives at slot N (0-based) for N in [0, SLOT_COUNT-1]
-      const isSlotArrival = arrivedSlotIndex >= 0 && arrivedSlotIndex < SLOT_COUNT;
-      if (isSlotArrival) {
-        const tier = state.slots[arrivedSlotIndex];
-        if (tier !== null) {
-          ball.value *= TIERS[tier].mult;
-          showFloatText(to, TIERS[tier].label, false);
-          pulseSlot(arrivedSlotIndex);
-        }
-      }
-      ball.seg++;
-      if (ball.seg >= waypoints.length - 1) {
-        state.money += ball.value;
-        showFloatText(to, '+$' + fmt(ball.value), true);
-        ball.el.remove();
-        balls.splice(i, 1);
-        renderMoney();
-        renderUpgrades();
-        renderChests();
-        save();
-        continue;
-      }
-      ball.segStart = now;
-    } else {
-      ball.el.textContent = fmt(ball.value);
+function canvasPointFromEvent(evt) {
+  const rect = els.canvas.getBoundingClientRect();
+  const scaleX = BOARD_W / rect.width;
+  const scaleY = BOARD_H / rect.height;
+  return {
+    x: (evt.clientX - rect.left) * scaleX,
+    y: (evt.clientY - rect.top) * scaleY,
+  };
+}
+
+function onCanvasClick(evt) {
+  const p = canvasPointFromEvent(evt);
+  let nearest = -1;
+  let nearestDist = Infinity;
+  SLOT_POS.forEach((s, i) => {
+    const d = Math.hypot(s.x - p.x, s.y - p.y);
+    if (d < nearestDist) {
+      nearestDist = d;
+      nearest = i;
     }
+  });
+  if (nearest >= 0 && nearestDist <= SLOT_RADIUS + 14) {
+    onSlotClick(nearest);
   }
 }
 
-function pulseSlot(index) {
-  const slotEl = els.board.querySelector(`.slot[data-index="${index}"] .tile`);
-  if (!slotEl) return;
-  slotEl.classList.remove('pulse');
-  // Force reflow so the animation can restart.
-  void slotEl.offsetWidth;
-  slotEl.classList.add('pulse');
+/* ---------- Drawing ---------- */
+
+function draw(now) {
+  ctx.clearRect(0, 0, BOARD_W, BOARD_H);
+
+  ctx.fillStyle = '#241748';
+  ctx.fillRect(0, 0, BOARD_W, BOARD_H);
+
+  ctx.fillStyle = 'rgba(183,169,217,0.85)';
+  ctx.font = '700 16px Segoe UI, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText('▼ DROP ZONE ▼', BOARD_W / 2, 26);
+
+  ctx.fillStyle = '#5b3f92';
+  PEGS.forEach(p => {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, PEG_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  SLOT_POS.forEach((p, i) => {
+    const tier = state.slots[i];
+    const pulseT = now - slotPulses[i];
+    const scale = pulseT < 250 ? 1 + 0.25 * (1 - pulseT / 250) : 1;
+    const r = SLOT_RADIUS * scale;
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+    if (tier !== null) {
+      ctx.fillStyle = TIERS[tier].color;
+      ctx.fill();
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+      ctx.stroke();
+      ctx.fillStyle = '#1b1032';
+      ctx.font = '800 15px Segoe UI, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(TIERS[tier].label, p.x, p.y + 1);
+    } else {
+      ctx.fillStyle = 'rgba(61,42,99,0.9)';
+      ctx.fill();
+      const selectable = selectedTrayIndex !== null;
+      ctx.setLineDash(selectable ? [5, 4] : []);
+      ctx.lineWidth = selectable ? 3 : 2;
+      ctx.strokeStyle = selectable ? '#7ee787' : '#5b3f92';
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+    ctx.restore();
+  });
+
+  ctx.fillStyle = 'rgba(255,215,0,0.12)';
+  ctx.fillRect(0, BOARD_H - 40, BOARD_W, 40);
+  ctx.fillStyle = '#ffd700';
+  ctx.font = '700 16px Segoe UI, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'alphabetic';
+  ctx.fillText('💵 CASH OUT 💵', BOARD_W / 2, BOARD_H - 15);
+
+  balls.forEach(b => {
+    const { x, y } = b.position;
+    ctx.beginPath();
+    const grad = ctx.createRadialGradient(x - 4, y - 5, 2, x, y, BALL_RADIUS);
+    grad.addColorStop(0, '#fff6c9');
+    grad.addColorStop(0.6, '#ffd700');
+    grad.addColorStop(1, '#b8860b');
+    ctx.fillStyle = grad;
+    ctx.arc(x, y, BALL_RADIUS, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#4a3200';
+    ctx.font = '700 9px Segoe UI, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(fmt(b.gameData.value), x, y + 1);
+  });
+
+  for (let i = floatTexts.length - 1; i >= 0; i--) {
+    const f = floatTexts[i];
+    const t = (now - f.start) / 800;
+    if (t >= 1) {
+      floatTexts.splice(i, 1);
+      continue;
+    }
+    ctx.globalAlpha = 1 - t;
+    ctx.fillStyle = f.color;
+    ctx.font = '800 14px Segoe UI, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'alphabetic';
+    ctx.fillText(f.text, f.x, f.y - t * 30);
+    ctx.globalAlpha = 1;
+  }
 }
 
+/* ---------- Main loop ---------- */
+
 function gameLoop(now) {
+  const dt = Math.min(33, now - (lastFrame || now));
+  lastFrame = now;
+  Matter.Engine.update(engine, dt);
+
   const intervalMs = spawnInterval() * 1000;
   if (now - lastSpawn >= intervalMs) {
     lastSpawn = now;
     spawnBall();
   }
-  updateBalls(now);
+
+  let cashedOut = false;
+  for (let i = balls.length - 1; i >= 0; i--) {
+    const ball = balls[i];
+    if (ball.position.y - BALL_RADIUS > BOARD_H) {
+      cashOutBall(ball, now);
+      balls.splice(i, 1);
+      cashedOut = true;
+    }
+  }
+  if (cashedOut) {
+    renderMoney();
+    renderUpgrades();
+    renderChests();
+    save();
+  }
+
+  draw(now);
   rafId = requestAnimationFrame(gameLoop);
 }
 
@@ -463,9 +600,10 @@ function gameLoop(now) {
 function init() {
   load();
   renderAll();
+  setupPhysics();
+  els.canvas.addEventListener('click', onCanvasClick);
   els.buySpeed.addEventListener('click', buySpeedUpgrade);
   els.buyValue.addEventListener('click', buyValueUpgrade);
-  window.addEventListener('resize', computeWaypoints);
   lastSpawn = performance.now() - spawnInterval() * 1000; // spawn one immediately
   rafId = requestAnimationFrame(gameLoop);
 }
