@@ -1,0 +1,363 @@
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body {
+  margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;
+  background: #0a0c10; font-family: 'Segoe UI', Arial, sans-serif; color: #eee;
+  overscroll-behavior: none; touch-action: none; -webkit-user-select: none; user-select: none;
+}
+#viewport { position: fixed; inset: 0; display: block; outline: none; touch-action: none; }
+
+#hud { position: fixed; inset: 0; pointer-events: none; user-select: none; }
+
+#bars { position: absolute; left: 18px; bottom: 18px; width: 220px; }
+.bar-row { display: flex; align-items: center; margin-bottom: 6px; }
+.bar-label { width: 24px; font-weight: 700; font-size: 12px; text-shadow: 0 1px 2px #000; }
+.bar-track { position: relative; flex: 1; height: 18px; background: rgba(0,0,0,0.55); border: 1px solid rgba(255,255,255,0.3); border-radius: 3px; overflow: hidden; }
+.bar-fill { height: 100%; width: 100%; transition: width 0.15s linear; }
+.bar-fill.health { background: linear-gradient(90deg,#7CFC00,#2ecc40); }
+.bar-fill.armor { background: linear-gradient(90deg,#4aa3ff,#1f6fd6); }
+.bar-num {
+  position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; font-variant-numeric: tabular-nums;
+  color: #fff; text-shadow: 0 1px 2px #000, 0 0 3px #000;
+}
+
+#stars { position: absolute; left: 18px; bottom: 78px; display: flex; gap: 3px; }
+#stars .star { width: 18px; height: 18px; opacity: 0.25; filter: drop-shadow(0 1px 1px #000); }
+#stars .star.on { opacity: 1; }
+#stars .star svg { width: 100%; height: 100%; }
+
+#weaponPanel {
+  position: fixed; right: 18px; bottom: 18px; display: flex; align-items: center; gap: 10px;
+  background: rgba(0,0,0,0.45); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.15);
+  pointer-events: auto; cursor: pointer; z-index: 6; transition: background 0.12s, border-color 0.12s;
+}
+#weaponPanel:hover, #weaponPanel:active { background: rgba(255,210,63,0.18); border-color: rgba(255,210,63,0.5); }
+#weaponIcon { width: 34px; height: 18px; border-radius: 3px; background: #999; box-shadow: inset 0 0 4px rgba(0,0,0,0.6); }
+#weaponInfo { text-align: right; }
+#weaponName { font-weight: 700; font-size: 13px; letter-spacing: 0.5px; }
+#ammoCount { font-size: 15px; font-variant-numeric: tabular-nums; }
+
+#mapPanel {
+  position: fixed; left: 18px; top: 18px; border-radius: 8px; overflow: hidden;
+  border: 2px solid rgba(255,255,255,0.35); box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+  pointer-events: auto; z-index: 6;
+}
+#mapLabel {
+  background: rgba(10,12,16,0.85); color: #ffd23f; font-size: 9px; font-weight: 700;
+  letter-spacing: 1px; text-align: center; padding: 2px 4px; border-radius: 6px 6px 0 0; overflow: hidden;
+}
+#minimap { display: block; background: #1a1e24; cursor: crosshair; }
+#waypointClear {
+  position: absolute; top: 22px; right: 4px; width: 20px; height: 20px; border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.4); background: rgba(0,0,0,0.7); color: #ff3ad6;
+  font: 700 11px/1 Arial, sans-serif; cursor: pointer; display: none; align-items: center; justify-content: center;
+  z-index: 7; padding: 0;
+}
+#waypointClear.show { display: flex; }
+#waypointTag {
+  position: absolute; right: 18px; bottom: 118px; font-size: 12px; font-weight: 700; color: #ff3ad6;
+  background: rgba(0,0,0,0.45); padding: 4px 10px; border-radius: 4px; opacity: 0; transition: opacity 0.3s;
+}
+#waypointTag.show { opacity: 1; }
+
+#cashDisplay {
+  position: absolute; left: 18px; top: 212px; font-size: 20px; font-weight: 700; color: #7CFC00;
+  background: rgba(0,0,0,0.45); padding: 6px 14px; border-radius: 6px; letter-spacing: 0.5px;
+  border: 1px solid rgba(124,252,0,0.35); display: flex; align-items: center; gap: 3px;
+}
+#cashIcon { color: #ffd23f; }
+
+#speedo { position: absolute; right: 18px; top: 18px; font-size: 22px; font-weight: 700; background: rgba(0,0,0,0.4); padding: 6px 14px; border-radius: 6px; min-width: 90px; text-align: center; }
+
+#stateIndicator { position: absolute; left: 50%; top: 18px; transform: translateX(-50%); font-size: 12px; letter-spacing: 2px; background: rgba(0,0,0,0.4); padding: 4px 12px; border-radius: 12px; }
+
+/* Active-mission readout: top-left, stacked under the map/cash so the
+   current objective is always visible without covering the center of the
+   screen. The full mission LIST only ever appears in the #missionMenu modal,
+   opened via the MISSIONS button below. */
+#missionPanel {
+  position: absolute; left: 18px; top: 302px; width: 220px; text-align: left;
+  background: rgba(10,12,16,0.7); border: 1px solid rgba(255,210,63,0.4); border-radius: 8px; padding: 8px 12px;
+  opacity: 0; transition: opacity 0.25s;
+}
+#missionPanel.show { opacity: 1; }
+#missionTitle { font-size: 12px; font-weight: 700; letter-spacing: 1px; color: #ffd23f; }
+#missionDetail { font-size: 11px; color: #dfe6ee; margin-top: 2px; }
+#missionTimerBar { height: 5px; background: rgba(255,255,255,0.15); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+#missionTimerFill { height: 100%; width: 100%; background: #ffd23f; transition: width 0.2s linear; }
+
+/* The always-visible entry point — missions themselves stay hidden until
+   the player opens this menu. Sits outside #hud so it can take clicks. */
+#missionBtn {
+  position: fixed; left: 18px; top: 258px; z-index: 6;
+  padding: 7px 14px; border-radius: 6px; border: 1px solid rgba(255,210,63,0.5);
+  background: rgba(10,12,16,0.7); color: #ffd23f; font: 700 12px/1 'Segoe UI', Arial, sans-serif;
+  letter-spacing: 1px; cursor: pointer;
+}
+#missionBtn:hover { background: rgba(255,210,63,0.15); }
+#missionBtn:disabled { opacity: 0.4; cursor: default; }
+
+#missionMenu {
+  display: none; position: fixed; inset: 0; z-index: 15;
+  background: rgba(5,7,10,0.75); align-items: center; justify-content: center;
+}
+#missionMenu.show { display: flex; }
+#missionMenuCard {
+  width: min(420px, 92vw); max-height: 80vh; overflow-y: auto; background: #12151c;
+  border: 1px solid rgba(255,210,63,0.4); border-radius: 10px; padding: 18px 20px; color: #eee;
+}
+#missionMenuCard h2 { margin: 0 0 4px; color: #ffd23f; letter-spacing: 2px; font-size: 18px; }
+#missionMenuHint { margin: 0 0 14px; color: #8a94a3; font-size: 12px; }
+.missionRow {
+  display: flex; align-items: center; gap: 10px; padding: 10px 0; border-top: 1px solid rgba(255,255,255,0.08);
+}
+.missionRowInfo { flex: 1; min-width: 0; }
+.missionRowTitle { font-weight: 700; font-size: 13px; letter-spacing: 0.5px; }
+.missionRowDetail { font-size: 11.5px; color: #9aa4b2; margin-top: 2px; }
+.missionRowPay { font-size: 12px; font-weight: 700; color: #7CFC00; white-space: nowrap; }
+.missionStartBtn {
+  flex: 0 0 auto; padding: 7px 12px; border-radius: 5px; border: none; background: #ffd23f;
+  color: #201a00; font: 700 11px/1 'Segoe UI', Arial, sans-serif; letter-spacing: 0.5px; cursor: pointer;
+}
+.missionStartBtn:hover { background: #ffdd66; }
+.missionRowStory { background: rgba(154,47,217,0.1); margin: 0 -8px; padding-left: 8px; padding-right: 8px; border-radius: 4px; }
+.storyBadge {
+  display: inline-block; background: #9a2fd9; color: #fff; font-size: 9px; font-weight: 700;
+  letter-spacing: 1px; padding: 2px 5px; border-radius: 3px; margin-right: 5px; vertical-align: middle;
+}
+#missionMenuButtons { display: flex; gap: 8px; margin-top: 14px; }
+#missionReroll, #missionMenuClose {
+  flex: 1; padding: 9px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25);
+  background: transparent; color: #cfd6e0; font: 700 12px/1 'Segoe UI', Arial, sans-serif; letter-spacing: 1px; cursor: pointer;
+}
+#missionReroll { border-color: rgba(255,210,63,0.5); color: #ffd23f; }
+#missionReroll:hover, #missionMenuClose:hover { background: rgba(255,255,255,0.08); }
+
+#fullMap {
+  display: none; position: fixed; inset: 0; z-index: 16;
+  background: rgba(5,7,10,0.85); align-items: center; justify-content: center;
+}
+#fullMap.show { display: flex; }
+#fullMapCard {
+  background: #12151c; border: 1px solid rgba(255,210,63,0.4); border-radius: 10px;
+  padding: 14px; color: #eee; text-align: center;
+}
+#fullMapHint { margin: 0 0 10px; color: #8a94a3; font-size: 12px; letter-spacing: 0.5px; }
+#fullMapCanvas {
+  display: block; width: min(640px, 86vw); height: min(640px, 86vw); border-radius: 8px;
+  border: 2px solid rgba(255,255,255,0.25); cursor: crosshair; background: #0c2634;
+}
+#fullMapClose {
+  margin-top: 12px; width: 100%; padding: 9px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25);
+  background: transparent; color: #cfd6e0; font: 700 12px/1 'Segoe UI', Arial, sans-serif; letter-spacing: 1px; cursor: pointer;
+}
+#fullMapClose:hover { background: rgba(255,255,255,0.08); }
+
+#shopMenu {
+  display: none; position: fixed; inset: 0; z-index: 15;
+  background: rgba(5,7,10,0.75); align-items: center; justify-content: center;
+}
+#shopMenu.show { display: flex; }
+#shopMenuCard {
+  width: min(420px, 92vw); max-height: 80vh; overflow-y: auto; background: #12151c;
+  border: 1px solid rgba(255,210,63,0.4); border-radius: 10px; padding: 18px 20px; color: #eee;
+}
+#shopMenuCard h2 { margin: 0 0 4px; color: #ffd23f; letter-spacing: 2px; font-size: 18px; }
+#shopMenuHint { margin: 0 0 14px; color: #8a94a3; font-size: 12px; }
+#shopMenuClose {
+  margin-top: 14px; width: 100%; padding: 9px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25);
+  background: transparent; color: #cfd6e0; font: 700 12px/1 'Segoe UI', Arial, sans-serif; letter-spacing: 1px; cursor: pointer;
+}
+#shopMenuClose:hover { background: rgba(255,255,255,0.08); }
+
+#toast {
+  position: absolute; left: 50%; top: 120px; transform: translateX(-50%); font-size: 16px; font-weight: 700;
+  padding: 10px 22px; border-radius: 8px; background: rgba(0,0,0,0.7); opacity: 0; transition: opacity 0.3s;
+  text-align: center; white-space: nowrap;
+}
+#toast.show { opacity: 1; }
+#toast.success { color: #7CFC00; }
+#toast.fail { color: #ff5533; }
+
+#crosshair { position: absolute; left: 50%; top: 50%; width: 36px; height: 36px; transform: translate(-50%,-50%); opacity: 0; transition: opacity 0.15s; }
+#crosshair.show { opacity: 1; }
+#crosshair .ch { position: absolute; background: #baff5e; box-shadow: 0 0 3px #000, 0 0 6px rgba(0,0,0,0.8); border-radius: 1px; }
+#crosshair .ch-t, #crosshair .ch-b { width: 3px; height: 11px; left: 16.5px; }
+#crosshair .ch-l, #crosshair .ch-r { width: 11px; height: 3px; top: 16.5px; }
+#crosshair .ch-t { top: 0; }
+#crosshair .ch-b { bottom: 0; }
+#crosshair .ch-l { left: 0; }
+#crosshair .ch-r { right: 0; }
+#crosshair .ch-dot {
+  position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px 0 0 -2px;
+  border-radius: 50%; background: #fff; box-shadow: 0 0 2px #000;
+}
+#hitMarker {
+  position: absolute; left: 50%; top: 50%; width: 46px; height: 46px; transform: translate(-50%,-50%) scale(0.7);
+  opacity: 0; pointer-events: none;
+}
+#hitMarker.show { animation: hitmarker 0.32s ease-out; }
+#hitMarker .hm { position: absolute; width: 4px; height: 18px; background: #ff2020; box-shadow: 0 0 5px #000, 0 0 8px rgba(255,40,40,0.8); border-radius: 1px; }
+#hitMarker .hm-1 { left: 2px; top: 2px; transform: rotate(45deg); }
+#hitMarker .hm-2 { right: 2px; top: 2px; transform: rotate(-45deg); }
+#hitMarker .hm-3 { left: 2px; bottom: 2px; transform: rotate(-45deg); }
+#hitMarker .hm-4 { right: 2px; bottom: 2px; transform: rotate(45deg); }
+@keyframes hitmarker {
+  0% { opacity: 1; transform: translate(-50%,-50%) scale(1.35); }
+  55% { opacity: 1; transform: translate(-50%,-50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%,-50%) scale(1); }
+}
+
+#prompt { position: absolute; left: 50%; bottom: 90px; transform: translateX(-50%); background: rgba(0,0,0,0.55); padding: 8px 16px; border-radius: 6px; font-size: 14px; opacity: 0; transition: opacity 0.2s; }
+#prompt.show { opacity: 1; }
+
+#radioTag { position: absolute; right: 18px; bottom: 70px; font-size: 12px; background: rgba(0,0,0,0.4); padding: 4px 10px; border-radius: 4px; opacity: 0; transition: opacity 0.3s; }
+#radioTag.show { opacity: 1; }
+
+#startOverlay {
+  position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at 50% 30%, #1b2230 0%, #05070a 70%); text-align: center; z-index: 10;
+  overflow-x: hidden; overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch;
+}
+#startOverlay.hidden { display: none; }
+
+/* decorative animated backdrop: a receding neon grid + a drifting glow, pure
+   CSS so the title screen has some life to it before the 3D scene exists */
+#startBg { position: absolute; inset: 0; z-index: 0; overflow: hidden; }
+#startGrid {
+  position: absolute; left: -50%; right: -50%; bottom: 0; height: 60%;
+  background-image:
+    linear-gradient(rgba(255,210,63,0.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,210,63,0.18) 1px, transparent 1px);
+  background-size: 60px 60px;
+  transform: perspective(340px) rotateX(62deg);
+  transform-origin: bottom;
+  animation: gridScroll 6s linear infinite;
+  mask-image: linear-gradient(to top, rgba(0,0,0,0.9), transparent 85%);
+  -webkit-mask-image: linear-gradient(to top, rgba(0,0,0,0.9), transparent 85%);
+}
+@keyframes gridScroll { from { background-position: 0 0; } to { background-position: 0 60px; } }
+#startGlow {
+  position: absolute; left: 50%; top: 28%; width: 700px; height: 700px; margin: -350px 0 0 -350px;
+  background: radial-gradient(circle, rgba(255,180,60,0.16) 0%, transparent 65%);
+  animation: glowPulse 4s ease-in-out infinite;
+}
+@keyframes glowPulse { 0%, 100% { opacity: 0.7; } 50% { opacity: 1; } }
+
+#startContent { position: relative; z-index: 1; max-width: 480px; padding: 24px 20px; margin: auto; flex-shrink: 0; }
+
+#titleWrap h1 {
+  font-size: 52px; letter-spacing: 4px; margin: 0; font-weight: 900; line-height: 1;
+  color: #fff; text-shadow: 0 2px 18px rgba(255,180,0,0.5);
+}
+#titleWrap h1 span {
+  display: block; color: #ffd23f; font-size: 0.72em; letter-spacing: 8px;
+  text-shadow: 0 2px 22px rgba(255,180,0,0.7);
+}
+#titleWrap .tagline { margin: 8px 0 22px; color: #9aa4b2; font-size: 13px; letter-spacing: 0.5px; }
+
+#controlsGrid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 7px 16px; margin: 0 0 20px;
+  text-align: left;
+}
+.ctrl { display: flex; align-items: center; gap: 9px; font-size: 12.5px; color: #cfd6e0; }
+.ctrl span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.keycap {
+  flex: 0 0 auto; min-width: 34px; text-align: center; padding: 3px 7px; border-radius: 5px;
+  background: linear-gradient(180deg, #2c2f36, #1a1c21); border: 1px solid rgba(255,255,255,0.18);
+  border-bottom: 2px solid rgba(0,0,0,0.5); color: #ffd23f; font-weight: 700; font-size: 11px;
+  letter-spacing: 0.5px; box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset;
+}
+.keycap-wide { min-width: 52px; }
+
+#touchHint { display: none; color: #ffd23f; font-size: 13px; margin-bottom: 18px; }
+
+#startBtn {
+  font-size: 19px; padding: 14px 40px; border-radius: 8px; border: none;
+  background: linear-gradient(180deg, #ffdd66, #ffb400); color: #201a00; font-weight: 800;
+  cursor: pointer; letter-spacing: 1.5px; box-shadow: 0 0 0 rgba(255,180,0,0.6);
+  animation: btnPulse 2s ease-in-out infinite;
+}
+#startBtn:hover { background: linear-gradient(180deg, #ffe37f, #ffc22a); }
+#startBtnGlyph { display: inline-block; margin-right: 4px; }
+@keyframes btnPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(255,180,0,0.45); }
+  50% { box-shadow: 0 0 0 10px rgba(255,180,0,0); }
+}
+
+@media (max-height: 620px) {
+  #controlsGrid { grid-template-columns: 1fr 1fr; gap: 4px 14px; }
+  .ctrl { font-size: 11px; }
+  #titleWrap h1 { font-size: 40px; }
+}
+
+/* A suggestion, never a block: pointer-events:none so this can NEVER
+   intercept a tap even while shown — it used to be a full opaque screen
+   that swallowed every touch underneath it (including the START button
+   and every touch control), which made the game untappable on a phone
+   held the normal way. Now it's a small non-interactive banner. */
+#rotateHint {
+  display: none; position: fixed; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+  z-index: 20; pointer-events: none; background: rgba(5,7,10,0.88); color: #ffd23f;
+  text-align: center; font-size: 13px; font-weight: 700;
+  padding: 8px 16px; border-radius: 8px; max-width: calc(100vw - 32px);
+}
+@media (pointer: coarse) and (orientation: portrait) {
+  #rotateHint { display: block; }
+}
+
+/* --- touch controls ------------------------------------------------- */
+#touchControls { display: none; position: fixed; inset: 0; z-index: 5; }
+#touchControls.show { display: block; }
+
+#lookZone { position: absolute; inset: 0; z-index: 1; touch-action: none; }
+
+#joyBase {
+  position: absolute; left: max(20px, env(safe-area-inset-left)); bottom: max(110px, calc(110px + env(safe-area-inset-bottom)));
+  width: 108px; height: 108px; border-radius: 50%; z-index: 3; touch-action: none;
+  background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.28);
+}
+#joyKnob {
+  position: absolute; left: 50%; top: 50%; width: 52px; height: 52px; margin: -26px 0 0 -26px;
+  border-radius: 50%; background: rgba(255,210,63,0.35); border: 2px solid rgba(255,210,63,0.7);
+  transition: transform 0.06s linear;
+}
+
+/* One auto-sizing column anchored by its bottom-right corner only, so the
+   util row and the action buttons stack naturally above each other without
+   hand-guessed pixel offsets (which broke on short landscape phone heights). */
+#touchActionCluster {
+  position: absolute; right: max(16px, env(safe-area-inset-right)); bottom: max(84px, calc(84px + env(safe-area-inset-bottom)));
+  z-index: 3; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+}
+
+#touchButtons { display: flex; flex-direction: column; align-items: flex-end; gap: 8px; }
+#touchButtons .tbtn-row { display: flex; gap: 8px; }
+.tbtn {
+  position: relative; min-width: 58px; height: 46px; padding: 0 10px; border-radius: 12px;
+  background: rgba(20,22,28,0.55); border: 1px solid rgba(255,255,255,0.3); color: #eee;
+  font: 700 11px/1 'Segoe UI', Arial, sans-serif; letter-spacing: 0.5px; touch-action: none;
+}
+.tbtn:active, .tbtn.active { background: rgba(255,210,63,0.35); border-color: #ffd23f; }
+.tbtn-fire { width: 74px; height: 74px; border-radius: 50%; font-size: 13px; background: rgba(180,40,30,0.5); border-color: rgba(255,120,90,0.7); }
+.tbtn-fire:active { background: rgba(255,90,60,0.7); }
+.tbtn-k { position: absolute; top: -6px; left: -6px; width: 16px; height: 16px; border-radius: 50%; background: #ffd23f; color: #201a00; font-size: 10px; display: flex; align-items: center; justify-content: center; }
+
+#touchUtilRow { display: flex; gap: 6px; flex-wrap: nowrap; justify-content: flex-end; }
+.ubtn {
+  min-width: 40px; height: 30px; padding: 0 7px; border-radius: 15px; background: rgba(20,22,28,0.5);
+  border: 1px solid rgba(255,255,255,0.25); color: #cfd6e0; font: 700 10px/1 'Segoe UI', Arial, sans-serif;
+  letter-spacing: 0.5px; touch-action: none; white-space: nowrap;
+}
+.ubtn:active { background: rgba(255,210,63,0.3); color: #201a00; }
+
+@media (max-height: 420px) {
+  #touchActionCluster { bottom: max(70px, calc(70px + env(safe-area-inset-bottom))); gap: 5px; }
+  #touchButtons { gap: 5px; }
+  #touchButtons .tbtn-row { gap: 5px; }
+  .tbtn { min-width: 46px; height: 36px; font-size: 10px; }
+  .tbtn-fire { width: 56px; height: 56px; }
+  .ubtn { height: 24px; min-width: 34px; font-size: 9px; }
+  #joyBase { bottom: max(80px, calc(80px + env(safe-area-inset-bottom))); width: 88px; height: 88px; }
+  #joyKnob { width: 42px; height: 42px; margin: -21px 0 0 -21px; }
+}

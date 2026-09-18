@@ -1,0 +1,815 @@
+import * as THREE from '../vendor/three/three.module.js';
+import { CAMERA, WORLD_SEED, VEHICLE, BIKE, HELI, JET, BOAT, SUB, WATER, BEACH, ISLAND, EXPLOSION, STARTING_CASH } from './config.js';
+import { Input } from './input.js';
+import { TouchControls } from './systems/touchControls.js';
+import { CityWorld } from './world/city.js';
+import { Player, PlayerState } from './entities/player.js';
+import { Vehicle } from './entities/vehicle.js';
+import { Helicopter, Jet } from './entities/aircraft.js';
+import { Boat } from './entities/boat.js';
+import { Submarine } from './entities/submarine.js';
+import { WeaponSystem } from './entities/weapons.js';
+import { AIManager } from './entities/ai/manager.js';
+import { WantedSystem } from './systems/wanted.js';
+import { AudioManager } from './systems/audio.js';
+import { ParticleSystem } from './systems/particles.js';
+import { WeatherSystem } from './systems/weather.js';
+import { MissionManager } from './systems/missions.js';
+import { ShopManager } from './systems/shops.js';
+import { applyVehicleStatMul } from './systems/vehicleGenerator.js';
+import { buildBeacon } from './systems/beacon.js';
+import { HUD } from './systems/hud.js';
+import { CameraRig } from './systems/camera.js';
+import { PostFX } from './systems/postfx.js';
+import { buildSky } from './world/sky.js';
+
+const MODE = { FOOT: 'FOOT', CAR: 'CAR', BIKE: 'BIKE', HELI: 'HELI', JET: 'JET', BOAT: 'BOAT', SUB: 'SUB' };
+const DRIVING_MODES = new Set([MODE.CAR, MODE.BIKE]);
+// Bumped from 'neonHorizonCash' so anyone with a stale save (from before
+// STARTING_CASH was $1.5M) gets the new starting balance instead of an old
+// leftover value.
+const CASH_STORAGE_KEY = 'neonHorizonCashV2';
+const LICENSE_STORAGE_KEY = 'neonHorizonLicense';
+const SPAWN_KIND_MODE = { car: MODE.CAR, bike: MODE.BIKE, heli: MODE.HELI, jet: MODE.JET, boat: MODE.BOAT, sub: MODE.SUB };
+// Interiors (world/interiors.js) sit far below the surface at the SAME X/Z
+// as their shop, so CityWorld's outdoor colliders would otherwise "leak"
+// into a room they were never meant to be in (collision only checks X/Z,
+// not Y). Interior walls aren't registered anywhere, so the honest fix is
+// no collision at all while inside rather than the wrong collision.
+const NO_COLLISION_WORLD = { getCollidersNear: () => [] };
+
+export class Game {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this._initRenderer();
+    this._initSceneAndLights();
+
+    this.input = new Input(canvas);
+    this.touchControls = new TouchControls(this.input);
+    this.cameraRig = new CameraRig(this.camera);
+    this.world = new CityWorld(this.scene, WORLD_SEED);
+    this.player = new Player(this.scene);
+    this.weaponSystem = new WeaponSystem(this.scene, this.player);
+    this.aiManager = new AIManager(this.scene);
+    this.wanted = new WantedSystem(this.scene);
+    this.audio = new AudioManager(this.camera, this.scene);
+    this.particles = new ParticleSystem(this.scene);
+    this.weather = new WeatherSystem(this.scene, this.sun, this.audio, this.sky);
+    this.missions = new MissionManager(this.scene);
+    this.shops = new ShopManager(this.scene);
+    this.hud = new HUD();
+    this.hasLicense = this._loadLicense();
+    this.hud.bindMissions(this.missions, () => this.hasLicense);
+    this.hud.bindWeapons(this.weaponSystem);
+    this.hud.bindShopMenu(() => this._exitShopInterior());
+    this.insideShop = null;
+    this._outsidePos = null;
+    this.hud.bindMinimapTap();
+    this.hud.bindFullMap((x, z) => this._setWaypoint(new THREE.Vector3(x, 0, z)));
+    this.hud.bindWaypointClear(() => this._clearWaypoint());
+
+    this._initWater();
+    this._spawnVehicles();
+    this.boat = null;
+    this.sub = null;
+
+    this.controlMode = { mode: MODE.FOOT, vehicle: null };
+    this.engineHandle = null;
+    this.tireHandle = null;
+    this._smokeTimer = 0;
+    this._playerDead = false;
+    this.cash = this._loadCash();
+    this.waypoint = null;
+    this._waypointBeacon = null;
+
+    this.clock = new THREE.Clock();
+    window.addEventListener('resize', () => this._onResize());
+  }
+
+  _initRenderer() {
+    this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
+    this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio));
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // NOT double-tonemapped despite going through both RenderPass and
+    // OutputPass: three.js only applies a material's own tonemapping when
+    // rendering to the default framebuffer (currentRenderTarget === null –
+    // see WebGLProgram's toneMapping parameter), so RenderPass's offscreen
+    // target always renders linear/untonemapped and OutputPass is the one
+    // place the curve gets applied. NoToneMapping here (tried earlier)
+    // removes that only compression step, so anything over 1.0 — lit
+    // facades under the sun, headlights, neon — clips to solid white and
+    // blooms into huge blown-out blobs instead of a tasteful glow.
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.outputColorSpace = THREE.SRGBColorSpace;
+    this.camera = new THREE.PerspectiveCamera(CAMERA.fov, window.innerWidth / window.innerHeight, CAMERA.near, CAMERA.far);
+  }
+
+  _initSceneAndLights() {
+    this.scene = new THREE.Scene();
+    // The gradient dome (world/sky.js) draws over this every frame, but it's
+    // kept as the actual clear color so there's never a one-frame flash of
+    // black, and it matches the dome's horizon tone so fogged-out geometry
+    // blends into the sky instead of fading to a mismatched flat color.
+    this.scene.background = new THREE.Color(0xcdd9dd);
+    this.scene.fog = new THREE.Fog(0xcdd9dd, 140, CAMERA.far * 0.9);
+    this.sky = buildSky(this.scene);
+
+    const ambient = new THREE.HemisphereLight(0xbfd9ff, 0x3a3a2a, 0.75);
+    this.scene.add(ambient);
+
+    const sun = new THREE.DirectionalLight(0xfff0d0, 1.2);
+    sun.position.set(120, 180, 80);
+    sun.castShadow = true;
+    sun.shadow.mapSize.set(2048, 2048);
+    // Tighter than the old ±160 frustum: at the same 2048 map size this
+    // roughly quadruples shadow-texel density right around the player
+    // (where it's actually visible) rather than spreading resolution over
+    // a box wider than the third-person camera ever sees at once.
+    sun.shadow.camera.left = -90;
+    sun.shadow.camera.right = 90;
+    sun.shadow.camera.top = 90;
+    sun.shadow.camera.bottom = -90;
+    sun.shadow.camera.far = 400;
+    sun.shadow.bias = -0.0012;
+    sun.shadow.normalBias = 0.02;
+    this.sun = sun;
+    this._sunDir = new THREE.Vector3();
+    this.scene.add(sun);
+    this.scene.add(sun.target);
+
+    this.postfx = new PostFX(this.renderer, this.scene, this.camera);
+  }
+
+  _spawnVehicles() {
+    this.starterCar = new Vehicle(this.scene, { position: new THREE.Vector3(14, 0, 20), color: 0xd23a3a, isPlayerStarter: true });
+    this.bike = new Vehicle(this.scene, { position: new THREE.Vector3(20, 0, 8), color: 0x161616, stats: BIKE, isBike: true, isPlayerStarter: true });
+    this.heli = new Helicopter(this.scene, new THREE.Vector3(-18, 0.4, 30));
+    this.jet = new Jet(this.scene, new THREE.Vector3(30, 1, -10));
+  }
+
+  // A single huge flat plane under everything, standing in for the ocean
+  // that surrounds the island (see config.js's ISLAND/WATER — CityWorld only
+  // generates land within ISLAND.radius of the origin), plus a sandy ring at
+  // the shoreline so land doesn't just cut off into open sea. The ring's
+  // inner half sits under the last row of land chunks (invisible); only the
+  // outer half, past ISLAND.radius, actually shows as a beach.
+  _initWater() {
+    const geo = new THREE.PlaneGeometry(WATER.size, WATER.size);
+    const mat = new THREE.MeshStandardMaterial({ color: WATER.color, roughness: 0.15, metalness: 0.1, transparent: true, opacity: 0.92 });
+    const water = new THREE.Mesh(geo, mat);
+    water.rotation.x = -Math.PI / 2;
+    water.position.y = WATER.level;
+    water.receiveShadow = true;
+    this.scene.add(water);
+    this.water = water;
+
+    const beachGeo = new THREE.RingGeometry(BEACH.innerRadius, BEACH.outerRadius, 96);
+    const beachMat = new THREE.MeshStandardMaterial({ color: BEACH.color, roughness: 0.95 });
+    const beach = new THREE.Mesh(beachGeo, beachMat);
+    beach.rotation.x = -Math.PI / 2;
+    beach.position.y = BEACH.level;
+    beach.receiveShadow = true;
+    this.scene.add(beach);
+    this.beach = beach;
+  }
+
+  // Cars/bikes can drive down onto the beach but slide off an invisible
+  // boundary at its outer edge instead of driving into open water — the
+  // player on foot has no boundary at all (see the FOOT branch below), so
+  // they can walk across the sand and swim past it. Boats, subs, and
+  // aircraft are untouched either way.
+  _clampToIsland(obj, radius) {
+    const d = Math.hypot(obj.mesh.position.x, obj.mesh.position.z);
+    if (d > radius) {
+      const s = radius / d;
+      obj.mesh.position.x *= s;
+      obj.mesh.position.z *= s;
+      if (typeof obj.speed === 'number') obj.speed *= 0.3;
+    }
+  }
+
+  // --- map waypoint --------------------------------------------------------
+  _setWaypoint(pos) {
+    if (this._waypointBeacon) this.scene.remove(this._waypointBeacon.group);
+    this.waypoint = pos;
+    this._waypointBeacon = buildBeacon(this.scene, pos, 0xff3ad6);
+    this.hud.showToast('Waypoint set', 'success', 1500);
+  }
+
+  _clearWaypoint() {
+    if (this._waypointBeacon) { this.scene.remove(this._waypointBeacon.group); this._waypointBeacon = null; }
+    this.waypoint = null;
+  }
+
+  // --- shops -----------------------------------------------------------
+  // Every openShopMenu call goes through here so the procedural gun/vehicle
+  // catalogs (see ShopManager.getShopItems) get freshly resampled each time
+  // a shop opens — including the "refresh after purchase" reopens below. On
+  // the FIRST call for a given visit it also walks the player into that
+  // shop's interior (world/interiors.js) — a pure Y-axis teleport, since the
+  // interior sits directly below the shop at the same X/Z (see that file).
+  // Re-opening while already inside (ammo refresh, "spin again", etc.) is a
+  // no-op on position.
+  _openShop(shop) {
+    if (this.insideShop !== shop) {
+      this._outsidePos = this.player.mesh.position.clone();
+      this.player.mesh.position.copy(shop.interior.entryPoint);
+      this.insideShop = shop;
+    }
+    const items = this.shops.getShopItems(shop);
+    this.hud.openShopMenu({ ...shop, items }, (it) => this.purchaseShopItem(shop, it));
+  }
+
+  // The one place that leaves a shop's interior — walks the player back to
+  // exactly where they stood outside before entering. Wired to every path
+  // that closes the shop menu (see HUD.bindShopMenu and the purchase
+  // branches below) so there's no way to get stranded underground.
+  _exitShopInterior() {
+    this.hud.closeShopMenu();
+    if (!this.insideShop) return;
+    this.player.mesh.position.copy(this._outsidePos);
+    this.insideShop = null;
+    this._outsidePos = null;
+  }
+
+  purchaseShopItem(shop, item) {
+    if (item.license && this.hasLicense) { this.hud.showToast('Already have a license', 'fail'); return; }
+    if (this.cash < item.price) { this.hud.showToast('Not enough cash', 'fail'); return; }
+    this.addCash(-item.price);
+    if (item.license) {
+      this._grantLicense();
+      this.hud.showToast('Contractor License acquired — contracts unlocked!', 'success', 4000);
+      this._openShop(shop); // refresh (cash changed)
+    } else if (item.weapon) {
+      if (item.weapon === 'all') {
+        for (const w of this.weaponSystem.inventory) w.ammo = w.maxAmmo;
+      } else {
+        const w = this.weaponSystem.inventory.find((w) => w.id === item.weapon);
+        if (w) w.ammo = w.maxAmmo;
+      }
+      this.hud.showToast(`Bought: ${item.label}`, 'success');
+      this._openShop(shop); // refresh (cash/ammo changed)
+    } else if (item.gunVariant) {
+      // A GUN_SHOP catalog pick: re-tunes/re-tints the matching weapon slot
+      // rather than adding a 6th weapon — see WeaponSystem.equipVariant.
+      this.weaponSystem.equipVariant(item.gunVariant);
+      this.hud.showToast(`Equipped: ${item.gunVariant.name}`, 'success', 4000);
+      this._exitShopInterior();
+    } else if (item.gamble) {
+      this._playSlots(item.price, shop);
+    } else if (item.spawn) {
+      // Vehicle shops "call in" a vehicle and drop the player straight into
+      // the driver's seat — the coastal boat/sub shops launch it out into
+      // open water, well past where the player could ever walk up to it.
+      // Exit the interior FIRST so the player (and the camera) are back at
+      // the real outdoor shop position before _enterVehicle hides them and
+      // attaches the camera to the car, not still underground.
+      this._exitShopInterior();
+      const vehicle = this._spawnPurchasedVehicle(item.spawn, shop.position, item.vehicleVariant);
+      this.hud.showToast(`${item.label} delivered!`, 'success');
+      this._enterVehicle({ obj: vehicle, type: SPAWN_KIND_MODE[item.spawn] });
+    }
+  }
+
+  // A weighted slot-machine spin: the bet was already deducted by
+  // purchaseShopItem above, so a payout here is added on top — a multiplier
+  // under 1 (or the 0x "bust") is a net loss, over 1 is a net win. Skewed
+  // toward the house (expected value < 1) like a real casino, with a rare
+  // 20x jackpot to make the high-roller bet worth the risk.
+  _playSlots(bet, shop) {
+    const outcomes = [
+      { mult: 0, weight: 45 }, { mult: 0.5, weight: 20 }, { mult: 1, weight: 14 },
+      { mult: 2, weight: 12 }, { mult: 5, weight: 7 }, { mult: 20, weight: 2 },
+    ];
+    const total = outcomes.reduce((sum, o) => sum + o.weight, 0);
+    let r = Math.random() * total;
+    let mult = 0;
+    for (const o of outcomes) { r -= o.weight; if (r <= 0) { mult = o.mult; break; } }
+    const payout = Math.round(bet * mult);
+    if (payout > 0) this.addCash(payout);
+
+    const net = payout - bet;
+    if (mult >= 20) this.hud.showToast(`JACKPOT! +$${payout.toLocaleString()}`, 'success', 5000);
+    else if (net > 0) this.hud.showToast(`Winner! +$${net.toLocaleString()}`, 'success', 3000);
+    else if (net === 0) this.hud.showToast('Push — bet returned', 'success', 2500);
+    else this.hud.showToast(`No luck. -$${Math.abs(net).toLocaleString()}`, 'fail', 2500);
+    this._openShop(shop); // refresh (cash changed) so the player can spin again
+  }
+
+  _spawnPurchasedVehicle(kind, shopPos, variant) {
+    const outward = shopPos.lengthSq() > 1 ? shopPos.clone().normalize() : new THREE.Vector3(1, 0, 0);
+    const isWater = kind === 'boat' || kind === 'sub';
+    const pos = shopPos.clone().addScaledVector(outward, isWater ? 60 : 8);
+    pos.y = 0;
+    const color = variant?.color;
+    const craftOverrides = variant ? { color, speedMul: variant.speedMul, handlingMul: variant.handlingMul } : undefined;
+
+    if (kind === 'car') {
+      const stats = variant ? applyVehicleStatMul(VEHICLE, variant) : VEHICLE;
+      const bodyType = variant?.bodyType || 'sedan';
+      return this._replaceVehicle('starterCar', new Vehicle(this.scene, { position: pos, color: color ?? 0xd23a3a, stats, bodyType, isPlayerStarter: true }));
+    } else if (kind === 'bike') {
+      const stats = variant ? applyVehicleStatMul(BIKE, variant) : BIKE;
+      return this._replaceVehicle('bike', new Vehicle(this.scene, { position: pos, color: color ?? 0x161616, stats, isBike: true, isPlayerStarter: true }));
+    } else if (kind === 'heli') {
+      pos.y = 0.4;
+      return this._replaceVehicle('heli', new Helicopter(this.scene, pos, craftOverrides));
+    } else if (kind === 'jet') {
+      pos.y = 1;
+      return this._replaceVehicle('jet', new Jet(this.scene, pos, craftOverrides));
+    } else if (kind === 'boat') {
+      pos.y = WATER.level + 0.1;
+      return this._replaceVehicle('boat', new Boat(this.scene, pos, craftOverrides));
+    } else if (kind === 'sub') {
+      pos.y = WATER.level;
+      return this._replaceVehicle('sub', new Submarine(this.scene, pos, craftOverrides));
+    }
+    return null;
+  }
+
+  _replaceVehicle(key, obj) {
+    const old = this[key];
+    if (old && old.mesh) this.scene.remove(old.mesh);
+    this[key] = obj;
+    return obj;
+  }
+
+  // Every drivable ground vehicle the world knows about — used for explosion
+  // splash damage and destruction bookkeeping. Aircraft aren't included; they
+  // aren't destructible in this prototype.
+  _allVehicles() {
+    return [
+      this.starterCar, this.bike,
+      ...this.aiManager.traffic.map((t) => t.vehicle),
+      ...this.wanted.police.map((p) => p.vehicle),
+    ];
+  }
+
+  // localStorage can throw (privacy mode, a sandboxed embed) or just not
+  // persist — either way the game must still run, just without save/load.
+  _loadCash() {
+    try {
+      const stored = Number(localStorage.getItem(CASH_STORAGE_KEY));
+      return Number.isFinite(stored) && stored > 0 ? stored : STARTING_CASH;
+    } catch {
+      return STARTING_CASH;
+    }
+  }
+
+  addCash(amount) {
+    this.cash += amount;
+    try {
+      localStorage.setItem(CASH_STORAGE_KEY, String(Math.round(this.cash)));
+    } catch {
+      // no persistence available in this context; the session still works
+    }
+  }
+
+  _loadLicense() {
+    try {
+      return localStorage.getItem(LICENSE_STORAGE_KEY) === '1';
+    } catch {
+      return false;
+    }
+  }
+
+  _grantLicense() {
+    this.hasLicense = true;
+    try {
+      localStorage.setItem(LICENSE_STORAGE_KEY, '1');
+    } catch {
+      // no persistence available in this context; the license still works this session
+    }
+  }
+
+  // Dying costs a flat hospital bill, clears heat, and drops you back at the
+  // plaza on foot — GTA-style consequence for a death that otherwise had none.
+  _onPlayerDeath() {
+    if (this.controlMode.mode !== MODE.FOOT) this._exitVehicle();
+    this.player.mesh.position.set(0, 0, 6);
+    this.player.respawn();
+    this.player.setVisible(true);
+
+    const fine = Math.min(this.cash, 20);
+    this.addCash(-fine);
+    this.wanted.stars = 0;
+    for (const p of this.wanted.police) p.dispose(this.scene);
+    this.wanted.police = [];
+
+    this.hud.showToast(`Hospitalized — lost $${fine}`, 'fail', 4000);
+  }
+
+  _onResize() {
+    this.camera.aspect = window.innerWidth / window.innerHeight;
+    this.camera.updateProjectionMatrix();
+    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.postfx.setSize(window.innerWidth, window.innerHeight);
+  }
+
+  start() {
+    this.renderer.setAnimationLoop(() => this._tick());
+  }
+
+  _tick() {
+    const dt = Math.min(0.05, this.clock.getDelta());
+    this.input.update(dt);
+    this._update(dt);
+    this.postfx.render();
+    this.input.endFrame();
+  }
+
+  // --- vehicle enter/exit -------------------------------------------------
+  _findInteractable() {
+    const p = this.player.mesh.position;
+    const candidates = [
+      { obj: this.starterCar, type: MODE.CAR, range: VEHICLE.enterRange },
+      { obj: this.bike, type: MODE.BIKE, range: BIKE.enterRange },
+      { obj: this.heli, type: MODE.HELI, range: HELI.enterRange },
+      { obj: this.jet, type: MODE.JET, range: JET.enterRange },
+    ];
+    if (this.boat) candidates.push({ obj: this.boat, type: MODE.BOAT, range: BOAT.enterRange });
+    if (this.sub) candidates.push({ obj: this.sub, type: MODE.SUB, range: SUB.enterRange });
+    for (const t of this.aiManager.traffic) {
+      candidates.push({ obj: t.vehicle, type: MODE.CAR, range: VEHICLE.enterRange, trafficRef: t });
+    }
+    let best = null, bestDist = Infinity;
+    for (const c of candidates) {
+      if (c.obj.occupied || c.obj.destroyed) continue;
+      const d = p.distanceTo(c.obj.mesh.position);
+      if (d < c.range && d < bestDist) { best = c; bestDist = d; }
+    }
+    return best ? { ...best, dist: bestDist } : null;
+  }
+
+  // Whichever's closer of a nearby shop or a nearby enterable vehicle — F
+  // does whichever this returns, and the on-foot HUD prompt names it.
+  _nearestInteraction() {
+    const p = this.player.mesh.position;
+    const shop = this.shops.findNearby(p, 10);
+    const vehicle = this._findInteractable();
+    const shopDist = shop ? p.distanceTo(shop.position) : Infinity;
+    const vehicleDist = vehicle ? vehicle.dist : Infinity;
+    if (shop && shopDist <= vehicleDist) return { kind: 'shop', shop };
+    if (vehicle) return { kind: 'vehicle', candidate: vehicle };
+    return null;
+  }
+
+  _enterVehicle(candidate) {
+    const { obj, type, trafficRef } = candidate;
+    if (trafficRef) this.aiManager.traffic = this.aiManager.traffic.filter((t) => t !== trafficRef);
+    if (DRIVING_MODES.has(type) && !obj.isPlayerStarter && !obj.reportedTheft) {
+      obj.reportedTheft = true;
+      this.wanted.reportCrime(1);
+    }
+    obj.occupied = true;
+    this.controlMode = { mode: type, vehicle: obj };
+    this.player.setVisible(false);
+
+    this.engineHandle = this.audio.attachLoop(obj.mesh, 'engine', { volume: 0.5, refDistance: 16 });
+    if (DRIVING_MODES.has(type)) this.tireHandle = this.audio.attachLoop(obj.mesh, 'tireScreech', { volume: 0.6, refDistance: 8 });
+  }
+
+  _exitVehicle() {
+    const v = this.controlMode.vehicle;
+    const mode = this.controlMode.mode;
+    v.occupied = false;
+    const heading = v.heading ?? 0;
+    const side = new THREE.Vector3(Math.cos(heading), 0, -Math.sin(heading));
+    this.player.mesh.position.copy(v.mesh.position).addScaledVector(side, 3.2);
+    this.player.mesh.position.y = (mode === MODE.BOAT || mode === MODE.SUB) ? WATER.level + 0.05 : 0;
+    this.player.setVisible(true);
+    this.controlMode = { mode: MODE.FOOT, vehicle: null };
+
+    this.audio.detachLoop(this.engineHandle); this.engineHandle = null;
+    if (this.tireHandle) { this.audio.detachLoop(this.tireHandle); this.tireHandle = null; }
+    this.audio.stopRadio();
+    this.hud.setRadioTag(null);
+  }
+
+  // --- main update ---------------------------------------------------------
+  _update(dt) {
+    const { input, cameraRig, world, player, weaponSystem, aiManager, wanted, audio, particles, weather, hud } = this;
+
+    if (this.input.wasPressed('KeyF')) {
+      if (this.controlMode.mode === MODE.FOOT) {
+        const interaction = this._nearestInteraction();
+        if (interaction?.kind === 'shop') this._openShop(interaction.shop);
+        else if (interaction?.kind === 'vehicle') this._enterVehicle(interaction.candidate);
+      } else {
+        this._exitVehicle();
+      }
+    }
+
+    let activePos = player.mesh.position;
+    let speedKmh = 0;
+    let heading = player.heading;
+    const traction = weather.traction;
+
+    if (this.controlMode.mode === MODE.FOOT) {
+      const aiming = input.isMouseDown(2);
+      cameraRig.handleMouseFoot(input, aiming);
+      cameraRig.updateFoot(player, dt, aiming);
+      // no clamp here: the player can walk down the beach and swim out past
+      // it into open water (e.g. to reach a boat) — only ground vehicles
+      // are stopped at the shoreline, just below. `swimDepth` eases through
+      // the beach ring first (still "wading", gravity/jump still apply),
+      // then at 1 (past BEACH.outerRadius) flips into true swimming: gravity
+      // off, the character sunk chin-deep, and the swim-stroke animation
+      // (see Player.update/_animate) instead of walking on the surface film.
+      // Interiors sit far below the surface at the shop's own X/Z (see
+      // world/interiors.js), so distFromCenter would otherwise read as
+      // whatever that shop's real outdoor distance is — never enough to
+      // trigger swimming for any current shop, but excluded explicitly
+      // rather than relying on that coincidence, along with outdoor
+      // collision (see NO_COLLISION_WORLD).
+      const collisionWorld = this.insideShop ? NO_COLLISION_WORLD : world;
+      const distFromCenter = Math.hypot(player.mesh.position.x, player.mesh.position.z);
+      const swimDepth = THREE.MathUtils.clamp((distFromCenter - ISLAND.radius) / (BEACH.outerRadius - ISLAND.radius), 0, 1);
+      const isSwimming = !this.insideShop && swimDepth >= 1;
+      const swimY = WATER.level - 1.3;
+      player.update(dt, input, cameraRig, collisionWorld, isSwimming);
+      if (isSwimming) {
+        if (!this._wasSwimming) this.particles.spawnSmoke(player.mesh.position, { color: 0xd8f2ff, size: 0.6, life: 0.6, spread: 1.1, rise: 0.9 });
+        player.mesh.position.y = swimY;
+      } else if (this.insideShop) {
+        // player.update()'s ground clamp assumes the outdoor y=0 floor and
+        // would otherwise snap the player straight back up out of the
+        // interior every frame — re-pin to the interior's actual floor
+        // level instead (grounded/velocityY bookkeeping being "wrong" while
+        // inside doesn't matter; nothing there reads it).
+        player.mesh.position.y = this.insideShop.interior.entryPoint.y;
+      } else if (player.grounded) {
+        player.mesh.position.y = THREE.MathUtils.lerp(0, swimY, swimDepth);
+      }
+      this._wasSwimming = isSwimming;
+      if (player.state === PlayerState.RUNNING) weaponSystem.addBloom(dt * 0.6);
+
+      const targets = [
+        ...world.getBuildingMeshes(),
+        ...world.getPropMeshes(),
+        ...aiManager.enemyMeshes,
+        ...aiManager.pedestrians.map((p) => p.mesh),
+        ...aiManager.traffic.map((t) => t.vehicle.mesh),
+        ...wanted.police.map((p) => p.vehicle.mesh),
+        ...wanted.police.filter((p) => p.officer?.alive).map((p) => p.officer.mesh),
+      ];
+      weaponSystem.update(
+        dt, input, this.camera, targets,
+        (hit, dmg) => this._onWeaponHit(hit, dmg), audio,
+        (pos, radius, dmg) => this.explodeAt(pos, radius, dmg)
+      );
+      if (weaponSystem.firedThisFrame) aiManager.notifyGunfire(player.mesh.position, 24);
+
+      const interaction = this._nearestInteraction();
+      hud.setPrompt(
+        interaction?.kind === 'shop' ? `Press F to browse ${interaction.shop.name}`
+        : interaction?.kind === 'vehicle' ? 'Press F to enter vehicle'
+        : null
+      );
+      activePos = player.mesh.position;
+      heading = player.heading;
+    } else if (DRIVING_MODES.has(this.controlMode.mode)) {
+      const vehicle = this.controlMode.vehicle;
+      const { collided } = vehicle.update(dt, input, world, undefined, traction);
+      this._clampToIsland(vehicle, BEACH.outerRadius); // cars/bikes can drive onto the sand, not into the sea
+      if (collided) particles.spawnSmoke(vehicle.mesh.position, { color: 0x777777, size: 0.5, life: 0.5, spread: 1.5, rise: 0.5 });
+      this._smashNearbyProps(vehicle);
+      const chaseDist = vehicle.isBike ? 5.5 : 8;
+      const chaseHeight = vehicle.isBike ? 2.4 : 3.2;
+      cameraRig.updateChase(vehicle, dt, { dist: chaseDist, height: chaseHeight });
+
+      const speedFrac = Math.abs(vehicle.speed) / vehicle.stats.maxSpeed;
+      audio.setLoopIntensity(this.engineHandle, 0.15 + 0.85 * speedFrac, 0.7 + 0.6 * speedFrac);
+      audio.setLoopIntensity(this.tireHandle, vehicle.isDrifting ? vehicle.driftIntensity : 0);
+
+      this._smokeTimer -= dt;
+      if (this._smokeTimer <= 0) {
+        this._smokeTimer = vehicle.isDrifting ? 0.06 : 0.35;
+        if (vehicle.isDrifting) {
+          const back = vehicle.mesh.position.clone().addScaledVector(vehicle.forward, -2.1);
+          particles.spawnSmoke(back, { color: 0xcccccc, size: 0.5, life: 0.7, spread: 1.2, rise: 0.4 });
+        } else if (Math.abs(vehicle.speed) > 1) {
+          const exhaust = vehicle.mesh.position.clone().addScaledVector(vehicle.forward, -2.3);
+          exhaust.y += 0.4;
+          particles.spawnSmoke(exhaust, { color: 0x999999, size: 0.3, life: 0.9, spread: 0.3, rise: 0.6 });
+        }
+      }
+
+      if (input.wasPressed('KeyT')) {
+        const label = audio.toggleRadio();
+        hud.setRadioTag(label === 'OFF' ? null : label);
+      }
+      if (input.wasPressed('KeyC')) vehicle.cycleColor();
+      if (input.wasPressed('KeyN')) vehicle.toggleNeon();
+
+      speedKmh = Math.abs(vehicle.speed) * 3.6;
+      activePos = vehicle.mesh.position;
+      heading = vehicle.heading;
+      hud.setPrompt(vehicle.destroyed ? 'Vehicle destroyed — press F to get out' : 'Press F to exit');
+      if (vehicle.destroyed) this._exitVehicle();
+    } else if (this.controlMode.mode === MODE.HELI) {
+      const heli = this.controlMode.vehicle;
+      heli.update(dt, input);
+      cameraRig.updateChase(heli, dt, { dist: 10, height: 4 });
+      audio.setLoopIntensity(this.engineHandle, 0.3 + 0.7 * heli.rotorSpeed, 0.8 + heli.rotorSpeed * 0.5);
+      speedKmh = heli.speed * 3.6;
+      activePos = heli.mesh.position;
+      heading = heli.heading;
+      hud.setPrompt('Press F to exit');
+    } else if (this.controlMode.mode === MODE.JET) {
+      const jet = this.controlMode.vehicle;
+      jet.update(dt, input);
+      cameraRig.updateChase(jet, dt, { dist: 14, height: 4.5, bank: jet.roll });
+      audio.setLoopIntensity(this.engineHandle, 0.3 + 0.7 * (jet.speed / JET.maxSpeed), 0.6 + (jet.speed / JET.maxSpeed) * 1.2);
+      speedKmh = jet.speed * 3.6;
+      activePos = jet.mesh.position;
+      heading = jet.heading;
+      hud.setPrompt(jet.stalling ? 'STALLING — nose down! (Press F to exit)' : 'Press F to exit');
+    } else if (this.controlMode.mode === MODE.BOAT) {
+      const boat = this.controlMode.vehicle;
+      boat.update(dt, input);
+      cameraRig.updateChase(boat, dt, { dist: 9, height: 3.4 });
+      audio.setLoopIntensity(this.engineHandle, 0.2 + 0.8 * (Math.abs(boat.speed) / BOAT.maxSpeed), 0.6);
+      speedKmh = Math.abs(boat.speed) * 3.6;
+      activePos = boat.mesh.position;
+      heading = boat.heading;
+      hud.setPrompt('Press F to exit');
+    } else if (this.controlMode.mode === MODE.SUB) {
+      const sub = this.controlMode.vehicle;
+      sub.update(dt, input);
+      cameraRig.updateChase(sub, dt, { dist: 10, height: 3.6 });
+      speedKmh = Math.abs(sub.speed) * 3.6;
+      activePos = sub.mesh.position;
+      heading = sub.heading;
+      hud.setPrompt(`Press F to exit (Depth ${Math.round(sub.depth)}m)`);
+    }
+
+    if (this.controlMode.mode !== MODE.HELI) this.heli.update(dt, input);
+    if (this.controlMode.mode !== MODE.JET) this.jet.update(dt, input);
+    if (this.boat && this.controlMode.mode !== MODE.BOAT) this.boat.update(dt, input);
+    if (this.sub && this.controlMode.mode !== MODE.SUB) this.sub.update(dt, input);
+
+    world.update(activePos.x, activePos.z);
+    aiManager.syncWithWorld(world);
+    aiManager.update(dt, world, player.mesh.position, (enemy, dmg) => this._onEnemyFire(enemy, dmg), traction);
+    wanted.update(dt, world, player, activePos, this.controlMode, traction, (officer, dmg) => this._onEnemyFire(officer, dmg));
+    weather.update(dt, activePos);
+    this._scanVehicleDestructions();
+    this.shops.update(dt);
+    if (this._waypointBeacon) this._waypointBeacon.ring.rotation.z += dt * 1.5;
+
+    if (input.wasPressed('KeyM')) hud.toggleMissionMenu();
+    const isInVehicle = DRIVING_MODES.has(this.controlMode.mode);
+    const missionEvent = this.missions.update(dt, activePos, player.health > 0, isInVehicle);
+    if (this.missions.consumeAlarm()) {
+      this.wanted.reportCrime(this.missions.alarmStars); // hitting the target is a big enough crime to spike heat hard
+      hud.showToast('ALARM TRIGGERED — GET TO THE GETAWAY POINT!', 'fail', 4000);
+    }
+    if (missionEvent) {
+      if (missionEvent.success) {
+        this.addCash(missionEvent.reward);
+        hud.showToast(`${missionEvent.title} complete! +$${missionEvent.reward.toLocaleString()}`, 'success');
+      } else {
+        hud.showToast(`${missionEvent.title} failed`, 'fail');
+      }
+    }
+
+    if (player.health <= 0 && !this._playerDead) {
+      this._playerDead = true;
+      this._onPlayerDeath();
+    } else if (player.health > 0) {
+      this._playerDead = false;
+    }
+
+    this._updateSunFollow(activePos);
+    particles.update(dt);
+    audio.update(dt);
+
+    hud.setCash(this.cash);
+    hud.updateMissions(this.missions.status());
+    hud.update({
+      player, weaponSystem, wanted, world, ai: aiManager,
+      controlMode: this.controlMode, speedKmh, heading, position: activePos,
+      weather, missions: this.missions, waypoint: this.waypoint, shops: this.shops.shops,
+    });
+  }
+
+  // A vehicle's health can hit zero from ramming, gunfire, or splash damage
+  // from another explosion — wherever it happens, catch the transition here
+  // so every source of destruction gets the same one-time blast + FX, and a
+  // vehicle killed by a blast can itself chain into the next explosion.
+  _scanVehicleDestructions() {
+    for (const v of this._allVehicles()) {
+      if (v.destroyed && !v._explodedFx) {
+        v._explodedFx = true;
+        this.explodeAt(v.mesh.position.clone(), EXPLOSION.radius, EXPLOSION.vehicleDamage);
+        this.missions.notifyVehicleDestroyed();
+      }
+    }
+  }
+
+  // Driving into a barrier/crate at any real speed smashes it in one hit —
+  // arcade-style destructible set-dressing rather than a rigid collider.
+  _smashNearbyProps(vehicle) {
+    if (Math.abs(vehicle.speed) < 3) return;
+    for (const prop of this.world.getPropsNear(vehicle.mesh.position.x, vehicle.mesh.position.z, vehicle.halfLength + 1.2)) {
+      if (prop.takeDamage(999)) {
+        this.particles.spawnSmoke(prop.mesh.position, { color: 0x9a8a6a, size: 0.5, life: 0.6, spread: 1.4, rise: 0.3 });
+        vehicle.speed *= 0.92;
+        this.missions.notifyPropDestroyed();
+      }
+    }
+  }
+
+  // Splash damage + FX at a point: used for rocket impacts and any vehicle
+  // that just died (ramming, gunfire, or a earlier chained blast).
+  explodeAt(position, radius = EXPLOSION.radius, vehicleDamage = EXPLOSION.vehicleDamage) {
+    this.particles.spawnExplosion(position);
+    this.audio.playExplosion(position);
+    this.aiManager.notifyGunfire(position, radius * 2.5);
+
+    for (const v of this._allVehicles()) {
+      if (v.destroyed) continue;
+      const d = v.mesh.position.distanceTo(position);
+      if (d < radius) v.takeDamage(vehicleDamage * (1 - d / radius));
+    }
+    for (const enemy of this.aiManager.enemies) {
+      if (!enemy.alive) continue;
+      const d = enemy.mesh.position.distanceTo(position);
+      if (d < radius) {
+        enemy.takeDamage(EXPLOSION.actorDamage * (1 - d / radius));
+        if (!enemy.alive) this.missions.notifyEnemyKilled();
+      }
+    }
+    for (const p of this.wanted.police) {
+      if (!p.officer?.alive) continue;
+      const d = p.officer.mesh.position.distanceTo(position);
+      if (d < radius) p.officer.takeDamage(EXPLOSION.actorDamage * (1 - d / radius));
+    }
+    for (const ped of [...this.aiManager.pedestrians]) {
+      if (ped.mesh.position.distanceTo(position) < radius * 0.6) {
+        this.aiManager.pedestrians = this.aiManager.pedestrians.filter((p) => p !== ped);
+        ped.dispose(this.scene);
+      }
+    }
+    for (const prop of this.world.getPropsNear(position.x, position.z, radius)) {
+      if (prop.takeDamage(999)) this.missions.notifyPropDestroyed();
+    }
+
+    const dPlayer = this.player.mesh.position.distanceTo(position);
+    if (this.controlMode.mode === MODE.FOOT && dPlayer < radius) {
+      this.player.takeDamage(EXPLOSION.actorDamage * 0.6 * (1 - dPlayer / radius));
+    }
+  }
+
+  _updateSunFollow(pos) {
+    this.sun.position.set(pos.x + 120, 180, pos.z + 80);
+    this.sun.target.position.set(pos.x, 0, pos.z);
+    this._sunDir.set(120, 180, 80); // fixed offset above == world-space direction to the sun
+    this.sky.update(this.camera.position, this._sunDir);
+  }
+
+  _onWeaponHit(hit, damage) {
+    const kind = hit.object.userData?.kind;
+    if (kind === 'enemy' || kind === 'pedestrian' || kind === 'vehicle' || kind === 'policeOfficer') this.hud.flashHitMarker();
+    if (kind === 'policeOfficer') {
+      const officer = hit.object.userData.ref;
+      officer.takeDamage(damage);
+      this.wanted.reportCrime(2); // shooting a cop is serious
+      if (!officer.alive) this.particles.spawnExplosion(hit.point);
+    } else if (kind === 'enemy') {
+      const enemy = hit.object.userData.ref;
+      enemy.takeDamage(damage);
+      this.wanted.reportCrime(1);
+      if (!enemy.alive) {
+        this.particles.spawnExplosion(hit.point);
+        this.missions.notifyEnemyKilled();
+      }
+    } else if (kind === 'pedestrian') {
+      const ped = hit.object.userData.ref;
+      this.aiManager.pedestrians = this.aiManager.pedestrians.filter((p) => p !== ped);
+      ped.dispose(this.scene);
+      this.wanted.reportCrime(1);
+    } else if (kind === 'vehicle') {
+      const vehicle = hit.object.userData.ref;
+      vehicle.takeDamage(damage);
+      this.wanted.reportCrime(1);
+    } else if (kind === 'prop') {
+      const prop = hit.object.userData.ref;
+      if (prop.takeDamage(damage)) {
+        this.particles.spawnSmoke(hit.point, { color: 0x9a8a6a, size: 0.5, life: 0.6, spread: 1.2, rise: 0.3 });
+        this.missions.notifyPropDestroyed();
+      }
+    }
+    this.particles.spawnSmoke(hit.point, { color: 0x8a1010, size: 0.25, life: 0.35, spread: 0.4, rise: 0.2 });
+  }
+
+  _onEnemyFire(enemy, damage) {
+    this.player.takeDamage(damage);
+    this.particles.spawnMuzzleFlash(enemy.mesh.position.clone().add(new THREE.Vector3(0, 1.1, 0)), 0xffaa55);
+    this.aiManager.notifyGunfire(enemy.mesh.position, 20);
+  }
+}

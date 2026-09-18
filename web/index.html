@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>Crime Shooter</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <canvas id="viewport"></canvas>
+
+  <div id="hud">
+    <div id="bars">
+      <div class="bar-row">
+        <span class="bar-label">HP</span>
+        <div class="bar-track"><div id="healthBar" class="bar-fill health"></div><span id="healthNum" class="bar-num">100</span></div>
+      </div>
+      <div class="bar-row">
+        <span class="bar-label">AR</span>
+        <div class="bar-track"><div id="armorBar" class="bar-fill armor"></div><span id="armorNum" class="bar-num">50</span></div>
+      </div>
+    </div>
+
+    <div id="stars"></div>
+
+    <div id="cashDisplay"><span id="cashIcon">$</span><span id="cashAmount">0</span></div>
+
+    <div id="speedo"></div>
+
+    <div id="stateIndicator">IDLE</div>
+
+    <div id="missionPanel">
+      <div id="missionTitle"></div>
+      <div id="missionDetail"></div>
+      <div id="missionTimerBar"><div id="missionTimerFill"></div></div>
+    </div>
+
+    <div id="crosshair">
+      <div class="ch ch-t"></div>
+      <div class="ch ch-b"></div>
+      <div class="ch ch-l"></div>
+      <div class="ch ch-r"></div>
+      <div class="ch-dot"></div>
+    </div>
+    <div id="hitMarker">
+      <div class="hm hm-1"></div>
+      <div class="hm hm-2"></div>
+      <div class="hm hm-3"></div>
+      <div class="hm hm-4"></div>
+    </div>
+
+    <div id="prompt"></div>
+
+    <div id="radioTag"></div>
+
+    <div id="toast"></div>
+  </div>
+
+  <button id="missionBtn" type="button">☰ MISSIONS</button>
+  <div id="weaponPanel">
+    <div id="weaponIcon"></div>
+    <div id="weaponInfo">
+      <div id="weaponName">—</div>
+      <div id="ammoCount">-- / --</div>
+    </div>
+  </div>
+  <div id="mapPanel">
+    <div id="mapLabel">MAP — tap to open</div>
+    <canvas id="minimap" width="180" height="180"></canvas>
+    <button id="waypointClear" type="button">✕</button>
+  </div>
+  <div id="waypointTag"></div>
+  <div id="fullMap">
+    <div id="fullMapCard">
+      <div id="fullMapHint">Tap anywhere on the island to drop a waypoint</div>
+      <canvas id="fullMapCanvas" width="640" height="640"></canvas>
+      <button id="fullMapClose" type="button">CLOSE</button>
+    </div>
+  </div>
+  <div id="missionMenu">
+    <div id="missionMenuCard">
+      <h2>CONTRACTS</h2>
+      <p id="missionMenuHint">Pick a job. Only one active at a time.</p>
+      <div id="missionList"></div>
+      <div id="missionMenuButtons">
+        <button id="missionReroll" type="button">🔄 NEW CONTRACTS</button>
+        <button id="missionMenuClose" type="button">CLOSE</button>
+      </div>
+    </div>
+  </div>
+  <div id="shopMenu">
+    <div id="shopMenuCard">
+      <h2 id="shopMenuTitle">SHOP</h2>
+      <p id="shopMenuHint">Spend cash to gear up.</p>
+      <div id="shopList"></div>
+      <button id="shopMenuClose" type="button">CLOSE</button>
+    </div>
+  </div>
+
+  <div id="touchControls">
+    <div id="joyBase"><div id="joyKnob"></div></div>
+    <div id="lookZone"></div>
+    <div id="touchActionCluster">
+      <div id="touchUtilRow">
+        <button id="btnRadio" class="ubtn" type="button">RADIO</button>
+        <button id="btnPaint" class="ubtn" type="button">PAINT</button>
+        <button id="btnNeon" class="ubtn" type="button">NEON</button>
+        <button id="btnYawL" class="ubtn" type="button">◀ YAW</button>
+        <button id="btnYawR" class="ubtn" type="button">YAW ▶</button>
+      </div>
+      <div id="touchButtons">
+        <div class="tbtn-row">
+          <button id="btnUse" class="tbtn" type="button"><span class="tbtn-k">F</span>USE</button>
+          <button id="btnReload" class="tbtn" type="button"><span class="tbtn-k">R</span>RELOAD</button>
+          <button id="btnWeapon" class="tbtn" type="button">WPN</button>
+          <button id="btnBoost" class="tbtn" type="button">BOOST</button>
+        </div>
+        <div class="tbtn-row">
+          <button id="btnJump" class="tbtn" type="button">JUMP</button>
+          <button id="btnAim" class="tbtn" type="button">AIM</button>
+          <button id="btnFire" class="tbtn tbtn-fire" type="button">FIRE</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="rotateHint">Rotate to landscape for the best experience</div>
+
+  <div id="startOverlay">
+    <div id="startBg"><div id="startGrid"></div><div id="startGlow"></div></div>
+    <div id="startContent">
+      <div id="titleWrap">
+        <h1>CRIME<span>SHOOTER</span></h1>
+        <p class="tagline">Port Salvento. You're Mars Vega. Everyone in this city is already dirty — the only question is whether you get paid for it.</p>
+      </div>
+
+      <div id="controlsGrid">
+        <div class="ctrl"><span class="keycap keycap-wide">↑↓←→</span><span>Move / Drive / Fly</span></div>
+        <div class="ctrl"><span class="keycap">Shift</span><span>Sprint (heli: ascend)</span></div>
+        <div class="ctrl"><span class="keycap">Mouse</span><span>Look around</span></div>
+        <div class="ctrl"><span class="keycap">Space</span><span>Jump (heli: descend)</span></div>
+        <div class="ctrl"><span class="keycap">F</span><span>Enter vehicle / browse shop</span></div>
+        <div class="ctrl"><span class="keycap keycap-wide">Tap map</span><span>Set a waypoint</span></div>
+        <div class="ctrl"><span class="keycap">1-5</span><span>Switch weapon</span></div>
+        <div class="ctrl"><span class="keycap">LMB</span><span>Shoot</span></div>
+        <div class="ctrl"><span class="keycap">RMB</span><span>Aim down sights</span></div>
+        <div class="ctrl"><span class="keycap">R</span><span>Reload</span></div>
+        <div class="ctrl"><span class="keycap keycap-wide">T·C·N</span><span>Radio / Paint / Neon</span></div>
+        <div class="ctrl"><span class="keycap keycap-wide">Q·E</span><span>Yaw (aircraft)</span></div>
+        <div class="ctrl"><span class="keycap">M</span><span>Open contracts menu</span></div>
+      </div>
+
+      <div id="touchHint">📱 Left joystick to move, drag anywhere else to look</div>
+      <button id="startBtn"><span id="startBtnGlyph">▶</span> TAP TO PLAY</button>
+    </div>
+  </div>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>
