@@ -26,18 +26,31 @@ const CHESTS = [
 ];
 
 const SELL_VALUE = TIERS.map(t => Math.round(t.mult * 15));
-const TRAY_MAX = 8;
-const SAVE_KEY = 'ballMultiplierMergeSave.v2';
+const TRAY_MAX = 15;
+const SAVE_KEY = 'ballMultiplierMergeSave.v3';
+const BASE_START = 1.1;
 
 /* ---------- Plinko board layout (fixed internal resolution) ---------- */
 
 const BOARD_W = 640;
-const BOARD_H = 700;
+const BOARD_H = 760;
 const PEG_RADIUS = 5;
 const SLOT_RADIUS = 26;
-const BALL_RADIUS = 12;
+const BALL_RADIUS = 17;
 
-// Multiplier slots spread out across the whole board, not confined to one row.
+const LANE_Y = 16;
+const MAX_LANES = 5;
+const LANE_X = [90, 205, 320, 435, 550];
+const LANE_UNLOCK_ORDER = [2, 1, 3, 0, 4]; // center lane unlocks first, then outward
+
+const WALL_Y = 104;
+const WALL_HEIGHT = 36;
+
+const CASH_BAR_HEIGHT = 40;
+const PLAY_TOP = 150;
+const PLAY_BOTTOM = BOARD_H - CASH_BAR_HEIGHT;
+
+// Multiplier slots spread out across the whole peg field, not confined to one row.
 const SLOT_FRACS = [
   { x: 0.20, y: 0.16 },
   { x: 0.75, y: 0.14 },
@@ -52,15 +65,16 @@ const SLOT_FRACS = [
 ];
 
 function buildPegs() {
-  const rows = 14;
-  const topMargin = BOARD_H * 0.07;
-  const bottomMargin = BOARD_H * 0.09;
-  const rowGap = (BOARD_H - topMargin - bottomMargin) / (rows - 1);
+  const rows = 13;
+  const usableH = PLAY_BOTTOM - PLAY_TOP;
+  const topMargin = usableH * 0.06;
+  const bottomMargin = usableH * 0.05;
+  const rowGap = (usableH - topMargin - bottomMargin) / (rows - 1);
   const sideMargin = BOARD_W * 0.07;
   const colGap = (BOARD_W - sideMargin * 2) / 9;
   const pegs = [];
   for (let r = 0; r < rows; r++) {
-    const y = topMargin + r * rowGap;
+    const y = PLAY_TOP + topMargin + r * rowGap;
     const even = r % 2 === 0;
     const count = even ? 10 : 9;
     for (let c = 0; c < count; c++) {
@@ -71,7 +85,7 @@ function buildPegs() {
   return pegs;
 }
 
-const SLOT_POS = SLOT_FRACS.map(f => ({ x: f.x * BOARD_W, y: f.y * BOARD_H }));
+const SLOT_POS = SLOT_FRACS.map(f => ({ x: f.x * BOARD_W, y: PLAY_TOP + f.y * (PLAY_BOTTOM - PLAY_TOP) }));
 const PEGS = buildPegs().filter(
   p => !SLOT_POS.some(s => Math.hypot(s.x - p.x, s.y - p.y) < SLOT_RADIUS + PEG_RADIUS + 10)
 );
@@ -86,7 +100,7 @@ let state = {
   tray: [],
 };
 
-let selectedTrayIndex = null;
+let selectedStorageIndex = null;
 let lastSpawn = 0;
 let lastFrame = 0;
 let rafId = null;
@@ -94,6 +108,8 @@ let rafId = null;
 let engine = null;
 let balls = [];
 const slotPulses = new Array(SLOT_COUNT).fill(-9999);
+const lastSpawnPerLane = new Array(MAX_LANES).fill(0);
+let wallPulse = -9999;
 let floatTexts = [];
 
 /* ---------- Persistence ---------- */
@@ -124,21 +140,41 @@ function load() {
 
 /* ---------- Economy helpers ---------- */
 
+function round2(n) {
+  return Math.round(n * 100) / 100;
+}
+
 function spawnInterval() {
   return Math.max(0.4, 3 - state.spawnLevel * 0.15);
 }
 function spawnUpgradeCost() {
   return Math.round(25 * Math.pow(1.5, state.spawnLevel));
 }
+function laneCount() {
+  return Math.min(MAX_LANES, 1 + Math.floor(state.spawnLevel / 2));
+}
+function activeLanes() {
+  return LANE_UNLOCK_ORDER.slice(0, laneCount());
+}
+
 function startValue() {
-  return 1 + state.valueLevel;
+  return round2(BASE_START * Math.pow(1.45, state.valueLevel));
+}
+function wallBonus() {
+  return round2(startValue() - BASE_START);
+}
+function wallColor(level) {
+  if (level <= 0) return '#5b3f92';
+  return `hsl(${(level * 47) % 360}, 70%, 60%)`;
 }
 function valueUpgradeCost() {
   return Math.round(40 * Math.pow(1.6, state.valueLevel));
 }
 
 function fmt(n) {
-  if (n < 1000) return Math.floor(n).toString();
+  if (n < 1000) {
+    return Number.isInteger(n) ? n.toString() : n.toFixed(2);
+  }
   const units = ['K', 'M', 'B', 'T', 'Qa', 'Qi'];
   let u = -1;
   while (n >= 1000 && u < units.length - 1) {
@@ -167,11 +203,15 @@ const els = {
   canvas: document.getElementById('boardCanvas'),
   hint: document.getElementById('hint'),
   speedSub: document.getElementById('speedSub'),
-  valueSub: document.getElementById('valueSub'),
   buySpeed: document.getElementById('buySpeed'),
+  wallSub: document.getElementById('wallSub'),
+  wallSwatch: document.getElementById('wallSwatch'),
   buyValue: document.getElementById('buyValue'),
   chestList: document.getElementById('chestList'),
-  tray: document.getElementById('tray'),
+  storageGrid: document.getElementById('storageGrid'),
+  storageActions: document.getElementById('storageActions'),
+  storageSelectedLabel: document.getElementById('storageSelectedLabel'),
+  storageSellBtn: document.getElementById('storageSellBtn'),
   toastStack: document.getElementById('toastStack'),
 };
 const ctx = els.canvas.getContext('2d');
@@ -182,15 +222,23 @@ function renderMoney() {
   els.money.textContent = '$' + fmt(state.money);
 }
 
-function renderUpgrades() {
-  els.speedSub.textContent = `Level ${state.spawnLevel} — every ${spawnInterval().toFixed(2)}s`;
-  els.valueSub.textContent = `Level ${state.valueLevel} — balls start at $${fmt(startValue())}`;
-  const speedCost = spawnUpgradeCost();
-  const valueCost = valueUpgradeCost();
-  els.buySpeed.querySelector('span').textContent = '$' + fmt(speedCost);
-  els.buyValue.querySelector('span').textContent = '$' + fmt(valueCost);
-  els.buySpeed.disabled = state.money < speedCost;
-  els.buyValue.disabled = state.money < valueCost;
+function renderSpeedUpgrade() {
+  const lc = laneCount();
+  els.speedSub.textContent = `Level ${state.spawnLevel} — ${lc} lane${lc > 1 ? 's' : ''}, every ${spawnInterval().toFixed(2)}s`;
+  const cost = spawnUpgradeCost();
+  els.buySpeed.querySelector('span').textContent = '$' + fmt(cost);
+  els.buySpeed.disabled = state.money < cost;
+}
+
+function renderWallUpgrade() {
+  const lvl = state.valueLevel;
+  els.wallSub.textContent = lvl === 0
+    ? `Level 0 — balls start at $${BASE_START.toFixed(2)}`
+    : `Level ${lvl} — +$${fmt(wallBonus())} (balls start at $${fmt(startValue())})`;
+  els.wallSwatch.style.background = wallColor(lvl);
+  const cost = valueUpgradeCost();
+  els.buyValue.querySelector('span').textContent = '$' + fmt(cost);
+  els.buyValue.disabled = state.money < cost;
 }
 
 function renderChests() {
@@ -215,31 +263,40 @@ function renderChests() {
   });
 }
 
-function renderTray() {
-  els.tray.innerHTML = '';
+function renderStorage() {
+  els.storageGrid.innerHTML = '';
   if (state.tray.length === 0) {
     const empty = document.createElement('div');
-    empty.className = 'tray-empty';
+    empty.className = 'storage-empty';
     empty.textContent = 'Open a chest to get multipliers!';
-    els.tray.appendChild(empty);
-    return;
+    els.storageGrid.appendChild(empty);
+  } else {
+    state.tray.forEach((tier, idx) => {
+      const tile = document.createElement('div');
+      tile.className = 'storage-tile' + (idx === selectedStorageIndex ? ' selected' : '');
+      tile.style.background = TIERS[tier].color;
+      tile.textContent = TIERS[tier].label;
+      tile.addEventListener('click', () => onStorageClick(idx));
+      els.storageGrid.appendChild(tile);
+    });
   }
-  state.tray.forEach((tier, idx) => {
-    const tile = document.createElement('div');
-    tile.className = 'tray-tile';
-    if (idx === selectedTrayIndex) tile.classList.add('selected');
-    tile.style.background = TIERS[tier].color;
-    tile.textContent = TIERS[tier].label;
-    tile.addEventListener('click', () => onTrayClick(idx));
-    els.tray.appendChild(tile);
-  });
+
+  if (selectedStorageIndex !== null && state.tray[selectedStorageIndex] !== undefined) {
+    const tier = state.tray[selectedStorageIndex];
+    els.storageActions.hidden = false;
+    els.storageSelectedLabel.textContent = `Selected ${TIERS[tier].label} — tap an empty board slot to equip it`;
+    els.storageSellBtn.onclick = () => sellStorageTile(selectedStorageIndex);
+  } else {
+    els.storageActions.hidden = true;
+  }
 }
 
 function renderAll() {
   renderMoney();
-  renderUpgrades();
+  renderSpeedUpgrade();
+  renderWallUpgrade();
   renderChests();
-  renderTray();
+  renderStorage();
 }
 
 /* ---------- Toast ---------- */
@@ -252,46 +309,81 @@ function toast(msg) {
   setTimeout(() => t.remove(), 3000);
 }
 
-/* ---------- Interaction ---------- */
+/* ---------- Interaction: storage ---------- */
 
-function onTrayClick(idx) {
-  selectedTrayIndex = selectedTrayIndex === idx ? null : idx;
-  renderTray();
+function onStorageClick(idx) {
+  selectedStorageIndex = selectedStorageIndex === idx ? null : idx;
+  renderStorage();
 }
 
-function onSlotClick(i) {
+function sellStorageTile(idx) {
+  const tier = state.tray[idx];
+  if (tier === undefined) return;
+  state.tray.splice(idx, 1);
+  state.money += SELL_VALUE[tier];
+  toast(`Sold a ${TIERS[tier].label} multiplier for $${fmt(SELL_VALUE[tier])}`);
+  selectedStorageIndex = null;
+  renderAll();
+  save();
+}
+
+function checkStorageMerges() {
+  let mergedAny = true;
+  while (mergedAny) {
+    mergedAny = false;
+    for (let tier = 0; tier < MAX_TIER; tier++) {
+      const idxs = [];
+      state.tray.forEach((t, i) => {
+        if (t === tier && idxs.length < 3) idxs.push(i);
+      });
+      if (idxs.length === 3) {
+        idxs.sort((a, b) => b - a).forEach(i => state.tray.splice(i, 1));
+        state.tray.push(tier + 1);
+        mergedAny = true;
+        toast(`Merged 3× ${TIERS[tier].label} into ${TIERS[tier + 1].label}!`);
+        break;
+      }
+    }
+    if (mergedAny) continue;
+    const topIdxs = [];
+    state.tray.forEach((t, i) => {
+      if (t === MAX_TIER && topIdxs.length < 3) topIdxs.push(i);
+    });
+    if (topIdxs.length === 3) {
+      topIdxs.sort((a, b) => b - a).forEach(i => state.tray.splice(i, 1));
+      const bonus = SELL_VALUE[MAX_TIER] * 10;
+      state.money += bonus;
+      toast(`Merged 3× ${TIERS[MAX_TIER].label} for a $${fmt(bonus)} bonus!`);
+      mergedAny = true;
+    }
+  }
+  selectedStorageIndex = null;
+}
+
+/* ---------- Interaction: board slots ---------- */
+
+function onBoardSlotClick(i) {
   if (state.slots[i] !== null) {
-    sellSlot(i);
+    if (state.tray.length >= TRAY_MAX) {
+      toast('Your storage is full! Sell something before unequipping more.');
+      return;
+    }
+    const tier = state.slots[i];
+    state.slots[i] = null;
+    state.tray.push(tier);
+    checkStorageMerges();
+    renderAll();
+    save();
     return;
   }
-  if (selectedTrayIndex === null) return;
-  const tier = state.tray[selectedTrayIndex];
-  state.tray.splice(selectedTrayIndex, 1);
-  selectedTrayIndex = null;
+  if (selectedStorageIndex === null) return;
+  const tier = state.tray[selectedStorageIndex];
+  state.tray.splice(selectedStorageIndex, 1);
+  selectedStorageIndex = null;
   state.slots[i] = tier;
   checkMerges();
   renderAll();
   save();
-}
-
-function sellSlot(i) {
-  const tier = state.slots[i];
-  if (tier === null) return;
-  state.slots[i] = null;
-  state.money += SELL_VALUE[tier];
-  toast(`Sold a ${TIERS[tier].label} multiplier for $${fmt(SELL_VALUE[tier])}`);
-  tryFillFromTray();
-  renderAll();
-  save();
-}
-
-function tryFillFromTray() {
-  while (state.tray.length > 0) {
-    const emptyIndex = state.slots.findIndex(s => s === null);
-    if (emptyIndex === -1) break;
-    state.slots[emptyIndex] = state.tray.shift();
-  }
-  checkMerges();
 }
 
 function checkMerges() {
@@ -329,17 +421,19 @@ function checkMerges() {
   }
 }
 
+/* ---------- Shop & upgrades ---------- */
+
 function buyChest(chest) {
   if (state.money < chest.cost) return;
   if (state.tray.length >= TRAY_MAX) {
-    toast('Your bag is full! Place or sell some multipliers first.');
+    toast('Your storage is full! Equip or sell some multipliers first.');
     return;
   }
   state.money -= chest.cost;
   const tier = weightedRandomTier(chest.weights);
   state.tray.push(tier);
   toast(`${chest.name} gave you a ${TIERS[tier].label} multiplier!`);
-  tryFillFromTray();
+  checkStorageMerges();
   renderAll();
   save();
 }
@@ -349,6 +443,8 @@ function buySpeedUpgrade() {
   if (state.money < cost) return;
   state.money -= cost;
   state.spawnLevel++;
+  const newLane = LANE_UNLOCK_ORDER[laneCount() - 1];
+  if (newLane !== undefined) lastSpawnPerLane[newLane] = performance.now();
   renderAll();
   save();
 }
@@ -418,16 +514,16 @@ function onCollisionStart(event) {
   });
 }
 
-function spawnBall() {
-  const x = BOARD_W / 2 + (Math.random() - 0.5) * 40;
-  const body = Matter.Bodies.circle(x, 16, BALL_RADIUS, {
+function spawnBallAtLane(laneIndex) {
+  const x = LANE_X[laneIndex] + (Math.random() - 0.5) * 14;
+  const body = Matter.Bodies.circle(x, LANE_Y, BALL_RADIUS, {
     restitution: 0.6,
     friction: 0.02,
     frictionAir: 0.001,
     density: 0.0025,
   });
   body.isGameBall = true;
-  body.gameData = { value: startValue(), hitSlots: new Set() };
+  body.gameData = { value: BASE_START, hitSlots: new Set(), wallApplied: false };
   Matter.Composite.add(engine.world, body);
   balls.push(body);
 }
@@ -463,11 +559,72 @@ function onCanvasClick(evt) {
     }
   });
   if (nearest >= 0 && nearestDist <= SLOT_RADIUS + 14) {
-    onSlotClick(nearest);
+    onBoardSlotClick(nearest);
   }
 }
 
 /* ---------- Drawing ---------- */
+
+function drawLanes(now) {
+  const active = activeLanes();
+  for (let li = 0; li < MAX_LANES; li++) {
+    const isActive = active.includes(li);
+    const x = LANE_X[li];
+    ctx.beginPath();
+    ctx.moveTo(x - 14, LANE_Y - 12);
+    ctx.lineTo(x + 14, LANE_Y - 12);
+    ctx.lineTo(x, LANE_Y + 14);
+    ctx.closePath();
+    if (isActive) {
+      const pulse = now - lastSpawnPerLane[li];
+      ctx.fillStyle = pulse < 200 ? '#fff6c9' : '#ffd700';
+      ctx.fill();
+    } else {
+      ctx.strokeStyle = 'rgba(183,169,217,0.4)';
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+}
+
+function drawWall(now) {
+  const marginX = BOARD_W * 0.06;
+  const w = BOARD_W - marginX * 2;
+  const x = marginX;
+  const y = WALL_Y - WALL_HEIGHT / 2;
+  const pulseT = now - wallPulse;
+  const glow = pulseT < 250 ? 1 - pulseT / 250 : 0;
+
+  ctx.save();
+  ctx.fillStyle = wallColor(state.valueLevel);
+  ctx.shadowColor = wallColor(state.valueLevel);
+  ctx.shadowBlur = 8 + glow * 20;
+  roundRect(ctx, x, y, w, WALL_HEIGHT, 10);
+  ctx.fill();
+  ctx.restore();
+
+  ctx.lineWidth = 2;
+  ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+  roundRect(ctx, x, y, w, WALL_HEIGHT, 10);
+  ctx.stroke();
+
+  ctx.fillStyle = '#1b1032';
+  ctx.font = '800 15px Segoe UI, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const label = state.valueLevel === 0 ? `BASE $${BASE_START.toFixed(2)}` : `+$${fmt(wallBonus())}`;
+  ctx.fillText(label, BOARD_W / 2, WALL_Y + 1);
+}
+
+function roundRect(c, x, y, w, h, r) {
+  c.beginPath();
+  c.moveTo(x + r, y);
+  c.arcTo(x + w, y, x + w, y + h, r);
+  c.arcTo(x + w, y + h, x, y + h, r);
+  c.arcTo(x, y + h, x, y, r);
+  c.arcTo(x, y, x + w, y, r);
+  c.closePath();
+}
 
 function draw(now) {
   ctx.clearRect(0, 0, BOARD_W, BOARD_H);
@@ -475,11 +632,14 @@ function draw(now) {
   ctx.fillStyle = '#241748';
   ctx.fillRect(0, 0, BOARD_W, BOARD_H);
 
-  ctx.fillStyle = 'rgba(183,169,217,0.85)';
-  ctx.font = '700 16px Segoe UI, sans-serif';
+  ctx.fillStyle = 'rgba(183,169,217,0.7)';
+  ctx.font = '700 12px Segoe UI, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText('▼ DROP ZONE ▼', BOARD_W / 2, 26);
+  ctx.fillText('▼ DROP ZONE ▼', BOARD_W / 2, 56);
+
+  drawLanes(now);
+  drawWall(now);
 
   ctx.fillStyle = '#5b3f92';
   PEGS.forEach(p => {
@@ -510,7 +670,7 @@ function draw(now) {
     } else {
       ctx.fillStyle = 'rgba(61,42,99,0.9)';
       ctx.fill();
-      const selectable = selectedTrayIndex !== null;
+      const selectable = selectedStorageIndex !== null;
       ctx.setLineDash(selectable ? [5, 4] : []);
       ctx.lineWidth = selectable ? 3 : 2;
       ctx.strokeStyle = selectable ? '#7ee787' : '#5b3f92';
@@ -521,7 +681,7 @@ function draw(now) {
   });
 
   ctx.fillStyle = 'rgba(255,215,0,0.12)';
-  ctx.fillRect(0, BOARD_H - 40, BOARD_W, 40);
+  ctx.fillRect(0, BOARD_H - CASH_BAR_HEIGHT, BOARD_W, CASH_BAR_HEIGHT);
   ctx.fillStyle = '#ffd700';
   ctx.font = '700 16px Segoe UI, sans-serif';
   ctx.textAlign = 'center';
@@ -531,7 +691,7 @@ function draw(now) {
   balls.forEach(b => {
     const { x, y } = b.position;
     ctx.beginPath();
-    const grad = ctx.createRadialGradient(x - 4, y - 5, 2, x, y, BALL_RADIUS);
+    const grad = ctx.createRadialGradient(x - 5, y - 6, 3, x, y, BALL_RADIUS);
     grad.addColorStop(0, '#fff6c9');
     grad.addColorStop(0.6, '#ffd700');
     grad.addColorStop(1, '#b8860b');
@@ -539,7 +699,7 @@ function draw(now) {
     ctx.arc(x, y, BALL_RADIUS, 0, Math.PI * 2);
     ctx.fill();
     ctx.fillStyle = '#4a3200';
-    ctx.font = '700 9px Segoe UI, sans-serif';
+    ctx.font = '700 11px Segoe UI, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(fmt(b.gameData.value), x, y + 1);
@@ -570,23 +730,35 @@ function gameLoop(now) {
   Matter.Engine.update(engine, dt);
 
   const intervalMs = spawnInterval() * 1000;
-  if (now - lastSpawn >= intervalMs) {
-    lastSpawn = now;
-    spawnBall();
-  }
+  activeLanes().forEach(li => {
+    if (now - lastSpawnPerLane[li] >= intervalMs) {
+      lastSpawnPerLane[li] = now;
+      spawnBallAtLane(li);
+    }
+  });
 
-  let cashedOut = false;
+  let uiDirty = false;
   for (let i = balls.length - 1; i >= 0; i--) {
     const ball = balls[i];
+    if (!ball.gameData.wallApplied && ball.position.y >= WALL_Y) {
+      ball.gameData.wallApplied = true;
+      const bonus = wallBonus();
+      if (bonus > 0) {
+        ball.gameData.value += bonus;
+        floatTexts.push({ x: ball.position.x, y: WALL_Y - 6, text: '+$' + fmt(bonus), color: '#fff6c9', start: now });
+      }
+      wallPulse = now;
+    }
     if (ball.position.y - BALL_RADIUS > BOARD_H) {
       cashOutBall(ball, now);
       balls.splice(i, 1);
-      cashedOut = true;
+      uiDirty = true;
     }
   }
-  if (cashedOut) {
+  if (uiDirty) {
     renderMoney();
-    renderUpgrades();
+    renderSpeedUpgrade();
+    renderWallUpgrade();
     renderChests();
     save();
   }
@@ -604,7 +776,10 @@ function init() {
   els.canvas.addEventListener('click', onCanvasClick);
   els.buySpeed.addEventListener('click', buySpeedUpgrade);
   els.buyValue.addEventListener('click', buyValueUpgrade);
-  lastSpawn = performance.now() - spawnInterval() * 1000; // spawn one immediately
+  const interval = spawnInterval() * 1000;
+  activeLanes().forEach((li, k) => {
+    lastSpawnPerLane[li] = performance.now() - (k / MAX_LANES) * interval;
+  });
   rafId = requestAnimationFrame(gameLoop);
 }
 

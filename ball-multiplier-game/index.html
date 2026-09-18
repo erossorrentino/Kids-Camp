@@ -15,10 +15,19 @@
 
   <main class="layout">
     <section class="board-panel">
-      <div class="board-wrap">
-        <canvas id="boardCanvas" width="640" height="700"></canvas>
+      <div class="panel wall-panel">
+        <div class="wall-swatch" id="wallSwatch"></div>
+        <div class="upgrade-info">
+          <div class="upgrade-title">💵 Starting Wall</div>
+          <div class="upgrade-sub" id="wallSub">Level 0 — balls start at $1.10</div>
+        </div>
+        <button class="buy-btn" id="buyValue">Buy<br><span></span></button>
       </div>
-      <p class="hint" id="hint">Tap a multiplier below, then tap an empty slot on the board to place it there. Balls drop from the top and bounce like Plinko — get 3 of the same multiplier to merge into a better one!</p>
+
+      <div class="board-wrap">
+        <canvas id="boardCanvas" width="640" height="760"></canvas>
+      </div>
+      <p class="hint" id="hint">Balls drop through the colored starting wall (brighter color = more starting cash), then bounce down through the pegs like Plinko. Select a multiplier from storage and tap an empty board slot to equip it — get 3 of the same to merge into a better one!</p>
     </section>
 
     <aside class="side-panel">
@@ -31,13 +40,6 @@
           </div>
           <button class="buy-btn" id="buySpeed">Buy<br><span></span></button>
         </div>
-        <div class="upgrade-row" id="upgradeValue">
-          <div class="upgrade-info">
-            <div class="upgrade-title">Starting Value</div>
-            <div class="upgrade-sub" id="valueSub">Level 0</div>
-          </div>
-          <button class="buy-btn" id="buyValue">Buy<br><span></span></button>
-        </div>
       </div>
 
       <div class="panel shop-panel">
@@ -45,9 +47,13 @@
         <div class="chest-list" id="chestList"></div>
       </div>
 
-      <div class="panel tray-panel">
-        <h2>🎒 Your Multipliers</h2>
-        <div class="tray" id="tray"></div>
+      <div class="panel storage-panel">
+        <h2>🧲 Multiplier Storage</h2>
+        <div class="storage-grid" id="storageGrid"></div>
+        <div class="storage-actions" id="storageActions" hidden>
+          <span id="storageSelectedLabel"></span>
+          <button class="sell-btn" id="storageSellBtn">Sell</button>
+        </div>
       </div>
     </aside>
   </main>
