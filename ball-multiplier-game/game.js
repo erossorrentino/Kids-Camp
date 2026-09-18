@@ -43,9 +43,9 @@ const WALL_COUNT = WALL_DEFS.length;
 
 const BOARD_W = 640;
 const BOARD_H = 820;
-const PEG_RADIUS = 5;
 const SLOT_RADIUS = 26;
 const BALL_RADIUS = 17;
+const GRAB_RADIUS = 46;
 
 const LANE_Y = 16;
 const MAX_LANES = 5;
@@ -59,14 +59,15 @@ const CASH_BAR_HEIGHT = 40;
 const PLAY_TOP = 205;
 const PLAY_BOTTOM = BOARD_H - CASH_BAR_HEIGHT;
 
-// A ball resting in a locally-symmetric spot in the peg field can stall
-// indefinitely with zero net force; periodically nudge it and, as a last
-// resort, force it to cash out so no ball is ever lost for good.
+// A ball resting perfectly balanced against a slot can stall with zero net
+// force; periodically nudge it and, as a last resort, force it to cash out
+// so no ball is ever lost for good.
 const STALL_CHECK_MS = 500;
 const STALL_PROGRESS_PX = 12;
 const MAX_FALL_MS = 20000;
 
-// Multiplier slots spread out across the whole peg field, not confined to one row.
+// Multiplier slots spread out across the whole board — the only things a
+// ball bounces off on its way down, besides the side walls.
 const SLOT_FRACS = [
   { x: 0.20, y: 0.16 },
   { x: 0.75, y: 0.14 },
@@ -80,31 +81,7 @@ const SLOT_FRACS = [
   { x: 0.72, y: 0.66 },
 ];
 
-function buildPegs() {
-  const rows = 13;
-  const usableH = PLAY_BOTTOM - PLAY_TOP;
-  const topMargin = usableH * 0.06;
-  const bottomMargin = usableH * 0.05;
-  const rowGap = (usableH - topMargin - bottomMargin) / (rows - 1);
-  const sideMargin = BOARD_W * 0.07;
-  const colGap = (BOARD_W - sideMargin * 2) / 9;
-  const pegs = [];
-  for (let r = 0; r < rows; r++) {
-    const y = PLAY_TOP + topMargin + r * rowGap;
-    const even = r % 2 === 0;
-    const count = even ? 10 : 9;
-    for (let c = 0; c < count; c++) {
-      const x = even ? sideMargin + c * colGap : sideMargin + colGap / 2 + c * colGap;
-      pegs.push({ x, y });
-    }
-  }
-  return pegs;
-}
-
 const SLOT_POS = SLOT_FRACS.map(f => ({ x: f.x * BOARD_W, y: PLAY_TOP + f.y * (PLAY_BOTTOM - PLAY_TOP) }));
-const PEGS = buildPegs().filter(
-  p => !SLOT_POS.some(s => Math.hypot(s.x - p.x, s.y - p.y) < SLOT_RADIUS + PEG_RADIUS + 10)
-);
 
 /* ---------- State ---------- */
 
@@ -127,6 +104,13 @@ const slotPulses = new Array(SLOT_COUNT).fill(-9999);
 const lastSpawnPerLane = new Array(MAX_LANES).fill(0);
 const wallPulses = new Array(WALL_COUNT).fill(-9999);
 let floatTexts = [];
+
+// Touch/mouse drag-to-steer state.
+let heldBall = null;
+let activePointerId = null;
+let pointerPos = null;
+let dragStart = null;
+let dragMoved = false;
 
 /* ---------- Persistence ---------- */
 
@@ -488,12 +472,8 @@ function setupPhysics() {
   engine = Matter.Engine.create();
   engine.gravity.y = 1;
 
-  const pegBodies = PEGS.map(p =>
-    Matter.Bodies.circle(p.x, p.y, PEG_RADIUS, { isStatic: true, restitution: 0.5, friction: 0 })
-  );
-
   const slotBodies = SLOT_POS.map((p, i) => {
-    const body = Matter.Bodies.circle(p.x, p.y, SLOT_RADIUS, { isStatic: true, restitution: 0.55, friction: 0 });
+    const body = Matter.Bodies.circle(p.x, p.y, SLOT_RADIUS, { isStatic: true, restitution: 0.7, friction: 0 });
     body.isSlot = true;
     body.slotIndex = i;
     return body;
@@ -503,7 +483,7 @@ function setupPhysics() {
   const leftWall = Matter.Bodies.rectangle(-10, BOARD_H / 2, 20, BOARD_H * 2, wallOpts);
   const rightWall = Matter.Bodies.rectangle(BOARD_W + 10, BOARD_H / 2, 20, BOARD_H * 2, wallOpts);
 
-  Matter.Composite.add(engine.world, [...pegBodies, ...slotBodies, leftWall, rightWall]);
+  Matter.Composite.add(engine.world, [...slotBodies, leftWall, rightWall]);
 
   Matter.Events.on(engine, 'collisionStart', onCollisionStart);
 }
@@ -580,8 +560,20 @@ function canvasPointFromEvent(evt) {
   };
 }
 
-function onCanvasClick(evt) {
-  const p = canvasPointFromEvent(evt);
+function nearestBall(p) {
+  let nearest = null;
+  let nearestDist = Infinity;
+  balls.forEach(b => {
+    const d = Math.hypot(b.position.x - p.x, b.position.y - p.y);
+    if (d < nearestDist) {
+      nearestDist = d;
+      nearest = b;
+    }
+  });
+  return nearestDist <= GRAB_RADIUS ? nearest : null;
+}
+
+function tapBoardSlot(p) {
   let nearest = -1;
   let nearestDist = Infinity;
   SLOT_POS.forEach((s, i) => {
@@ -594,6 +586,38 @@ function onCanvasClick(evt) {
   if (nearest >= 0 && nearestDist <= SLOT_RADIUS + 14) {
     onBoardSlotClick(nearest);
   }
+}
+
+function onPointerDown(evt) {
+  if (activePointerId !== null) return;
+  const p = canvasPointFromEvent(evt);
+  activePointerId = evt.pointerId;
+  pointerPos = p;
+  dragStart = p;
+  dragMoved = false;
+  heldBall = nearestBall(p);
+  if (els.canvas.setPointerCapture) els.canvas.setPointerCapture(evt.pointerId);
+  evt.preventDefault();
+}
+
+function onPointerMove(evt) {
+  if (evt.pointerId !== activePointerId) return;
+  const p = canvasPointFromEvent(evt);
+  pointerPos = p;
+  if (Math.hypot(p.x - dragStart.x, p.y - dragStart.y) > 6) dragMoved = true;
+  evt.preventDefault();
+}
+
+function onPointerUp(evt) {
+  if (evt.pointerId !== activePointerId) return;
+  if (!heldBall && !dragMoved) {
+    tapBoardSlot(pointerPos);
+  }
+  heldBall = null;
+  activePointerId = null;
+  pointerPos = null;
+  dragStart = null;
+  dragMoved = false;
 }
 
 /* ---------- Drawing ---------- */
@@ -680,13 +704,6 @@ function draw(now) {
   drawLanes(now);
   drawWalls(now);
 
-  ctx.fillStyle = '#5b3f92';
-  PEGS.forEach(p => {
-    ctx.beginPath();
-    ctx.arc(p.x, p.y, PEG_RADIUS, 0, Math.PI * 2);
-    ctx.fill();
-  });
-
   SLOT_POS.forEach((p, i) => {
     const tier = state.slots[i];
     const pulseT = now - slotPulses[i];
@@ -729,6 +746,15 @@ function draw(now) {
 
   balls.forEach(b => {
     const { x, y } = b.position;
+    if (b === heldBall) {
+      ctx.beginPath();
+      ctx.arc(x, y, BALL_RADIUS + 8, 0, Math.PI * 2);
+      ctx.setLineDash([4, 4]);
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = '#7ee787';
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
     ctx.beginPath();
     const grad = ctx.createRadialGradient(x - 5, y - 6, 3, x, y, BALL_RADIUS);
     grad.addColorStop(0, '#fff6c9');
@@ -768,6 +794,15 @@ function gameLoop(now) {
   lastFrame = now;
   Matter.Engine.update(engine, dt);
 
+  if (heldBall && pointerPos) {
+    const x = Math.min(BOARD_W - BALL_RADIUS - 2, Math.max(BALL_RADIUS + 2, pointerPos.x));
+    const y = Math.min(BOARD_H - BALL_RADIUS, Math.max(BALL_RADIUS + 2, pointerPos.y));
+    Matter.Body.setPosition(heldBall, { x, y });
+    Matter.Body.setVelocity(heldBall, { x: 0, y: 0 });
+    heldBall.gameData.checkY = y;
+    heldBall.gameData.nextCheck = now + STALL_CHECK_MS;
+  }
+
   const intervalMs = spawnInterval() * 1000;
   activeLanes().forEach(li => {
     if (now - lastSpawnPerLane[li] >= intervalMs) {
@@ -794,6 +829,7 @@ function gameLoop(now) {
       cashOutBall(ball, now);
       balls.splice(i, 1);
       uiDirty = true;
+      if (heldBall === ball) heldBall = null;
       continue;
     }
 
@@ -833,7 +869,10 @@ function init() {
   load();
   renderAll();
   setupPhysics();
-  els.canvas.addEventListener('click', onCanvasClick);
+  els.canvas.addEventListener('pointerdown', onPointerDown);
+  els.canvas.addEventListener('pointermove', onPointerMove);
+  els.canvas.addEventListener('pointerup', onPointerUp);
+  els.canvas.addEventListener('pointercancel', onPointerUp);
   els.buySpeed.addEventListener('click', buySpeedUpgrade);
   els.buyWalls.forEach((btn, i) => btn.addEventListener('click', () => buyWallUpgrade(i)));
   const interval = spawnInterval() * 1000;

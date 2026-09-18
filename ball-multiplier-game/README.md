@@ -1,9 +1,10 @@
 # Ball Multiplier Merge
 
 A browser mini-game: money balls drop from the top of a Plinko-style
-board, pass through 3 stacked colored starting walls, then bounce off
-pegs and multiplier slots spread across the whole board before cashing
-out at the bottom. Merge 3 identical multipliers to upgrade them, and
+board, pass through 3 stacked colored starting walls, then fall free
+and bounce off whichever multiplier slots they hit before cashing out
+at the bottom — and you can touch or click-drag any ball in flight to
+steer it yourself. Merge 3 identical multipliers to upgrade them, and
 spend your earnings in the chest shop or on upgrades.
 
 ## How to play
@@ -14,12 +15,17 @@ spend your earnings in the chest shop or on upgrades.
   cash, every lane's balls passing through the same 3 walls. Each
   wall's color and dollar amount scale with its own upgrade level (buy
   them independently in the panel above the board).
-- After the walls, the ball bounces down through a field of pegs, like
-  Plinko — where it lands and which of the 10 multiplier slots it
-  happens to hit is physics-driven, not fixed.
+- After the walls, the ball falls freely until it bounces off one of
+  the 10 multiplier slots spread across the board — there are no pegs,
+  so a slot is the only thing (besides the side walls) a ball can hit.
+  A slot can only boost a given ball once per drop.
+- **Touch or click-and-drag a ball** anywhere in the board to grab it
+  and steer it up, down, or sideways — right into the multiplier slot
+  you're aiming for. Let go and it drops back into free fall from
+  wherever you released it. Tapping without grabbing a ball still
+  equips/unequips a multiplier on whichever board slot you tap.
 - Any slot holding a multiplier tile (×2, ×3, ×5, ... up to ×200)
-  multiplies the ball's value if the ball bounces into it on the way
-  down. A slot can only boost a given ball once per drop.
+  multiplies the ball's value if it bounces into it on the way down.
 - Buy chests in the shop with your money to get random multiplier
   tiles, delivered straight to your **Multiplier Storage**. Pricier
   chests have better odds of high-tier multipliers.
@@ -52,10 +58,13 @@ game.js            Game state, shop logic, Plinko physics + rendering
 lib/matter.min.js  Vendored Matter.js physics engine (MIT, see lib/matter-js-LICENSE.md)
 ```
 
-The Plinko board runs on [Matter.js](https://brm.io/matter-js/) for
-gravity and peg/ball collisions; everything — launch lanes, the 3
-starting walls, pegs, slots, and balls — is drawn on a single
-`<canvas>` each frame based on the physics engine's body positions. A
-ball that lands in a locally-symmetric dead spot in the peg field is
-periodically nudged (and, as a last resort, force-cashed-out after 20s)
-so nothing ever gets stuck for good.
+The board runs on [Matter.js](https://brm.io/matter-js/) for gravity
+and ball/slot collisions; everything — launch lanes, the 3 starting
+walls, slots, and balls — is drawn on a single `<canvas>` each frame
+based on the physics engine's body positions. Dragging a ball works by
+pinning its physics body to the pointer position every frame (via
+Pointer Events, so mouse and touch share one code path) and handing it
+back to gravity on release. A ball resting perfectly balanced against
+a slot can stall with zero net force; it's periodically nudged and, as
+a last resort, force-cashed-out after 20s so nothing ever gets stuck
+for good.
