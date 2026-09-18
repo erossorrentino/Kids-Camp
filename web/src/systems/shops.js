@@ -2,6 +2,7 @@ import * as THREE from '../../vendor/three/three.module.js';
 import { SHOPS } from '../config.js';
 import { generateWeaponVariants, describeWeaponVariant } from './weaponGenerator.js';
 import { generateVehicleVariants, describeVehicleVariant } from './vehicleGenerator.js';
+import { buildShopInterior } from '../world/interiors.js';
 
 const DEALERSHIP_KINDS = new Set(['CAR_SHOP', 'BOAT_SHOP', 'HELI_SHOP', 'JET_SHOP', 'SUB_SHOP']);
 // Which vehicle-catalog `kind`s a dealership shop type browses (see
@@ -124,7 +125,11 @@ export class ShopManager {
       const cfg = SHOPS.types[loc.type];
       const position = new THREE.Vector3(...loc.position);
       const marker = buildShopMarker(scene, position, cfg.color, loc.type);
-      return { id: `${loc.type}_${i}`, type: loc.type, name: cfg.name, color: cfg.color, position, items: cfg.items, marker };
+      const shop = { id: `${loc.type}_${i}`, type: loc.type, name: cfg.name, color: cfg.color, position, items: cfg.items, marker };
+      // A walk-in interior per shop (see world/interiors.js) — built eagerly
+      // so it's ready the moment the player first presses F, not popped in.
+      shop.interior = buildShopInterior(scene, shop);
+      return shop;
     });
     // Built once at construction (like the 500-entry mission pool): a
     // 1000-entry gun catalog and a 1500-entry vehicle catalog (see

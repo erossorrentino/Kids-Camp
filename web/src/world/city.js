@@ -180,8 +180,78 @@ function makeWindowGlowTexture() {
   return tex;
 }
 
+// Sandy desert ground: coarse mottled tan speckle plus a few wind-carved
+// ripple streaks instead of the city's asphalt/concrete grid.
+function makeDesertTexture() {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#d9c08a';
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 6000; i++) {
+    const x = Math.random() * size, y = Math.random() * size;
+    const v = Math.random() * 30 - 15;
+    ctx.fillStyle = `rgba(${v > 0 ? 255 : 90},${v > 0 ? 230 : 60},${v > 0 ? 170 : 20},${Math.abs(v) / 90})`;
+    ctx.fillRect(x, y, 1.3, 1.3);
+  }
+  ctx.strokeStyle = 'rgba(160,120,60,0.25)';
+  ctx.lineWidth = 2.5;
+  for (let i = 0; i < 14; i++) {
+    const y = Math.random() * size;
+    ctx.beginPath();
+    ctx.moveTo(0, y);
+    for (let x = 0; x <= size; x += 40) ctx.lineTo(x, y + Math.sin(x * 0.05 + i) * 8);
+    ctx.stroke();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = ANISOTROPY;
+  return tex;
+}
+
+// Grassy farmland ground: mottled green with sparse darker tufts.
+function makeGrassTexture() {
+  const size = 512;
+  const canvas = document.createElement('canvas');
+  canvas.width = size; canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#5a8a3f';
+  ctx.fillRect(0, 0, size, size);
+  for (let i = 0; i < 8000; i++) {
+    const x = Math.random() * size, y = Math.random() * size;
+    const v = Math.random() * 34 - 17;
+    ctx.fillStyle = `rgba(${v > 0 ? 210 : 20},${v > 0 ? 255 : 60},${v > 0 ? 140 : 10},${Math.abs(v) / 100})`;
+    ctx.fillRect(x, y, 1.4, 1.4);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = ANISOTROPY;
+  return tex;
+}
+
 const facadeTexture = makeFacadeTexture();
 const windowGlowTexture = makeWindowGlowTexture();
+
+// The island isn't one uniform city: a wedge of desert and a wedge of
+// farm country sit past downtown on opposite sides, so driving away from
+// the spawn plaza actually goes somewhere different instead of more of the
+// same street grid forever. Downtown itself (near the shops/spawn) always
+// stays city so the plaza and its surroundings are unaffected.
+const BIOME_PALETTES = {
+  desert: [0xc9a66b, 0xd8b878, 0xb8935a, 0xe0c48f],
+  country: [0xb03a2a, 0xd8d2c0, 0x8a6a45, 0xc9b98a],
+};
+function getBiome(cx, cz) {
+  const wx = (cx + 0.5) * CITY.chunkSize, wz = (cz + 0.5) * CITY.chunkSize;
+  if (Math.hypot(wx, wz) < 220) return 'city'; // downtown stays downtown
+  const norm = (Math.atan2(wz, wx) + Math.PI) / (Math.PI * 2); // 0..1
+  if (norm < 0.3) return 'desert';
+  if (norm < 0.6) return 'country';
+  return 'city';
+}
 
 // A destructible roadside prop (barrier/crate): one hit from a vehicle,
 // explosion, or heavy enough gunfire clears it out of the way.
@@ -216,10 +286,18 @@ function makeRoadMaterials() {
   const sidewalkTex = makeSidewalkTexture();
   const B = S - RW;
   sidewalkTex.repeat.set(B / 6, B / 6);
+  const desertTex = makeDesertTexture();
+  desertTex.repeat.set(B / 5, B / 5);
+  const grassTex = makeGrassTexture();
+  grassTex.repeat.set(B / 5, B / 5);
 
   return {
     road: new THREE.MeshStandardMaterial({ map: asphalt, roughness: 0.95 }),
     sidewalk: new THREE.MeshStandardMaterial({ map: sidewalkTex, roughness: 0.9 }),
+    ground: {
+      desert: new THREE.MeshStandardMaterial({ map: desertTex, roughness: 1 }),
+      country: new THREE.MeshStandardMaterial({ map: grassTex, roughness: 1 }),
+    },
     line: new THREE.MeshBasicMaterial({ color: LINE_COLOR }),
   };
 }
@@ -244,6 +322,8 @@ class Chunk {
     const oz = this.cz * S;
     const rng = rngForChunk(this.cx, this.cz, world.seed);
     const isSpawnPlaza = this.cx === 0 && this.cz === 0;
+    const biome = getBiome(this.cx, this.cz);
+    this.biome = biome;
 
     // --- roads (L shape at the min-corner, see module notes) ---
     const roadX = new THREE.Mesh(new THREE.PlaneGeometry(S - RW, RW), world.mats.road);
@@ -272,9 +352,11 @@ class Chunk {
     this.roadLanes.push({ from: new THREE.Vector3(ox + RW, 0, oz + RW * 0.32), to: new THREE.Vector3(ox + S, 0, oz + RW * 0.32) });
     this.roadLanes.push({ from: new THREE.Vector3(ox + RW * 0.68, 0, oz), to: new THREE.Vector3(ox + RW * 0.68, 0, oz + S) });
 
-    // --- sidewalk block ---
+    // --- ground block (sidewalk downtown; sand/grass out in the desert or
+    // country wedges — see getBiome) ---
     const B = S - RW;
-    const sw = new THREE.Mesh(new THREE.PlaneGeometry(B, B), world.mats.sidewalk);
+    const groundMat = biome === 'city' ? world.mats.sidewalk : world.mats.ground[biome];
+    const sw = new THREE.Mesh(new THREE.PlaneGeometry(B, B), groundMat);
     sw.rotation.x = -Math.PI / 2;
     sw.position.set(ox + RW + B / 2, 0.02, oz + RW + B / 2);
     sw.receiveShadow = true;
@@ -290,42 +372,56 @@ class Chunk {
 
     if (isSpawnPlaza) return; // keep the starting block clear for vehicles
 
-    // --- destructible roadside props (barriers/crates), individual meshes
-    // since each needs its own health/destroyed state ---
-    for (let i = 0; i < PROPS.perChunk; i++) {
+    // --- destructible roadside props: barrels/crates downtown, rocks/hay
+    // bales out in the desert or country wedges ---
+    const propCount = biome === 'city' ? PROPS.perChunk : Math.max(1, Math.round(PROPS.perChunk * 0.5));
+    for (let i = 0; i < propCount; i++) {
       const alongXEdge = rng() < 0.5;
       const px = alongXEdge ? ox + RW + randRange(rng, 2, B - 2) : ox + RW + 1;
       const pz = alongXEdge ? oz + RW + 1 : oz + RW + randRange(rng, 2, B - 2);
       const isBarrier = rng() < 0.5;
-      const geo = isBarrier ? new THREE.BoxGeometry(1.4, 0.9, 0.5) : new THREE.BoxGeometry(1, 1, 1);
-      const mat = new THREE.MeshStandardMaterial({ color: isBarrier ? 0xd97a1f : 0x8a6a45, roughness: 0.85 });
+      let geo, color;
+      if (biome === 'desert') { geo = new THREE.DodecahedronGeometry(0.55, 0); color = 0x9a8060; }
+      else if (biome === 'country') { geo = new THREE.CylinderGeometry(0.5, 0.5, 0.9, 10); color = 0xc9a75a; }
+      else { geo = isBarrier ? new THREE.BoxGeometry(1.4, 0.9, 0.5) : new THREE.BoxGeometry(1, 1, 1); color = isBarrier ? 0xd97a1f : 0x8a6a45; }
+      const mat = new THREE.MeshStandardMaterial({ color, roughness: 0.85 });
       const mesh = new THREE.Mesh(geo, mat);
-      mesh.position.set(px, isBarrier ? 0.45 : 0.5, pz);
+      mesh.position.set(px, isBarrier || biome !== 'city' ? 0.45 : 0.5, pz);
+      if (biome === 'country') mesh.rotation.z = Math.PI / 2; // hay bale lying on its side
       mesh.rotation.y = rng() * Math.PI;
       mesh.castShadow = true;
       this.group.add(mesh);
       this.props.push(new Prop(mesh, PROPS.health));
     }
 
-    // --- buildings, instanced per chunk ---
+    // --- buildings, instanced per chunk — downtown is a dense mixed-height
+    // skyline; the desert/country wedges are sparse, low, and biome-tinted
+    // (adobe tans out in the sand, barn reds/whites out in the fields) ---
     const lotSize = B / lotsPerSide;
-    const palette = pick(rng, colorPalettes);
+    const palette = biome === 'city' ? pick(rng, colorPalettes) : BIOME_PALETTES[biome];
+    const skipChance = biome === 'city' ? 0.12 : 0.62;
+    const [bMinH, bMaxH] = biome === 'city' ? [minHeight, maxHeight] : [3, 8];
     const lots = [];
     for (let i = 0; i < lotsPerSide; i++) {
       for (let j = 0; j < lotsPerSide; j++) {
-        if (rng() < 0.12) continue; // occasional empty plaza lot
+        if (rng() < skipChance) continue; // occasional empty plaza lot (or mostly-open desert/country)
         const cx = ox + RW + lotSize * (i + 0.5);
         const cz2 = oz + RW + lotSize * (j + 0.5);
         const w = lotSize * randRange(rng, 0.5, 0.8);
         const d = lotSize * randRange(rng, 0.5, 0.8);
-        const h = randRange(rng, minHeight, maxHeight);
+        const h = randRange(rng, bMinH, bMaxH);
         lots.push({ x: cx, z: cz2, w, d, h, color: pick(rng, palette) });
       }
     }
 
     if (lots.length === 0) return;
     const geo = new THREE.BoxGeometry(1, 1, 1);
-    const mat = new THREE.MeshStandardMaterial({ map: facadeTexture, roughness: 0.75, metalness: 0.05 });
+    // Downtown gets the glassy window-grid facade; low adobe/barn buildings
+    // out in the desert/country wedges just take their vertex color plain —
+    // a tiled skyscraper window texture on a 4m-tall barn looks wrong.
+    const mat = biome === 'city'
+      ? new THREE.MeshStandardMaterial({ map: facadeTexture, roughness: 0.75, metalness: 0.05 })
+      : new THREE.MeshStandardMaterial({ roughness: 0.9 });
     const inst = new THREE.InstancedMesh(geo, mat, lots.length);
     inst.castShadow = true;
     inst.receiveShadow = true;
@@ -355,9 +451,11 @@ class Chunk {
     this.buildingMesh = inst;
 
     // LOD detail: near chunks get a glowing window-grid overlay on their front
-    // face, far chunks stay as plain textured boxes to save draw calls / fill rate.
+    // face, far chunks stay as plain textured boxes to save draw calls / fill
+    // rate. City only — a glowing office-window texture on a barn or an
+    // adobe house would look wrong.
     const distChunks = Math.max(Math.abs(this.cx), Math.abs(this.cz));
-    if (distChunks <= 1 && lots.length > 0) {
+    if (biome === 'city' && distChunks <= 1 && lots.length > 0) {
       const winGeo = new THREE.PlaneGeometry(1, 1);
       const winMat = new THREE.MeshBasicMaterial({ map: windowGlowTexture, transparent: true, opacity: 0.9 });
       const winInst = new THREE.InstancedMesh(winGeo, winMat, lots.length);

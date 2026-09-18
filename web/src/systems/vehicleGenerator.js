@@ -17,6 +17,12 @@ const MODELS = [
   'Drifter', 'Warhawk', 'Sentinel', 'Nomad', 'Baron', 'Renegade', 'Overdrive', 'Zephyr',
 ];
 const TRIMS = ['', 'GT', 'RS', 'Turbo', 'Custom', 'Street', 'Sport', 'LE', 'SE', 'Cartel Spec'];
+// Weighted so a "car" purchase is usually a sedan (the sporty default look)
+// but regularly turns up something with a genuinely different silhouette —
+// see entities/vehicle.js's BODY_BUILDERS for what each of these builds.
+const CAR_BODY_TYPES = [
+  ['sedan', 0.5], ['wagon', 0.18], ['minivan', 0.16], ['pickup', 0.16],
+];
 const COLORS = [
   0xd23a3a, 0x2255aa, 0xdddddd, 0x161616, 0xffd23f, 0x2f8a4a, 0x9a2fd9, 0xff6a00,
   0x1fb0c9, 0x8a1010, 0xc9b98a, 0x33d6ff, 0x555555, 0xffffff, 0x7a1fa2, 0xd4af37,
@@ -33,6 +39,16 @@ const KIND_INFO = {
   sub: { count: 100, price0: 3800000, priceMax: 16000000 },
 };
 
+function weightedPick(rng, weights) {
+  const total = weights.reduce((sum, [, w]) => sum + w, 0);
+  let r = rng() * total;
+  for (const [value, w] of weights) {
+    r -= w;
+    if (r <= 0) return value;
+  }
+  return weights[weights.length - 1][0];
+}
+
 export function generateVehicleVariants(seed = 778899) {
   const rng = mulberry32(seed);
   const list = [];
@@ -48,6 +64,7 @@ export function generateVehicleVariants(seed = 778899) {
       list.push({
         id: `VEH_${String(n).padStart(4, '0')}`,
         kind,
+        bodyType: kind === 'car' ? weightedPick(rng, CAR_BODY_TYPES) : undefined,
         name: `${pick(rng, MAKES)} ${pick(rng, MODELS)}${trim ? ' ' + trim : ''}`,
         color: pick(rng, COLORS),
         speedMul: +speedMul.toFixed(3),
@@ -60,7 +77,8 @@ export function generateVehicleVariants(seed = 778899) {
 }
 
 export function describeVehicleVariant(v) {
-  return `SPEED ${Math.round(v.speedMul * 100)}% · HANDLING ${Math.round(v.handlingMul * 100)}%`;
+  const body = v.bodyType && v.bodyType !== 'sedan' ? `${v.bodyType.toUpperCase()} · ` : '';
+  return `${body}SPEED ${Math.round(v.speedMul * 100)}% · HANDLING ${Math.round(v.handlingMul * 100)}%`;
 }
 
 // Merges a variant's speed/handling multipliers into a base VEHICLE/BIKE

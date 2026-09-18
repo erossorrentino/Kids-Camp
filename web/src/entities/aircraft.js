@@ -122,13 +122,38 @@ export class Helicopter {
 
 function buildJetMesh(tint = 0x5b6b78) {
   const group = new THREE.Group();
-  const fuselage = new THREE.Mesh(
-    new THREE.ConeGeometry(0.8, 5.5, 8),
-    new THREE.MeshStandardMaterial({ color: tint, roughness: 0.3, metalness: 0.6 })
+  const bodyMat = new THREE.MeshStandardMaterial({ color: tint, roughness: 0.3, metalness: 0.6 });
+
+  // A real fuselage silhouette instead of one tapered cone: a smooth
+  // cylindrical body, a pointed nose cone forward, and a tapered section
+  // aft leading into the engine nozzle/flame below. Nose at -Z, tail
+  // (flame + control surfaces, unchanged from before) at +Z.
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.5, 3.2, 16), bodyMat);
+  body.rotation.x = Math.PI / 2;
+  body.position.z = -0.4;
+  body.castShadow = true;
+  group.add(body);
+
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.55, 1.5, 16), bodyMat);
+  nose.rotation.x = -Math.PI / 2;
+  nose.position.z = -2.75;
+  nose.castShadow = true;
+  group.add(nose);
+
+  const tailCone = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.32, 1.3, 16), bodyMat);
+  tailCone.rotation.x = Math.PI / 2;
+  tailCone.position.z = 1.85;
+  tailCone.castShadow = true;
+  group.add(tailCone);
+
+  // cockpit canopy bubble just aft of the nose
+  const canopy = new THREE.Mesh(
+    new THREE.SphereGeometry(0.32, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55),
+    new THREE.MeshStandardMaterial({ color: 0x1a2a2e, roughness: 0.15, metalness: 0.3, transparent: true, opacity: 0.75 })
   );
-  fuselage.rotation.x = Math.PI / 2;
-  fuselage.castShadow = true;
-  group.add(fuselage);
+  canopy.rotation.x = -Math.PI / 2;
+  canopy.position.set(0, 0.42, -1.5);
+  group.add(canopy);
 
   const wingGeo = new THREE.BoxGeometry(6.5, 0.12, 1.4);
   const wingMat = new THREE.MeshStandardMaterial({ color: 0x3f4a54 });

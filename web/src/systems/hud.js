@@ -112,10 +112,14 @@ export class HUD {
   // Wires the generic shop modal (see systems/shops.js + Game.purchaseShopItem).
   // openShopMenu()/closeShopMenu() do the actual show/populate; this just
   // wires the always-present close affordances once.
-  bindShopMenu() {
-    this.el.shopMenuClose.addEventListener('click', () => this.closeShopMenu());
+  // onLeave: called whenever the shop menu closes by any path (close
+  // button or clicking the backdrop) — Game uses it to walk the player back
+  // outside the shop's interior (see Game._exitShopInterior).
+  bindShopMenu(onLeave) {
+    this._onShopLeave = onLeave || (() => {});
+    this.el.shopMenuClose.addEventListener('click', () => { this.closeShopMenu(); this._onShopLeave(); });
     this.el.shopMenu.addEventListener('click', (e) => {
-      if (e.target === this.el.shopMenu) this.closeShopMenu();
+      if (e.target === this.el.shopMenu) { this.closeShopMenu(); this._onShopLeave(); }
     });
   }
 

@@ -31,6 +31,12 @@ const DRIVING_MODES = new Set([MODE.CAR, MODE.BIKE]);
 const CASH_STORAGE_KEY = 'neonHorizonCashV2';
 const LICENSE_STORAGE_KEY = 'neonHorizonLicense';
 const SPAWN_KIND_MODE = { car: MODE.CAR, bike: MODE.BIKE, heli: MODE.HELI, jet: MODE.JET, boat: MODE.BOAT, sub: MODE.SUB };
+// Interiors (world/interiors.js) sit far below the surface at the SAME X/Z
+// as their shop, so CityWorld's outdoor colliders would otherwise "leak"
+// into a room they were never meant to be in (collision only checks X/Z,
+// not Y). Interior walls aren't registered anywhere, so the honest fix is
+// no collision at all while inside rather than the wrong collision.
+const NO_COLLISION_WORLD = { getCollidersNear: () => [] };
 
 export class Game {
   constructor(canvas) {
@@ -55,7 +61,9 @@ export class Game {
     this.hasLicense = this._loadLicense();
     this.hud.bindMissions(this.missions, () => this.hasLicense);
     this.hud.bindWeapons(this.weaponSystem);
-    this.hud.bindShopMenu();
+    this.hud.bindShopMenu(() => this._exitShopInterior());
+    this.insideShop = null;
+    this._outsidePos = null;
     this.hud.bindMinimapTap();
     this.hud.bindFullMap((x, z) => this._setWaypoint(new THREE.Vector3(x, 0, z)));
     this.hud.bindWaypointClear(() => this._clearWaypoint());
@@ -190,10 +198,32 @@ export class Game {
   // --- shops -----------------------------------------------------------
   // Every openShopMenu call goes through here so the procedural gun/vehicle
   // catalogs (see ShopManager.getShopItems) get freshly resampled each time
-  // a shop opens — including the "refresh after purchase" reopens below.
+  // a shop opens — including the "refresh after purchase" reopens below. On
+  // the FIRST call for a given visit it also walks the player into that
+  // shop's interior (world/interiors.js) — a pure Y-axis teleport, since the
+  // interior sits directly below the shop at the same X/Z (see that file).
+  // Re-opening while already inside (ammo refresh, "spin again", etc.) is a
+  // no-op on position.
   _openShop(shop) {
+    if (this.insideShop !== shop) {
+      this._outsidePos = this.player.mesh.position.clone();
+      this.player.mesh.position.copy(shop.interior.entryPoint);
+      this.insideShop = shop;
+    }
     const items = this.shops.getShopItems(shop);
     this.hud.openShopMenu({ ...shop, items }, (it) => this.purchaseShopItem(shop, it));
+  }
+
+  // The one place that leaves a shop's interior — walks the player back to
+  // exactly where they stood outside before entering. Wired to every path
+  // that closes the shop menu (see HUD.bindShopMenu and the purchase
+  // branches below) so there's no way to get stranded underground.
+  _exitShopInterior() {
+    this.hud.closeShopMenu();
+    if (!this.insideShop) return;
+    this.player.mesh.position.copy(this._outsidePos);
+    this.insideShop = null;
+    this._outsidePos = null;
   }
 
   purchaseShopItem(shop, item) {
@@ -218,15 +248,18 @@ export class Game {
       // rather than adding a 6th weapon — see WeaponSystem.equipVariant.
       this.weaponSystem.equipVariant(item.gunVariant);
       this.hud.showToast(`Equipped: ${item.gunVariant.name}`, 'success', 4000);
-      this.hud.closeShopMenu();
+      this._exitShopInterior();
     } else if (item.gamble) {
       this._playSlots(item.price, shop);
     } else if (item.spawn) {
       // Vehicle shops "call in" a vehicle and drop the player straight into
       // the driver's seat — the coastal boat/sub shops launch it out into
       // open water, well past where the player could ever walk up to it.
+      // Exit the interior FIRST so the player (and the camera) are back at
+      // the real outdoor shop position before _enterVehicle hides them and
+      // attaches the camera to the car, not still underground.
+      this._exitShopInterior();
       const vehicle = this._spawnPurchasedVehicle(item.spawn, shop.position, item.vehicleVariant);
-      this.hud.closeShopMenu();
       this.hud.showToast(`${item.label} delivered!`, 'success');
       this._enterVehicle({ obj: vehicle, type: SPAWN_KIND_MODE[item.spawn] });
     }
@@ -267,7 +300,8 @@ export class Game {
 
     if (kind === 'car') {
       const stats = variant ? applyVehicleStatMul(VEHICLE, variant) : VEHICLE;
-      return this._replaceVehicle('starterCar', new Vehicle(this.scene, { position: pos, color: color ?? 0xd23a3a, stats, isPlayerStarter: true }));
+      const bodyType = variant?.bodyType || 'sedan';
+      return this._replaceVehicle('starterCar', new Vehicle(this.scene, { position: pos, color: color ?? 0xd23a3a, stats, bodyType, isPlayerStarter: true }));
     } else if (kind === 'bike') {
       const stats = variant ? applyVehicleStatMul(BIKE, variant) : BIKE;
       return this._replaceVehicle('bike', new Vehicle(this.scene, { position: pos, color: color ?? 0x161616, stats, isBike: true, isPlayerStarter: true }));
@@ -469,17 +503,39 @@ export class Game {
       const aiming = input.isMouseDown(2);
       cameraRig.handleMouseFoot(input, aiming);
       cameraRig.updateFoot(player, dt, aiming);
-      player.update(dt, input, cameraRig, world);
       // no clamp here: the player can walk down the beach and swim out past
       // it into open water (e.g. to reach a boat) — only ground vehicles
-      // are stopped at the shoreline, just below. Past the shoreline, ease
-      // them down toward the waterline so it reads as swimming rather than
-      // walking on an invisible plane above the sea.
-      if (player.grounded) {
-        const distFromCenter = Math.hypot(player.mesh.position.x, player.mesh.position.z);
-        const swimDepth = THREE.MathUtils.clamp((distFromCenter - ISLAND.radius) / (BEACH.outerRadius - ISLAND.radius), 0, 1);
-        player.mesh.position.y = THREE.MathUtils.lerp(0, WATER.level + 0.15, swimDepth);
+      // are stopped at the shoreline, just below. `swimDepth` eases through
+      // the beach ring first (still "wading", gravity/jump still apply),
+      // then at 1 (past BEACH.outerRadius) flips into true swimming: gravity
+      // off, the character sunk chin-deep, and the swim-stroke animation
+      // (see Player.update/_animate) instead of walking on the surface film.
+      // Interiors sit far below the surface at the shop's own X/Z (see
+      // world/interiors.js), so distFromCenter would otherwise read as
+      // whatever that shop's real outdoor distance is — never enough to
+      // trigger swimming for any current shop, but excluded explicitly
+      // rather than relying on that coincidence, along with outdoor
+      // collision (see NO_COLLISION_WORLD).
+      const collisionWorld = this.insideShop ? NO_COLLISION_WORLD : world;
+      const distFromCenter = Math.hypot(player.mesh.position.x, player.mesh.position.z);
+      const swimDepth = THREE.MathUtils.clamp((distFromCenter - ISLAND.radius) / (BEACH.outerRadius - ISLAND.radius), 0, 1);
+      const isSwimming = !this.insideShop && swimDepth >= 1;
+      const swimY = WATER.level - 1.3;
+      player.update(dt, input, cameraRig, collisionWorld, isSwimming);
+      if (isSwimming) {
+        if (!this._wasSwimming) this.particles.spawnSmoke(player.mesh.position, { color: 0xd8f2ff, size: 0.6, life: 0.6, spread: 1.1, rise: 0.9 });
+        player.mesh.position.y = swimY;
+      } else if (this.insideShop) {
+        // player.update()'s ground clamp assumes the outdoor y=0 floor and
+        // would otherwise snap the player straight back up out of the
+        // interior every frame — re-pin to the interior's actual floor
+        // level instead (grounded/velocityY bookkeeping being "wrong" while
+        // inside doesn't matter; nothing there reads it).
+        player.mesh.position.y = this.insideShop.interior.entryPoint.y;
+      } else if (player.grounded) {
+        player.mesh.position.y = THREE.MathUtils.lerp(0, swimY, swimDepth);
       }
+      this._wasSwimming = isSwimming;
       if (player.state === PlayerState.RUNNING) weaponSystem.addBloom(dt * 0.6);
 
       const targets = [

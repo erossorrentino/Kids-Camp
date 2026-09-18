@@ -2,6 +2,10 @@ import { Vehicle } from '../vehicle.js';
 
 const BRAKE_DISTANCE = 9;
 const COLORS = [0x2255aa, 0xaaaaaa, 0xcc8822, 0x224422, 0x882222, 0xdddddd];
+// Weighted toward sedans (still the most common car on the road) but with
+// wagons/minivans/pickups in the mix so ambient traffic doesn't read as one
+// car copy-pasted down every street.
+const BODY_TYPES = ['sedan', 'sedan', 'sedan', 'wagon', 'minivan', 'pickup'];
 
 // Ambient traffic: shuttles back and forth along its home chunk's road lane,
 // braking to a stop if another vehicle (traffic or the player's) is ahead.
@@ -12,6 +16,7 @@ export class TrafficAI {
     this.vehicle = new Vehicle(scene, {
       position: lane.from.clone(),
       color: COLORS[Math.floor(Math.random() * COLORS.length)],
+      bodyType: BODY_TYPES[Math.floor(Math.random() * BODY_TYPES.length)],
     });
     // `occupied` stays false: it gates only the player-input `update()` path,
     // not `driveTowards()`, and false lets the player carjack this vehicle

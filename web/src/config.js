@@ -22,6 +22,7 @@ export const PLAYER = {
   height: 1.8,
   walkSpeed: 3.2,
   runSpeed: 6.4,
+  swimSpeed: 2.1,
   jumpVelocity: 6.5,
   gravity: 18,
   turnLerp: 10,

@@ -233,6 +233,259 @@ function buildCarMesh(color) {
   return { group, bodyMesh: tub, paintPanels, wheels, tailLights, neon, halfLength: HALF_LENGTH, halfWidth: HALF_WIDTH };
 }
 
+// Shared by the three "family vehicle" body types below: wheels/rims,
+// headlights, taillights and the neon underglow plane all look the same as
+// the sedan's, parameterized by the actual half-length/width so bigger
+// bodies get correctly spaced wheels instead of the sedan's fixed numbers.
+function buildRunningGear(group, color, halfLength, halfWidth, wheelZOffset, tubY, tubH) {
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.5, metalness: 0.4 });
+  const wheels = [];
+  const wheelGeo = new THREE.CylinderGeometry(0.4, 0.4, 0.32, 14);
+  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
+  const wheelPositions = [
+    [-halfWidth - 0.06, 0.42, halfLength - wheelZOffset], [halfWidth + 0.06, 0.42, halfLength - wheelZOffset],
+    [-halfWidth - 0.06, 0.42, -halfLength + wheelZOffset], [halfWidth + 0.06, 0.42, -halfLength + wheelZOffset],
+  ];
+  wheelPositions.forEach(([x, y, z], i) => {
+    const w = new THREE.Mesh(wheelGeo, wheelMat);
+    w.rotation.z = Math.PI / 2;
+    w.position.set(x, y, z);
+    w.castShadow = true;
+    group.add(w);
+    const rim = buildRim(0.22, new THREE.MeshStandardMaterial({ map: spokeTexture, roughness: 0.4, metalness: 0.7 }));
+    rim.rotation.z = Math.PI / 2;
+    rim.position.set(x + (x < 0 ? 0.11 : -0.11), y, z);
+    group.add(rim);
+    wheels.push({ mesh: w, front: i < 2 });
+  });
+
+  const headlightGeo = new THREE.BoxGeometry(0.32, 0.13, 0.05);
+  const headlightMat = new THREE.MeshStandardMaterial({ color: 0xfff6d8, emissive: 0xfff2b0, emissiveIntensity: 1.6, roughness: 0.3 });
+  for (const s of [-1, 1]) {
+    const hl = new THREE.Mesh(headlightGeo, headlightMat);
+    hl.position.set(s * (halfWidth - 0.3), tubY + 0.06, halfLength - 0.01);
+    group.add(hl);
+  }
+
+  const tailLightMat = new THREE.MeshStandardMaterial({ color: 0x330000, emissive: 0xaa1010, emissiveIntensity: 1.2, roughness: 0.4 });
+  const tailLightGeo = new THREE.BoxGeometry(halfWidth * 0.7, 0.16, 0.05);
+  const tailLights = new THREE.Group();
+  tailLights.material = tailLightMat;
+  for (const s of [-1, 1]) {
+    const tl = new THREE.Mesh(tailLightGeo, tailLightMat);
+    tl.position.set(s * halfWidth * 0.55, tubY + 0.1, -halfLength + 0.02);
+    tailLights.add(tl);
+  }
+  group.add(tailLights);
+
+  const neon = new THREE.Mesh(
+    new THREE.PlaneGeometry(halfWidth * 2.6, halfLength * 2.6),
+    new THREE.MeshBasicMaterial({ color: 0x00eaff, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false })
+  );
+  neon.rotation.x = -Math.PI / 2;
+  neon.position.y = 0.05;
+  neon.visible = false;
+  group.add(neon);
+
+  const bumperFront = new THREE.Mesh(new THREE.BoxGeometry(halfWidth * 2.05, 0.24, 0.12), trimMat);
+  bumperFront.position.set(0, tubY - tubH / 2 + 0.1, halfLength - 0.02);
+  group.add(bumperFront);
+  const bumperRear = bumperFront.clone();
+  bumperRear.position.z = -halfLength + 0.02;
+  group.add(bumperRear);
+
+  return { wheels, tailLights, neon };
+}
+
+// A tall, boxy people-mover: short hood, a nearly-full-length flat roof, and
+// a sliding-door accent line instead of the sedan's coupe-style tapering.
+function buildMinivanMesh(color) {
+  const group = new THREE.Group();
+  const halfLength = 2.35, halfWidth = 1.02;
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0x0c1620, roughness: 0.08, metalness: 0.4, transparent: true, opacity: 0.55 });
+  const paintMat = new THREE.MeshPhysicalMaterial({ color, roughness: 0.4, metalness: 0.55, clearcoat: 1, clearcoatRoughness: 0.12 });
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.5, metalness: 0.4 });
+  const paintPanels = [];
+
+  const TUB_H = 1.15, TUB_Y = 0.75;
+  const tub = new THREE.Mesh(new THREE.BoxGeometry(halfWidth * 2, TUB_H, halfLength * 1.86), paintMat);
+  tub.position.y = TUB_Y;
+  tub.castShadow = true;
+  group.add(tub);
+  paintPanels.push(tub);
+
+  // short, steep hood — minivans have almost no nose
+  const hood = new THREE.Mesh(new THREE.BoxGeometry(halfWidth * 1.85, 0.4, halfLength * 0.22), paintMat);
+  hood.position.set(0, TUB_Y - TUB_H * 0.18, halfLength * 0.9);
+  hood.castShadow = true;
+  group.add(hood);
+  paintPanels.push(hood);
+
+  const windshield = new THREE.Mesh(new THREE.BoxGeometry(halfWidth * 1.8, 0.55, 0.05), glassMat);
+  windshield.position.set(0, TUB_Y + TUB_H * 0.28, halfLength * 0.78);
+  windshield.rotation.x = -0.5;
+  group.add(windshield);
+
+  const sideGlassGeo = new THREE.BoxGeometry(0.04, TUB_H * 0.5, halfLength * 1.5);
+  for (const s of [-1, 1]) {
+    const sg = new THREE.Mesh(sideGlassGeo, glassMat);
+    sg.position.set(s * (halfWidth + 0.02), TUB_Y + TUB_H * 0.15, -halfLength * 0.1);
+    group.add(sg);
+    // sliding-door accent groove
+    const groove = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.03, halfLength * 1.2), trimMat);
+    groove.position.set(s * (halfWidth + 0.01), TUB_Y - TUB_H * 0.1, -halfLength * 0.05);
+    group.add(groove);
+  }
+
+  for (const s of [-1, 1]) {
+    const mirror = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.2), trimMat);
+    mirror.position.set(s * (halfWidth + 0.1), TUB_Y + TUB_H * 0.25, halfLength * 0.7);
+    group.add(mirror);
+  }
+
+  const grille = new THREE.Mesh(new THREE.BoxGeometry(halfWidth * 1.3, 0.3, 0.06), trimMat);
+  grille.position.set(0, TUB_Y - TUB_H * 0.3, halfLength - 0.02);
+  group.add(grille);
+
+  const { wheels, tailLights, neon } = buildRunningGear(group, color, halfLength, halfWidth, 0.72, TUB_Y, TUB_H);
+  return { group, bodyMesh: tub, paintPanels, wheels, tailLights, neon, halfLength, halfWidth };
+}
+
+// A sedan front half with the roofline stretched flat all the way to a
+// near-vertical tailgate instead of tapering into a separate trunk lid.
+function buildWagonMesh(color) {
+  const group = new THREE.Group();
+  const halfLength = 2.4, halfWidth = 1.05;
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0x0c1620, roughness: 0.08, metalness: 0.4, transparent: true, opacity: 0.55 });
+  const paintMat = new THREE.MeshPhysicalMaterial({ color, roughness: 0.32, metalness: 0.65, clearcoat: 1, clearcoatRoughness: 0.08 });
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.5, metalness: 0.4 });
+  const paintPanels = [];
+
+  const TUB_H = 0.6, TUB_Y = 0.62;
+  const tub = new THREE.Mesh(new THREE.BoxGeometry(halfWidth * 2, TUB_H, halfLength * 1.9), paintMat);
+  tub.position.y = TUB_Y;
+  tub.castShadow = true;
+  group.add(tub);
+  paintPanels.push(tub);
+
+  // roof spans from just behind the hood all the way to the tail
+  const roofH = 0.36;
+  const roof = new THREE.Mesh(new THREE.BoxGeometry(halfWidth * 1.7, roofH, halfLength * 1.5), paintMat);
+  roof.position.set(0, TUB_Y + TUB_H / 2 + roofH / 2, -halfLength * 0.12);
+  roof.castShadow = true;
+  group.add(roof);
+  paintPanels.push(roof);
+
+  const hood = new THREE.Mesh(new THREE.BoxGeometry(halfWidth * 1.9, 0.3, halfLength * 0.42), paintMat);
+  hood.position.set(0, TUB_Y + TUB_H * 0.2, halfLength * 0.72);
+  hood.rotation.x = 0.08;
+  hood.castShadow = true;
+  group.add(hood);
+  paintPanels.push(hood);
+
+  const windshield = new THREE.Mesh(new THREE.BoxGeometry(halfWidth * 1.7, 0.42, 0.04), glassMat);
+  windshield.position.set(0, TUB_Y + TUB_H / 2 + 0.16, halfLength * 0.48);
+  windshield.rotation.x = -0.42;
+  group.add(windshield);
+
+  // near-vertical tailgate glass instead of a raked rear window
+  const tailgateGlass = new THREE.Mesh(new THREE.BoxGeometry(halfWidth * 1.6, roofH * 1.6, 0.05), glassMat);
+  tailgateGlass.position.set(0, TUB_Y + 0.2, -halfLength + 0.05);
+  tailgateGlass.rotation.x = 0.12;
+  group.add(tailgateGlass);
+
+  const sideGlassGeo = new THREE.BoxGeometry(0.04, 0.32, halfLength * 1.3);
+  for (const s of [-1, 1]) {
+    const sg = new THREE.Mesh(sideGlassGeo, glassMat);
+    sg.position.set(s * (halfWidth * 0.86 + 0.02), TUB_Y + TUB_H / 2 + 0.08, -halfLength * 0.1);
+    group.add(sg);
+    const mirror = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.2), trimMat);
+    mirror.position.set(s * (halfWidth + 0.1), TUB_Y + TUB_H / 2 - 0.1, halfLength * 0.42);
+    group.add(mirror);
+  }
+
+  const grille = new THREE.Mesh(new THREE.BoxGeometry(halfWidth * 1.1, 0.16, 0.06), trimMat);
+  grille.position.set(0, TUB_Y - TUB_H / 2 + 0.28, halfLength - 0.02);
+  group.add(grille);
+
+  const { wheels, tailLights, neon } = buildRunningGear(group, color, halfLength, halfWidth, 0.7, TUB_Y, TUB_H);
+  return { group, bodyMesh: tub, paintPanels, wheels, tailLights, neon, halfLength, halfWidth };
+}
+
+// A cab up front and an open, walled cargo bed at the rear instead of a
+// trunk — the bed floor sits noticeably lower than the cab floor, the way a
+// real truck's frame steps down behind the cabin.
+function buildPickupMesh(color) {
+  const group = new THREE.Group();
+  const halfLength = 2.6, halfWidth = 1.08;
+  const glassMat = new THREE.MeshStandardMaterial({ color: 0x0c1620, roughness: 0.08, metalness: 0.4, transparent: true, opacity: 0.55 });
+  const paintMat = new THREE.MeshPhysicalMaterial({ color, roughness: 0.35, metalness: 0.6, clearcoat: 1, clearcoatRoughness: 0.1 });
+  const bedMat = new THREE.MeshStandardMaterial({ color: 0x1c1e22, roughness: 0.8, metalness: 0.3 });
+  const trimMat = new THREE.MeshStandardMaterial({ color: 0x14161a, roughness: 0.5, metalness: 0.4 });
+  const paintPanels = [];
+
+  const cabLen = halfLength * 0.85;
+  const TUB_H = 0.62, TUB_Y = 0.68;
+  const cab = new THREE.Mesh(new THREE.BoxGeometry(halfWidth * 2, TUB_H, cabLen), paintMat);
+  cab.position.set(0, TUB_Y, halfLength - cabLen / 2 - 0.1);
+  cab.castShadow = true;
+  group.add(cab);
+  paintPanels.push(cab);
+
+  const roofH = 0.4;
+  const cabRoof = new THREE.Mesh(new THREE.BoxGeometry(halfWidth * 1.7, roofH, cabLen * 0.62), paintMat);
+  cabRoof.position.set(0, TUB_Y + TUB_H / 2 + roofH / 2, halfLength - cabLen * 0.62 - 0.1);
+  cabRoof.castShadow = true;
+  group.add(cabRoof);
+  paintPanels.push(cabRoof);
+
+  const windshield = new THREE.Mesh(new THREE.BoxGeometry(halfWidth * 1.6, 0.42, 0.04), glassMat);
+  windshield.position.set(0, TUB_Y + TUB_H / 2 + 0.16, halfLength - cabLen * 0.3);
+  windshield.rotation.x = -0.46;
+  group.add(windshield);
+
+  const rearGlass = new THREE.Mesh(new THREE.BoxGeometry(halfWidth * 1.6, 0.36, 0.04), glassMat);
+  rearGlass.position.set(0, TUB_Y + TUB_H / 2 + 0.1, halfLength - cabLen * 0.94);
+  rearGlass.rotation.x = 0.4;
+  group.add(rearGlass);
+
+  // open cargo bed: a floor + four short walls, sitting lower than the cab
+  const bedLen = halfLength * 2 - cabLen - 0.2;
+  const bedY = TUB_Y - TUB_H * 0.22;
+  const bedFloor = new THREE.Mesh(new THREE.BoxGeometry(halfWidth * 1.9, 0.12, bedLen), bedMat);
+  bedFloor.position.set(0, bedY - 0.2, halfLength - cabLen - bedLen / 2 - 0.15);
+  bedFloor.castShadow = true;
+  group.add(bedFloor);
+  const bedWallSide = new THREE.BoxGeometry(0.1, 0.42, bedLen);
+  for (const s of [-1, 1]) {
+    const wall = new THREE.Mesh(bedWallSide, paintMat);
+    wall.position.set(s * (halfWidth - 0.05), bedY, halfLength - cabLen - bedLen / 2 - 0.15);
+    group.add(wall);
+    paintPanels.push(wall);
+  }
+  const tailgate = new THREE.Mesh(new THREE.BoxGeometry(halfWidth * 1.9, 0.42, 0.1), paintMat);
+  tailgate.position.set(0, bedY, -halfLength + 0.1);
+  group.add(tailgate);
+  paintPanels.push(tailgate);
+
+  for (const s of [-1, 1]) {
+    const mirror = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.2), trimMat);
+    mirror.position.set(s * (halfWidth + 0.1), TUB_Y + TUB_H / 2 - 0.05, halfLength - cabLen * 0.3);
+    group.add(mirror);
+  }
+
+  const grille = new THREE.Mesh(new THREE.BoxGeometry(halfWidth * 1.3, 0.22, 0.06), trimMat);
+  grille.position.set(0, TUB_Y - TUB_H / 2 + 0.22, halfLength - 0.02);
+  group.add(grille);
+
+  const { wheels, tailLights, neon } = buildRunningGear(group, color, halfLength, halfWidth, 0.78, TUB_Y, TUB_H);
+  // taillights belong on the tailgate, not floating past it
+  tailLights.children.forEach((tl) => { tl.position.z = -halfLength + 0.16; });
+  return { group, bodyMesh: cab, paintPanels, wheels, tailLights, neon, halfLength, halfWidth };
+}
+
+const BODY_BUILDERS = { sedan: buildCarMesh, minivan: buildMinivanMesh, wagon: buildWagonMesh, pickup: buildPickupMesh };
+
 function buildBikeMesh(color) {
   const group = new THREE.Group();
   const body = new THREE.Mesh(
@@ -310,8 +563,8 @@ const PAINT_COLORS = [0xcc3333, 0x2255aa, 0x22aa55, 0xdddddd, 0x111111, 0xffcc00
 const NEON_OPTIONS = [null, 0x00eaff, 0xff00aa, 0x39ff14, 0xff2a2a, 0xffee00];
 
 export class Vehicle {
-  constructor(scene, { position = new THREE.Vector3(), color = 0xcc3333, isPlayerStarter = false, stats = VEHICLE, isBike = false } = {}) {
-    const built = isBike ? buildBikeMesh(color) : buildCarMesh(color);
+  constructor(scene, { position = new THREE.Vector3(), color = 0xcc3333, isPlayerStarter = false, stats = VEHICLE, isBike = false, bodyType = 'sedan' } = {}) {
+    const built = isBike ? buildBikeMesh(color) : (BODY_BUILDERS[bodyType] || buildCarMesh)(color);
     this.mesh = built.group;
     this.bodyMesh = built.bodyMesh;
     for (const panel of built.paintPanels || [this.bodyMesh]) {
@@ -324,6 +577,7 @@ export class Vehicle {
     this.halfLength = built.halfLength;
     this.halfWidth = built.halfWidth;
     this.isBike = isBike;
+    this.bodyType = bodyType;
     this.stats = stats;
 
     this.mesh.position.copy(position);
