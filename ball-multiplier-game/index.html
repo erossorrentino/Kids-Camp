@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ball Multiplier Merge</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%92%B0%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>💰 Ball Multiplier Merge</h1>
+    <div class="money-display" id="moneyDisplay">$0</div>
+  </header>
+
+  <main class="layout">
+    <section class="board-panel">
+      <div class="board-wrap">
+        <div class="path-marker start-marker" id="startMarker">▶ START</div>
+        <div class="board" id="board"></div>
+        <div class="path-marker end-marker" id="endMarker">💵 CASH OUT</div>
+      </div>
+      <p class="hint" id="hint">Tap a multiplier below, then tap an empty slot to place it. Get 3 of the same to merge into a better one!</p>
+    </section>
+
+    <aside class="side-panel">
+      <div class="panel upgrades-panel">
+        <h2>⚙️ Upgrades</h2>
+        <div class="upgrade-row" id="upgradeSpeed">
+          <div class="upgrade-info">
+            <div class="upgrade-title">Ball Speed</div>
+            <div class="upgrade-sub" id="speedSub">Level 0</div>
+          </div>
+          <button class="buy-btn" id="buySpeed">Buy<br><span></span></button>
+        </div>
+        <div class="upgrade-row" id="upgradeValue">
+          <div class="upgrade-info">
+            <div class="upgrade-title">Starting Value</div>
+            <div class="upgrade-sub" id="valueSub">Level 0</div>
+          </div>
+          <button class="buy-btn" id="buyValue">Buy<br><span></span></button>
+        </div>
+      </div>
+
+      <div class="panel shop-panel">
+        <h2>🛒 Chest Shop</h2>
+        <div class="chest-list" id="chestList"></div>
+      </div>
+
+      <div class="panel tray-panel">
+        <h2>🎒 Your Multipliers</h2>
+        <div class="tray" id="tray"></div>
+      </div>
+    </aside>
+  </main>
+
+  <div class="toast-stack" id="toastStack"></div>
+
+  <script src="game.js"></script>
+</body>
+</html>

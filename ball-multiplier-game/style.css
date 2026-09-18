@@ -1,0 +1,335 @@
+:root {
+  --bg: #1b1032;
+  --panel: #2a1a4a;
+  --panel-2: #35225c;
+  --accent: #ffd700;
+  --text: #f4eeff;
+  --muted: #b7a9d9;
+  --slot-empty: #3d2a63;
+  --slot-border: #5b3f92;
+  --good: #7ee787;
+  --bad: #ff6b6b;
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at top, #2b1a52 0%, var(--bg) 60%);
+  color: var(--text);
+  padding-bottom: 40px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 24px;
+  background: linear-gradient(180deg, #2f1c58, #1b1032);
+  border-bottom: 3px solid var(--accent);
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.topbar h1 {
+  font-size: 1.4rem;
+  margin: 0;
+}
+
+.money-display {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--accent);
+  text-shadow: 0 0 8px rgba(255, 215, 0, 0.5);
+}
+
+.layout {
+  display: flex;
+  gap: 20px;
+  padding: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.board-panel {
+  flex: 2 1 480px;
+  min-width: 320px;
+}
+
+.board-wrap {
+  position: relative;
+  background: var(--panel);
+  border-radius: 16px;
+  padding: 60px 20px;
+  border: 2px solid var(--slot-border);
+}
+
+.board {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  gap: 14px;
+  min-height: 260px;
+}
+
+.path-marker {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--muted);
+  background: var(--panel-2);
+  padding: 4px 10px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.start-marker { top: 14px; }
+.end-marker { bottom: 14px; }
+
+.slot {
+  position: relative;
+  aspect-ratio: 1 / 1;
+  background: var(--slot-empty);
+  border: 2px dashed var(--slot-border);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  user-select: none;
+}
+
+.slot:hover {
+  transform: scale(1.05);
+}
+
+.slot.selectable {
+  box-shadow: 0 0 0 3px var(--good);
+}
+
+.slot .tile {
+  width: 88%;
+  height: 88%;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 1.1rem;
+  color: #1b1032;
+  border: 2px solid rgba(0,0,0,0.25);
+  box-shadow: inset 0 0 10px rgba(255,255,255,0.35);
+}
+
+.slot .tile.pulse {
+  animation: pulse 0.35s ease;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.25); }
+  100% { transform: scale(1); }
+}
+
+.ball {
+  position: absolute;
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fff6c9, var(--accent) 60%, #b8860b 100%);
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.6rem;
+  font-weight: 800;
+  color: #4a3200;
+  transform: translate(-50%, -50%);
+  z-index: 10;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.float-text {
+  position: absolute;
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: var(--good);
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  animation: floatUp 0.8s ease-out forwards;
+  z-index: 11;
+  white-space: nowrap;
+}
+
+.float-text.money {
+  color: var(--accent);
+  font-size: 1.1rem;
+}
+
+@keyframes floatUp {
+  0% { opacity: 1; transform: translate(-50%, -50%); }
+  100% { opacity: 0; transform: translate(-50%, -120%); }
+}
+
+.hint {
+  color: var(--muted);
+  font-size: 0.85rem;
+  text-align: center;
+  margin-top: 10px;
+}
+
+.side-panel {
+  flex: 1 1 300px;
+  min-width: 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.panel {
+  background: var(--panel);
+  border: 2px solid var(--slot-border);
+  border-radius: 16px;
+  padding: 14px 16px;
+}
+
+.panel h2 {
+  margin: 0 0 10px;
+  font-size: 1.05rem;
+}
+
+.upgrade-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 0;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+.upgrade-row:first-of-type { border-top: none; }
+
+.upgrade-title { font-weight: 700; }
+.upgrade-sub { color: var(--muted); font-size: 0.8rem; }
+
+.buy-btn {
+  background: linear-gradient(180deg, #6ee787, #3fae5a);
+  border: none;
+  color: #063d17;
+  font-weight: 800;
+  border-radius: 10px;
+  padding: 6px 14px;
+  cursor: pointer;
+  line-height: 1.2;
+  font-size: 0.8rem;
+  min-width: 78px;
+}
+
+.buy-btn:disabled {
+  background: #4a4560;
+  color: #8b85a3;
+  cursor: not-allowed;
+}
+
+.chest-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.chest-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel-2);
+  border-radius: 12px;
+  padding: 8px 10px;
+}
+
+.chest-emoji { font-size: 1.8rem; }
+
+.chest-info { flex: 1; }
+.chest-name { font-weight: 700; font-size: 0.9rem; }
+.chest-odds { color: var(--muted); font-size: 0.7rem; }
+
+.tray {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-height: 60px;
+}
+
+.tray-empty {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.tray-tile {
+  width: 52px;
+  height: 52px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  color: #1b1032;
+  cursor: pointer;
+  border: 2px solid rgba(0,0,0,0.25);
+  box-shadow: inset 0 0 8px rgba(255,255,255,0.35);
+  transition: transform 0.12s ease;
+}
+
+.tray-tile.selected {
+  outline: 3px solid var(--good);
+  transform: scale(1.08);
+}
+
+.toast-stack {
+  position: fixed;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 50;
+}
+
+.toast {
+  background: #16102a;
+  border: 2px solid var(--accent);
+  color: var(--text);
+  padding: 8px 16px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  animation: toastIn 0.2s ease, toastOut 0.4s ease 2.6s forwards;
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes toastOut {
+  to { opacity: 0; transform: translateY(-10px); }
+}
+
+@media (max-width: 700px) {
+  .board {
+    grid-template-columns: repeat(5, 1fr);
+  }
+  .slot .tile { font-size: 0.8rem; }
+  .topbar h1 { font-size: 1.1rem; }
+}
