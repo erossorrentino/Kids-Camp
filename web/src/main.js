@@ -41,6 +41,10 @@ startBtn.addEventListener('click', () => {
     window.__game = game; // handy for poking at live state from the devtools console
     game.start();
     overlay.classList.add('hidden');
+    // The "rotate to landscape" suggestion (see style.css) is only useful
+    // before play starts; once in-game the touch controls already lay out
+    // fine in portrait, so it'd just be a stray label sitting over the HUD.
+    document.getElementById('rotateHint').style.display = 'none';
     game.audio.resume();
     if (!isTouchDevice) {
       // Best-effort: a sandboxed embed (e.g. this game running as a Claude

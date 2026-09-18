@@ -7,9 +7,15 @@
 // misreport inside some embedded/WebView contexts, and getting this wrong
 // means TouchControls never shows up and a touch-only player has no way to
 // move at all, so every check below is deliberately an OR (permissive),
-// never the sole source of truth.
+// never the sole source of truth. The narrow-viewport check is the most
+// important one in practice: it catches phones even when every touch-
+// capability API above misreports (seen when this game runs embedded as a
+// Claude Artifact on mobile) — a real desktop window is essentially never
+// this narrow, so showing the on-screen controls there is a harmless,
+// vanishingly rare false positive rather than a broken phone.
 export const isTouchDevice = ('ontouchstart' in window) || navigator.maxTouchPoints > 0
-  || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches);
+  || (window.matchMedia && window.matchMedia('(pointer: coarse)').matches)
+  || (window.matchMedia && window.matchMedia('(max-width: 820px)').matches);
 
 // Arrow keys are the primary movement scheme (plus Space); WASD keeps
 // working too. This is NOT a blanket alias on isDown() — the jet already

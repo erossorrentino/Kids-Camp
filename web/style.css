@@ -291,13 +291,19 @@ html, body {
   #titleWrap h1 { font-size: 40px; }
 }
 
+/* A suggestion, never a block: pointer-events:none so this can NEVER
+   intercept a tap even while shown — it used to be a full opaque screen
+   that swallowed every touch underneath it (including the START button
+   and every touch control), which made the game untappable on a phone
+   held the normal way. Now it's a small non-interactive banner. */
 #rotateHint {
-  display: none; position: fixed; inset: 0; z-index: 20; background: #05070a; color: #ffd23f;
-  align-items: center; justify-content: center; text-align: center; font-size: 22px;
-  padding: 32px; font-weight: 700;
+  display: none; position: fixed; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%);
+  z-index: 20; pointer-events: none; background: rgba(5,7,10,0.88); color: #ffd23f;
+  text-align: center; font-size: 13px; font-weight: 700;
+  padding: 8px 16px; border-radius: 8px; max-width: calc(100vw - 32px);
 }
 @media (pointer: coarse) and (orientation: portrait) {
-  #rotateHint { display: flex; }
+  #rotateHint { display: block; }
 }
 
 /* --- touch controls ------------------------------------------------- */

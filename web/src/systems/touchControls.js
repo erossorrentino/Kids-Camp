@@ -52,8 +52,16 @@ export class TouchControls {
     if (isTouchDevice) {
       this.el.container.classList.add('show');
     } else {
+      // isTouchDevice (input.js) now also catches narrow/phone-sized
+      // viewports, so this only matters for an unusual case it still
+      // misses (e.g. a touch tablet in a wide landscape). Reveal on the
+      // very first real touch, anywhere — classList.add is idempotent, so
+      // it's safe to leave this listening indefinitely rather than
+      // `once: true`, in case the first touch that lands is one this
+      // listener somehow misses (a defensive belt-and-suspenders).
       const revealOnRealTouch = () => this.el.container.classList.add('show');
-      window.addEventListener('touchstart', revealOnRealTouch, { passive: true, once: true });
+      window.addEventListener('touchstart', revealOnRealTouch, { passive: true });
+      document.addEventListener('touchstart', revealOnRealTouch, { passive: true, capture: true });
     }
   }
 
