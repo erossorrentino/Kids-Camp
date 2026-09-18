@@ -1,19 +1,20 @@
 # Ball Multiplier Merge
 
 A browser mini-game: money balls drop from the top of a Plinko-style
-board, pass through a colored starting wall, then bounce off pegs and
-multiplier slots spread across the whole board before cashing out at
-the bottom. Merge 3 identical multipliers to upgrade them, and spend
-your earnings in the chest shop or on upgrades.
+board, pass through 3 stacked colored starting walls, then bounce off
+pegs and multiplier slots spread across the whole board before cashing
+out at the bottom. Merge 3 identical multipliers to upgrade them, and
+spend your earnings in the chest shop or on upgrades.
 
 ## How to play
 
 - Balls drop out of one or more launch lanes at the top of the board.
-  Every ball starts at **$1.10** and immediately passes through the
-  **Starting Wall** — a colored band that adds bonus cash. The wall's
-  color and dollar amount scale with its upgrade level (buy it in the
-  panel above the board).
-- After the wall, the ball bounces down through a field of pegs, like
+  Every ball starts at **$1.10** and immediately passes through all
+  **3 Starting Walls** — colored bands that each add their own bonus
+  cash, every lane's balls passing through the same 3 walls. Each
+  wall's color and dollar amount scale with its own upgrade level (buy
+  them independently in the panel above the board).
+- After the walls, the ball bounces down through a field of pegs, like
   Plinko — where it lands and which of the 10 multiplier slots it
   happens to hit is physics-driven, not fixed.
 - Any slot holding a multiplier tile (×2, ×3, ×5, ... up to ×200)
@@ -52,6 +53,9 @@ lib/matter.min.js  Vendored Matter.js physics engine (MIT, see lib/matter-js-LIC
 ```
 
 The Plinko board runs on [Matter.js](https://brm.io/matter-js/) for
-gravity and peg/ball collisions; everything — launch lanes, the
-starting wall, pegs, slots, and balls — is drawn on a single
-`<canvas>` each frame based on the physics engine's body positions.
+gravity and peg/ball collisions; everything — launch lanes, the 3
+starting walls, pegs, slots, and balls — is drawn on a single
+`<canvas>` each frame based on the physics engine's body positions. A
+ball that lands in a locally-symmetric dead spot in the peg field is
+periodically nudged (and, as a last resort, force-cashed-out after 20s)
+so nothing ever gets stuck for good.

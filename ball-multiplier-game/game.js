@@ -27,13 +27,22 @@ const CHESTS = [
 
 const SELL_VALUE = TIERS.map(t => Math.round(t.mult * 15));
 const TRAY_MAX = 15;
-const SAVE_KEY = 'ballMultiplierMergeSave.v3';
+const SAVE_KEY = 'ballMultiplierMergeSave.v4';
 const BASE_START = 1.1;
+
+// Every lane's ball passes through all 3 of these stacked starting walls,
+// each with its own upgrade level, color ramp, and cash bonus.
+const WALL_DEFS = [
+  { name: 'Wall 1', baseCost: 40,   costMult: 1.55, amtBase: 0.6, amtMult: 1.35, hueBase: 130 },
+  { name: 'Wall 2', baseCost: 300,  costMult: 1.6,  amtBase: 2,   amtMult: 1.4,  hueBase: 250 },
+  { name: 'Wall 3', baseCost: 2000, costMult: 1.65, amtBase: 8,   amtMult: 1.45, hueBase: 15 },
+];
+const WALL_COUNT = WALL_DEFS.length;
 
 /* ---------- Plinko board layout (fixed internal resolution) ---------- */
 
 const BOARD_W = 640;
-const BOARD_H = 760;
+const BOARD_H = 820;
 const PEG_RADIUS = 5;
 const SLOT_RADIUS = 26;
 const BALL_RADIUS = 17;
@@ -43,12 +52,19 @@ const MAX_LANES = 5;
 const LANE_X = [90, 205, 320, 435, 550];
 const LANE_UNLOCK_ORDER = [2, 1, 3, 0, 4]; // center lane unlocks first, then outward
 
-const WALL_Y = 104;
-const WALL_HEIGHT = 36;
+const WALL_Y_LIST = [72, 120, 168];
+const WALL_HEIGHT = 32;
 
 const CASH_BAR_HEIGHT = 40;
-const PLAY_TOP = 150;
+const PLAY_TOP = 205;
 const PLAY_BOTTOM = BOARD_H - CASH_BAR_HEIGHT;
+
+// A ball resting in a locally-symmetric spot in the peg field can stall
+// indefinitely with zero net force; periodically nudge it and, as a last
+// resort, force it to cash out so no ball is ever lost for good.
+const STALL_CHECK_MS = 500;
+const STALL_PROGRESS_PX = 12;
+const MAX_FALL_MS = 20000;
 
 // Multiplier slots spread out across the whole peg field, not confined to one row.
 const SLOT_FRACS = [
@@ -95,7 +111,7 @@ const PEGS = buildPegs().filter(
 let state = {
   money: 0,
   spawnLevel: 0,
-  valueLevel: 0,
+  valueLevels: new Array(WALL_COUNT).fill(0),
   slots: new Array(SLOT_COUNT).fill(null),
   tray: [],
 };
@@ -109,7 +125,7 @@ let engine = null;
 let balls = [];
 const slotPulses = new Array(SLOT_COUNT).fill(-9999);
 const lastSpawnPerLane = new Array(MAX_LANES).fill(0);
-let wallPulse = -9999;
+const wallPulses = new Array(WALL_COUNT).fill(-9999);
 let floatTexts = [];
 
 /* ---------- Persistence ---------- */
@@ -128,7 +144,11 @@ function load() {
     if (!parsed || typeof parsed !== 'object') return;
     state.money = Number(parsed.money) || 0;
     state.spawnLevel = Number(parsed.spawnLevel) || 0;
-    state.valueLevel = Number(parsed.valueLevel) || 0;
+    if (Array.isArray(parsed.valueLevels)) {
+      state.valueLevels = new Array(WALL_COUNT)
+        .fill(0)
+        .map((_, i) => Math.max(0, Number(parsed.valueLevels[i]) || 0));
+    }
     if (Array.isArray(parsed.slots) && parsed.slots.length === SLOT_COUNT) {
       state.slots = parsed.slots.map(v => (v === null ? null : Math.max(0, Math.min(MAX_TIER, v))));
     }
@@ -157,20 +177,22 @@ function activeLanes() {
   return LANE_UNLOCK_ORDER.slice(0, laneCount());
 }
 
-function startValue() {
-  return round2(BASE_START * Math.pow(1.45, state.valueLevel));
+function wallBonus(i) {
+  const level = state.valueLevels[i];
+  if (level <= 0) return 0;
+  const def = WALL_DEFS[i];
+  return round2(def.amtBase * Math.pow(def.amtMult, level - 1));
 }
-function wallBonus() {
-  return round2(startValue() - BASE_START);
+function wallCost(i) {
+  const def = WALL_DEFS[i];
+  return Math.round(def.baseCost * Math.pow(def.costMult, state.valueLevels[i]));
 }
-function wallColor(level) {
+function wallColor(i) {
+  const level = state.valueLevels[i];
   if (level <= 0) return '#5b3f92';
-  return `hsl(${(level * 47) % 360}, 70%, 60%)`;
+  const def = WALL_DEFS[i];
+  return `hsl(${(def.hueBase + level * 23) % 360}, 70%, 60%)`;
 }
-function valueUpgradeCost() {
-  return Math.round(40 * Math.pow(1.6, state.valueLevel));
-}
-
 function fmt(n) {
   if (n < 1000) {
     return Number.isInteger(n) ? n.toString() : n.toFixed(2);
@@ -204,9 +226,9 @@ const els = {
   hint: document.getElementById('hint'),
   speedSub: document.getElementById('speedSub'),
   buySpeed: document.getElementById('buySpeed'),
-  wallSub: document.getElementById('wallSub'),
-  wallSwatch: document.getElementById('wallSwatch'),
-  buyValue: document.getElementById('buyValue'),
+  wallSubs: [0, 1, 2].map(i => document.getElementById('wallSub' + i)),
+  wallSwatches: [0, 1, 2].map(i => document.getElementById('wallSwatch' + i)),
+  buyWalls: [0, 1, 2].map(i => document.getElementById('buyWall' + i)),
   chestList: document.getElementById('chestList'),
   storageGrid: document.getElementById('storageGrid'),
   storageActions: document.getElementById('storageActions'),
@@ -230,15 +252,17 @@ function renderSpeedUpgrade() {
   els.buySpeed.disabled = state.money < cost;
 }
 
-function renderWallUpgrade() {
-  const lvl = state.valueLevel;
-  els.wallSub.textContent = lvl === 0
-    ? `Level 0 — balls start at $${BASE_START.toFixed(2)}`
-    : `Level ${lvl} — +$${fmt(wallBonus())} (balls start at $${fmt(startValue())})`;
-  els.wallSwatch.style.background = wallColor(lvl);
-  const cost = valueUpgradeCost();
-  els.buyValue.querySelector('span').textContent = '$' + fmt(cost);
-  els.buyValue.disabled = state.money < cost;
+function renderWallUpgrades() {
+  for (let i = 0; i < WALL_COUNT; i++) {
+    const lvl = state.valueLevels[i];
+    els.wallSubs[i].textContent = lvl === 0
+      ? 'Level 0 — no bonus yet'
+      : `Level ${lvl} — +$${fmt(wallBonus(i))}`;
+    els.wallSwatches[i].style.background = wallColor(i);
+    const cost = wallCost(i);
+    els.buyWalls[i].querySelector('span').textContent = '$' + fmt(cost);
+    els.buyWalls[i].disabled = state.money < cost;
+  }
 }
 
 function renderChests() {
@@ -294,7 +318,7 @@ function renderStorage() {
 function renderAll() {
   renderMoney();
   renderSpeedUpgrade();
-  renderWallUpgrade();
+  renderWallUpgrades();
   renderChests();
   renderStorage();
 }
@@ -449,11 +473,11 @@ function buySpeedUpgrade() {
   save();
 }
 
-function buyValueUpgrade() {
-  const cost = valueUpgradeCost();
+function buyWallUpgrade(i) {
+  const cost = wallCost(i);
   if (state.money < cost) return;
   state.money -= cost;
-  state.valueLevel++;
+  state.valueLevels[i]++;
   renderAll();
   save();
 }
@@ -516,6 +540,7 @@ function onCollisionStart(event) {
 
 function spawnBallAtLane(laneIndex) {
   const x = LANE_X[laneIndex] + (Math.random() - 0.5) * 14;
+  const now = performance.now();
   const body = Matter.Bodies.circle(x, LANE_Y, BALL_RADIUS, {
     restitution: 0.6,
     friction: 0.02,
@@ -523,7 +548,15 @@ function spawnBallAtLane(laneIndex) {
     density: 0.0025,
   });
   body.isGameBall = true;
-  body.gameData = { value: BASE_START, hitSlots: new Set(), wallApplied: false };
+  body.gameData = {
+    value: BASE_START,
+    hitSlots: new Set(),
+    wallHit: new Array(WALL_COUNT).fill(false),
+    spawnTime: now,
+    checkY: LANE_Y,
+    nextCheck: now + STALL_CHECK_MS,
+    stallCount: 0,
+  };
   Matter.Composite.add(engine.world, body);
   balls.push(body);
 }
@@ -587,33 +620,39 @@ function drawLanes(now) {
   }
 }
 
-function drawWall(now) {
+function drawWalls(now) {
   const marginX = BOARD_W * 0.06;
   const w = BOARD_W - marginX * 2;
   const x = marginX;
-  const y = WALL_Y - WALL_HEIGHT / 2;
-  const pulseT = now - wallPulse;
-  const glow = pulseT < 250 ? 1 - pulseT / 250 : 0;
 
-  ctx.save();
-  ctx.fillStyle = wallColor(state.valueLevel);
-  ctx.shadowColor = wallColor(state.valueLevel);
-  ctx.shadowBlur = 8 + glow * 20;
-  roundRect(ctx, x, y, w, WALL_HEIGHT, 10);
-  ctx.fill();
-  ctx.restore();
+  for (let i = 0; i < WALL_COUNT; i++) {
+    const wallY = WALL_Y_LIST[i];
+    const y = wallY - WALL_HEIGHT / 2;
+    const pulseT = now - wallPulses[i];
+    const glow = pulseT < 250 ? 1 - pulseT / 250 : 0;
+    const color = wallColor(i);
 
-  ctx.lineWidth = 2;
-  ctx.strokeStyle = 'rgba(0,0,0,0.35)';
-  roundRect(ctx, x, y, w, WALL_HEIGHT, 10);
-  ctx.stroke();
+    ctx.save();
+    ctx.fillStyle = color;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 6 + glow * 18;
+    roundRect(ctx, x, y, w, WALL_HEIGHT, 9);
+    ctx.fill();
+    ctx.restore();
 
-  ctx.fillStyle = '#1b1032';
-  ctx.font = '800 15px Segoe UI, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  const label = state.valueLevel === 0 ? `BASE $${BASE_START.toFixed(2)}` : `+$${fmt(wallBonus())}`;
-  ctx.fillText(label, BOARD_W / 2, WALL_Y + 1);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = 'rgba(0,0,0,0.35)';
+    roundRect(ctx, x, y, w, WALL_HEIGHT, 9);
+    ctx.stroke();
+
+    ctx.fillStyle = '#1b1032';
+    ctx.font = '800 14px Segoe UI, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    const bonus = wallBonus(i);
+    const label = bonus === 0 ? WALL_DEFS[i].name : `+$${fmt(bonus)}`;
+    ctx.fillText(label, BOARD_W / 2, wallY + 1);
+  }
 }
 
 function roundRect(c, x, y, w, h, r) {
@@ -636,10 +675,10 @@ function draw(now) {
   ctx.font = '700 12px Segoe UI, sans-serif';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'alphabetic';
-  ctx.fillText('▼ DROP ZONE ▼', BOARD_W / 2, 56);
+  ctx.fillText('▼ DROP ZONE ▼', BOARD_W / 2, 44);
 
   drawLanes(now);
-  drawWall(now);
+  drawWalls(now);
 
   ctx.fillStyle = '#5b3f92';
   PEGS.forEach(p => {
@@ -740,25 +779,46 @@ function gameLoop(now) {
   let uiDirty = false;
   for (let i = balls.length - 1; i >= 0; i--) {
     const ball = balls[i];
-    if (!ball.gameData.wallApplied && ball.position.y >= WALL_Y) {
-      ball.gameData.wallApplied = true;
-      const bonus = wallBonus();
+    for (let w = 0; w < WALL_COUNT; w++) {
+      if (ball.gameData.wallHit[w] || ball.position.y < WALL_Y_LIST[w]) continue;
+      ball.gameData.wallHit[w] = true;
+      const bonus = wallBonus(w);
       if (bonus > 0) {
         ball.gameData.value += bonus;
-        floatTexts.push({ x: ball.position.x, y: WALL_Y - 6, text: '+$' + fmt(bonus), color: '#fff6c9', start: now });
+        floatTexts.push({ x: ball.position.x, y: WALL_Y_LIST[w] - 6, text: '+$' + fmt(bonus), color: '#fff6c9', start: now });
       }
-      wallPulse = now;
+      wallPulses[w] = now;
     }
-    if (ball.position.y - BALL_RADIUS > BOARD_H) {
+
+    if (ball.position.y - BALL_RADIUS > BOARD_H || now - ball.gameData.spawnTime > MAX_FALL_MS) {
       cashOutBall(ball, now);
       balls.splice(i, 1);
       uiDirty = true;
+      continue;
+    }
+
+    // A ball can land in a locally-symmetric spot with zero net force and
+    // stall there forever; if it isn't making downward progress, nudge it.
+    if (now >= ball.gameData.nextCheck) {
+      const progressed = ball.position.y - ball.gameData.checkY > STALL_PROGRESS_PX;
+      if (progressed) {
+        ball.gameData.stallCount = 0;
+      } else {
+        ball.gameData.stallCount++;
+        const kick = 2 + ball.gameData.stallCount * 1.5;
+        Matter.Body.setVelocity(ball, {
+          x: (Math.random() - 0.5) * kick,
+          y: Math.max(ball.velocity.y, 0) + kick * 0.6,
+        });
+      }
+      ball.gameData.checkY = ball.position.y;
+      ball.gameData.nextCheck = now + STALL_CHECK_MS;
     }
   }
   if (uiDirty) {
     renderMoney();
     renderSpeedUpgrade();
-    renderWallUpgrade();
+    renderWallUpgrades();
     renderChests();
     save();
   }
@@ -775,7 +835,7 @@ function init() {
   setupPhysics();
   els.canvas.addEventListener('click', onCanvasClick);
   els.buySpeed.addEventListener('click', buySpeedUpgrade);
-  els.buyValue.addEventListener('click', buyValueUpgrade);
+  els.buyWalls.forEach((btn, i) => btn.addEventListener('click', () => buyWallUpgrade(i)));
   const interval = spawnInterval() * 1000;
   activeLanes().forEach((li, k) => {
     lastSpawnPerLane[li] = performance.now() - (k / MAX_LANES) * interval;

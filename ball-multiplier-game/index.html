@@ -16,18 +16,37 @@
   <main class="layout">
     <section class="board-panel">
       <div class="panel wall-panel">
-        <div class="wall-swatch" id="wallSwatch"></div>
-        <div class="upgrade-info">
-          <div class="upgrade-title">💵 Starting Wall</div>
-          <div class="upgrade-sub" id="wallSub">Level 0 — balls start at $1.10</div>
+        <h2>💵 Starting Walls</h2>
+        <div class="upgrade-row" id="wallRow0">
+          <div class="wall-swatch" id="wallSwatch0"></div>
+          <div class="upgrade-info">
+            <div class="upgrade-title">Wall 1</div>
+            <div class="upgrade-sub" id="wallSub0">Level 0</div>
+          </div>
+          <button class="buy-btn" id="buyWall0">Buy<br><span></span></button>
         </div>
-        <button class="buy-btn" id="buyValue">Buy<br><span></span></button>
+        <div class="upgrade-row" id="wallRow1">
+          <div class="wall-swatch" id="wallSwatch1"></div>
+          <div class="upgrade-info">
+            <div class="upgrade-title">Wall 2</div>
+            <div class="upgrade-sub" id="wallSub1">Level 0</div>
+          </div>
+          <button class="buy-btn" id="buyWall1">Buy<br><span></span></button>
+        </div>
+        <div class="upgrade-row" id="wallRow2">
+          <div class="wall-swatch" id="wallSwatch2"></div>
+          <div class="upgrade-info">
+            <div class="upgrade-title">Wall 3</div>
+            <div class="upgrade-sub" id="wallSub2">Level 0</div>
+          </div>
+          <button class="buy-btn" id="buyWall2">Buy<br><span></span></button>
+        </div>
       </div>
 
       <div class="board-wrap">
-        <canvas id="boardCanvas" width="640" height="760"></canvas>
+        <canvas id="boardCanvas" width="640" height="820"></canvas>
       </div>
-      <p class="hint" id="hint">Balls drop through the colored starting wall (brighter color = more starting cash), then bounce down through the pegs like Plinko. Select a multiplier from storage and tap an empty board slot to equip it — get 3 of the same to merge into a better one!</p>
+      <p class="hint" id="hint">Every lane drops balls through all 3 colored starting walls (brighter color = more starting cash), then they bounce down through the pegs like Plinko. Select a multiplier from storage and tap an empty board slot to equip it — get 3 of the same to merge into a better one!</p>
     </section>
 
     <aside class="side-panel">

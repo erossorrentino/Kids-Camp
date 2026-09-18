@@ -64,21 +64,19 @@ body {
 }
 
 .wall-panel {
-  display: flex;
-  align-items: center;
-  gap: 12px;
   margin-bottom: 12px;
 }
 
 .wall-swatch {
-  width: 40px;
-  height: 40px;
-  border-radius: 10px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
   border: 2px solid rgba(0,0,0,0.3);
-  box-shadow: inset 0 0 10px rgba(255,255,255,0.35);
+  box-shadow: inset 0 0 8px rgba(255,255,255,0.35);
   flex-shrink: 0;
   background: #5b3f92;
   transition: background 0.3s ease;
+  margin-right: 10px;
 }
 
 .wall-panel .upgrade-info { flex: 1; }
