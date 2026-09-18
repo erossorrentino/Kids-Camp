@@ -596,7 +596,9 @@ function onPointerDown(evt) {
   dragStart = p;
   dragMoved = false;
   heldBall = nearestBall(p);
-  if (els.canvas.setPointerCapture) els.canvas.setPointerCapture(evt.pointerId);
+  try {
+    if (els.canvas.setPointerCapture) els.canvas.setPointerCapture(evt.pointerId);
+  } catch (e) { /* capture is best-effort; window-level listeners below still catch release */ }
   evt.preventDefault();
 }
 
@@ -613,11 +615,24 @@ function onPointerUp(evt) {
   if (!heldBall && !dragMoved) {
     tapBoardSlot(pointerPos);
   }
+  releasePointer();
+}
+
+// A ball must never be stuck frozen at a held position forever. If the
+// browser fails to deliver pointerup/pointercancel to the canvas (pointer
+// released outside the window, tab switched mid-drag, capture not
+// supported), these catch-alls force the release so it drops again.
+function releasePointer() {
   heldBall = null;
   activePointerId = null;
   pointerPos = null;
   dragStart = null;
   dragMoved = false;
+}
+
+function onWindowPointerUp(evt) {
+  if (evt.pointerId !== activePointerId) return;
+  releasePointer();
 }
 
 /* ---------- Drawing ---------- */
@@ -873,6 +888,15 @@ function init() {
   els.canvas.addEventListener('pointermove', onPointerMove);
   els.canvas.addEventListener('pointerup', onPointerUp);
   els.canvas.addEventListener('pointercancel', onPointerUp);
+  // Safety nets: catch a release the canvas never sees (pointer let go
+  // outside the window, tab switched mid-drag) so a ball can't stay
+  // stuck in a held position forever.
+  window.addEventListener('pointerup', onWindowPointerUp);
+  window.addEventListener('pointercancel', onWindowPointerUp);
+  window.addEventListener('blur', releasePointer);
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) releasePointer();
+  });
   els.buySpeed.addEventListener('click', buySpeedUpgrade);
   els.buyWalls.forEach((btn, i) => btn.addEventListener('click', () => buyWallUpgrade(i)));
   const interval = spawnInterval() * 1000;
