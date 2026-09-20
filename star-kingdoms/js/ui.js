@@ -666,8 +666,9 @@
   /* --------------------------------------------------------- battle */
   UI.prototype.showBattle = function (on, title) {
     this.el.battle.classList.toggle('show', !!on);
-    if (title) this.el.battleTitle.textContent = title;
-
+    if (title) this.battleTitleText = title;
+    this.el.battleTitle.textContent = this.battleTitleText || '';
+    this.el.battleTitle.classList.remove('urgent');
   };
 
   UI.prototype.renderCards = function () { /* no cards: the army is already deployed */ };
@@ -684,6 +685,14 @@
     this.el.keepYouNum.textContent = Math.max(0, Math.ceil(b.homeKeep.hp));
     this.el.keepThemNum.textContent = Math.max(0, Math.ceil(b.enemyKeep.hp));
     this.el.keepThemLabel.textContent = b.isCitadel ? 'Their keep (optional)' : 'Enemy keep';
+    // Both armies gone: show the clock that is running down to a draw.
+    if (b.drawT != null && !b.result) {
+      this.el.battleTitle.textContent = 'Draw in ' + Math.max(0, Math.ceil(b.drawT));
+      this.el.battleTitle.classList.add('urgent');
+    } else if (this.el.battleTitle.classList.contains('urgent')) {
+      this.el.battleTitle.textContent = this.battleTitleText || '';
+      this.el.battleTitle.classList.remove('urgent');
+    }
     const boss = b.boss;
     this.el.bossRow.classList.toggle('show', !!boss);
     if (boss) {

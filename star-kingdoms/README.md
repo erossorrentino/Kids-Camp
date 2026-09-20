@@ -100,6 +100,13 @@ and you do not respawn: the camera lifts into the air and follows the
 fight while your army finishes it. Your soldiers are never permanently
 lost either, so a defeat costs nothing but time.
 
+**If everyone dies, it is a draw.** Armies are fixed and nothing
+reinforces them, so both sides can wipe each other out. Neither side can
+win that, so the battle ends in a draw: no coins, no territory, nothing
+lost. If you are still standing when the last soldier falls you get a
+twenty-second last stand to break their keep on your own, counted down in
+the HUD; go down during it and it settles at once.
+
 **Losing costs nothing.** A failed assault takes no coins, no territory
 and no soldiers. The result screen offers **Try again**, which drops you
 straight back in from the same approach. Territory you already hold is
@@ -258,7 +265,7 @@ js/props.js       scenery, kingdom architecture, territory keeps
 js/world.js       terrain, sky, weather, lighting, settlement
 js/fx.js          tracers, explosions, dust, damage numbers, health bars
 js/player.js      third-person controller, hover physics, camera, input
-js/battle.js      territory combat, unit AI, deployment, win/lose
+js/battle.js      territory combat, unit AI, win/lose/draw
 js/galaxy.js      flyable star system and planet travel
 js/bloom.js       HDR bloom post-processing
 js/ui.js          HUD, radar, kingdom and army consoles, results

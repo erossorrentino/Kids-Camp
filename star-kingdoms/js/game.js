@@ -36,7 +36,7 @@
       conquered: {},            // planet id -> true once its Warlord falls
       planet: 'verdania',
       appearance: { skin: APPEARANCES.skins[1], suit: 0x24467a, trim: 0x35e0ff, accent: 0x9df0ff, crest: 'fin' },
-      stats: { kills: 0, battlesWon: 0, battlesLost: 0, warlords: 0 },
+      stats: { kills: 0, battlesWon: 0, battlesLost: 0, draws: 0, warlords: 0 },
       lastTick: Date.now()
     };
   }
@@ -632,23 +632,31 @@
     this.save();
   };
 
-  Game.prototype.showBattleResult = function (won, reward) {
+  Game.prototype.showBattleResult = function (outcome, reward) {
     const self = this;
     const b = this.battle;
+    const won = outcome === 'win';
+    const draw = outcome === 'draw';
     const isCit = b.isCitadel;
     const cit = b.citadel;
     const tr = b.territory;
+    const where = isCit ? cit.name : (tr ? tr.name : 'the field');
     const allHeld = !isCit && this.planet.territories.every((t) => this.state.owned[t.id]);
     const trophy = isCit ? D.TROPHIES.filter((t) => t.planet === this.planet.id)[0] : null;
     setTimeout(function () {
-      if (!self.battle.active || self.battle.result !== (won ? 'win' : 'lose')) return;
+      if (!self.battle.active || self.battle.result !== outcome) return;
       self.ui.showResult({
-        tone: won ? 'win' : 'lose',
-        eyebrow: won ? (isCit ? 'World conquered' : 'Territory claimed') : 'Assault repelled',
-        title: won
-          ? (isCit ? cit.warlord.name + ' has fallen' : tr.name + ' is yours')
-          : 'Your keep has fallen',
-        body: won
+        tone: draw ? 'draw' : (won ? 'win' : 'lose'),
+        eyebrow: draw ? 'Draw' : (won ? (isCit ? 'World conquered' : 'Territory claimed') : 'Assault repelled'),
+        title: draw
+          ? 'Nobody left standing'
+          : (won
+            ? (isCit ? cit.warlord.name + ' has fallen' : tr.name + ' is yours')
+            : 'Your keep has fallen'),
+        body: draw
+          ? 'Both armies wiped each other out and both keeps are still up, so ' + where +
+            ' stays exactly as it was. No coins, no ground — bring a bigger army and settle it.'
+          : won
           ? (isCit
             ? self.planet.name + ' is yours entirely. The ' + self.planet.faction.name +
               ' have no capital left, and ' + cit.warlord.name + "'s guard has joined your roster."
@@ -660,12 +668,11 @@
             ? cit.warlord.name + ' still holds ' + cit.name + '. Promote your units, widen your deck, and come back.'
             : 'The ' + self.planet.faction.name + ' hold ' + tr.name +
               '. Strengthen the Aegis Shield, promote your units, and come back. It costs you nothing to try again.'),
-        rewards: won
-          ? '<span><i class="c-coin"></i>+' + U.fmt(Math.round(reward.coins * self.rewardMultiplier())) + '</span>' +
+        rewards: !won ? null
+          : '<span><i class="c-coin"></i>+' + U.fmt(Math.round(reward.coins * self.rewardMultiplier())) + '</span>' +
             (self.rewardMultiplier() > 1.05
               ? '<span class="rw-inc">&times;' + self.rewardMultiplier().toFixed(2) + ' from your kingdom</span>' : '') +
-            (trophy ? '<span class="rw-trophy">Unlocked: ' + trophy.name + '</span>' : '')
-          : null,
+            (trophy ? '<span class="rw-trophy">Unlocked: ' + trophy.name + '</span>' : ''),
         actions: [
           { label: won ? 'Return to the surface' : 'Try again', primary: true,
             fn: function () { self.endBattle(won ? null : (isCit ? 'citadel' : tr)); } },

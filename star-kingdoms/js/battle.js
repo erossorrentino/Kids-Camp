@@ -25,6 +25,12 @@
   };
 
   const KEEP_RANGE = 26;
+  /* Nobody can win a battle where both armies are gone, so it ends in a
+     draw. If you are still standing you get a last stand to break their
+     keep on your own; if you are already spectating there is nothing left
+     to watch, so it settles almost at once. */
+  const LAST_STAND = 20;
+  const DRAW_SETTLE = 3;
   /* Keeps are fortifications, not soft targets. The two sides are
      deliberately asymmetric: you are the one assaulting, so your units
      siege properly, while the defenders' job is to stop you rather than
@@ -77,6 +83,7 @@
     this.boss = null;
     this.spectating = false;
     this.result = null;
+    this.drawT = null;
     this.endT = 0;
     this.tier = citadel ? citadel.tier : territory.tier;
 
@@ -334,12 +341,32 @@
     }
 
     if (this.isCitadel) {
-      if (this.boss && this.boss.dead) this.finish(true);
-      else if (this.homeKeep.hp <= 0) this.finish(false);
+      if (this.boss && this.boss.dead) this.finish('win');
+      else if (this.homeKeep.hp <= 0) this.finish('lose');
     } else {
-      if (this.enemyKeep.hp <= 0) this.finish(true);
-      else if (this.homeKeep.hp <= 0) this.finish(false);
+      if (this.enemyKeep.hp <= 0) this.finish('win');
+      else if (this.homeKeep.hp <= 0) this.finish('lose');
     }
+    if (!this.result) this.updateStalemate(dt);
+  };
+
+  /* Both armies wiped out and both keeps still up: there is no way left for
+     either side to win, so run a short clock down and call it a draw. */
+  Battle.prototype.updateStalemate = function (dt) {
+    const c = this.counts();
+    if (c.ally > 0 || c.foe > 0) { this.drawT = null; return; }
+    const standing = !this.spectating && this.game.player.health > 0;
+    const limit = standing ? LAST_STAND : DRAW_SETTLE;
+    if (this.drawT === null) {
+      this.drawT = limit;
+      this.game.toast(standing
+        ? 'Every soldier is down. Break their keep yourself or it ends in a draw.'
+        : 'Every soldier is down on both sides. This one is a draw.', 'bad');
+    } else if (this.drawT > limit) {
+      this.drawT = limit; // you went down mid-window
+    }
+    this.drawT -= dt;
+    if (this.drawT <= 0) this.finish('draw');
   };
 
   Battle.prototype.updateKeep = function (keep, dt) {
@@ -873,23 +900,30 @@
   };
 
   /* ----------------------------------------------------------- finish */
-  Battle.prototype.finish = function (won) {
+  Battle.prototype.finish = function (outcome) {
     if (this.result) return;
-    this.result = won ? 'win' : 'lose';
+    // 'win' | 'lose' | 'draw'
+    this.result = outcome === 'draw' ? 'draw' : (outcome === true || outcome === 'win' ? 'win' : 'lose');
+    this.drawT = null;
     this.endT = 0;
     const g = this.game;
-    if (won) {
+    if (this.result === 'win') {
       SK.Audio.victory();
       const reward = this.stats.reward;
       g.state.coins += Math.round(reward.coins * g.rewardMultiplier());
       g.state.stats.battlesWon++;
       if (this.isCitadel) g.onCitadelTaken(this.planet, this.citadel, reward);
       else { g.state.owned[this.territory.id] = true; g.onTerritoryCaptured(this.territory, reward); }
+    } else if (this.result === 'draw') {
+      // A draw takes nothing and gives nothing: no coins, no ground.
+      SK.Audio.defeat();
+      g.state.stats.draws = (g.state.stats.draws || 0) + 1;
+      g.save();
     } else {
       SK.Audio.defeat();
       g.state.stats.battlesLost++;
     }
-    g.showBattleResult(won, this.stats.reward);
+    g.showBattleResult(this.result, this.stats.reward);
   };
 
   Battle.prototype.cleanup = function () {
@@ -902,6 +936,7 @@
     this.spectating = false;
     this.active = false;
     this.result = null;
+    this.drawT = null;
     this.game.fx.clear();
   };
 
