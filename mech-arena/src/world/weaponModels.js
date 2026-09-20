@@ -26,9 +26,11 @@ function cyl(rt, rb, h, s = 10) { return g(`c${rt},${rb},${h},${s}`, () => new T
  */
 export function buildWeaponModel(w, mats, scaleRef) {
   const group = new THREE.Group();
-  const S = SIZE_SCALE[w.size] * (scaleRef ? scaleRef.w * 1.4 : 1);
+  // Scale against the chassis's own torso width so a gun looks proportionate
+  // on a 20-ton Locust and on a 100-ton Atlas alike.
+  const S = SIZE_SCALE[w.size] * (scaleRef ? scaleRef.w * 0.38 : 1);
   const rng = makeRng(hash(w.id));
-  const bore = Math.min(0.42, 0.10 + (w.dmg / 260)) * S;
+  const bore = Math.min(0.34, 0.09 + (w.dmg / 320)) * S;
   const muzzle = new THREE.Object3D();
   let kind = 'barrel';
 
@@ -42,7 +44,7 @@ export function buildWeaponModel(w, mats, scaleRef) {
   };
 
   if (w.cls === 'ballistic') {
-    const len = S * (w.opt > 500 ? 2.3 : w.opt > 280 ? 1.75 : 1.2);
+    const len = S * (w.opt > 500 ? 2.6 : w.opt > 280 ? 2.0 : 1.4);
     add(box(S * 0.7, S * 0.62, S * 0.9), mats.dark, [0, 0, -S * 0.15]);
     if ((w.flags || []).includes('pierce')) {
       // Rail/gauss: coil rings along the rod.

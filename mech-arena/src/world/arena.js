@@ -56,6 +56,10 @@ export class Arena {
     this.smokes = [];
     this.lights = [];
     this.decor = [];
+    this.deckCenters = [];
+    // Foundry layouts are roofed, so the directional sun cannot reach the
+    // floor; the renderer needs to know to lean on ambient instead.
+    this.interior = mapDef.layout === 'foundry';
 
     this._materials();
     this._buildGround();
@@ -410,6 +414,7 @@ export class Arena {
   }
 
   _deck(x, y, z, w, d, rng) {
+    this.deckCenters.push(new THREE.Vector3(x, y + 1.4, z));
     const c = new Collider(
       new THREE.Vector3(x - w / 2, y - 2, z - d / 2),
       new THREE.Vector3(x + w / 2, y + 1.4, z + d / 2),
@@ -456,6 +461,19 @@ export class Arena {
         }
       }
     }
+    // Work lights hanging from the roof: a foundry has no sun.
+    const lamps = Math.min(10, Math.round(6 + this.def.density * 5));
+    for (let i = 0; i < lamps; i++) {
+      const a = (i / lamps) * Math.PI * 2;
+      const r = i === 0 ? 0 : this.half * (0.3 + (i % 3) * 0.22);
+      const lx = Math.cos(a) * r, lz = Math.sin(a) * r;
+      const light = new THREE.PointLight(0xffd9a8, 900, this.half * 0.95, 2);
+      light.position.set(lx, roofY - 6, lz);
+      this.group.add(light);
+      this.lights.push(light);
+      this._emit('accent', boxGeo(4, 0.5, 4), [lx, roofY - 4, lz]);
+    }
+
     // Machinery clutter.
     for (let i = 0; i < 40 * this.def.density; i++) {
       const x = rng.range(-this.half * 0.9, this.half * 0.9), z = rng.range(-this.half * 0.9, this.half * 0.9);
@@ -545,14 +563,60 @@ export class Arena {
     this.group.add(shell);
   }
 
+  /**
+   * Ground height at a point, or null when there is nothing to stand on --
+   * which is the normal case over the gaps in a platform map.
+   */
+  standableAt(x, z) {
+    if (Math.abs(x) > this.half - 8 || Math.abs(z) > this.half - 8) return null;
+    const y = this.safeGround(x, z);
+    return y > this.voidLevel + 1 ? y : null;
+  }
+
+  /** Spiral outward from a point until we find somewhere legal to stand. */
+  findStandable(x, z, maxRadius = 90) {
+    const direct = this.standableAt(x, z);
+    if (direct != null) return new THREE.Vector3(x, direct, z);
+    for (let r = 8; r <= maxRadius; r += 8) {
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2 + r * 0.31;
+        const px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
+        const y = this.standableAt(px, pz);
+        if (y != null) return new THREE.Vector3(px, y, pz);
+      }
+    }
+    // Last resort: the centre of a deck, or the middle of the map.
+    if (this.deckCenters.length) return this.deckCenters[0].clone();
+    return new THREE.Vector3(0, this.safeGround(0, 0), 0);
+  }
+
   _placeSpawns() {
     const rng = this.rng;
     const R = this.half * 0.78;
     const mk = (angle) => {
-      const x = Math.cos(angle) * R, z = Math.sin(angle) * R;
-      return new THREE.Vector3(x, this.safeGround(x, z) + 1, z);
+      const p = this.findStandable(Math.cos(angle) * R, Math.sin(angle) * R);
+      return p.setY(p.y + 1);
     };
     const baseAngle = rng.range(0, Math.PI * 2);
+
+    if (!this.hasFloor && this.deckCenters.length >= 4) {
+      // Platform maps: spawn on the decks furthest from the centre, split
+      // into two arcs so the teams start opposite one another.
+      const sorted = [...this.deckCenters]
+        .map(p => ({ p, a: Math.atan2(p.z, p.x), r: Math.hypot(p.x, p.z) }))
+        .filter(d => d.r > 30)
+        .sort((x, y) => x.a - y.a);
+      const half = Math.max(1, Math.floor(sorted.length / 2));
+      const take = (list, n) => Array.from({ length: n }, (_, i) => {
+        const d = list[i % list.length];
+        return new THREE.Vector3(d.p.x + rng.range(-6, 6), d.p.y + 1, d.p.z + rng.range(-6, 6));
+      });
+      this.spawns.a = take(sorted.slice(0, half), 6);
+      this.spawns.b = take(sorted.slice(half), 6);
+      this.spawns.ffa = take(sorted, 12);
+      return;
+    }
+
     for (let i = 0; i < 6; i++) this.spawns.a.push(mk(baseAngle + (i - 2.5) * 0.14));
     for (let i = 0; i < 6; i++) this.spawns.b.push(mk(baseAngle + Math.PI + (i - 2.5) * 0.14));
     for (let i = 0; i < 12; i++) this.spawns.ffa.push(mk(baseAngle + (i / 12) * Math.PI * 2));
@@ -575,12 +639,12 @@ export class Arena {
     const names = ['ALPHA', 'BRAVO', 'CHARLIE'];
     for (let i = 0; i < 3; i++) {
       const a = a0 + (i / 3) * Math.PI * 2;
-      const x = i === 0 ? 0 : Math.cos(a) * R;
-      const z = i === 0 ? 0 : Math.sin(a) * R;
-      const y = this.safeGround(x, z);
+      const wx = i === 0 ? 0 : Math.cos(a) * R;
+      const wz = i === 0 ? 0 : Math.sin(a) * R;
+      const p = this.findStandable(wx, wz);
       this.zones.push({
         id: i, name: names[i],
-        pos: new THREE.Vector3(x, y, z),
+        pos: p,
         radius: 26, owner: null, progress: 0, contested: false,
       });
     }

@@ -19,7 +19,12 @@ for (const f of files) {
     new vm.SourceTextModule(src, { identifier: f });
   } catch (e) {
     failed++;
-    console.error(`FAIL ${f}\n  ${e.message}`);
+    // V8 does not put the offending line in the message, so recover it from
+    // the stack frame it attaches to the SyntaxError.
+    const at = /:(\d+):(\d+)/.exec((e.stack || '').split('\n').find(l => l.includes(f)) || '');
+    const where = at ? ` (line ${at[1]}:${at[2]})` : '';
+    const line = at ? '\n  > ' + src.split('\n')[+at[1] - 1]?.trim() : '';
+    console.error(`FAIL ${f}${where}\n  ${e.message}${line}`);
   }
 }
 if (failed) {

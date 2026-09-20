@@ -27,11 +27,11 @@ const CockpitShader = {
     tDiffuse: { value: null },
     uAberration: { value: 0.0012 },
     uVignette: { value: 0.72 },
-    uScan: { value: 0.06 },
+    uScan: { value: 0.035 },
     uTime: { value: 0 },
     uDamage: { value: 0 },
     uHeat: { value: 0 },
-    uGrain: { value: 0.035 },
+    uGrain: { value: 0.018 },
     uEmp: { value: 0 },
   },
   vertexShader: /* glsl */`
@@ -94,9 +94,12 @@ export class Engine {
     this.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, this.q.pixelRatio * 1.5));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.06;
+    this.renderer.toneMappingExposure = 1.18;
     this.renderer.shadowMap.enabled = this.q.shadow > 0;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    // Post-processing renders several passes; letting three reset its counters
+    // per pass would make the on-screen stats report only the final blit.
+    this.renderer.info.autoReset = false;
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(72, 1, 0.35, 4200);
@@ -109,6 +112,8 @@ export class Engine {
     this._onResize();
     addEventListener('resize', () => this._onResize());
 
+    this.pmrem = new THREE.PMREMGenerator(this.renderer);
+    this.envTarget = null;
     this.shakeAmp = 0;
     this.shakeFreq = 26;
     this._shakeT = 0;
@@ -143,6 +148,17 @@ export class Engine {
     this.rim = new THREE.DirectionalLight(0x6fb6ff, 0.55);
     this.rim.position.set(-90, 60, -110);
     this.scene.add(this.rim);
+
+    // Flat ambient floor. Without it, anything the sun cannot reach -- the
+    // inside of a foundry, the shadow side of a mech -- reads as pure black,
+    // which looks broken rather than dramatic.
+    this.ambient = new THREE.AmbientLight(0xffffff, 0.35);
+    this.scene.add(this.ambient);
+
+    // A soft fill that rides with the camera so the machine you are looking
+    // at is always legible, whatever direction the sun is coming from.
+    this.fill = new THREE.DirectionalLight(0xbcd4e8, 0.5);
+    this.scene.add(this.fill, this.fill.target);
   }
 
   _setupComposer() {
@@ -178,7 +194,11 @@ export class Engine {
     this._onResize();
   }
 
-  /** Apply a biome's lighting/fog description to the scene. */
+  /**
+   * Apply a biome's lighting/fog description to the scene.
+   * @param {object} opts { fogScale, interior } -- interior maps have a roof,
+   *        so the directional sun is mostly useless and ambient carries them.
+   */
   applyBiome(b, opts = {}) {
     this.scene.background = new THREE.Color(b.sky);
     this.scene.fog = new THREE.Fog(b.fogCol, b.fog[0] * (opts.fogScale || 1), b.fog[1] * (opts.fogScale || 1));
@@ -189,6 +209,70 @@ export class Engine {
     this.hemi.intensity = b.ambI;
     this.rim.color.setHex(b.accent);
     this.rim.intensity = b.sunI * 0.22 + 0.2;
+
+    const interior = !!opts.interior;
+    this.ambient.color.setHex(b.amb);
+    this.ambient.intensity = interior ? 1.5 : 0.42 + b.ambI * 0.22;
+    this.hemi.intensity = b.ambI * (interior ? 1.7 : 1);
+    this.fill.color.setHex(b.hazeCol);
+    this.fill.intensity = interior ? 0.85 : 0.55;
+
+    this.buildEnvironment(b);
+    this.scene.environmentIntensity = interior ? 0.55 : 1.0;
+  }
+
+  /**
+   * Build an image-based lighting environment from a biome description.
+   *
+   * Without this, every metallic surface -- which is most of a mech --
+   * renders almost black, because a metal reflects its surroundings and
+   * there is nothing in the scene for it to reflect. A cheap procedural
+   * sky/ground dome plus a sun disc, prefiltered once per map load, is
+   * what makes the armour read as painted steel instead of matte plastic.
+   */
+  buildEnvironment(b) {
+    const envScene = new THREE.Scene();
+
+    const sky = new THREE.Mesh(
+      new THREE.SphereGeometry(80, 24, 16),
+      new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        uniforms: {
+          uTop: { value: new THREE.Color(b.sky).multiplyScalar(1.5) },
+          uHorizon: { value: new THREE.Color(b.hazeCol).multiplyScalar(1.15) },
+          uGround: { value: new THREE.Color(b.ground).multiplyScalar(0.55) },
+        },
+        vertexShader: `varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+        fragmentShader: `
+          uniform vec3 uTop, uHorizon, uGround;
+          varying vec3 vP;
+          void main(){
+            float h = normalize(vP).y;
+            vec3 c = h > 0.0
+              ? mix(uHorizon, uTop, pow(clamp(h, 0.0, 1.0), 0.55))
+              : mix(uHorizon, uGround, pow(clamp(-h, 0.0, 1.0), 0.4));
+            gl_FragColor = vec4(c, 1.0);
+          }`,
+      }),
+    );
+    envScene.add(sky);
+
+    // A bright disc standing in for the sun gives metals a specular highlight
+    // that tracks the biome's key light direction.
+    const sun = new THREE.Mesh(
+      new THREE.SphereGeometry(7, 12, 8),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(b.sun).multiplyScalar(b.sunI * 6) }),
+    );
+    sun.position.set(30, 48, 20);
+    envScene.add(sun);
+
+    if (this.envTarget) this.envTarget.dispose();
+    this.envTarget = this.pmrem.fromScene(envScene, 0.04);
+    this.scene.environment = this.envTarget.texture;
+    this.scene.environmentIntensity = 1.0;
+
+    sky.geometry.dispose(); sky.material.dispose();
+    sun.geometry.dispose(); sun.material.dispose();
   }
 
   _onResize() {
@@ -230,15 +314,21 @@ export class Engine {
     u.uDamage.value = damp(u.uDamage.value, grade.damage || 0, 6, dt);
     u.uHeat.value = damp(u.uHeat.value, grade.heat || 0, 4, dt);
     u.uEmp.value = damp(u.uEmp.value, grade.emp || 0, 8, dt);
-    u.uScan.value = grade.cockpit ? 0.10 : 0.045;
+    u.uScan.value = grade.cockpit ? 0.075 : 0.022;
     u.uVignette.value = grade.cockpit ? 0.95 : 0.7;
 
     // Keep the shadow frustum centred on the action.
-    this.sun.position.copy(this.camera.position).add(new THREE.Vector3(120, 190, 80));
+    this.sun.position.copy(this.camera.position).add(_sunOffset);
     this.sunTarget.position.copy(this.camera.position);
+
+    // The fill light always points away from the viewer, into the scene.
+    this.camera.getWorldDirection(_camDir);
+    this.fill.target.position.copy(this.camera.position).add(_camDir);
+    this.fill.position.copy(this.camera.position).addScaledVector(_camDir, -1).setY(this.camera.position.y + 12);
   }
 
   render() {
+    this.renderer.info.reset();
     this.composer.render();
     const info = this.renderer.info.render;
     this.stats.draw = info.calls;
@@ -255,3 +345,6 @@ export class Engine {
 
   setZoom(z) { this.fovTarget = clamp(this.fovBase / z, 14, 96); }
 }
+
+const _sunOffset = new THREE.Vector3(120, 190, 80);
+const _camDir = new THREE.Vector3();
