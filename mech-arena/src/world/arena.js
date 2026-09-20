@@ -215,8 +215,24 @@ export class Arena {
     const blocks = Math.round(lerp(4, 7, this.def.density));
     const step = this.size / blocks;
     const road = step * 0.38;
+    // Two boulevards cut through the grid. Without them a dense city is a
+    // maze of forty-metre sightlines and the two teams can circle each
+    // other for a whole match without ever getting a shot.
+    const avenueI = rng.int(1, blocks - 2);
+    const avenueJ = rng.int(1, blocks - 2);
     for (let i = 0; i < blocks; i++) {
       for (let j = 0; j < blocks; j++) {
+        if (i === avenueI || j === avenueJ) {
+          // Keep low cover in the avenue so it is a lane, not a shooting gallery.
+          if (rng.chance(0.55)) {
+            const ax = -this.half + step * (i + 0.5) + rng.range(-step * 0.2, step * 0.2);
+            const az = -this.half + step * (j + 0.5) + rng.range(-step * 0.2, step * 0.2);
+            const ay = this.heightAt(ax, az);
+            const ah = rng.range(5, 10);
+            this._addBox(ax, ay + ah / 2, az, rng.range(7, 16), ah, rng.range(7, 16), 'dark');
+          }
+          continue;
+        }
         if (rng.chance(0.14)) continue;   // plazas and gaps keep it from being a pure grid
         const cx = -this.half + step * (i + 0.5);
         const cz = -this.half + step * (j + 0.5);

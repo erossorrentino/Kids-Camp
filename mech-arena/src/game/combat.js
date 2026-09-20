@@ -98,11 +98,62 @@ export class Combat {
 
   /* ================= firing ================= */
 
+  /**
+   * Where this mech's weapons are converging this frame.
+   *
+   * Hardpoints are metres apart on a mech's body. Firing every one of them
+   * parallel to the crosshair means an arm-mounted gun lands its shots a
+   * couple of metres to the side -- fine at 400m, a clean miss at 30m.
+   * Real fire control converges the barrels on the aim point instead, and
+   * that is what a player expects when the reticle is on a target.
+   *
+   * Recomputed at most once per mech per frame, since it costs a raycast.
+   */
+  convergencePoint(mech) {
+    const frame = this.match.frameId;
+    if (mech._convFrame === frame) return mech._convPoint;
+    mech._convFrame = frame;
+
+    const eye = mech.eyePosition(_conv1);
+    const dir = mech.aimForward(_conv2);
+
+    // Prefer the range to whatever this mech is actually shooting at. The
+    // crosshair ray is a poor substitute: in a city it clips the corner of
+    // a building forty metres away while the target is two hundred metres
+    // down the street, and converging on the corner throws every arm-
+    // mounted shot wide of the thing you were aiming at.
+    let dist = null;
+    const t = (mech.lockedTarget?.alive && mech.lockedTarget.team !== mech.team) ? mech.lockedTarget
+      : (mech.target?.alive && mech.target.team !== mech.team) ? mech.target
+      : null;
+    if (t) {
+      const along = _conv3.copy(t.position).setY(t.position.y + t.height * 0.5).sub(eye).dot(dir);
+      if (along > 0) dist = along;
+    }
+    if (dist == null) {
+      const hit = this.world.raycast(eye, dir, 1200);
+      dist = hit ? hit.t : 600;
+    }
+
+    // Converging too close turns a small aiming error into a large one past
+    // the convergence point, so keep a sane floor.
+    dist = clamp(dist, 60, 1200);
+    mech._convPoint = (mech._convPoint || new THREE.Vector3())
+      .copy(eye).addScaledVector(dir, dist);
+    return mech._convPoint;
+  }
+
   /** Called by Mech when a weapon actually discharges. */
   fireWeapon(mech, inst, muzzlePos, chargeLevel = 1) {
     const d = inst.def;
     const pellets = d.pellets || 1;
-    const baseDir = mech.aimForward(_dir).clone();
+
+    // Point this barrel at the convergence point rather than straight ahead.
+    const converge = this.convergencePoint(mech);
+    const baseDir = _dir.copy(converge).sub(muzzlePos);
+    const len = baseDir.length();
+    if (len < 0.001) baseDir.copy(mech.aimForward(_conv2));
+    else baseDir.multiplyScalar(1 / len);
 
     // Aim assist for bots is applied by the AI, not here -- every shooter
     // goes through the same spread and travel-time maths.
@@ -641,6 +692,9 @@ function applySpread(dir, spreadDeg) {
 }
 
 const _dir = new THREE.Vector3();
+const _conv1 = new THREE.Vector3();
+const _conv2 = new THREE.Vector3();
+const _conv3 = new THREE.Vector3();
 const _hp = Object.assign(new THREE.Vector3(), { t: 0 });
 const _v1 = new THREE.Vector3();
 const _v2 = new THREE.Vector3();

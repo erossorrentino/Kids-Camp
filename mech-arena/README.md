@@ -12,6 +12,7 @@ vendored copy of Three.js.
 ```
 34 chassis   ·  302 weapons  ·  22 abilities  ·  2,496 paint schemes
 41 arenas    ·  10 biomes    ·  8 game modes  ·  12 pilots, 20 implants
+5 tournament circuits with locked lances, purses and trophies
 ```
 
 ---
@@ -45,6 +46,7 @@ frame times stay poor, so it degrades rather than stutters.
 | Zoom | right button, or `V` to toggle |
 | Jump jets | `Space` |
 | Chassis ability | `Q` |
+| Melee (punch / kick) | `R` |
 | Select weapon | `1`–`6`, or the mouse wheel |
 | Fire group Alpha / Beta / All | `Z` / `X` / `C` |
 | Cockpit ↔ chase view | `F` |
@@ -90,6 +92,12 @@ not after you are hit. Shoulder-charge when they are reloading. Stomp when
 a light closes to knife range. Between two pilots of the same rank, ability
 timing is most of the gap.
 
+Three things sit on top of those: **melee** (`R`) for when something is
+already inside your reach, **resupply pads** that pull a stalled fight back
+into motion, and **weapon convergence** — hardpoints are metres apart on a
+mech's body, so fire control angles every barrel at what you are actually
+aiming at rather than firing them all parallel.
+
 ---
 
 ## Game modes
@@ -104,6 +112,21 @@ timing is most of the gap.
 | Hardpoint | 5v5, 5 min | One live zone that relocates every sixty seconds |
 | Last Lance | 5v5, 7 min | No respawn timer — your hangar is your lives |
 | Juggernaut | 5v5, 5 min | One pilot per team is worth double and has double armour |
+
+Every arena hosts every competitive mode; the Training Range runs on the
+four widest, most open maps.
+
+## Circuits
+
+Five tournament circuits, from the free Rookie Circuit up to the Legend
+Gauntlet. A circuit is a fixed run of three to five matches against
+escalating opposition:
+
+- You enter with the lance you have and **it is locked for the whole run** —
+  editing your hangar afterwards does not change it.
+- A **loss ends the run**. You keep what you earned in the rounds you won.
+- Finishing one pays a purse far above the same number of casual matches
+  and grants a trophy you cannot buy: a paint scheme, or a chassis.
 
 ---
 
@@ -129,6 +152,7 @@ src/
     skins.js        colourway x pattern x finish
     maps.js         41 arenas as (seed, biome, layout) triples
     modes.js        rule sets
+    tournaments.js  circuit ladders, purses and trophies
   world/
     arena.js        deterministic level generation + collision + raycasts
     mechBuilder.js  procedural rigged mech models from primitives
@@ -136,6 +160,7 @@ src/
     textures.js     procedural albedo / roughness / normal maps
     skinTexture.js  paint schemes painted into canvases at runtime
     sky.js          shader skydome and per-biome weather volumes
+    pickups.js      coolant, ammunition, repair and shield resupply pads
     fx.js           pooled particles, tracers, beams, decals, shockwaves
   game/
     mech.js         one machine: movement, thermals, damage, animation
@@ -148,13 +173,18 @@ src/
     menus.js        title, hangar, garage, pilot, deploy, settings, codex
     hangarScene.js  the 3D hangar bay used as the menu backdrop
     tutorial.js     ten lessons that watch the live match state
-    progression.js  credits, ranks, unlocks, localStorage profile
+    markers.js      nameplates, damage numbers, hit direction, waypoints
+    progression.js  credits, ranks, unlocks, circuits, localStorage profile
 
 tools/
+  test.sh           runs everything below in order
   check.sh          full ESM parse check of every module
+  validate.mjs      cross-reference and sanity checks over the data layer
   smoke.mjs         boots the game in headless Chromium, walks the menus,
-                    plays matches on several arenas, screenshots each
+                    plays matches on several arenas, screenshots each,
+                    and drives a death through the kill cam to respawn
   sim.mjs           headless combat simulation across every arena
+  circuit.mjs       plays a tournament end to end and checks the bookkeeping
 ```
 
 ### Design rules the code follows
@@ -200,9 +230,12 @@ new scoring rule needs a case in `Match._updateObjective`.
 ## Testing
 
 ```bash
+./tools/test.sh                     # everything
 ./tools/check.sh                    # parse every module (catches typos)
+node tools/validate.mjs             # data integrity, no browser needed
 node tools/smoke.mjs                # boot, walk menus, play, screenshot
 node tools/sim.mjs                  # simulate combat on all 41 arenas
+node tools/circuit.mjs              # play a tournament end to end
 SIM_SECONDS=180 node tools/sim.mjs  # longer runs
 node tools/sim.mjs refinery,mesa    # specific arenas
 ```

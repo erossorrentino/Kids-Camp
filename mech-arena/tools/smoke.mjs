@@ -143,6 +143,49 @@ await step('combat frame', async () => {
 });
 await page.screenshot({ path: join(OUT, '09-combat.png') });
 
+await step('death -> kill cam -> respawn', async () => {
+  const downed = await page.evaluate(() => {
+    const g = window.__game;
+    g.match.state = 'live';
+    g.match.countdown = 0;
+    // The combat step above runs forty simulated seconds, so the player may
+    // already be down. Put them back in a mech before killing them again.
+    if (!g.match.player.mech) {
+      g.killCam = null;
+      g.hud.hideKillCam();
+      g.hud.hideRespawn();
+      g.match.respawnPlayer(0);
+    }
+    const me = g.match.player.mech;
+    if (!me) throw new Error('could not put the player back in a mech');
+    me.iFrames = 0;   // a fresh spawn is invulnerable for a moment
+    const killer = g.match.mechs.find(m => m.alive && m.team !== me.team);
+    // Delete the player's mech outright, crediting a live enemy.
+    me.lastDamagedBy = killer || null;
+    g.match.applyDamage(me, killer, 1e6, { location: 'CT' });
+    return { alive: !!g.match.player.mech, killCam: !!g.killCam, killer: g.killCam?.name || null };
+  });
+  if (downed.alive) throw new Error('player mech survived a million damage');
+  if (!downed.killCam) throw new Error('no kill cam after death');
+
+  // The kill cam runs on frame time, which is very slow under software
+  // rendering, so drive it directly rather than waiting it out.
+  const respawned = await page.evaluate(() => {
+    const g = window.__game;
+    for (let i = 0; i < 400 && g.killCam; i++) g._updateKillCam(0.05);
+    const overlay = document.getElementById('respawn-overlay');
+    const shown = overlay && !overlay.classList.contains('hidden');
+    const cards = overlay ? overlay.querySelectorAll('.respawn-card').length : 0;
+    if (shown && cards) overlay.querySelector('.respawn-card').click();
+    return { shown, cards, alive: !!g.match.player.mech, pending: g._pendingRespawn };
+  });
+  if (!respawned.shown) throw new Error('respawn overlay never appeared');
+  if (!respawned.cards) throw new Error('respawn overlay had no mechs to pick');
+  if (!respawned.alive) throw new Error('picking a mech did not respawn the player');
+  console.log('\n   ', JSON.stringify({ ...downed, ...respawned }));
+});
+await page.screenshot({ path: join(OUT, '13-respawned.png') });
+
 await step('cockpit view', async () => {
   await page.evaluate(() => { window.__game.controller.view = 'cockpit'; });
   await page.waitForTimeout(900);

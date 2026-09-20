@@ -17,6 +17,7 @@ import { MODE_LIST, getMode } from '../data/modes.js';
 import { getAbility } from '../data/abilities.js';
 import { DIFFICULTIES } from '../game/ai.js';
 import { autoLoadout } from '../game/match.js';
+import { TOURNAMENTS, resolveRoundMap } from '../data/tournaments.js';
 import { RANK_TITLES } from './progression.js';
 import { clamp } from '../core/rng.js';
 
@@ -76,6 +77,7 @@ export class Menus {
       case 'settings': html = this.renderSettings(); break;
       case 'results': html = this.renderResults(); break;
       case 'codex': html = this.renderCodex(); break;
+      case 'circuit': html = this.renderCircuit(); break;
       default: html = this.renderTitle();
     }
     this.root.innerHTML = html;
@@ -113,6 +115,7 @@ export class Menus {
              <button class="btn" data-go="deploy">DEPLOY</button>`
           : `<button class="btn primary lg" data-go="deploy">DEPLOY</button>
              <button class="btn" data-action="training">TRAINING RANGE</button>`}
+        <button class="btn" data-go="circuit">CIRCUIT${p.tournaments?.run ? ' <span style="color:var(--amber)">● IN PROGRESS</span>' : ''}</button>
         <button class="btn" data-go="hangar">HANGAR</button>
         <button class="btn" data-go="garage">GARAGE</button>
         <button class="btn" data-go="pilot">PILOT</button>
@@ -477,7 +480,7 @@ export class Menus {
   renderResults() {
     const r = this.lastResult;
     if (!r) return this.renderTitle();
-    const { result, award } = r;
+    const { result, award, circuit } = r;
     const title = result.draw ? 'STALEMATE' : result.playerWon ? 'VICTORY' : 'DEFEAT';
     const colour = result.draw ? 'var(--amber)' : result.playerWon ? 'var(--green)' : 'var(--red)';
     return `<div class="screen">
@@ -504,17 +507,105 @@ export class Menus {
         <div class="panel"><h3>REWARDS</h3>
           <div class="kv"><span>CREDITS</span><b style="color:var(--amber)">+${fmt(award?.credits || 0)}</b></div>
           <div class="kv"><span>EXPERIENCE</span><b style="color:var(--cyan)">+${fmt(award?.xp || 0)}</b></div>
+          ${circuit ? this._circuitPanel(circuit) : ''}
           ${award?.rankUp ? `<div style="margin-top:14px;padding:12px;border:1px solid var(--cyan);border-radius:7px;text-align:center">
             <div class="tiny muted">PROMOTED</div>
             <div style="font-size:19px;letter-spacing:.2em;color:var(--cyan)">RANK ${award.rank}</div>
             <div class="tiny">${esc(award.title)}</div></div>` : ''}
           <div class="row" style="margin-top:18px">
-            <button class="btn primary" data-action="launch">REDEPLOY</button>
+            ${circuit && !circuit.finished
+              ? '<button class="btn primary" data-action="runRound">NEXT ROUND</button>'
+              : '<button class="btn primary" data-action="launch">REDEPLOY</button>'}
+            ${circuit ? '<button class="btn" data-go="circuit">CIRCUIT</button>' : ''}
             <button class="btn" data-go="hangar">HANGAR</button>
             <button class="btn ghost" data-go="title">MENU</button>
           </div>
         </div>
       </div>
+    </div>`;
+  }
+
+  /* ---------------- tournament circuit ---------------- */
+  renderCircuit() {
+    const p = this.progression;
+    const run = p.run;
+
+    const active = run ? (() => {
+      const st = p.tournamentState(run.id);
+      const t = st.def;
+      const round = t.rounds[run.round];
+      const lance = run.lance.map(b => MECH_BY_ID[b.chassisId]).filter(Boolean);
+      return `<div class="panel" style="border-color:var(--amber);margin-bottom:18px">
+        <h3 style="color:var(--amber)">IN PROGRESS — ${esc(t.name)}</h3>
+        <div class="row" style="gap:6px;margin-bottom:12px">
+          ${t.rounds.map((r, i) => `<div class="round-pip ${i < run.round ? 'won' : i === run.round ? 'now' : ''}">
+            <b>${i + 1}</b><span>${esc(r.label)}</span></div>`).join('')}
+        </div>
+        <div class="kv"><span>NEXT ROUND</span><b>${esc(round.label)}</b></div>
+        <div class="kv"><span>MODE</span><b>${esc(getMode(round.mode).name)}</b></div>
+        <div class="kv"><span>ARENA</span><b>${esc(round.map ? (MAP_BY_ID[round.map]?.name || round.map) : 'RANDOM')}</b></div>
+        <div class="kv"><span>OPPOSITION</span><b>${esc(DIFFICULTIES[round.difficulty]?.label || round.difficulty)}</b></div>
+        <div class="kv"><span>LOCKED LANCE</span><b>${lance.map(m => esc(m.name)).join(' · ') || '—'}</b></div>
+        <div class="kv"><span>RUN EARNINGS</span><b>${fmt(run.credits)} CR · ${fmt(run.xp)} XP · ${run.kills} kills</b></div>
+        <p class="tiny muted" style="margin-top:10px;line-height:1.6">Your lance is locked for the circuit. A loss ends the run and you keep only what you earned in the rounds you won.</p>
+        <div class="row" style="margin-top:14px">
+          <button class="btn primary lg" data-action="runRound">FIGHT ROUND ${run.round + 1}</button>
+          <button class="btn danger" data-action="abandonRun">WITHDRAW</button>
+        </div>
+      </div>`;
+    })() : '';
+
+    const cards = TOURNAMENTS.map(t => {
+      const st = p.tournamentState(t.id);
+      const locked = !st.unlocked;
+      const blockedByRun = !!run && run.id !== t.id;
+      return `<div class="card ${locked || blockedByRun ? 'locked' : 'clickable'} ${st.completed ? 'on' : ''}"
+           ${locked || blockedByRun || run ? '' : `data-enter="${t.id}"`}>
+        ${st.completed ? '<span class="lock">🏆</span>' : locked ? '<span class="lock">🔒</span>' : ''}
+        <h4>${esc(t.name)}</h4>
+        <div class="sub">${t.rounds.length} ROUNDS · TIER ${t.tier}</div>
+        <p class="muted tiny" style="margin:8px 0;line-height:1.55;min-height:48px">${esc(t.blurb)}</p>
+        <div class="kv"><span>ENTRY</span><b>${t.entryFee ? fmt(t.entryFee) + ' CR' : 'FREE'}</b></div>
+        <div class="kv"><span>PURSE</span><b style="color:var(--amber)">${fmt(t.purse)} CR + ${fmt(t.xp)} XP</b></div>
+        <div class="kv"><span>TROPHY</span><b>${esc(t.reward.label)}</b></div>
+        <div class="kv"><span>BEST</span><b>${st.best}/${t.rounds.length} rounds</b></div>
+        ${locked ? `<div class="tiny" style="color:var(--red);margin-top:8px">Requires rank ${t.rank} — you are ${p.rank}</div>` : ''}
+        ${!locked && !st.affordable && t.entryFee ? '<div class="tiny" style="color:var(--red);margin-top:8px">Cannot cover the entry fee</div>' : ''}
+      </div>`;
+    }).join('');
+
+    return `<div class="screen">${this.header('CIRCUIT · TOURNAMENTS', 'title')}
+      ${active}
+      <p class="muted tiny" style="margin-bottom:12px;line-height:1.6">
+        A circuit is a fixed run of matches against escalating opposition. You enter with the lance you have,
+        you cannot change it between rounds, and a loss ends the run. Finishing one pays far better than the
+        same number of casual matches and unlocks something you cannot buy.</p>
+      <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(280px,1fr))">${cards}</div>
+    </div>`;
+  }
+
+  /** The circuit block on the results screen: advance, win, or bust. */
+  _circuitPanel(c) {
+    if (!c.finished) {
+      return `<div style="margin-top:14px;padding:12px;border:1px solid var(--amber);border-radius:7px">
+        <div class="tiny muted">CIRCUIT</div>
+        <div style="font-size:16px;letter-spacing:.12em;color:var(--amber)">ROUND ${c.index} OF ${c.total} CLEARED</div>
+        <div class="tiny" style="margin-top:5px">Next: ${esc(c.round.label)}</div>
+      </div>`;
+    }
+    if (!c.won) {
+      return `<div style="margin-top:14px;padding:12px;border:1px solid var(--red);border-radius:7px">
+        <div class="tiny muted">CIRCUIT OVER</div>
+        <div style="font-size:16px;letter-spacing:.12em;color:var(--red)">KNOCKED OUT</div>
+        <div class="tiny" style="margin-top:5px">${c.roundsCleared} of ${c.total} rounds cleared. You keep what you earned.</div>
+      </div>`;
+    }
+    return `<div style="margin-top:14px;padding:14px;border:1px solid var(--green);border-radius:7px;text-align:center">
+      <div class="tiny muted">CIRCUIT WON</div>
+      <div style="font-size:19px;letter-spacing:.16em;color:var(--green)">🏆 ${esc(c.tournament.name)}</div>
+      <div class="kv" style="margin-top:10px"><span>PURSE</span><b style="color:var(--amber)">+${fmt(c.payout.credits)} CR</b></div>
+      <div class="kv"><span>BONUS XP</span><b style="color:var(--cyan)">+${fmt(c.payout.xp)}</b></div>
+      ${c.reward ? `<div class="kv"><span>TROPHY</span><b>${esc(c.reward.label)}</b></div>` : ''}
     </div>`;
   }
 
@@ -582,6 +673,12 @@ export class Menus {
       const [kind, id] = el.dataset.buy.split(':');
       this._tryBuy(kind, id);
     });
+    q('[data-enter]').forEach(el => el.onclick = () => {
+      const res = this.progression.enterTournament(el.dataset.enter);
+      if (!res.ok) { this.audio.play('dry'); this._toastModal(res.reason); return; }
+      this.audio.play('kill');
+      this.render();
+    });
     q('[data-pilot]').forEach(el => el.onclick = () => this._selectPilot(el.dataset.pilot));
     q('[data-implant]').forEach(el => el.onclick = () => this._toggleImplant(el.dataset.implant));
     q('[data-implant-slot]').forEach(el => el.onclick = () => {
@@ -648,6 +745,27 @@ export class Menus {
       case 'training':
         this.audio.play('ui');
         this.onDeploy({ mode: 'training', mapId: 'saltflat', difficulty: 'recruit' });
+        break;
+      case 'runRound': {
+        const run = this.progression.run;
+        if (!run) { this.render(); break; }
+        const t = TOURNAMENTS.find(x => x.id === run.id);
+        const round = t.rounds[run.round];
+        this.audio.play('ui');
+        this.onDeploy({
+          mode: round.mode,
+          mapId: resolveRoundMap(round, mapsForMode),
+          difficulty: round.difficulty,
+          tournament: { id: t.id, round: run.round, label: round.label, name: t.name, total: t.rounds.length },
+        });
+        break;
+      }
+      case 'abandonRun':
+        this._confirm('Withdraw from the circuit? You keep what you have earned but forfeit the purse and the trophy.', () => {
+          this.progression.abandonRun();
+          this.audio.play('uiBack');
+          this.render();
+        });
         break;
       case 'launch':
         this.audio.play('ui');
@@ -866,8 +984,8 @@ export class Menus {
     });
   }
 
-  showResults(result, award) {
-    this.lastResult = { result, award };
+  showResults(result, award, circuit = null) {
+    this.lastResult = { result, award, circuit };
     this.open('results');
   }
 }

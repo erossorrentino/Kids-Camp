@@ -586,7 +586,12 @@ export class Mech {
     w.muzzle.getWorldPosition(_muzzlePos);
     ctx.fireWeapon(this, w, _muzzlePos, chargeLevel);
 
-    this.fx.muzzle(_muzzlePos, this.aimForward(_fwd), d);
+    // The flash follows the barrel's converged direction so it lines up
+    // with where the round actually went.
+    const conv = this._convPoint;
+    if (conv) _fwd.copy(conv).sub(_muzzlePos).normalize();
+    else this.aimForward(_fwd);
+    this.fx.muzzle(_muzzlePos, _fwd, d);
     this.audio.weapon(d, _muzzlePos);
 
     if (this.barrageShots > 0 && d.cls === 'missile') {

@@ -114,6 +114,8 @@ export class BotBrain {
       this.lastKnownTargetPos.copy(this.target.position);
     }
     if (this.target && !this.target.alive) this.target = null;
+    // Publish it: fire control converges the barrels on the current target.
+    m.target = this.target;
   }
 
   _canSee(other) {

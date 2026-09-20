@@ -385,3 +385,23 @@ kbd{font-family:var(--mono);background:rgba(255,255,255,.1);border:1px solid var
 .waypoint.theirs{color:var(--team-b);}
 .waypoint.contested{color:var(--amber);animation:blink .6s steps(2) infinite;}
 .waypoint.offscreen{opacity:.55;}
+
+/* ---------------- Kill cam ---------------- */
+#killcam{position:absolute;left:50%;top:16%;transform:translateX(-50%);text-align:center;
+  animation:kcin .4s ease-out;}
+#killcam .kc-title{font-size:15px;letter-spacing:.34em;color:var(--red);
+  text-shadow:0 2px 14px rgba(0,0,0,.9);}
+#killcam .kc-by{font-size:32px;letter-spacing:.14em;margin-top:8px;
+  text-shadow:0 2px 18px rgba(0,0,0,.95);}
+#killcam .kc-sub{font-size:10.5px;letter-spacing:.28em;color:var(--ink-dim);margin-top:5px;}
+@keyframes kcin{from{opacity:0;transform:translateX(-50%) translateY(-12px);}}
+
+/* ---------------- Circuit ---------------- */
+.round-pip{flex:1;min-width:92px;padding:7px 9px;border-radius:6px;border:1px solid var(--line);
+  background:rgba(255,255,255,.03);text-align:center;}
+.round-pip b{display:block;font-family:var(--mono);font-size:13px;font-weight:normal;color:var(--ink-dim);}
+.round-pip span{display:block;font-size:8.5px;letter-spacing:.14em;color:var(--ink-dim);margin-top:3px;}
+.round-pip.won{border-color:rgba(93,242,160,.55);background:rgba(93,242,160,.1);}
+.round-pip.won b{color:var(--green);}
+.round-pip.now{border-color:var(--amber);background:rgba(255,180,84,.12);box-shadow:0 0 18px rgba(255,180,84,.2);}
+.round-pip.now b{color:var(--amber);}

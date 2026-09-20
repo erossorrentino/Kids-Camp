@@ -90,6 +90,58 @@ credits = (240 + kills*85 + assists*30 + damage/22 + healing/30 + winBonus) * mo
 `winBonus` is 500 for a win, 200 for a draw. Rank gates content by tier;
 credits then buy it. Tier unlock ranks are 1, 4, 8, 13 and 19.
 
+## Melee
+
+Melee damage is `tons * 2.1 + 40` with an arm to swing, `tons * 1.3 + 40`
+as a kick. An Atlas punch is therefore about 250 damage with no heat and
+no ammunition, which sounds absurd until you account for the range: the
+reach is `radius + height * 0.42`, roughly nine metres for an assault mech.
+To land it you have to stand somewhere every weapon they own is inside its
+optimal bracket.
+
+It also shoves: impulse scales with the tonnage ratio, so a hundred-ton
+mech genuinely knocks a Locust off its feet and a Locust barely moves an
+Atlas. That asymmetry is the point — melee is an assault mech's tool and a
+light mech's finisher, not a general-purpose attack.
+
+## Resupply pads
+
+Pads exist to break stalemates. A mech that is dry, cooking, or down to
+structure has a specific place to go, and so does the enemy who knows it.
+Dormancy is twenty-two to thirty-four seconds depending on type, and a pad
+that has nothing to give does not trigger — walking over coolant while cold
+leaves it standing for the teammate behind you.
+
+Measured effect over 75 simulated seconds on Refinery: 9.9k damage and 3
+kills before pads and melee, 23.6k and 11 after. Pads are most of that;
+they keep mechs in the fight instead of walking home.
+
+## Weapon convergence
+
+Hardpoints are metres apart. Firing every barrel parallel to the crosshair
+means an arm-mounted gun lands its shots a couple of metres to the side:
+irrelevant at 400m, a clean miss at 30m. Fire control converges the barrels
+on the current target's range instead, with a 60m floor so that a small
+aiming error does not become a large one past the convergence point.
+
+The first implementation converged on whatever the crosshair ray hit, which
+looked correct and was much worse: in a city the ray clips a building corner
+forty metres away while the target is two hundred metres down the street,
+and every arm-mounted shot went wide. Downtown fell from 7.8k damage to 1.2k
+over the same 75 seconds. Converging on the target's range instead fixed it.
+
+## Arena pacing
+
+`tools/sim.mjs` reports damage and kills per arena over a fixed simulated
+window, which is the only reliable way to tell a dense map from a broken
+one. Across all 41 arenas at 75 seconds: 264 kills, median 15.4k damage.
+
+The grid layouts were the outlier. A dense city is a maze of forty-metre
+sightlines, and two teams could circle each other for a whole match without
+trading fire — Downtown managed 1.2k damage where its peers were doing 15k.
+Cutting two boulevards through the grid brought it to 12.9k without making
+it an open field.
+
 ## Known tensions
 
 - **Assault mechs are strong in Control and weak in Free For All.** This is

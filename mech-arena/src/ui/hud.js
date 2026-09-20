@@ -462,6 +462,25 @@ export class HUD {
     }
   }
 
+  /* ---- kill cam ---- */
+  showKillCam(kc) {
+    if (!this._killCamEl) {
+      const el = document.createElement('div');
+      el.id = 'killcam';
+      el.innerHTML = `<div class="kc-title">MECH DESTROYED</div>
+        <div class="kc-by"></div><div class="kc-sub"></div>`;
+      this.root.appendChild(el);
+      this._killCamEl = el;
+    }
+    this._killCamEl.style.display = '';
+    this._killCamEl.querySelector('.kc-by').textContent = kc.name ? kc.name : 'THE ARENA';
+    this._killCamEl.querySelector('.kc-sub').textContent = kc.chassis || '';
+  }
+
+  hideKillCam() {
+    if (this._killCamEl) this._killCamEl.style.display = 'none';
+  }
+
   /* ---- respawn screen ---- */
   showRespawn(entry, killerName, onPick) {
     this.el.respawn.classList.remove('hidden');

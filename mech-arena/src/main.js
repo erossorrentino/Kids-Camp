@@ -21,6 +21,7 @@ import { Progression } from './ui/progression.js';
 import { Tutorial } from './ui/tutorial.js';
 import { Markers } from './ui/markers.js';
 import { MAPS, MAP_BY_ID, mapsForMode, BIOMES } from './data/maps.js';
+import { TOURNAMENTS } from './data/tournaments.js';
 import { clamp } from './core/rng.js';
 
 const MAX_FRAME = 1 / 20;     // never simulate more than a 50ms step
@@ -74,6 +75,7 @@ class Game {
     this.lastTime = performance.now();
     this.paused = false;
     this._pendingRespawn = false;
+    this.killCam = null;
 
     // Adaptive quality: a mech arena is unplayable below ~40fps, and the
     // right response to a slow machine is fewer shadows, not a slideshow.
@@ -154,7 +156,7 @@ class Game {
   }
 
   /* ---------------------------------------------------------------- */
-  startMatch({ mode, mapId, difficulty }) {
+  startMatch({ mode, mapId, difficulty, tournament = null }) {
     this.audio.resume();
     this.menus.close();
     this.menus.suspended = true;
@@ -183,13 +185,15 @@ class Game {
     }
     this.controller.world = this.arena;
 
+    this.tournamentRound = tournament;
     this.match = new Match({
       engine: this.engine,
       world: this.arena,
       fx: this.fx,
       audio: this.audio,
       mode,
-      hangar: this.progression.toMatchHangar(),
+      // A circuit round is fought with the lance locked in at entry.
+      hangar: tournament ? this.progression.runHangar() : this.progression.toMatchHangar(),
       difficulty,
       progression: this.progression,
       quality: QUALITY[this.progression.settings.quality],
@@ -200,10 +204,13 @@ class Game {
     this.state = 'match';
     this.paused = false;
     this._pendingRespawn = false;
+    this.killCam = null;
     this.hud.show();
     this.markers.setVisible(true);
     this.hud.hideRespawn();
-    this.hud.toast(def.name, BIOMES[def.biome].label);
+    this.hud.toast(
+      tournament ? `${tournament.name} — ROUND ${tournament.round + 1}/${tournament.total}` : def.name,
+      tournament ? `${tournament.label} · ${def.name}` : BIOMES[def.biome].label);
     if (this.match.mode.tutorial) {
       this.tutorial.start({ mech: this.match.player.mech, match: this.match, controller: this.controller, input: this.input });
     } else {
@@ -218,12 +225,16 @@ class Game {
 
   endMatch(result) {
     const award = this.progression.awardMatch(result, this.match.mode.id);
+    const circuit = this.tournamentRound ? this.progression.advanceRun(result, award) : null;
+    this.tournamentRound = null;
     const seconds = (performance.now() - this._matchStartTime) / 1000;
     const chassisId = this.match.player?.mech?.chassis.id;
     if (chassisId) this.progression.recordMechUse(chassisId, seconds);
 
     this.state = 'menu';
     this.tutorial.stop();
+    this.killCam = null;
+    this.hud.hideKillCam();
     this.markers.setVisible(false);
     this.menus.suspended = false;
     this.input.releaseLock();
@@ -238,7 +249,7 @@ class Game {
     if (this.arena) { this.engine.scene.remove(this.arena.group); this.arena.dispose(); this.arena = null; }
     if (this.match) { this.match.dispose(); this.match = null; }
 
-    this.menus.showResults(result, award);
+    this.menus.showResults(result, award, circuit);
   }
 
   onMatchEvent(e) {
@@ -248,14 +259,20 @@ class Game {
     if (e.type === 'playerDown') {
       this._pendingRespawn = true;
       this.input.releaseLock();
-      const killer = e.entry?.mech?.lastDamagedBy?.name;
-      this.hud.showRespawn(e.entry, killer, (i) => {
-        if (this.match?.respawnPlayer(i)) {
-          this._pendingRespawn = false;
-          this.hud.hideRespawn();
-          this.input.requestLock();
-        }
-      });
+      // Hold on whoever did it for a beat before offering the respawn
+      // screen. Seeing the kill is most of how a player learns what went
+      // wrong; cutting straight to a menu throws that away.
+      const killer = e.killer && e.killer.alive ? e.killer : null;
+      this.killCam = {
+        target: killer,
+        anchor: (killer ? killer.position : e.lastPosition || this.engine.camera.position).clone(),
+        name: killer ? killer.name : null,
+        chassis: killer ? killer.chassis.name : null,
+        time: killer ? 2.8 : 1.6,
+        angle: Math.random() * Math.PI * 2,
+        entry: e.entry,
+      };
+      this.hud.showKillCam(this.killCam);
     }
     if (e.type === 'matchEnd') {
       setTimeout(() => this.endMatch(e.result), 1400);
@@ -334,6 +351,8 @@ class Game {
     }
     if (steps >= 12) this.accumulator = 0;   // give up rather than spiral
 
+    if (this.killCam) this._updateKillCam(dt);
+
     // Visual systems run at frame rate.
     this.sky.update(dt, this.engine.camera);
     this.fx.update(dt);
@@ -398,6 +417,51 @@ class Game {
     this._perfWindow.length = 0;
   }
 
+  /**
+   * Orbit the killer (or the wreck) while the death beat plays, then hand
+   * over to the respawn picker.
+   */
+  _updateKillCam(dt) {
+    const kc = this.killCam;
+    kc.time -= dt;
+    kc.angle += dt * 0.45;
+
+    // Track a live killer; a wreck or a hazard death just holds position.
+    if (kc.target?.alive) kc.anchor.lerp(kc.target.position, clamp(dt * 3, 0, 1));
+
+    const height = kc.target?.height || 10;
+    const dist = height * 2.4 + 10;
+    const cam = this.engine.camera;
+    const want = _kcWant.set(
+      kc.anchor.x + Math.cos(kc.angle) * dist,
+      kc.anchor.y + height * 1.25,
+      kc.anchor.z + Math.sin(kc.angle) * dist,
+    );
+    // Do not bury the camera in a wall.
+    if (this.arena) {
+      const dir = _kcDir.copy(want).sub(kc.anchor);
+      const len = dir.length();
+      dir.multiplyScalar(1 / len);
+      const hit = this.arena.raycast(kc.anchor, dir, len + 1);
+      if (hit) want.copy(kc.anchor).addScaledVector(dir, Math.max(5, hit.t - 1.2));
+    }
+    cam.position.lerp(want, clamp(dt * 4, 0, 1));
+    cam.lookAt(kc.anchor.x, kc.anchor.y + height * 0.5, kc.anchor.z);
+
+    if (kc.time > 0) return;
+
+    this.killCam = null;
+    this.hud.hideKillCam();
+    if (this.state !== 'match' || !this.match) return;
+    this.hud.showRespawn(kc.entry, kc.name, (i) => {
+      if (this.match?.respawnPlayer(i)) {
+        this._pendingRespawn = false;
+        this.hud.hideRespawn();
+        this.input.requestLock();
+      }
+    });
+  }
+
   /** Floating numbers for damage dealt, and a ring segment for damage taken. */
   _markerFeedback(e) {
     const me = this.match?.player?.mech;
@@ -450,10 +514,13 @@ class Game {
 function frame() { return new Promise(r => requestAnimationFrame(() => setTimeout(r, 14))); }
 
 const _fwd = new THREE.Vector3();
+const _kcWant = new THREE.Vector3();
+const _kcDir = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
 
 const game = new Game();
 window.__game = game;      // handy for debugging from the console
 window.__MAP_IDS = MAPS.map(m => m.id);
+window.__TOURNAMENTS = TOURNAMENTS;
 game.boot();

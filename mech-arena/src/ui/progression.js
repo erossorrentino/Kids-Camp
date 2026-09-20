@@ -9,6 +9,7 @@ import { MECHS, MECH_BY_ID } from '../data/mechs.js';
 import { WEAPONS, WEAPON_BY_ID } from '../data/weapons.js';
 import { PILOTS, IMPLANTS } from '../data/pilots.js';
 import { SKINS, starterSkins, DEFAULT_SKIN } from '../data/skins.js';
+import { TOURNAMENT_BY_ID } from '../data/tournaments.js';
 import { autoLoadout } from '../game/match.js';
 import { makeRng } from '../core/rng.js';
 
@@ -49,6 +50,7 @@ function freshProfile() {
       fov: 72, showFps: false, difficulty: 'regular', autoQuality: true,
     },
     stats: { bestKills: 0, bestDamage: 0, favouriteMech: null, mechUse: {} },
+    tournaments: { completed: [], best: {}, run: null },
   };
 }
 
@@ -64,7 +66,12 @@ export class Progression {
       const p = JSON.parse(raw);
       // Merge forward so a profile saved by an older build still loads.
       const base = freshProfile();
-      const merged = { ...base, ...p, settings: { ...base.settings, ...(p.settings || {}) }, stats: { ...base.stats, ...(p.stats || {}) } };
+      const merged = {
+        ...base, ...p,
+        settings: { ...base.settings, ...(p.settings || {}) },
+        stats: { ...base.stats, ...(p.stats || {}) },
+        tournaments: { ...base.tournaments, ...(p.tournaments || {}) },
+      };
       if (!Array.isArray(merged.hangar) || !merged.hangar.length) merged.hangar = base.hangar;
       return merged;
     } catch {
@@ -212,4 +219,112 @@ export class Progression {
 
   setSetting(k, v) { this.data.settings[k] = v; this.save(); }
   get settings() { return this.data.settings; }
+
+  /* ================= tournaments ================= */
+
+  get run() { return this.data.tournaments.run; }
+
+  tournamentState(id) {
+    const t = TOURNAMENT_BY_ID[id];
+    if (!t) return null;
+    const run = this.run;
+    return {
+      def: t,
+      completed: this.data.tournaments.completed.includes(id),
+      best: this.data.tournaments.best[id] || 0,
+      active: run?.id === id ? run : null,
+      unlocked: this.rank >= t.rank,
+      affordable: this.data.credits >= t.entryFee,
+    };
+  }
+
+  /** @returns {{ok:boolean, reason?:string}} */
+  enterTournament(id) {
+    const t = TOURNAMENT_BY_ID[id];
+    if (!t) return { ok: false, reason: 'No such circuit' };
+    if (this.run) return { ok: false, reason: 'You are already in a circuit' };
+    if (this.rank < t.rank) return { ok: false, reason: `Requires rank ${t.rank}` };
+    if (this.data.credits < t.entryFee) return { ok: false, reason: 'Cannot cover the entry fee' };
+    this.data.credits -= t.entryFee;
+    this.data.tournaments.run = {
+      id, round: 0, wins: 0,
+      // The lance is locked for the whole circuit: that is the point of one.
+      lance: JSON.parse(JSON.stringify(this.data.hangar.filter(Boolean))),
+      pilotId: this.data.pilotId,
+      implants: [...this.data.implants],
+      credits: 0, xp: 0, kills: 0,
+    };
+    this.save();
+    return { ok: true };
+  }
+
+  abandonRun() {
+    this.data.tournaments.run = null;
+    this.save();
+  }
+
+  /**
+   * Record the result of a circuit round.
+   * @returns {{finished:boolean, won:boolean, payout?:object, reward?:object, round?:object}}
+   */
+  advanceRun(result, award) {
+    const run = this.run;
+    if (!run) return { finished: true, won: false };
+    const t = TOURNAMENT_BY_ID[run.id];
+
+    run.credits += award?.credits || 0;
+    run.xp += award?.xp || 0;
+    const me = result.players.find(p => p.isPlayer);
+    run.kills += me?.kills || 0;
+
+    if (!result.playerWon) {
+      // A loss ends the run. Rounds survived still count for the record.
+      const reached = run.round;
+      this.data.tournaments.best[run.id] = Math.max(this.data.tournaments.best[run.id] || 0, reached);
+      this.data.tournaments.run = null;
+      this.save();
+      return { finished: true, won: false, roundsCleared: reached, total: t.rounds.length };
+    }
+
+    run.wins++;
+    run.round++;
+    this.data.tournaments.best[run.id] = Math.max(this.data.tournaments.best[run.id] || 0, run.round);
+
+    if (run.round < t.rounds.length) {
+      this.save();
+      return { finished: false, won: true, round: t.rounds[run.round], index: run.round, total: t.rounds.length };
+    }
+
+    // Circuit won.
+    this.data.credits += t.purse;
+    this.data.xp += t.xp;
+    if (!this.data.tournaments.completed.includes(t.id)) this.data.tournaments.completed.push(t.id);
+    const reward = t.reward;
+    let rewardGranted = null;
+    if (reward.kind === 'skin' && !this.data.ownedSkins.includes(reward.id)) {
+      this.data.ownedSkins.push(reward.id);
+      rewardGranted = reward;
+    } else if (reward.kind === 'mech' && !this.data.ownedMechs.includes(reward.id)) {
+      this.data.ownedMechs.push(reward.id);
+      rewardGranted = reward;
+    }
+    this.data.tournaments.run = null;
+    this.save();
+    return {
+      finished: true, won: true, total: t.rounds.length,
+      payout: { credits: t.purse, xp: t.xp }, reward: rewardGranted, tournament: t,
+    };
+  }
+
+  /** The locked lance a circuit round must be fought with. */
+  runHangar() {
+    const run = this.run;
+    if (!run) return this.toMatchHangar();
+    return {
+      mechs: run.lance.map(b => ({ chassisId: b.chassisId, loadout: b.loadout, skinId: b.skinId })),
+      pilotId: run.pilotId,
+      implants: (run.implants || []).filter(Boolean),
+      pilotName: this.data.name,
+    };
+  }
 }

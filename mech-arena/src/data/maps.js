@@ -40,9 +40,17 @@ export const BIOMES = {
                 ground:0x3e4450, accent:0xa8c8ff, hazeCol:0x49535f, label:'STORM' },
 };
 
+/**
+ * Every arena generates three objective zones and supports team play, so
+ * by default a map is legal for every competitive mode. A map opts out by
+ * naming its own `modes` list -- which is how the very tight interiors
+ * avoid hosting eight-player free-for-alls.
+ */
+const ALL_MODES = ['tdm', 'ffa', 'control', 'duel', 'king', 'attrition', 'juggernaut'];
+
 const M = (id, name, biome, layout, seed, size, opts = {}) => ({
   id, name, biome, layout, seed, size,
-  modes: opts.modes || ['tdm', 'ffa', 'control', 'duel'],
+  modes: opts.modes || ALL_MODES,
   tier: opts.tier || 1,
   hazard: opts.hazard || null,
   blurb: opts.blurb || '',
@@ -61,12 +69,12 @@ export const MAPS = [
   M('railhub',     'RAIL HUB 12',       'industrial', 'grid',     6642, 540, { verticality:0.4,  density:0.6,  blurb:'Long rail sightlines broken by rolling stock and loading gantries.' }),
 
   /* ---- Desert ---- */
-  M('duneline',    'DUNE LINE',         'desert', 'dunes',    7128, 620, { verticality:0.3, density:0.3, blurb:'Almost no cover. Bring something with reach or bring speed.' }),
+  M('duneline',    'DUNE LINE',         'desert', 'dunes',    7128, 620, { modes:[...ALL_MODES, 'training'], verticality:0.3, density:0.3, blurb:'Almost no cover. Bring something with reach or bring speed.' }),
   M('oasis',       'DEAD OASIS',        'desert', 'basin',    8236, 520, { verticality:0.5, density:0.5, blurb:'A dry basin ringed by cliffs. Whoever holds the rim holds the match.' }),
   M('canyonrun',   'CANYON RUN',        'desert', 'canyon',   9317, 560, { verticality:0.65, density:0.45, blurb:'One long trench with ledges above. Ambush country.' }),
   M('boneyard',    'BONEYARD',          'desert', 'ruins',   10493, 500, { verticality:0.45, density:0.7, blurb:'The wrecks of an entire regiment, left where they fell.' }),
   M('mesa',        'MESA STATION',      'desert', 'spires',  11578, 540, { verticality:0.85, density:0.4, tier:2, blurb:'Flat-topped rock towers connected by bridges. Jump jets strongly advised.' }),
-  M('saltflat',    'SALT FLAT',         'desert', 'dunes',   12654, 680, { verticality:0.2, density:0.2, blurb:'A perfectly flat white plain. The purest gunnery test in the circuit.' }),
+  M('saltflat',    'SALT FLAT',         'desert', 'dunes',   12654, 680, { modes:[...ALL_MODES, 'training'], verticality:0.2, density:0.2, blurb:'A perfectly flat white plain. The purest gunnery test in the circuit.' }),
 
   /* ---- Arctic ---- */
   M('glacier',     'GLACIER SHELF',     'arctic', 'canyon',  13711, 540, { verticality:0.6, density:0.4, hazard:'ice', blurb:'Ice crevasses and wind-carved walls. Footing is treacherous.' }),
@@ -101,20 +109,26 @@ export const MAPS = [
 
   /* ---- Wasteland ---- */
   M('scrapline',   'SCRAPLINE',         'wasteland', 'ruins',  35893, 520, { verticality:0.5, density:0.75, blurb:'Compacted hulks stacked into walls. Everything here used to be a mech.' }),
-  M('craterfield', 'CRATER FIELD',      'wasteland', 'basin',  36904, 560, { verticality:0.4, density:0.4, blurb:'Overlapping bomb craters make rolling cover and terrible footing.' }),
+  M('craterfield', 'CRATER FIELD',      'wasteland', 'basin',  36904, 560, { modes:[...ALL_MODES, 'training'], verticality:0.4, density:0.4, blurb:'Overlapping bomb craters make rolling cover and terrible footing.' }),
   M('highway',     'BROKEN HIGHWAY',    'wasteland', 'canyon', 37015, 600, { verticality:0.65, density:0.5, blurb:'A collapsed elevated roadway. Fight on it, under it, or through it.' }),
   M('silofield',   'SILO FIELD',        'wasteland', 'spires', 38126, 540, { verticality:0.75, density:0.55, tier:2, blurb:'Missile silos turned cover. Climbable, and they explode.' }),
 
   /* ---- Abyssal / storm ---- */
   M('trench',      'ABYSSAL TRENCH',    'underwater', 'canyon', 39237, 480, { verticality:0.6, density:0.5, hazard:'water', tier:3, gravity:0.7, blurb:'Deep-sea mining trench. Everything moves slower and hits softer.' }),
   M('seafloor',    'SEAFLOOR ARRAY',    'underwater', 'grid',   40348, 460, { verticality:0.45, density:0.7, hazard:'water', tier:3, gravity:0.7, blurb:'A sensor farm on the abyssal plain, lit only by your own floods.' }),
-  M('stormfront',  'STORM FRONT',       'storm', 'dunes',       41459, 600, { verticality:0.35, density:0.35, hazard:'lightning', tier:2, blurb:'Open ground in a supercell. Lightning genuinely does strike the tallest mech.' }),
+  M('stormfront',  'STORM FRONT',       'storm', 'dunes',       41459, 600, { modes:[...ALL_MODES, 'training'], verticality:0.35, density:0.35, hazard:'lightning', tier:2, blurb:'Open ground in a supercell. Lightning genuinely does strike the tallest mech.' }),
   M('thunderhead', 'THUNDERHEAD MESA',  'storm', 'spires',      42560, 560, { verticality:0.8, density:0.4, hazard:'lightning', tier:3, blurb:'Rock towers in a permanent electrical storm. Height is power and risk.' }),
 ];
 
 export const MAP_BY_ID = Object.fromEntries(MAPS.map(m => [m.id, m]));
 
-export function mapsForMode(mode) { return MAPS.filter(m => m.modes.includes(mode)); }
+export function mapsForMode(mode) {
+  const pool = MAPS.filter(m => m.modes.includes(mode));
+  // A mode with no arena is unplayable, and the menu would render an empty
+  // list rather than telling anyone. Falling back to the team-deathmatch
+  // pool keeps a new or mis-tagged mode launchable.
+  return pool.length ? pool : MAPS.filter(m => m.modes.includes('tdm'));
+}
 export function randomMap(mode, rng = Math.random) {
   const pool = mapsForMode(mode);
   return pool[Math.floor(rng() * pool.length)];

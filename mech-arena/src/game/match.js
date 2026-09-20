@@ -447,7 +447,9 @@ export class Match {
     if (i >= 0) this.mechs.splice(i, 1);
     entry.mech = null;
 
-    if (entry.isPlayer) this.onEvent?.({ type: 'playerDown', entry });
+    if (entry.isPlayer) {
+      this.onEvent?.({ type: 'playerDown', entry, killer, lastPosition: pos });
+    }
     this._checkEnd();
   }
 

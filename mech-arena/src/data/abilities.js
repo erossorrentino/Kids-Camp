@@ -132,7 +132,10 @@ export const ABILITIES = {
   }),
 
   smoke: A({
-    id:'smoke', name:'SMOKE SCREEN', icon:'🌫️', cooldown:14, duration:7.0,
+    // The cloud carries its own seven-second lifetime in the world, so the
+    // ability itself is instant -- a duration here would only gate re-use,
+    // which the cooldown already does.
+    id:'smoke', name:'SMOKE SCREEN', icon:'🌫️', cooldown:14, duration:0,
     desc:'Fire a chaff canister. Blocks line of sight and breaks every missile lock inside 20m.',
     onActivate(ctx) {
       const m = ctx.mech;
@@ -211,7 +214,8 @@ export const ABILITIES = {
   }),
 
   scan: A({
-    id:'scan', name:'DEEP SCAN', icon:'🔍', cooldown:15, duration:8.0,
+    // revealAll() holds the reveal for eight seconds on its own.
+    id:'scan', name:'DEEP SCAN', icon:'🔍', cooldown:15, duration:0,
     desc:'Reveal every enemy on the map through walls for your whole team, and hand them free missile locks.',
     onActivate(ctx) {
       ctx.match.revealAll(ctx.mech.team, 8.0);
