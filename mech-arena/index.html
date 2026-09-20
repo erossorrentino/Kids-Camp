@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>Mech Arena — Iron Vanguard</title>
+<meta name="description" content="A 3D mech battle arena: pilot heavy war machines, build loadouts, and fight five-minute matches." />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>&#129302;</text></svg>" />
+<link rel="stylesheet" href="./styles.css" />
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three/three.module.js",
+    "three/addons/": "./vendor/addons/"
+  }
+}
+</script>
+</head>
+<body>
+<canvas id="viewport"></canvas>
+
+<!-- ============ IN-MATCH HUD ============ -->
+<div id="hud" class="hidden" aria-hidden="true">
+  <svg id="reticle" viewBox="0 0 200 200" width="200" height="200">
+    <g id="ret-static">
+      <circle cx="100" cy="100" r="2.5" class="ret-dot"/>
+      <path d="M100 76 L100 88 M100 112 L100 124 M76 100 L88 100 M112 100 L124 100" class="ret-tick"/>
+    </g>
+    <circle id="ret-spread" cx="100" cy="100" r="30" class="ret-spread"/>
+    <g id="ret-lock" class="hidden">
+      <path d="M62 62 h18 M62 62 v18 M138 62 h-18 M138 62 v18 M62 138 h18 M62 138 v-18 M138 138 h-18 M138 138 v-18" class="ret-lockmark"/>
+    </g>
+    <circle id="ret-lock-arc" cx="100" cy="100" r="52" class="ret-lockarc"/>
+  </svg>
+
+  <div id="hit-marker"></div>
+  <div id="damage-vignette"></div>
+  <div id="heat-warning" class="hidden">HEAT CRITICAL</div>
+  <div id="shutdown-banner" class="hidden">
+    <span class="big">REACTOR SHUTDOWN</span>
+    <span class="sub">Emergency cooling — hold <kbd>Shift</kbd> to force restart</span>
+  </div>
+
+  <!-- Top bar: score + timer -->
+  <div id="topbar">
+    <div class="score team-a"><span id="score-a">0</span></div>
+    <div id="clock">
+      <div id="timer">5:00</div>
+      <div id="mode-label">TEAM DEATHMATCH</div>
+    </div>
+    <div class="score team-b"><span id="score-b">0</span></div>
+  </div>
+
+  <div id="objectives"></div>
+  <div id="killfeed"></div>
+  <div id="event-toast"></div>
+
+  <!-- Bottom left: mech status / paper doll -->
+  <div id="status-panel">
+    <div id="paperdoll"></div>
+    <div id="status-readout">
+      <div class="bar-row"><label>STRUCTURE</label><div class="bar"><i id="bar-hp"></i></div><span id="val-hp">100%</span></div>
+      <div class="bar-row"><label>SHIELD</label><div class="bar shield"><i id="bar-shield"></i></div><span id="val-shield">0</span></div>
+      <div class="bar-row"><label>HEAT</label><div class="bar heat"><i id="bar-heat"></i><u id="heat-redline"></u></div><span id="val-heat">0%</span></div>
+      <div class="bar-row"><label>JETS</label><div class="bar jets"><i id="bar-jets"></i></div><span id="val-jets">100%</span></div>
+    </div>
+  </div>
+
+  <!-- Bottom right: weapons -->
+  <div id="weapon-panel"></div>
+
+  <!-- Bottom center: ability -->
+  <div id="ability-panel">
+    <div id="ability-icon">—</div>
+    <div id="ability-meta">
+      <div id="ability-name">NONE</div>
+      <div id="ability-key">SPACE</div>
+    </div>
+    <div id="ability-cd"></div>
+  </div>
+
+  <!-- Radar -->
+  <div id="radar"><canvas id="radar-canvas" width="320" height="320"></canvas><div id="radar-ring"></div></div>
+
+  <div id="speedo"><span id="speed-val">0</span><small>KPH</small></div>
+
+  <div id="respawn-overlay" class="hidden">
+    <h2>MECH DESTROYED</h2>
+    <p id="respawn-killer"></p>
+    <p class="hint">Select your next machine</p>
+    <div id="respawn-choices"></div>
+  </div>
+
+  <div id="scoreboard" class="hidden"></div>
+</div>
+
+<!-- ============ MENUS ============ -->
+<div id="ui-root"></div>
+
+<div id="loading">
+  <div class="load-inner">
+    <div class="load-logo">IRON<span>VANGUARD</span></div>
+    <div class="load-bar"><i id="load-fill"></i></div>
+    <div id="load-text">Spinning up reactors…</div>
+  </div>
+</div>
+
+<div id="fps" class="hidden"></div>
+<div id="pointer-hint" class="hidden">Click to capture mouse</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
