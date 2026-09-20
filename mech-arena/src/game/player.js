@@ -71,6 +71,7 @@ export class PlayerController {
       mech.wantJump = inp.isDown('jump');
       mech.wantBrake = inp.isDown('brake');
       if (inp.pressed('ability')) mech.wantAbility = true;
+      if (inp.pressed('melee')) mech.wantMelee = true;
     } else {
       mech.moveX = mech.moveZ = 0;
       mech.wantJump = false;

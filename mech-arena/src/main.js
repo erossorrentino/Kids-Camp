@@ -19,6 +19,7 @@ import { Menus } from './ui/menus.js';
 import { HangarScene } from './ui/hangarScene.js';
 import { Progression } from './ui/progression.js';
 import { Tutorial } from './ui/tutorial.js';
+import { Markers } from './ui/markers.js';
 import { MAPS, MAP_BY_ID, mapsForMode, BIOMES } from './data/maps.js';
 import { clamp } from './core/rng.js';
 
@@ -50,6 +51,8 @@ class Game {
 
     this.sky = new Sky(this.engine.scene);
     this.tutorial = new Tutorial(this.audio);
+    this.markers = new Markers(this.engine.camera);
+    this.markers.setVisible(false);
     this.hangarScene = new HangarScene(this.engine);
 
     this.menus = new Menus({
@@ -198,6 +201,7 @@ class Game {
     this.paused = false;
     this._pendingRespawn = false;
     this.hud.show();
+    this.markers.setVisible(true);
     this.hud.hideRespawn();
     this.hud.toast(def.name, BIOMES[def.biome].label);
     if (this.match.mode.tutorial) {
@@ -205,6 +209,7 @@ class Game {
     } else {
       this.tutorial.stop();
     }
+    this.audio.ambience(def.biome);
     this.input.requestLock();
     this.accumulator = 0;
     this.lastTime = performance.now();
@@ -219,6 +224,7 @@ class Game {
 
     this.state = 'menu';
     this.tutorial.stop();
+    this.markers.setVisible(false);
     this.menus.suspended = false;
     this.input.releaseLock();
     this.hud.hide();
@@ -227,6 +233,8 @@ class Game {
     document.getElementById('pointer-hint').classList.add('hidden');
 
     this.sky.detach();
+    this.audio.stopAmbience();
+    this.audio.stopAllLoops();
     if (this.arena) { this.engine.scene.remove(this.arena.group); this.arena.dispose(); this.arena = null; }
     if (this.match) { this.match.dispose(); this.match = null; }
 
@@ -236,6 +244,7 @@ class Game {
   onMatchEvent(e) {
     this.hud.onMatchEvent(e);
     this._lastEvent = e;
+    this._markerFeedback(e);
     if (e.type === 'playerDown') {
       this._pendingRespawn = true;
       this.input.releaseLock();
@@ -339,6 +348,7 @@ class Game {
       this._lastEvent = null;
     }
     this._fadeCloseMechs(m, mech);
+    this.markers.update(dt, m, mech, this.controller);
     this.hud.update(m, mech, this.controller, dt);
     this.hud.setScoreboard(m, this.controller.scoreboardOpen);
 
@@ -386,6 +396,24 @@ class Game {
     this.hud.toast('GRAPHICS ' + (order.indexOf(next) < i ? 'REDUCED' : 'RAISED'), next.toUpperCase());
     this._perfCooldown = 14;
     this._perfWindow.length = 0;
+  }
+
+  /** Floating numbers for damage dealt, and a ring segment for damage taken. */
+  _markerFeedback(e) {
+    const me = this.match?.player?.mech;
+    if (e.type === 'hit' && e.target) {
+      const p = e.target.position.clone();
+      p.y += e.target.height * (0.45 + Math.random() * 0.3);
+      p.x += (Math.random() - 0.5) * 2;
+      p.z += (Math.random() - 0.5) * 2;
+      this.markers.damage(p, e.amount, e.killing ? 'kill' : e.amount >= 70 ? 'crit' : 'hit');
+    } else if (e.type === 'taken' && me) {
+      const from = e.from || e.attacker?.position;
+      const angle = from
+        ? Math.atan2(from.x - me.position.x, from.z - me.position.z)
+        : me.aimYaw + Math.PI;
+      this.markers.incoming(angle, e.amount);
+    }
   }
 
   /**

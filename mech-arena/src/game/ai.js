@@ -171,6 +171,7 @@ export class BotBrain {
     if (m.shutdown) next = 'retreat';
     else if (hp < 0.24 && this.rng.chance(this.d.heatIQ)) next = 'retreat';
     else if (heat > 0.9 && this.d.heatIQ > 0.4) next = 'retreat';
+    else if (this._wantsResupply()) next = 'resupply';
     else if (this.isSupport && this._woundedAlly()) next = 'support';
     else if (this.target && seen) {
       const dist = m.position.distanceTo(this.target.position);
@@ -210,6 +211,7 @@ export class BotBrain {
     m.wantJump = false;
     m.wantBrake = false;
     m.firing.clear();
+    this._considerMelee();
 
     switch (this.state) {
       case 'engage': this._engage(dt); break;
@@ -218,6 +220,7 @@ export class BotBrain {
       case 'support': this._support(dt); break;
       case 'capture': this._capture(dt); break;
       case 'hunt': this._hunt(dt); break;
+      case 'resupply': this._resupply(dt); break;
       default: this._patrol(dt); break;
     }
 
@@ -343,6 +346,54 @@ export class BotBrain {
     } else {
       m.aimYaw = damp(m.aimYaw, m.yaw, 3, dt);
     }
+  }
+
+  /**
+   * Does this pilot have a reason to break off for a resupply pad, and is
+   * one close enough to be worth the walk?
+   */
+  _wantsResupply() {
+    const pads = this.match.pickups;
+    if (!pads) return false;
+    const m = this.mech;
+
+    let want = null;
+    if (m.healthFraction < 0.5) want = 'repair';
+    else if (m.heatFraction > 0.85) want = 'coolant';
+    else if (this._lowOnAmmo()) want = 'ammo';
+    if (!want) return false;
+
+    const pad = pads.nearestLive(m.position, want) || pads.nearestLive(m.position);
+    if (!pad) return false;
+    // Only worth it if it is nearer than the fight is dangerous.
+    const d = pad.pos.distanceTo(m.position);
+    if (d > 220) return false;
+    this.resupplyPad = pad;
+    return true;
+  }
+
+  _lowOnAmmo() {
+    const m = this.mech;
+    let any = false, dry = 0, total = 0;
+    for (const w of m.weapons) {
+      if (!w || w.destroyed || w.def.ammo < 0) continue;
+      any = true; total++;
+      const max = Math.round(w.def.ammo * (1 + (m.mods.ammo || 0)));
+      if (w.ammo < max * 0.2) dry++;
+    }
+    return any && dry / total > 0.6;
+  }
+
+  _resupply(dt) {
+    const m = this.mech;
+    const pad = this.resupplyPad;
+    if (!pad || pad.cooldown > 0) { this.state = 'patrol'; this.stateTime = 0; return; }
+    this._navigateTo(pad.pos, dt, 1);
+    if (this.target && this._canSee(this.target)) {
+      this._aimAt(this.target, dt, true);
+      this._shoot(this.target, m.position.distanceTo(this.target.position), dt);
+    }
+    if (m.position.distanceTo(pad.pos) < 6) { this.state = 'engage'; this.stateTime = 0; }
   }
 
   /**
@@ -557,6 +608,25 @@ export class BotBrain {
       if (d.mode === 'lock' && (d.flags || []).includes('homing') && m.lockedTarget !== target) continue;
       m.firing.add(w.index);
     }
+  }
+
+  /**
+   * Throw a punch when something is already inside knife range. Bots do
+   * not chase for melee -- that reads as suicidal -- but they will not
+   * pass up a free hit either.
+   */
+  _considerMelee() {
+    const m = this.mech;
+    if (m.meleeCooldown > 0 || m.meleeSwing > 0 || m.shutdown) return;
+    const t = this.target;
+    if (!t || !t.alive || t.team === m.team) return;
+    const d = m.position.distanceTo(t.position);
+    if (d > m.meleeReach + t.radius * 0.8) return;
+    // Only when actually facing them, and only as often as skill allows.
+    const to = _v6.subVectors(t.position, m.position).setY(0).normalize();
+    if (to.dot(m.aimForward(_v5).setY(0).normalize()) < 0.65) return;
+    if (!this.rng.chance(0.35 + this.d.abilityIQ * 0.6)) return;
+    m.wantMelee = true;
   }
 
   /* ---- abilities ---- */

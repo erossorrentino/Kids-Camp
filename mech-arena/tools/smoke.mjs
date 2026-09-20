@@ -129,6 +129,20 @@ for (const mapId of MAPS_TO_TEST) {
   await page.screenshot({ path: join(OUT, `10-match-${mapId}.png`) });
 }
 
+await step('combat frame', async () => {
+  // Software rendering runs at a few frames a second, so the countdown has
+  // not elapsed in wall time. Start the fight and simulate into the middle
+  // of it, then let one frame render so the shot shows a real firefight.
+  await page.evaluate(() => {
+    const g = window.__game;
+    g.match.state = 'live';
+    g.match.countdown = 0;
+    for (let i = 0; i < 2400; i++) g.match.update(1 / 60, null);
+  });
+  await page.waitForTimeout(1600);
+});
+await page.screenshot({ path: join(OUT, '09-combat.png') });
+
 await step('cockpit view', async () => {
   await page.evaluate(() => { window.__game.controller.view = 'cockpit'; });
   await page.waitForTimeout(900);

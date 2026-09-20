@@ -449,6 +449,7 @@ export class Menus {
           <div class="kv"><span>ZOOM</span><b>RMB / V</b></div>
           <div class="kv"><span>JUMP JETS</span><b>SPACE</b></div>
           <div class="kv"><span>ABILITY</span><b>Q</b></div>
+          <div class="kv"><span>MELEE</span><b>R</b></div>
           <div class="kv"><span>WEAPONS</span><b>1 – 6 / WHEEL</b></div>
           <div class="kv"><span>FIRE GROUPS</span><b>Z X C</b></div>
           <div class="kv"><span>COCKPIT VIEW</span><b>F</b></div>
@@ -528,6 +529,8 @@ export class Menus {
         ${codexCard('LOCKS, ECM AND SMOKE', `Guided missiles need a lock: hold the target near your crosshair until the ring closes. An enemy ECM field, a smoke canister or simply breaking line of sight will drop the lock — even mid-flight, which sends the whole volley stupid.<br><br>A <b>TAG</b> designator gives your entire team a lock without one.`)}
         ${codexCard('USE THE ABILITY, ALWAYS', `An ability on cooldown is doing nothing. Bulwark before you peek, not after you are hit. Charge when they are reloading. Stomp when a light mech closes. The difference between pilots at the same rank is almost entirely ability timing.`)}
         ${codexCard('JUMP JETS COST ARMOUR', `Fuel regenerates on the ground and hard landings damage your legs. Jets are for repositioning and for getting an angle nobody expected — not for permanent flight. Landing on someone with Death From Above is, however, entirely correct.`)}
+        ${codexCard('PUNCH THINGS', `<b>R</b> throws a physical attack with whichever arm you still have — a kick if both are gone. No heat, no ammunition, and it hits harder than any small weapon: damage scales with your tonnage, it staggers, and it shoves the target bodily backwards.<br><br>The catch is the range. To land it you have to be close enough that everything they own is in its optimal bracket. Assault mechs love it. Lights use it to finish something already broken.`)}
+        ${codexCard('RESUPPLY PADS', `Every arena has coolant, ammunition, field repair and shield-cell pads. They go dormant for twenty to thirty seconds after use and then come back in the same place, so their positions are worth learning.<br><br>A pad will not trigger if it has nothing to give you — walking over a coolant pad while cold leaves it up for the teammate behind you.`)}
         ${codexCard('FIRE GROUPS', `<b>1–6</b> select a single weapon. <b>Z</b> fires group Alpha (your first two hardpoints), <b>X</b> fires group Beta, <b>C</b> fires everything.<br><br>Chain-firing a group of lasers keeps heat manageable; alpha-striking wins the exchange and then you walk away to cool down.`)}
       </div>
     </div>`;

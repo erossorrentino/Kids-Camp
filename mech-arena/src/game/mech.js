@@ -68,6 +68,16 @@ export class Mech {
     this.wantBrake = false;
     this.firing = new Set();
     this.wantAbility = false;
+    this.wantMelee = false;
+
+    /* ---- melee ---- */
+    // A physical attack: no heat, no ammunition, and it hits far harder
+    // than any small weapon -- but you have to be close enough to be hit
+    // back by everything they own.
+    this.meleeCooldown = 0;
+    this.meleeSwing = 0;
+    this.meleeArm = 1;
+    this.meleeHit = false;
 
     /* ---- combat state ---- */
     this.armour = {}; this.structure = {};
@@ -308,6 +318,7 @@ export class Mech {
     this.firedThisFrame = false;
 
     this._updateAbility(dt, ctx);
+    this._updateMelee(dt, ctx);
     this._updateThermals(dt);
     this._updateMovement(dt);
     this._updateWeapons(dt, ctx);
@@ -585,6 +596,182 @@ export class Mech {
     }
   }
 
+  /* ---- melee ---- */
+
+  /** Reach of a punch or kick, measured from the mech's own hull. */
+  get meleeReach() { return this.radius + this.height * 0.42; }
+
+  /** Damage scales with tonnage, and with an intact arm to swing. */
+  get meleeDamage() {
+    const armed = !this.destroyed[this.meleeArm > 0 ? 'RA' : 'LA'];
+    return this.chassis.tons * (armed ? 2.1 : 1.3) + 40;
+  }
+
+  _updateMelee(dt, ctx) {
+    this.meleeCooldown = Math.max(0, this.meleeCooldown - dt);
+
+    if (this.meleeSwing > 0) {
+      const before = this.meleeSwing;
+      this.meleeSwing = Math.max(0, this.meleeSwing - dt);
+      // Contact lands in the middle of the swing, once.
+      if (!this.meleeHit && before > MELEE_CONTACT && this.meleeSwing <= MELEE_CONTACT) {
+        this.meleeHit = true;
+        this._resolveMelee(ctx);
+      }
+      return;
+    }
+
+    if (!this.wantMelee) return;
+    this.wantMelee = false;
+    if (this.meleeCooldown > 0 || this.shutdown || this.staggerTime > 0) return;
+
+    this.meleeSwing = MELEE_DURATION;
+    this.meleeHit = false;
+    this.meleeCooldown = 2.2;
+    // Swing with whichever arm still exists; kick if both are gone.
+    this.meleeArm = !this.destroyed.RA ? 1 : !this.destroyed.LA ? -1 : 0;
+    this.audio.play('brace', this.position);
+  }
+
+  _resolveMelee(ctx) {
+    const match = ctx?.match || this._ctx?.match;
+    if (!match) return;
+    const fwd = this.aimForward(_fwd).setY(0).normalize();
+    const reach = this.meleeReach;
+    let best = null, bestDot = 0.45;
+
+    for (const other of match.aliveMechs()) {
+      if (other === this || other.team === this.team) continue;
+      const to = _v3.subVectors(other.position, this.position);
+      const dist = to.length();
+      if (dist > reach + other.radius) continue;
+      to.setY(0).normalize();
+      const dot = to.dot(fwd);
+      if (dot < bestDot) continue;
+      bestDot = dot;
+      best = other;
+    }
+
+    const impact = this.position.clone()
+      .addScaledVector(fwd, reach * 0.8)
+      .setY(this.position.y + this.height * 0.5);
+
+    if (!best) {
+      // A whiffed swing still scars the scenery, which makes it feel physical.
+      this.fx.sparks(impact, fwd.clone().negate(), 4, 0xbfc8d0);
+      this.audio.impact(impact, 'stone');
+      return;
+    }
+
+    const dmg = this.meleeDamage;
+    // Punches land high, kicks land low.
+    const loc = this.meleeArm === 0 ? (Math.random() < 0.5 ? 'LL' : 'RL')
+      : best.height > this.height * 1.25 ? 'CT'
+      : (Math.random() < 0.3 ? 'HD' : 'CT');
+
+    match.applyDamage(best, this, dmg, {
+      location: loc, source: 'melee', from: this.position, point: impact,
+      type: 'kinetic', stagger: 1.1, shred: true,
+    });
+    // Shove them off their feet -- a 100-ton punch should move a light mech.
+    const push = (this.chassis.tons / Math.max(25, best.chassis.tons)) * 13;
+    best.velocity.addScaledVector(fwd, push);
+    best.velocity.y += push * 0.28;
+
+    this.fx.impactBurst(impact, 1.5, 0xffd9a0);
+    this.fx.ring(impact, 0.5, 5, 0xffe8c0, 0.3, true);
+    this.audio.explosion(impact, 0.5);
+    if (this.isPlayer) this.fx.shakeRequest = Math.max(this.fx.shakeRequest, 0.45);
+  }
+
+  /* ---- melee ---- */
+
+  /** Reach of a punch or kick, measured from the mech's own hull. */
+  get meleeReach() { return this.radius + this.height * 0.42; }
+
+  /** Damage scales with tonnage, and with an intact arm to swing. */
+  get meleeDamage() {
+    const armed = !this.destroyed[this.meleeArm > 0 ? 'RA' : 'LA'];
+    return this.chassis.tons * (armed ? 2.1 : 1.3) + 40;
+  }
+
+  _updateMelee(dt, ctx) {
+    this.meleeCooldown = Math.max(0, this.meleeCooldown - dt);
+
+    if (this.meleeSwing > 0) {
+      const before = this.meleeSwing;
+      this.meleeSwing = Math.max(0, this.meleeSwing - dt);
+      // Contact lands in the middle of the swing, once.
+      if (!this.meleeHit && before > MELEE_CONTACT && this.meleeSwing <= MELEE_CONTACT) {
+        this.meleeHit = true;
+        this._resolveMelee(ctx);
+      }
+      return;
+    }
+
+    if (!this.wantMelee) return;
+    this.wantMelee = false;
+    if (this.meleeCooldown > 0 || this.shutdown || this.staggerTime > 0) return;
+
+    this.meleeSwing = MELEE_DURATION;
+    this.meleeHit = false;
+    this.meleeCooldown = 2.2;
+    // Swing with whichever arm still exists; kick if both are gone.
+    this.meleeArm = !this.destroyed.RA ? 1 : !this.destroyed.LA ? -1 : 0;
+    this.audio.play('brace', this.position);
+  }
+
+  _resolveMelee(ctx) {
+    const match = ctx?.match || this._ctx?.match;
+    if (!match) return;
+    const fwd = this.aimForward(_fwd).setY(0).normalize();
+    const reach = this.meleeReach;
+    let best = null, bestDot = 0.45;
+
+    for (const other of match.aliveMechs()) {
+      if (other === this || other.team === this.team) continue;
+      const to = _v3.subVectors(other.position, this.position);
+      const dist = to.length();
+      if (dist > reach + other.radius) continue;
+      to.setY(0).normalize();
+      const dot = to.dot(fwd);
+      if (dot < bestDot) continue;
+      bestDot = dot;
+      best = other;
+    }
+
+    const impact = this.position.clone()
+      .addScaledVector(fwd, reach * 0.8)
+      .setY(this.position.y + this.height * 0.5);
+
+    if (!best) {
+      // A whiffed swing still scars the scenery, which makes it feel physical.
+      this.fx.sparks(impact, fwd.clone().negate(), 4, 0xbfc8d0);
+      this.audio.impact(impact, 'stone');
+      return;
+    }
+
+    const dmg = this.meleeDamage;
+    // Punches land high, kicks land low.
+    const loc = this.meleeArm === 0 ? (Math.random() < 0.5 ? 'LL' : 'RL')
+      : best.height > this.height * 1.25 ? 'CT'
+      : (Math.random() < 0.3 ? 'HD' : 'CT');
+
+    match.applyDamage(best, this, dmg, {
+      location: loc, source: 'melee', from: this.position, point: impact,
+      type: 'kinetic', stagger: 1.1, shred: true,
+    });
+    // Shove them off their feet -- a 100-ton punch should move a light mech.
+    const push = (this.chassis.tons / Math.max(25, best.chassis.tons)) * 13;
+    best.velocity.addScaledVector(fwd, push);
+    best.velocity.y += push * 0.28;
+
+    this.fx.impactBurst(impact, 1.5, 0xffd9a0);
+    this.fx.ring(impact, 0.5, 5, 0xffe8c0, 0.3, true);
+    this.audio.explosion(impact, 0.5);
+    if (this.isPlayer) this.fx.shakeRequest = Math.max(this.fx.shakeRequest, 0.45);
+  }
+
   /* ---- ability ---- */
   _updateAbility(dt, ctx) {
     if (this.wantAbility && !this.abilityActive && this.abilityCd <= 0 && !this.shutdown) {
@@ -845,6 +1032,24 @@ export class Mech {
     rig.armL.elbow.rotation.x = damp(rig.armL.elbow.rotation.x, -0.12 - this.recoil * 0.25, 14, dt);
     rig.armR.elbow.rotation.x = damp(rig.armR.elbow.rotation.x, -0.12 - this.recoil * 0.25, 14, dt);
 
+    if (this.meleeSwing > 0) {
+      // Wind up, then throw: a fast forward swing out of a cocked shoulder.
+      const t = 1 - this.meleeSwing / MELEE_DURATION;
+      const throwPhase = clamp((t - 0.35) / 0.4, 0, 1);
+      const swing = t < 0.35 ? -t / 0.35 * 1.3 : lerp(-1.3, 1.5, throwPhase);
+      const arm = this.meleeArm > 0 ? rig.armR : this.meleeArm < 0 ? rig.armL : null;
+      if (arm) {
+        arm.upper.rotation.x = swing;
+        arm.elbow.rotation.x = -0.9 + throwPhase * 0.85;
+      } else {
+        // No arms left: throw a kick instead.
+        const leg = rig.legR;
+        leg.thigh.rotation.x = swing * 0.8;
+        leg.knee.rotation.x = 0.4 - throwPhase * 0.4;
+      }
+      rig.torsoYaw.rotation.y += -this.meleeArm * (t < 0.35 ? 0.3 : 0.3 - throwPhase * 0.55);
+    }
+
     this.recoil = damp(this.recoil, 0, 9, dt);
 
     // Commit the transform.
@@ -878,7 +1083,11 @@ export class Mech {
   }
 }
 
+const MELEE_DURATION = 0.55;
+const MELEE_CONTACT = 0.55 * 0.42;   // where in the swing contact lands
+
 const _colBuf = [];
 const _muzzlePos = new THREE.Vector3();
 const _fwd = new THREE.Vector3();
 const _v3 = new THREE.Vector3();
+const _mfwd = new THREE.Vector3();

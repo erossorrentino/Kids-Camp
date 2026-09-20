@@ -13,7 +13,7 @@ export const DEFAULT_BINDS = {
   weapon4:['Digit4'], weapon5:['Digit5'], weapon6:['Digit6'],
   groupAlpha:['KeyZ'], groupBeta:['KeyX'], groupAll:['KeyC'],
   zoom:['KeyV'], cockpit:['KeyF'], scoreboard:['Tab'], target:['KeyE'],
-  powerdown:['KeyP'], menu:['Escape'], radarPing:['KeyG'], nextTarget:['KeyR'],
+  powerdown:['KeyP'], menu:['Escape'], radarPing:['KeyG'], melee:['KeyR'],
 };
 
 export class Input {

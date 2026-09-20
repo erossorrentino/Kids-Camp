@@ -443,6 +443,9 @@ export class HUD {
       case 'zoneRotate':
         this.toast('ZONE RELOCATED', e.zone.name);
         break;
+      case 'pickup':
+        this.toast(e.pad.type.label, e.pad.type.desc);
+        break;
     }
   }
 

@@ -9,6 +9,7 @@ import * as THREE from 'three';
 import { Mech } from './mech.js';
 import { Combat } from './combat.js';
 import { BotBrain } from './ai.js';
+import { Pickups } from '../world/pickups.js';
 import { getMode } from '../data/modes.js';
 import { MECHS, MECH_BY_ID, battleValue } from '../data/mechs.js';
 import { WEAPONS, WEAPON_BY_ID, fitsHardpoint, dps } from '../data/weapons.js';
@@ -50,6 +51,11 @@ export class Match {
     this.brains = new Map();
     this.players = [];               // roster entries (a pilot + their hangar)
     this.combat = new Combat(this, world, fx, audio);
+    // Resupply pads, scaled to the arena so a big map is not a long walk
+    // between them. The training range does not need them.
+    this.pickups = this.mode.objective === 'training'
+      ? null
+      : new Pickups(world, fx, audio, clamp(Math.round(world.size / 78), 5, 11));
     this.player = null;              // the human's roster entry
     this.reveals = [];               // { team, until }
     this.zones = world.zones;
@@ -510,6 +516,11 @@ export class Match {
     }
 
     this.combat.update(simDt);
+    if (this.pickups && live) {
+      this.pickups.update(simDt, this.mechs, (pad, mech) => {
+        if (mech.isPlayer) this.onEvent?.({ type: 'pickup', pad, mech });
+      });
+    }
     this.world.update(dt, this.engine.camera.position);
 
     if (live) {
@@ -730,6 +741,8 @@ export class Match {
   }
 
   dispose() {
+    this.pickups?.dispose();
+    this.pickups = null;
     for (const m of this.mechs) { this.scene.remove(m.root); }
     this.mechs.length = 0;
     this.brains.clear();

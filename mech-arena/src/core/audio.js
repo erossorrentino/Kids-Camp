@@ -39,6 +39,13 @@ export class Audio {
     this.comp.release.value = 0.18;
     this.master.connect(this.comp).connect(this.ctx.destination);
     this._buildNoise();
+    // A bed requested before the context existed (i.e. before the first
+    // click) starts as soon as audio is unlocked.
+    if (this._pendingAmbience) {
+      const k = this._pendingAmbience;
+      this._pendingAmbience = null;
+      this.ambience(k);
+    }
   }
 
   setVolume(v) { this.volume = v; if (this.master) this.master.gain.value = v; }
@@ -233,4 +240,87 @@ export class Audio {
     this._loops.delete(id);
   }
   stopAllLoops() { for (const id of [...this._loops.keys()]) this.stopLoop(id); }
+
+  /* ------------------------------------------------------------------ *
+   * Ambience
+   * ------------------------------------------------------------------ */
+
+  /**
+   * A per-biome atmosphere bed: filtered noise for wind or rain, a low
+   * drone for the room tone, and a slow LFO on the filter so it breathes
+   * instead of sitting there as a flat hiss.
+   */
+  ambience(kind) {
+    if (!this.ctx) { this._pendingAmbience = kind; return; }
+    if (this._ambKind === kind) return;
+    this.stopAmbience();
+    this._ambKind = kind;
+    if (!kind) return;
+
+    const P = AMBIENCE[kind] || AMBIENCE.default;
+    const t = this.ctx.currentTime;
+
+    const src = this._noiseSource(P.rate);
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = P.filter;
+    filter.frequency.value = P.freq;
+    filter.Q.value = P.q;
+
+    const gain = this.ctx.createGain();
+    gain.gain.value = 0;
+    src.connect(filter).connect(gain).connect(this.master);
+    src.start();
+    gain.gain.setTargetAtTime(P.gain, t, 1.4);
+
+    // Slow sweep so the wind rises and falls.
+    const lfo = this.ctx.createOscillator();
+    const lfoGain = this.ctx.createGain();
+    lfo.frequency.value = P.lfo;
+    lfoGain.gain.value = P.freq * P.sweep;
+    lfo.connect(lfoGain).connect(filter.frequency);
+    lfo.start();
+
+    const drone = this.ctx.createOscillator();
+    const droneGain = this.ctx.createGain();
+    drone.type = 'sawtooth';
+    drone.frequency.value = P.drone;
+    droneGain.gain.value = 0;
+    const droneFilter = this.ctx.createBiquadFilter();
+    droneFilter.type = 'lowpass';
+    droneFilter.frequency.value = P.drone * 4;
+    drone.connect(droneFilter).connect(droneGain).connect(this.master);
+    drone.start();
+    droneGain.gain.setTargetAtTime(P.droneGain, t, 2.0);
+
+    this._amb = { src, gain, lfo, lfoGain, drone, droneGain };
+  }
+
+  stopAmbience() {
+    this._ambKind = null;
+    const a = this._amb;
+    if (!a) return;
+    this._amb = null;
+    const t = this.ctx.currentTime;
+    a.gain.gain.setTargetAtTime(0, t, 0.5);
+    a.droneGain.gain.setTargetAtTime(0, t, 0.5);
+    setTimeout(() => {
+      for (const n of [a.src, a.lfo, a.drone]) { try { n.stop(); } catch {} }
+    }, 1600);
+  }
 }
+
+/* Atmosphere presets. `gain` values are deliberately low: this is a bed
+ * that should be felt rather than heard over the guns. */
+const AMBIENCE = {
+  default:    { filter:'bandpass', freq:420,  q:0.7, rate:0.6,  gain:0.018, lfo:0.06, sweep:0.5, drone:48, droneGain:0.012 },
+  desert:     { filter:'bandpass', freq:620,  q:0.5, rate:0.75, gain:0.026, lfo:0.08, sweep:0.6, drone:42, droneGain:0.008 },
+  arctic:     { filter:'highpass', freq:900,  q:0.4, rate:1.0,  gain:0.038, lfo:0.11, sweep:0.5, drone:38, droneGain:0.010 },
+  storm:      { filter:'lowpass',  freq:1400, q:0.3, rate:1.2,  gain:0.055, lfo:0.16, sweep:0.4, drone:34, droneGain:0.016 },
+  industrial: { filter:'bandpass', freq:230,  q:1.6, rate:0.4,  gain:0.030, lfo:0.05, sweep:0.3, drone:56, droneGain:0.024 },
+  volcanic:   { filter:'lowpass',  freq:260,  q:0.6, rate:0.35, gain:0.040, lfo:0.04, sweep:0.4, drone:31, droneGain:0.028 },
+  jungle:     { filter:'bandpass', freq:1800, q:1.2, rate:0.9,  gain:0.024, lfo:0.2,  sweep:0.7, drone:62, droneGain:0.008 },
+  orbital:    { filter:'lowpass',  freq:120,  q:0.5, rate:0.25, gain:0.012, lfo:0.03, sweep:0.3, drone:27, droneGain:0.022 },
+  citynight:  { filter:'bandpass', freq:340,  q:0.8, rate:0.5,  gain:0.020, lfo:0.07, sweep:0.4, drone:44, droneGain:0.016 },
+  wasteland:  { filter:'bandpass', freq:520,  q:0.6, rate:0.7,  gain:0.028, lfo:0.09, sweep:0.6, drone:40, droneGain:0.010 },
+  underwater: { filter:'lowpass',  freq:180,  q:1.1, rate:0.3,  gain:0.034, lfo:0.05, sweep:0.5, drone:24, droneGain:0.030 },
+};
