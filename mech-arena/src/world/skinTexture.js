@@ -272,7 +272,22 @@ export function skinMaterials(skinId, teamColor = null) {
     color: 0x0b1a24, emissive: accentColor, emissiveIntensity: 0.55,
     metalness: 1.0, roughness: 0.08, transparent: true, opacity: 0.85,
   });
-  return { hull, dark, trim, accent, glass, skin };
+  // Progressive damage states. Swapping a section's material is far cheaper
+  // than a per-vertex damage channel and reads clearly at combat distance:
+  // scorched plating, then glowing exposed structure.
+  const hullDamaged = hull.clone();
+  hullDamaged.color = new THREE.Color(0x6b5f55);
+  hullDamaged.roughness = 1.0;
+  hullDamaged.metalness = Math.max(0.25, skin.metal * 0.55);
+
+  const hullCritical = hull.clone();
+  hullCritical.color = new THREE.Color(0x3a2a22);
+  hullCritical.roughness = 1.0;
+  hullCritical.metalness = 0.3;
+  hullCritical.emissive = new THREE.Color(0xff4a1f);
+  hullCritical.emissiveIntensity = 0.55;
+
+  return { hull, hullDamaged, hullCritical, dark, trim, accent, glass, skin };
 }
 
 export function hashStr(s) {

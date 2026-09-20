@@ -8,6 +8,7 @@
  * to read an enemy loadout at a glance.
  */
 import * as THREE from 'three';
+import * as BGU from 'three/addons/utils/BufferGeometryUtils.js';
 import { makeRng } from '../core/rng.js';
 
 const SIZE_SCALE = { S: 0.62, M: 0.85, L: 1.12, XL: 1.45 };
@@ -34,7 +35,29 @@ export function buildWeaponModel(w, mats, scaleRef) {
   const muzzle = new THREE.Object3D();
   let kind = 'barrel';
 
+  // Parts are accumulated per material and merged at the end. A missile
+  // launcher is twenty tubes; emitting twenty meshes per weapon per mech is
+  // how a scene quietly ends up with two thousand draw calls.
+  const batches = new Map();
   const add = (geo, mat, pos, rot) => {
+    const g = geo.clone();
+    const m4 = new THREE.Matrix4().compose(
+      new THREE.Vector3(...(pos || [0, 0, 0])),
+      new THREE.Quaternion().setFromEuler(new THREE.Euler(...(rot || [0, 0, 0]))),
+      new THREE.Vector3(1, 1, 1),
+    );
+    g.applyMatrix4(m4);
+    if (!g.attributes.uv) {
+      g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+    }
+    let list = batches.get(mat);
+    if (!list) { list = []; batches.set(mat, list); }
+    list.push(g);
+    return g;
+  };
+
+  /** Emit a mesh that must stay independent (it animates or glows). */
+  const addLive = (geo, mat, pos, rot) => {
     const m = new THREE.Mesh(geo, mat);
     m.castShadow = true; m.receiveShadow = true;
     if (pos) m.position.set(...pos);
@@ -85,7 +108,8 @@ export function buildWeaponModel(w, mats, scaleRef) {
     add(box(S * 0.72, S * 0.66, S * 1.0), mats.dark, [0, 0, -S * 0.1]);
     add(cyl(bore * 1.25, bore * 0.85, len, 12), mats.trim, [0, 0, len / 2], [Math.PI / 2, 0, 0]);
     // Focusing lens: the glowing bit.
-    const lens = add(cyl(bore * 0.9, bore * 0.9, S * 0.08, 12), mats.accent, [0, 0, len], [Math.PI / 2, 0, 0]);
+    const lens = addLive(cyl(bore * 0.9, bore * 0.9, S * 0.08, 12), mats.accent, [0, 0, len], [Math.PI / 2, 0, 0]);
+    lens.castShadow = false;
     group.userData.lens = lens;
     // Heat fins scale with how hot the gun runs.
     const fins = Math.min(6, 2 + Math.round(w.heat / 4));
@@ -125,6 +149,18 @@ export function buildWeaponModel(w, mats, scaleRef) {
       add(box(S * 0.08, S * 0.5, S * 0.08), mats.trim, [(i - 1) * S * 0.24, S * 0.52, 0]);
     }
     muzzle.position.set(0, 0, S * 0.7);
+  }
+
+  // Flush the batches: at most one mesh per material.
+  for (const [mat, geos] of batches) {
+    if (!geos.length) continue;
+    const merged = geos.length === 1 ? geos[0] : BGU.mergeGeometries(geos, false);
+    if (geos.length > 1) geos.forEach(g => g.dispose());
+    if (!merged) continue;
+    const mesh = new THREE.Mesh(merged, mat);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    group.add(mesh);
   }
 
   group.add(muzzle);

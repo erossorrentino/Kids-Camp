@@ -46,7 +46,7 @@ function freshProfile() {
     })),
     settings: {
       quality: 'high', sensitivity: 0.0022, invertY: false, volume: 0.6,
-      fov: 72, showFps: false, difficulty: 'regular',
+      fov: 72, showFps: false, difficulty: 'regular', autoQuality: true,
     },
     stats: { bestKills: 0, bestDamage: 0, favouriteMech: null, mechUse: {} },
   };

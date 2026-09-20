@@ -203,19 +203,41 @@ export class Match {
     const list = entry.team === 'a' ? this.world.spawns.a
                : entry.team === 'b' ? this.world.spawns.b
                : this.world.spawns.ffa;
-    // Spawn away from live enemies where possible.
+    // Spawn away from live enemies, and with elbow room from teammates --
+    // a lance stacked on one tile blocks its own line of fire and its own
+    // third-person cameras.
     let best = list[0], bestScore = -Infinity;
     for (const p of list) {
       let score = this.rng.range(0, 40);
       for (const m of this.aliveMechs()) {
         const d = m.position.distanceTo(p);
-        score += m.team === entry.team ? clamp(120 - d, 0, 60) * 0.3 : -clamp(300 - d, 0, 300);
+        if (m.team === entry.team) {
+          if (d < 34) score -= (34 - d) * 14;         // far too close
+          else score += clamp(140 - d, 0, 70) * 0.2;  // but stay in the area
+        } else {
+          score -= clamp(300 - d, 0, 300);
+        }
       }
       if (score > bestScore) { bestScore = score; best = p; }
     }
-    const jitter = new THREE.Vector3(this.rng.range(-12, 12), 0, this.rng.range(-12, 12));
-    const pos = best.clone().add(jitter);
-    pos.y = this.world.safeGround(pos.x, pos.z);
+
+    const pos = best.clone().add(new THREE.Vector3(this.rng.range(-12, 12), 0, this.rng.range(-12, 12)));
+    // Push out of anyone we still overlap, then re-seat on the ground.
+    for (let iter = 0; iter < 6; iter++) {
+      let moved = false;
+      for (const m of this.aliveMechs()) {
+        const dx = pos.x - m.position.x, dz = pos.z - m.position.z;
+        const d = Math.hypot(dx, dz);
+        const want = m.radius + 20;
+        if (d > want || d < 0.001) continue;
+        pos.x += (dx / d) * (want - d);
+        pos.z += (dz / d) * (want - d);
+        moved = true;
+      }
+      if (!moved) break;
+    }
+    const seated = this.world.findStandable(pos.x, pos.z, 40, 10);
+    pos.copy(seated);
     const yaw = Math.atan2(-pos.x, -pos.z);
     return { pos, yaw };
   }
@@ -481,7 +503,7 @@ export class Match {
     }
 
     this.combat.update(simDt);
-    this.world.update(dt);
+    this.world.update(dt, this.engine.camera.position);
 
     if (live) {
       this._updateRespawns(dt);
@@ -570,6 +592,7 @@ export class Match {
           this.fx.light(p, 0xdfefff, 120, 0.3, 300);
           this.fx.explosion(best.position.clone(), 1.2, 0xc8e4ff);
           this.audio.explosion(best.position, 2);
+          this.onLightning?.();
           this.applyDamage(best, null, 220, { location: 'HD', source: 'lightning', type: 'energy' });
           best.heat += 30;
           best.jammedFor = 2.5;

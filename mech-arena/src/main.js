@@ -11,6 +11,7 @@ import { Input } from './core/input.js';
 import { Audio } from './core/audio.js';
 import { FX } from './world/fx.js';
 import { Arena } from './world/arena.js';
+import { Sky } from './world/sky.js';
 import { Match } from './game/match.js';
 import { PlayerController } from './game/player.js';
 import { HUD } from './ui/hud.js';
@@ -46,6 +47,7 @@ class Game {
     this.hud = new HUD(this.engine, this.audio);
     this.hud.setFpsVisible(s.showFps);
 
+    this.sky = new Sky(this.engine.scene);
     this.hangarScene = new HangarScene(this.engine);
 
     this.menus = new Menus({
@@ -67,6 +69,12 @@ class Game {
     this.lastTime = performance.now();
     this.paused = false;
     this._pendingRespawn = false;
+
+    // Adaptive quality: a mech arena is unplayable below ~40fps, and the
+    // right response to a slow machine is fewer shadows, not a slideshow.
+    this.autoQuality = s.autoQuality !== false;
+    this._perfWindow = [];
+    this._perfCooldown = 6;
 
     this._wireGlobal();
   }
@@ -110,6 +118,7 @@ class Game {
       case 'volume': this.audio.setVolume(value); break;
       case 'fov': this.engine.fovBase = value; this.engine.fovTarget = value; break;
       case 'showFps': this.hud.setFpsVisible(value); break;
+      case 'autoQuality': this.autoQuality = value !== false; break;
     }
   }
 
@@ -159,6 +168,14 @@ class Game {
     this.arena = new Arena(def, QUALITY[this.progression.settings.quality]);
     this.engine.scene.add(this.arena.group);
     this.engine.applyBiome(this.arena.biome, { interior: this.arena.interior });
+    // Interior maps have a roof; a skydome behind it would only z-fight
+    // with the ceiling and cost fill rate for nothing.
+    if (this.arena.interior) this.sky.detach();
+    else {
+      const sunDir = this.engine.sun.position.clone().sub(this.engine.sunTarget.position).normalize();
+      this.sky.apply(this.arena.biome, def, sunDir);
+      this.engine.scene.background = null;   // the dome is the background now
+    }
     this.controller.world = this.arena;
 
     this.match = new Match({
@@ -173,6 +190,7 @@ class Game {
       quality: QUALITY[this.progression.settings.quality],
     });
     this.match.onEvent = (e) => this.onMatchEvent(e);
+    this.match.onLightning = () => this.sky.strike();
 
     this.state = 'match';
     this.paused = false;
@@ -200,6 +218,7 @@ class Game {
     this.hud.setScoreboard(this.match, false);
     document.getElementById('pointer-hint').classList.add('hidden');
 
+    this.sky.detach();
     if (this.arena) { this.engine.scene.remove(this.arena.group); this.arena.dispose(); this.arena = null; }
     if (this.match) { this.match.dispose(); this.match = null; }
 
@@ -270,6 +289,7 @@ class Game {
     dt = Math.min(dt, MAX_FRAME);
 
     this.engine.tickStats(dt);
+    if (this.state === 'match') this._adaptQuality(dt);
 
     if (this.state === 'match' && this.match) {
       this._updateMatch(dt);
@@ -297,11 +317,13 @@ class Game {
     if (steps >= 12) this.accumulator = 0;   // give up rather than spiral
 
     // Visual systems run at frame rate.
+    this.sky.update(dt, this.engine.camera);
     this.fx.update(dt);
     const shake = this.fx.consumeShake();
     if (shake > 0) this.engine.shake(shake);
 
     const mech = m.player?.mech;
+    this._fadeCloseMechs(m, mech);
     this.hud.update(m, mech, this.controller, dt);
     this.hud.setScoreboard(m, this.controller.scoreboardOpen);
 
@@ -318,6 +340,55 @@ class Game {
       this.audio.setLoop('engine', { f0: 42 + spd * 34 + mech.heatFraction * 10, vol: 0.03 + spd * 0.035 });
     } else {
       this.audio.stopLoop('engine');
+    }
+  }
+
+  /**
+   * Step the quality preset down when frame times stay bad, and back up
+   * when there is headroom to spare. Uses a rolling window of frame times
+   * rather than the displayed FPS so one stutter never triggers it.
+   */
+  _adaptQuality(dt) {
+    if (!this.autoQuality || this.paused) return;
+    this._perfCooldown -= dt;
+    this._perfWindow.push(dt);
+    if (this._perfWindow.length > 180) this._perfWindow.shift();
+    if (this._perfCooldown > 0 || this._perfWindow.length < 120) return;
+
+    const sorted = [...this._perfWindow].sort((a, b) => a - b);
+    // The 80th-percentile frame time: what the game feels like, not its best case.
+    const p80 = sorted[Math.floor(sorted.length * 0.8)];
+    const order = ['low', 'medium', 'high', 'ultra'];
+    const i = order.indexOf(this.progression.settings.quality);
+
+    let next = null;
+    if (p80 > 1 / 34 && i > 0) next = order[i - 1];
+    else if (p80 < 1 / 110 && i < order.length - 1) next = order[i + 1];
+    if (!next) return;
+
+    this.progression.setSetting('quality', next);
+    this.applySetting('quality', next);
+    this.hud.toast('GRAPHICS ' + (order.indexOf(next) < i ? 'REDUCED' : 'RAISED'), next.toUpperCase());
+    this._perfCooldown = 14;
+    this._perfWindow.length = 0;
+  }
+
+  /**
+   * Third-person cameras get blocked by whatever walks in front of them.
+   * Any mech that is not yours and is crowding the lens fades out rather
+   * than filling the screen.
+   */
+  _fadeCloseMechs(match, playerMech) {
+    const cam = this.engine.camera;
+    const cockpit = this.controller.view === 'cockpit';
+    for (const other of match.mechs) {
+      if (!other.alive) continue;
+      const isSelf = other === playerMech;
+      if (isSelf && !cockpit) { other.screenFade = 1; continue; }
+      const d = other.position.distanceTo(cam.position);
+      const near = isSelf ? other.radius + 6 : other.radius + 7;
+      const far = near + 6;
+      other.screenFade = clamp((d - near) / (far - near), isSelf ? 0 : 0.12, 1);
     }
   }
 
@@ -341,4 +412,5 @@ const _up = new THREE.Vector3(0, 1, 0);
 
 const game = new Game();
 window.__game = game;      // handy for debugging from the console
+window.__MAP_IDS = MAPS.map(m => m.id);
 game.boot();

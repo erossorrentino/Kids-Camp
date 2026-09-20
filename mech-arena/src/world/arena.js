@@ -18,6 +18,7 @@ import * as THREE from 'three';
 import * as BGU from 'three/addons/utils/BufferGeometryUtils.js';
 import { makeRng, clamp, lerp } from '../core/rng.js';
 import { BIOMES } from '../data/maps.js';
+import { surface } from './textures.js';
 
 const CELL = 32; // spatial-hash cell size in metres
 
@@ -57,6 +58,7 @@ export class Arena {
     this.lights = [];
     this.decor = [];
     this.deckCenters = [];
+    this.spawnHint = null;
     // Foundry layouts are roofed, so the directional sun cannot reach the
     // floor; the renderer needs to know to lean on ambient instead.
     this.interior = mapDef.layout === 'foundry';
@@ -73,16 +75,30 @@ export class Arena {
   /* ------------------------------------------------------------------ */
   _materials() {
     const b = this.biome;
+    const seed = this.def.seed;
+    // Ground styling follows the biome so sand ripples, cracked rock and
+    // plated decking each read as the right material underfoot.
+    const groundStyle = { dunes:'sand', desert:'sand', arctic:'sand', orbital:'metal', platform:'metal' }[this.def.layout]
+      || { desert:'sand', arctic:'sand', orbital:'metal', underwater:'sand' }[this.def.biome]
+      || 'rock';
+
+    const g = surface('ground', b.ground, { seed, repeat: 26, style: groundStyle, normalStrength: 2.6 });
+    const c = surface('concrete', mixHex(b.ground, 0xffffff, 0.26), { seed: seed + 11, repeat: 1 });
+    const m = surface('metal', mixHex(b.ground, 0x8899aa, 0.55), { seed: seed + 23, repeat: 1 });
+    const dk = surface('metal', mixHex(b.ground, 0x000000, 0.6), { seed: seed + 37, repeat: 1 });
+
     this.mat = {
-      ground: new THREE.MeshStandardMaterial({ color: b.ground, roughness: 0.95, metalness: 0.05 }),
-      concrete: new THREE.MeshStandardMaterial({ color: mixHex(b.ground, 0xffffff, 0.22), roughness: 0.88, metalness: 0.08 }),
-      metal: new THREE.MeshStandardMaterial({ color: mixHex(b.ground, 0x8899aa, 0.5), roughness: 0.46, metalness: 0.75 }),
-      dark: new THREE.MeshStandardMaterial({ color: mixHex(b.ground, 0x000000, 0.55), roughness: 0.8, metalness: 0.3 }),
+      ground: new THREE.MeshStandardMaterial({ ...g, roughness: 1.0, metalness: 0.04, envMapIntensity: 0.5 }),
+      concrete: new THREE.MeshStandardMaterial({ ...c, roughness: 1.0, metalness: 0.06, envMapIntensity: 0.6 }),
+      metal: new THREE.MeshStandardMaterial({ ...m, roughness: 1.0, metalness: 0.78, envMapIntensity: 1.0 }),
+      dark: new THREE.MeshStandardMaterial({ ...dk, roughness: 1.0, metalness: 0.42, envMapIntensity: 0.8 }),
       accent: new THREE.MeshStandardMaterial({ color: b.accent, emissive: b.accent, emissiveIntensity: 1.7, roughness: 0.4 }),
       hazard: new THREE.MeshStandardMaterial({ color: 0xff5a2d, emissive: 0xff3a10, emissiveIntensity: 2.6, roughness: 0.6 }),
       glass: new THREE.MeshStandardMaterial({ color: 0x223344, metalness: 1, roughness: 0.12, transparent: true, opacity: 0.55 }),
     };
-    this._buckets = { concrete: [], metal: [], dark: [], accent: [], hazard: [], glass: [] };
+    this.mat.window = new THREE.MeshBasicMaterial({ color: mixHex(b.accent, 0xffe6b0, 0.55), fog: true });
+    this.mat.windowWarm = new THREE.MeshBasicMaterial({ color: 0xffc98a, fog: true });
+    this._buckets = { concrete: [], metal: [], dark: [], accent: [], hazard: [], glass: [], window: [], windowWarm: [] };
   }
 
   _emit(bucket, geo, pos, rot, scale) {
@@ -94,6 +110,7 @@ export class Arena {
       new THREE.Vector3(scale?.[0] ?? 1, scale?.[1] ?? 1, scale?.[2] ?? 1),
     );
     g.applyMatrix4(m);
+    boxMapUVs(g);
     this._buckets[bucket].push(g);
   }
 
@@ -104,7 +121,7 @@ export class Arena {
       geos.forEach(g => g.dispose());
       if (!merged) continue;
       const mesh = new THREE.Mesh(merged, this.mat[name]);
-      mesh.castShadow = name !== 'hazard';
+      mesh.castShadow = name !== 'hazard' && !name.startsWith('window');
       mesh.receiveShadow = true;
       mesh.name = 'static_' + name;
       this.group.add(mesh);
@@ -214,9 +231,7 @@ export class Arena {
           this._addBox(cx + rng.range(-4, 4), y + h + h2 / 2, cz + rng.range(-4, 4), w * 0.45, h2, d * 0.45, 'metal');
         }
         if (rng.chance(0.5)) this._ramp(cx, y, cz, step * 0.5, rng);
-        if (this.biome.label === 'NIGHT CITY' && rng.chance(0.7)) {
-          this._emit('accent', boxGeo(w * 0.5, 0.5, 0.4), [cx, y + h * rng.range(0.4, 0.9), cz + d * 0.42]);
-        }
+        if (this.biome.night) this._windows(cx, y, cz, w * rng.range(0.66, 0.94), h, d * rng.range(0.66, 0.94), rng);
       }
     }
   }
@@ -225,6 +240,9 @@ export class Arena {
     const rng = this.rng;
     const wallH = 34 * (0.6 + this.def.verticality);
     const trench = this.size * 0.28;
+    // Fighting happens in the trench, so that is where everyone starts.
+    this.spawnHint = 'axis-z';
+    this.trenchHalfWidth = trench / 2;
     for (const side of [-1, 1]) {
       let z = -this.half;
       while (z < this.half) {
@@ -233,6 +251,13 @@ export class Arena {
         const h = wallH * rng.range(0.7, 1.3);
         const cx = side * inset + side * h * 0.1;
         const y = this.heightAt(cx, z);
+        // A continuous wall would make the flanks unreachable; breaches turn
+        // them into the flanking routes the layout is supposed to have.
+        if (rng.chance(0.18)) {
+          this._addBox(cx + side * 24, y + h * 0.78, z + seg / 2, 48, h * 0.44, seg, 'concrete');
+          z += seg;
+          continue;
+        }
         this._addBox(cx + side * 24, y + h / 2, z + seg / 2, 48, h, seg, 'concrete');
         // Ledges above the trench: the whole point of a canyon map.
         if (rng.chance(0.55)) {
@@ -504,6 +529,33 @@ export class Arena {
     this._addBox(0, this.heightAt(0, 0) + h + 1.2, 0, 34, 2.4, 34, 'metal', 'deck');
   }
 
+  /**
+   * Lit windows on a building face. Emissive, unlit quads cost nothing and
+   * are most of what makes a night city look inhabited rather than modelled.
+   */
+  _windows(cx, y, cz, w, h, d, rng) {
+    if (h < 10) return;
+    const rows = Math.max(1, Math.floor(h / 5.5));
+    const cols = Math.max(1, Math.floor(w / 5.5));
+    for (const [nx, nz, sw, sd] of [[0, 1, w, 0], [0, -1, w, 0], [1, 0, 0, d], [-1, 0, 0, d]]) {
+      if (rng.chance(0.25)) continue;
+      const faceW = sw || sd;
+      const n = Math.max(1, Math.floor(faceW / 5.5));
+      for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < n; c++) {
+          if (!rng.chance(0.42)) continue;
+          const ox = nx !== 0 ? nx * (w / 2 + 0.12) : (c / (n - 1 || 1) - 0.5) * w * 0.86;
+          const oz = nz !== 0 ? nz * (d / 2 + 0.12) : (c / (n - 1 || 1) - 0.5) * d * 0.86;
+          const oy = y + 3 + (r + 0.5) * (h / rows) * 0.92;
+          // A few dead windows and a mix of sizes stop the facade looking stamped.
+          const ww = rng.range(1.4, 2.2), wh = rng.range(0.9, 1.5);
+          this._emit(rng.chance(0.22) ? 'windowWarm' : 'window',
+            boxGeo(nx !== 0 ? 0.18 : ww, wh, nz !== 0 ? 0.18 : ww), [cx + ox, oy, cz + oz]);
+        }
+      }
+    }
+  }
+
   _ramp(cx, y, cz, len, rng) {
     const ang = rng.range(0, 7);
     const x = cx + Math.cos(ang) * len * 0.7;
@@ -553,14 +605,42 @@ export class Arena {
       );
       this.colliders.push(c);
     }
-    // A translucent boundary shell so players can see the edge.
+    // Boundary shell. A flat translucent box would tint the whole arena, so
+    // it only becomes visible as you approach it -- which is also exactly
+    // the feedback a player wants from an out-of-bounds marker.
     const geo = new THREE.BoxGeometry(this.size, h, this.size);
-    const mat = new THREE.MeshBasicMaterial({
-      color: this.biome.accent, transparent: true, opacity: 0.055, side: THREE.BackSide, depthWrite: false,
+    const mat = new THREE.ShaderMaterial({
+      uniforms: {
+        uColor: { value: new THREE.Color(this.biome.accent) },
+        uCam: { value: new THREE.Vector3() },
+        uTime: { value: 0 },
+      },
+      vertexShader: `
+        varying vec3 vWorld;
+        void main(){
+          vWorld = (modelMatrix * vec4(position, 1.0)).xyz;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }`,
+      fragmentShader: `
+        uniform vec3 uColor, uCam;
+        uniform float uTime;
+        varying vec3 vWorld;
+        void main(){
+          float d = distance(vWorld.xz, uCam.xz);
+          float near = 1.0 - smoothstep(0.0, 70.0, d);
+          // A slow horizontal scan so the wall reads as a projected field.
+          float grid = step(0.86, fract(vWorld.y * 0.09 + uTime * 0.15))
+                     + step(0.93, fract((vWorld.x + vWorld.z) * 0.06));
+          float a = near * (0.10 + grid * 0.18);
+          if (a < 0.004) discard;
+          gl_FragColor = vec4(uColor, a);
+        }`,
+      transparent: true, side: THREE.BackSide, depthWrite: false,
     });
     const shell = new THREE.Mesh(geo, mat);
     shell.position.y = h / 2 - 20;
     this.group.add(shell);
+    this._shell = shell;
   }
 
   /**
@@ -573,18 +653,44 @@ export class Arena {
     return y > this.voidLevel + 1 ? y : null;
   }
 
+  /**
+   * Horizontal room around a point, up to `want` metres. Spawning a mech in
+   * a one-metre alley technically works and is miserable to play, so spawn
+   * selection prefers points with space to turn around in.
+   */
+  clearanceAt(x, z, y, want = 10) {
+    let worst = want;
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      const dir = _v3.set(Math.cos(a), 0, Math.sin(a));
+      const hit = this.raycast(_v4.set(x, y + 4, z), dir, want);
+      if (hit) worst = Math.min(worst, hit.t);
+    }
+    return worst;
+  }
+
   /** Spiral outward from a point until we find somewhere legal to stand. */
-  findStandable(x, z, maxRadius = 90) {
+  findStandable(x, z, maxRadius = 90, minClearance = 0) {
     const direct = this.standableAt(x, z);
-    if (direct != null) return new THREE.Vector3(x, direct, z);
+    if (direct != null && (!minClearance || this.clearanceAt(x, z, direct, minClearance) >= minClearance)) {
+      return new THREE.Vector3(x, direct, z);
+    }
+    let fallback = direct != null ? new THREE.Vector3(x, direct, z) : null;
+    let best = null, bestClear = -1;
     for (let r = 8; r <= maxRadius; r += 8) {
       for (let i = 0; i < 12; i++) {
         const a = (i / 12) * Math.PI * 2 + r * 0.31;
         const px = x + Math.cos(a) * r, pz = z + Math.sin(a) * r;
         const y = this.standableAt(px, pz);
-        if (y != null) return new THREE.Vector3(px, y, pz);
+        if (y == null) continue;
+        if (!minClearance) return new THREE.Vector3(px, y, pz);
+        const c = this.clearanceAt(px, pz, y, minClearance);
+        if (c >= minClearance) return new THREE.Vector3(px, y, pz);
+        if (c > bestClear) { bestClear = c; best = new THREE.Vector3(px, y, pz); }
       }
     }
+    if (best) return best;
+    if (fallback) return fallback;
     // Last resort: the centre of a deck, or the middle of the map.
     if (this.deckCenters.length) return this.deckCenters[0].clone();
     return new THREE.Vector3(0, this.safeGround(0, 0), 0);
@@ -594,10 +700,30 @@ export class Arena {
     const rng = this.rng;
     const R = this.half * 0.78;
     const mk = (angle) => {
-      const p = this.findStandable(Math.cos(angle) * R, Math.sin(angle) * R);
+      const p = this.findStandable(Math.cos(angle) * R, Math.sin(angle) * R, 90, 11);
       return p.setY(p.y + 1);
     };
     const baseAngle = rng.range(0, Math.PI * 2);
+
+    if (this.spawnHint === 'axis-z') {
+      // Canyon maps: the two ends of the trench, facing each other down it.
+      const w = (this.trenchHalfWidth || this.size * 0.14) * 0.7;
+      const mkEnd = (sign) => {
+        const x = rng.range(-w, w);
+        const z = sign * this.half * 0.82;
+        const p = this.findStandable(x, z, 90, 11);
+        return p.setY(p.y + 1);
+      };
+      for (let i = 0; i < 6; i++) this.spawns.a.push(mkEnd(-1));
+      for (let i = 0; i < 6; i++) this.spawns.b.push(mkEnd(1));
+      for (let i = 0; i < 12; i++) {
+        const x = rng.range(-w, w);
+        const z = rng.range(-this.half * 0.85, this.half * 0.85);
+        const p = this.findStandable(x, z, 90, 11);
+        this.spawns.ffa.push(p.setY(p.y + 1));
+      }
+      return;
+    }
 
     if (!this.hasFloor && this.deckCenters.length >= 4) {
       // Platform maps: spawn on the decks furthest from the centre, split
@@ -641,7 +767,7 @@ export class Arena {
       const a = a0 + (i / 3) * Math.PI * 2;
       const wx = i === 0 ? 0 : Math.cos(a) * R;
       const wz = i === 0 ? 0 : Math.sin(a) * R;
-      const p = this.findStandable(wx, wz);
+      const p = this.findStandable(wx, wz, 110, 16);
       this.zones.push({
         id: i, name: names[i],
         pos: p,
@@ -850,7 +976,11 @@ export class Arena {
     return false;
   }
 
-  update(dt) {
+  update(dt, cameraPos) {
+    if (this._shell && cameraPos) {
+      this._shell.material.uniforms.uCam.value.copy(cameraPos);
+      this._shell.material.uniforms.uTime.value += dt;
+    }
     for (let i = this.smokes.length - 1; i >= 0; i--) {
       const s = this.smokes[i];
       s.life -= dt;
@@ -887,7 +1017,35 @@ const _seen = new Set();
 const _seen2 = new Set();
 const _v1 = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
+const _v3 = new THREE.Vector3();
+const _v4 = new THREE.Vector3();
 const _boxGeoCache = new Map();
+
+/**
+ * Rewrite a geometry's UVs from world position, projected on whichever axis
+ * each face points along. Box geometries otherwise stretch one 0..1 UV square
+ * across every face, so a 40m wall and a 4m crate would show wildly different
+ * texel densities. World-space mapping keeps one metre the same size
+ * everywhere, which is most of what sells scale.
+ */
+const UV_METRES = 9;
+function boxMapUVs(g) {
+  const pos = g.attributes.position;
+  const nor = g.attributes.normal;
+  if (!pos || !nor) return;
+  const uv = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+    const nx = Math.abs(nor.getX(i)), ny = Math.abs(nor.getY(i)), nz = Math.abs(nor.getZ(i));
+    let u, v;
+    if (ny >= nx && ny >= nz) { u = x; v = z; }
+    else if (nx >= nz) { u = z; v = y; }
+    else { u = x; v = y; }
+    uv[i * 2] = u / UV_METRES;
+    uv[i * 2 + 1] = v / UV_METRES;
+  }
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+}
 
 function boxGeo(w, h, d) {
   const k = `${w.toFixed(2)},${h.toFixed(2)},${d.toFixed(2)}`;

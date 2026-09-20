@@ -104,6 +104,7 @@ export class Mech {
     this.amsDome = 0;
     this.repairField = 0;
     this.cloaked = false; this.radarHidden = false;
+    this.screenFade = 1;          // driven by the camera, not by gameplay
     this.pinpoint = false; this.braced = false; this.bulwark = false;
     this.alphaMode = false; this.barrageShots = 0; this.barrageFree = false;
     this.chargeActive = false; this.pendingSlam = false;
@@ -753,16 +754,27 @@ export class Mech {
     return amount - left;
   }
 
-  /** Tint section meshes by how hurt they are. */
+  /**
+   * Swap section materials as they take damage: painted plating, then
+   * scorched metal once the armour is gone, then glowing internals.
+   * Only runs when a section crosses a threshold, so it is free in the
+   * common case of a hit that changes nothing visually.
+   */
   _applySectionVisuals() {
-    if (!this._sectionTint) this._sectionTint = {};
+    if (!this._sectionState) this._sectionState = {};
+    const mats = this.model.materials;
     for (const loc of LOCATIONS) {
-      const max = this.maxArmour[loc] + this.maxStructure[loc];
-      if (max <= 0) continue;
-      const f = (this.armour[loc] + this.structure[loc]) / max;
-      const q = Math.round(f * 4) / 4;
-      if (this._sectionTint[loc] === q) continue;
-      this._sectionTint[loc] = q;
+      const meshes = this.rig.sectionMeshes[loc];
+      if (!meshes || !meshes.length) continue;
+      let state;
+      if (this.destroyed[loc]) state = 2;
+      else if (this.armour[loc] <= 0) state = 2;
+      else if (this.armour[loc] < this.maxArmour[loc] * 0.45) state = 1;
+      else state = 0;
+      if (this._sectionState[loc] === state) continue;
+      this._sectionState[loc] = state;
+      const mat = state === 2 ? mats.hullCritical : state === 1 ? mats.hullDamaged : mats.hull;
+      for (const m of meshes) m.material = mat;
     }
   }
 
@@ -844,17 +856,17 @@ export class Mech {
     const hp = this.healthFraction;
     if (hp < 0.62) this.fx.damageSmoke(this, 1 - hp, dt);
 
-    if (this.cloaked) {
+    // Cloak and camera-proximity fade share one opacity channel, so the
+    // lower of the two wins and neither fights the other for the material.
+    const alpha = this.cloaked ? 0.11 : this.screenFade;
+    if (Math.abs(alpha - (this._appliedAlpha ?? 1)) > 0.02) {
+      this._appliedAlpha = alpha;
+      const transparent = alpha < 0.995;
       this.root.traverse(o => {
-        if (!o.isMesh) return;
-        if (!o.material.transparent) { o.material.transparent = true; }
-        o.material.opacity = 0.11;
-      });
-      this._wasCloaked = true;
-    } else if (this._wasCloaked) {
-      this._wasCloaked = false;
-      this.root.traverse(o => {
-        if (o.isMesh && o.material) o.material.opacity = 1;
+        if (!o.isMesh || !o.material) return;
+        o.material.transparent = transparent;
+        o.material.depthWrite = !transparent;
+        o.material.opacity = alpha;
       });
     }
 

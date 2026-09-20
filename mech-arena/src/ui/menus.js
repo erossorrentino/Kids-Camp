@@ -432,6 +432,8 @@ export class Menus {
           <div class="tiny muted">FIELD OF VIEW — <b class="mono">${s.fov}</b></div>
           <input type="range" min="60" max="105" value="${s.fov}" data-range="fov" style="width:100%">
           <div class="tabs" data-setting="showFps">${[false, true].map(v => `<button class="tab${v === s.showFps ? ' on' : ''}" data-set="${v}">FPS ${v ? 'ON' : 'OFF'}</button>`).join('')}</div>
+          <div class="tabs" data-setting="autoQuality">${[true, false].map(v => `<button class="tab${v === (s.autoQuality !== false) ? ' on' : ''}" data-set="${v}">AUTO ${v ? 'ON' : 'OFF'}</button>`).join('')}</div>
+          <div class="tiny muted" style="line-height:1.6;margin-top:6px">Auto drops the preset a step if frame times stay poor, and raises it again when there is headroom.</div>
         </div>
         <div class="panel"><h3>CONTROLS</h3>
           <div class="tiny muted">MOUSE SENSITIVITY — <b class="mono">${(s.sensitivity * 1000).toFixed(1)}</b></div>

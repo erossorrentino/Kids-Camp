@@ -135,7 +135,10 @@ export class BotBrain {
       const dist = m.position.distanceTo(other.position);
       if (dist > m.sensorRange * 2.4) continue;
       const visible = this._canSee(other);
-      if (!visible && dist > 120) continue;
+      // A contact behind cover is still a contact: a pilot who forgets about
+      // everything the moment it breaks line of sight never finds a fight on
+      // a dense map.
+      if (!visible && dist > m.sensorRange * 0.9) continue;
 
       // Score: closer is better, hurt is better, and the weapons actually
       // reaching them matters more than raw proximity.
@@ -211,6 +214,7 @@ export class BotBrain {
       case 'retreat': this._retreat(dt); break;
       case 'support': this._support(dt); break;
       case 'capture': this._capture(dt); break;
+      case 'hunt': this._hunt(dt); break;
       default: this._patrol(dt); break;
     }
 
@@ -335,6 +339,41 @@ export class BotBrain {
       this._shoot(this.target, m.position.distanceTo(this.target.position), dt);
     } else {
       m.aimYaw = damp(m.aimYaw, m.yaw, 3, dt);
+    }
+  }
+
+  /**
+   * Move to where the target was last seen. This is what keeps a fight
+   * going on a map full of corners -- without it, bots lose contact the
+   * moment anyone steps behind a wall and drift back to wandering.
+   */
+  _hunt(dt) {
+    const m = this.mech;
+    const t = this.target;
+    if (!t || !t.alive) { this._patrol(dt); return; }
+
+    // If the target is visible again, that is the engage state's job.
+    if (this._canSee(t)) { this.state = 'engage'; this.stateTime = 0; return; }
+
+    if (!this.waypoint || this.repathTimer <= 0) {
+      this.repathTimer = REPATH_INTERVAL * 2;
+      // Head for the last known position, but bias toward where they were
+      // heading rather than where they stood.
+      this.waypoint = this.lastKnownTargetPos.clone().addScaledVector(t.velocity, 1.2);
+      this.waypoint.y = this.world.safeGround(this.waypoint.x, this.waypoint.z);
+    }
+    this._navigateTo(this.waypoint, dt, 1);
+    this._aimAtPoint(_v1.copy(this.waypoint).setY(this.waypoint.y + 6), dt);
+
+    // Indirect-fire weapons can still work the last known position.
+    const dist = m.position.distanceTo(this.waypoint);
+    if (dist < 400 && this.match.time - this.targetSeenAt < 3) this._shoot(t, dist, dt, true);
+
+    if (m.position.distanceTo(this.waypoint) < 14) {
+      this.waypoint = null;
+      this.repathTimer = 0;
+      // Arrived and found nothing: stop hunting a cold trail.
+      if (this.match.time - this.targetSeenAt > 6) { this.target = null; this.state = 'patrol'; this.stateTime = 0; }
     }
   }
 

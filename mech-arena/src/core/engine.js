@@ -208,14 +208,20 @@ export class Engine {
     this.hemi.groundColor.setHex(b.ground);
     this.hemi.intensity = b.ambI;
     this.rim.color.setHex(b.accent);
-    this.rim.intensity = b.sunI * 0.22 + 0.2;
+    // The rim is a colour accent, not a key light: at night a strong one
+    // washes the whole arena in the biome's neon.
+    this.rim.intensity = b.night ? 0.16 : b.sunI * 0.22 + 0.2;
 
     const interior = !!opts.interior;
-    this.ambient.color.setHex(b.amb);
-    this.ambient.intensity = interior ? 1.5 : 0.42 + b.ambI * 0.22;
+    // Biome ambient colours are deliberately dark for mood; lifting them
+    // toward white keeps the mood without turning the mechs into cutouts.
+    this.ambient.color.setHex(b.amb).lerp(_white, interior ? 0.4 : b.night ? 0.42 : 0.2);
+    // Dark biomes need a higher flat floor or the mechs -- which are the
+    // thing the player actually has to read -- become pure silhouettes.
+    this.ambient.intensity = interior ? 1.5 : b.night ? 1.25 : 0.42 + b.ambI * 0.22;
     this.hemi.intensity = b.ambI * (interior ? 1.7 : 1);
-    this.fill.color.setHex(b.hazeCol);
-    this.fill.intensity = interior ? 0.85 : 0.55;
+    this.fill.color.setHex(b.hazeCol).lerp(_white, b.night ? 0.62 : 0.35);
+    this.fill.intensity = interior ? 0.9 : b.night ? 1.25 : 0.55;
 
     this.buildEnvironment(b);
     this.scene.environmentIntensity = interior ? 0.55 : 1.0;
@@ -346,5 +352,6 @@ export class Engine {
   setZoom(z) { this.fovTarget = clamp(this.fovBase / z, 14, 96); }
 }
 
+const _white = new THREE.Color(0xffffff);
 const _sunOffset = new THREE.Vector3(120, 190, 80);
 const _camDir = new THREE.Vector3();

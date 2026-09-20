@@ -355,13 +355,58 @@ function buildLeg(type, S, mats, side, rng) {
 }
 
 /* ---------- accents ---------- */
+/** Glow strips, merged into a single unlit mesh -- they never cast shadows. */
 function addAccents(group, S, mats, count, rng) {
+  if (count <= 0) return;
+  const parts = [];
   for (let i = 0; i < count; i++) {
     const w = S.w * rng.range(0.1, 0.4);
-    const strip = mesh(box(w, S.h * 0.035, 0.06), mats.accent, false);
-    strip.position.set(rng.range(-0.4, 0.4) * S.w, rng.range(-0.3, 0.35) * S.h, S.d * 0.51);
-    group.add(strip);
+    parts.push({
+      geo: box(w, S.h * 0.035, 0.06),
+      pos: [rng.range(-0.4, 0.4) * S.w, rng.range(-0.3, 0.35) * S.h, S.d * 0.51],
+    });
   }
+  const m = new THREE.Mesh(mergeParts(parts), mats.accent);
+  m.castShadow = false;
+  m.receiveShadow = false;
+  group.add(m);
+}
+
+/**
+ * Collapse a group's direct mesh children into one mesh per material.
+ * Anything that has to move on its own should not be passed here.
+ */
+function flattenByMaterial(group) {
+  const batches = new Map();
+  const keep = [];
+  for (const child of [...group.children]) {
+    if (!child.isMesh) { keep.push(child); continue; }
+    const g = child.geometry.clone();
+    child.updateMatrix();
+    g.applyMatrix4(child.matrix);
+    if (!g.attributes.uv) {
+      g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(g.attributes.position.count * 2), 2));
+    }
+    let list = batches.get(child.material);
+    if (!list) { list = []; batches.set(child.material, list); }
+    list.push(g);
+    group.remove(child);
+  }
+  for (const [mat, geos] of batches) {
+    const merged = geos.length === 1 ? geos[0] : mergeGeoms(geos);
+    if (!merged) continue;
+    const m = new THREE.Mesh(merged, mat);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    group.add(m);
+  }
+  return group;
+}
+
+function mergeGeoms(geos) {
+  const merged = BGU.mergeGeometries(geos, false);
+  geos.forEach(g => g.dispose());
+  return merged;
 }
 
 /* ================================================================== *
@@ -428,7 +473,7 @@ export function buildMech(chassis, skinId, teamColor = null) {
     sideTorso[key] = st;
   }
 
-  const cockpit = buildCockpit(b.cockpit, S, mats, rng);
+  const cockpit = flattenByMaterial(buildCockpit(b.cockpit, S, mats, rng));
   cockpit.position.set(0, S.h * 0.62, S.d * 0.08);
   torsoPitch.add(cockpit);
 
@@ -477,10 +522,23 @@ export function buildMech(chassis, skinId, teamColor = null) {
     }
   }
 
+  // Section -> the meshes that should change material as it takes damage.
+  // Only meshes currently wearing the hull material take part, so trim,
+  // glass and glow strips keep their look.
+  const collectHull = (root) => {
+    const out = [];
+    root.traverse(o => { if (o.isMesh && o.material === mats.hull) out.push(o); });
+    return out;
+  };
   const sectionMeshes = {
-    CT: [torsoMesh], LT: [sideTorso.LT], RT: [sideTorso.RT],
-    HD: cockpit.children.slice(), LA: [armL.group], RA: [armR.group],
-    LL: [legL.group], RL: [legR.group],
+    CT: [torsoMesh],
+    LT: [sideTorso.LT],
+    RT: [sideTorso.RT],
+    HD: collectHull(cockpit),
+    LA: collectHull(armL.group),
+    RA: collectHull(armR.group),
+    LL: collectHull(legL.group),
+    RL: collectHull(legR.group),
   };
 
   root.userData.height = H;

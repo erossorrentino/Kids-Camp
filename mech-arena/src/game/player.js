@@ -167,12 +167,29 @@ export class PlayerController {
       .addScaledVector(back, dist)
       .addScaledVector(right, this.camSide * (this.zoom > 1.5 ? 0.35 : 1));
 
-    // Pull the camera in if a wall is in the way.
+    // Pull the camera in if a wall is in the way. Pulling all the way to the
+    // mech puts the lens inside its own cockpit, so once the available room
+    // drops below a usable minimum the camera climbs instead and looks down
+    // over the shoulder -- which is what a player in an alley actually wants.
     const dir = _v5.copy(want).sub(pivot);
     const len = dir.length();
     dir.multiplyScalar(1 / len);
+    const minDist = mech.radius * 1.8 + 2.5;
     const hit = this.world.raycast(pivot, dir, len + 1.4);
-    if (hit) want.copy(pivot).addScaledVector(dir, Math.max(2.5, hit.t - 1.4));
+    if (hit) {
+      const room = hit.t - 1.4;
+      if (room >= minDist) {
+        want.copy(pivot).addScaledVector(dir, room);
+      } else {
+        // Try straight up: there is almost always headroom.
+        const up = _v6.set(0, 1, 0);
+        const upHit = this.world.raycast(pivot, up, mech.height * 1.6);
+        const rise = Math.min(mech.height * 1.3, (upHit ? upHit.t - 1.2 : mech.height * 1.3));
+        want.copy(pivot)
+          .addScaledVector(dir, Math.max(minDist * 0.55, room))
+          .addScaledVector(up, Math.max(0, rise));
+      }
+    }
 
     // Critically damped follow; snap on teleport-scale jumps.
     if (cam.position.distanceTo(want) > 60) cam.position.copy(want);
@@ -184,7 +201,7 @@ export class PlayerController {
 
     // Look at a point slightly ahead of the mech so the crosshair sits where
     // the weapons actually converge.
-    const aimDir = mech.aimForward(_v6);
+    const aimDir = mech.aimForward(_v8);
     const convergence = 240;
     this.camLook.copy(mech.eyePosition(_v7)).addScaledVector(aimDir, convergence);
     cam.lookAt(this.camLook);
@@ -206,3 +223,4 @@ const _v4 = new THREE.Vector3();
 const _v5 = new THREE.Vector3();
 const _v6 = new THREE.Vector3();
 const _v7 = new THREE.Vector3();
+const _v8 = new THREE.Vector3();
