@@ -22,8 +22,6 @@
     crests: ['fin', 'halo', 'horns', null]
   };
 
-  const STARTER_DECK = ['vanguard-1-std', 'lancer-1-std', 'vanguard-2-std', 'lancer-2-std'];
-
   function defaultState() {
     return {
       version: 3,
@@ -31,8 +29,8 @@
       // You begin with a small kingdom in the middle of your home world and
       // nothing else: no land, no vehicles, no fancy buildings.
       buildings: { command: 1, mine: 1, refinery: 0, barracks: 1, lab: 0, reactor: 0, hangar: 0, shield: 0 },
-      army: {},                 // unit id -> level, absent means level 1
-      deck: STARTER_DECK.slice(),
+      // Your army is five soldiers you own outright. Buy more in the shop.
+      roster: D.STARTER_ARMY.map((id) => ({ id: id, lv: 1 })),
       vehicles: {},             // vehicle id -> true once bought
       owned: {},                // territory id -> true; you start holding none
       unlocked: { verdania: true },
@@ -177,11 +175,16 @@
       this.state.version = 3;
       // The roster was replaced wholesale, so old unit ids no longer exist.
       // Buildings, resources and conquests carry over; the army restarts.
-      const army = {};
-      Object.keys(s.army || {}).forEach((k) => { if (D.unit(k)) army[k] = s.army[k]; });
-      this.state.army = army;
-      const deck = (s.deck || []).filter((id) => D.unit(id));
-      this.state.deck = deck.length ? deck : STARTER_DECK.slice();
+      // Decks and per-type levels became an owned squad.
+      let roster = (s.roster || []).filter((e) => e && D.unit(e.id));
+      if (!roster.length) {
+        roster = (s.deck || []).filter((id) => D.unit(id))
+          .map((id) => ({ id: id, lv: (s.army && s.army[id]) || 1 }));
+      }
+      if (!roster.length) roster = D.STARTER_ARMY.map((id) => ({ id: id, lv: 1 }));
+      this.state.roster = roster.slice(0, D.armyCap(this.state.buildings));
+      delete this.state.deck;
+      delete this.state.army;
       if (legacy || (s.version && s.version < 3)) this.pendingMigrationNote = true;
       this.collectOffline();
       return true;
@@ -271,6 +274,66 @@
     return true;
   };
 
+  /* The squad that walks onto the lane. */
+  Game.prototype.roster = function () {
+    if (!this.state.roster) this.state.roster = D.STARTER_ARMY.map((id) => ({ id: id, lv: 1 }));
+    return this.state.roster;
+  };
+  Game.prototype.armyCap = function () { return D.armyCap(this.state.buildings); };
+
+  Game.prototype.buySoldier = function (defId) {
+    const def = D.unit(defId);
+    const s = this.state;
+    if (!def) return false;
+    if (!D.unitUnlocked(def, s.buildings, s.conquered)) {
+      this.toast('That soldier is not available yet.', 'bad'); SK.Audio.deny(); return false;
+    }
+    if (this.roster().length >= this.armyCap()) {
+      this.toast('Your army is full. Upgrade the War Barracks for more room.', 'bad');
+      SK.Audio.deny(); return false;
+    }
+    if (s.coins < def.price) { this.toast('Not enough coins.', 'bad'); SK.Audio.deny(); return false; }
+    s.coins -= def.price;
+    this.roster().push({ id: defId, lv: 1 });
+    SK.Audio.build();
+    this.toast(def.name + ' joined your army.', 'good');
+    this.save();
+    return true;
+  };
+
+  Game.prototype.sellSoldier = function (index) {
+    const r = this.roster();
+    const ent = r[index];
+    if (!ent) return false;
+    if (r.length <= 1) { this.toast('You cannot sell your last soldier.', 'bad'); SK.Audio.deny(); return false; }
+    const def = D.unit(ent.id);
+    const refund = Math.round((def.price + D.unitUpgradeCost(def, 1) * (ent.lv - 1)) * 0.5);
+    r.splice(index, 1);
+    this.state.coins += refund;
+    SK.Audio.confirm();
+    this.toast(def.name + ' dismissed for ' + U.fmt(refund) + ' coins.', 'info');
+    this.save();
+    return true;
+  };
+
+  Game.prototype.promoteSoldier = function (index) {
+    const ent = this.roster()[index];
+    if (!ent) return false;
+    const def = D.unit(ent.id);
+    const s = this.state;
+    if (ent.lv >= D.MAX_LEVEL) { this.toast('Already at maximum rank.', 'bad'); return false; }
+    const cost = D.unitUpgradeCost(def, ent.lv);
+    if (s.coins < cost) { this.toast('Not enough coins.', 'bad'); SK.Audio.deny(); return false; }
+    s.coins -= cost;
+    ent.lv++;
+    SK.Audio.build();
+    const pi = D.PERK_LEVELS.indexOf(ent.lv);
+    if (pi >= 0 && def.perks[pi]) this.toast(def.name + ' learned ' + D.PERKS[def.perks[pi]].name + '.', 'good');
+    else this.toast(def.name + ' promoted to level ' + ent.lv + '.', 'good');
+    this.save();
+    return true;
+  };
+
   Game.prototype.ownsVehicle = function (id) { return !!(this.state.vehicles || {})[id]; };
 
   Game.prototype.buyVehicle = function (id) {
@@ -341,6 +404,40 @@
     f.style.transitionDuration = (ms || 450) + 'ms';
     f.classList.toggle('on', dir === 'out');
     setTimeout(() => { if (cb) cb(); }, ms || 450);
+  };
+
+  /* Going down hands the camera to the battle: it drifts above whatever is
+     still fighting until the result comes in. */
+  Game.prototype.onSpectate = function () {
+    this.spectate = { t: 0, look: new THREE.Vector3(), pos: new THREE.Vector3() };
+    const b = this.battle;
+    this.spectate.look.copy(b.homeKeep.pos).lerp(b.enemyKeep.pos, 0.5);
+    this.spectate.pos.copy(this.camera.position);
+    $('#spectate').classList.add('show');
+    this.toast('You are down. Your army fights on — watch it finish.', 'bad');
+  };
+
+  Game.prototype.updateSpectate = function (dt) {
+    const b = this.battle;
+    const sp = this.spectate;
+    if (!sp || !b) return;
+    sp.t += dt;
+    // aim at the middle of whatever is still alive, falling back to the keeps
+    let n = 0, ax = 0, az = 0;
+    for (let i = 0; i < b.units.length; i++) {
+      const u = b.units[i];
+      if (u.dead) continue;
+      ax += u.pos.x; az += u.pos.z; n++;
+    }
+    const tx = n ? ax / n : (b.homeKeep.pos.x + b.enemyKeep.pos.x) / 2;
+    const tz = n ? az / n : (b.homeKeep.pos.z + b.enemyKeep.pos.z) / 2;
+    const ty = this.world.heightAt(tx, tz);
+    sp.look.lerp(this._v.set(tx, ty + 3, tz), 1 - Math.exp(-2.2 * dt));
+    const a = sp.t * 0.16;
+    const want = this._v2.set(sp.look.x + Math.cos(a) * 46, sp.look.y + 30, sp.look.z + Math.sin(a) * 46);
+    sp.pos.lerp(want, 1 - Math.exp(-2.0 * dt));
+    this.camera.position.copy(sp.pos);
+    this.camera.lookAt(sp.look);
   };
 
   Game.prototype.flashDamage = function () {
@@ -499,8 +596,8 @@
   /* ------------------------------------------------------- battles */
   Game.prototype.startBattle = function (territory) {
     const self = this;
-    if (this.state.deck.length === 0) {
-      this.toast('Your deck is empty. Open the army console first.', 'bad');
+    if (this.roster().length === 0) {
+      this.toast('You have no soldiers. Buy some in the kingdom shop first.', 'bad');
       return;
     }
     this.fade('out', 320, function () {
@@ -509,7 +606,7 @@
       self.ui.showBattle(true, territory.name + ' · Tier ' + territory.tier);
       self.chase.snap(self.player.pos, 'foot');
       self.fade('in', 420);
-      self.toast('Take their keep. Press 1-' + self.state.deck.length + ' to call units to your position.', 'info');
+      self.toast('Your whole army is already out there. Push down the lane and take their keep.', 'info');
     });
   };
 
@@ -518,8 +615,8 @@
     const planet = this.planet;
     const cit = planet.citadel;
     if (!this.citadelAvailable(planet)) return;
-    if (this.state.deck.length === 0) {
-      this.toast('Your deck is empty. Open the army console first.', 'bad');
+    if (this.roster().length === 0) {
+      this.toast('You have no soldiers. Buy some in the kingdom shop first.', 'bad');
       return;
     }
     this.fade('out', 380, function () {
@@ -528,7 +625,7 @@
       self.ui.showBattle(true, cit.name + ' · Warlord assault');
       self.chase.snap(self.player.pos, 'foot');
       self.fade('in', 460);
-      self.toast('Kill ' + cit.warlord.name + ' to take this world. The keep is optional.', 'info');
+      self.toast('Kill ' + cit.warlord.name + ' to take this world. Your whole army is with you.', 'info');
     });
   };
 
@@ -536,16 +633,6 @@
     this.state.conquered[planet.id] = true;
     this.state.stats.warlords++;
     this.save();
-  };
-
-  Game.prototype.tryDeploy = function (id) {
-    if (this.mode !== 'battle' || !this.battle.active || this.battle.result) return;
-    if (this.state.deck.indexOf(id) < 0) return;
-    const def = D.unit(id);
-    if (!def) return;
-    if (this.battle.energy < def.energy) { SK.Audio.deny(); this.toast('Not enough energy.', 'bad'); return; }
-    const msg = this.battle.deploy(id);
-    if (msg) this.toast(msg, 'info');
   };
 
   Game.prototype.onTerritoryCaptured = function (territory, reward) {
@@ -604,6 +691,8 @@
     this.ui.hideResult();
     this.fade('out', 320, function () {
       self.battle.cleanup();
+      self.spectate = null;
+      $('#spectate').classList.remove('show');
       self.world.syncOwnership(self.state);
       self.world.syncCitadel(self.state, self.citadelAvailable(self.planet),
         !!self.state.conquered[self.planet.id]);
@@ -804,7 +893,7 @@
     }
     if (mouse.wheel) this.chase.zoom(mouse.wheel);
 
-    if (!menuOpen) {
+    if (!menuOpen && !(battling && this.battle.spectating)) {
       player.update(dt, st, this.chase);
     } else {
       player.char.update(dt, { speed: 0 });
@@ -812,7 +901,8 @@
 
     // weapon fire
     player.fireCooldown = Math.max(0, player.fireCooldown - 0);
-    if (!menuOpen && st.fire && player.mode === 'foot' && player.fireCooldown <= 0 && !this.battle.playerDown) {
+    if (!menuOpen && st.fire && player.mode === 'foot' && player.fireCooldown <= 0 &&
+      !(battling && this.battle.spectating)) {
       player.fireCooldown = 0.17;
       const origin = player.muzzlePos(this._v).clone();
       const dir = this._v2.set(
@@ -839,22 +929,19 @@
       if (v.rig.pods) v.rig.pods.forEach((p) => { p.material.opacity = 0.22 + Math.sin(this.clockT * 3) * 0.06; });
     });
 
-    world.update(dt, player.pos);
+    const spectating = battling && this.battle.spectating;
+    world.update(dt, spectating && this.spectate ? this.spectate.look : player.pos);
     this.fx.update(dt);
     this.fx.updatePopups(dt, this.camera, window.innerWidth, window.innerHeight);
-    this.chase.update(dt, player.pos, world, player.mode);
+    if (spectating) this.updateSpectate(dt);
+    else this.chase.update(dt, player.pos, world, player.mode);
 
     /* --------- battle vs free roam --------- */
     if (battling) {
       this.battle.update(dt);
       this.ui.syncBattle(this.battle);
-      this.ui.setPlayerHealth(player.health, true);
+      this.ui.setPlayerHealth(player.health, !this.battle.spectating);
       this.ui.setPrompt(null);
-      if (!menuOpen && !this.battle.result) {
-        for (let i = 0; i < this.state.deck.length; i++) {
-          if (input.consumeKey('Digit' + (i + 1))) this.tryDeploy(this.state.deck[i]);
-        }
-      }
     } else {
       this.ui.setPlayerHealth(player.health, false);
       const it = menuOpen ? null : this.nearestInteraction();
@@ -883,7 +970,8 @@
     }
 
     this.ui.drawRadar();
-    $('#crosshair').classList.toggle('on', player.mode === 'foot' && !menuOpen);
+    $('#crosshair').classList.toggle('on',
+      player.mode === 'foot' && !menuOpen && !(battling && this.battle.spectating));
     this.renderScene(world.scene, 1.0, battling ? 0.85 : 0.65);
   };
 

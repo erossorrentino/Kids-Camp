@@ -589,5 +589,102 @@
     };
   }
 
-  SK.props = { PROPS, Parts, mergeParts, makePropField, buildBuilding, buildKeep, buildCitadel, buildingPalette };
+
+  /* ================================================================
+     BATTLE LANE — a road between the two keeps that hugs the ground,
+     with lit edges and marker posts, so it is obvious where the fight
+     happens and which way to push.
+     ================================================================ */
+  function buildLane(world, from, to, halfWidth, color) {
+    const g = new THREE.Group();
+    const dx = to.x - from.x, dz = to.z - from.z;
+    const len = Math.hypot(dx, dz) || 1;
+    const ux = dx / len, uz = dz / len;        // along the lane
+    const px = -uz, pz = ux;                   // across it
+    const SEG = 44;
+    const lift = 0.35;
+
+    const verts = [], cols = [];
+    const road = new THREE.Color(0x3b4250).convertSRGBToLinear();
+    const edge = new THREE.Color(0x59647a).convertSRGBToLinear();
+    const pt = (t, side) => {
+      const cx = from.x + ux * len * t + px * halfWidth * side;
+      const cz = from.z + uz * len * t + pz * halfWidth * side;
+      return [cx, world.heightAt(cx, cz) + lift, cz];
+    };
+    for (let i = 0; i < SEG; i++) {
+      const t0 = i / SEG, t1 = (i + 1) / SEG;
+      const a = pt(t0, -1), b = pt(t0, 1), c = pt(t1, 1), d = pt(t1, -1);
+      [a, b, c, a, c, d].forEach((v, k) => {
+        verts.push(v[0], v[1], v[2]);
+        const col = (k === 0 || k === 3 || k === 5) ? edge : road;
+        cols.push(col.r, col.g, col.b);
+      });
+    }
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts), 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(cols), 3));
+    geo.computeVertexNormals();
+    const surface = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({
+      vertexColors: true, roughness: 0.94, metalness: 0.05
+    }));
+    surface.receiveShadow = true;
+    g.add(surface);
+
+    // glowing kerbs so the edges read from any angle
+    [-1, 1].forEach((side) => {
+      const ev = [];
+      for (let i = 0; i <= SEG; i++) {
+        const t = i / SEG;
+        const inner = pt(t, side * 0.965), outer = pt(t, side);
+        ev.push(inner[0], inner[1] + 0.06, inner[2], outer[0], outer[1] + 0.06, outer[2]);
+      }
+      const eg = new THREE.BufferGeometry();
+      const tri = [];
+      for (let i = 0; i < SEG; i++) {
+        const o = i * 6;
+        const q = [o, o + 3, o + 9, o, o + 9, o + 6];
+        q.forEach((k) => tri.push(ev[k], ev[k + 1], ev[k + 2]));
+      }
+      eg.setAttribute('position', new THREE.BufferAttribute(new Float32Array(tri), 3));
+      const em = new THREE.Mesh(eg, new THREE.MeshBasicMaterial({
+        color: B.SRGB(color), transparent: true, opacity: 0.6,
+        blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide
+      }));
+      g.add(em);
+    });
+
+    // centre dashes, pointing the way to push
+    for (let i = 1; i < SEG; i += 3) {
+      const t = i / SEG;
+      const cx = from.x + ux * len * t, cz = from.z + uz * len * t;
+      const dash = B.decor(B.box(1.1, 0.05, 3.2), B.glowMat(color, 0.32),
+        cx, world.heightAt(cx, cz) + lift + 0.1, cz);
+      dash.rotation.y = Math.atan2(ux, uz);
+      g.add(dash);
+    }
+
+    // marker posts down both sides
+    const postMat = B.mat(0x2a3140, { rough: 0.8, metal: 0.3 });
+    for (let i = 0; i <= 8; i++) {
+      const t = i / 8;
+      [-1, 1].forEach((side) => {
+        const cx = from.x + ux * len * t + px * (halfWidth + 1.6) * side;
+        const cz = from.z + uz * len * t + pz * (halfWidth + 1.6) * side;
+        const y = world.heightAt(cx, cz);
+        g.add(B.m(B.box(0.5, 3.4, 0.5), postMat, cx, y + 1.7, cz));
+        g.add(B.decor(B.sphere(0.26, 8), B.glowMat(color, 0.75), cx, y + 3.6, cz));
+      });
+    }
+
+    g.traverse((o) => { if (o.isMesh && o.material.blending !== THREE.AdditiveBlending) o.castShadow = false; });
+    return {
+      group: g,
+      ax: from.x, az: from.z, ux: ux, uz: uz, px: px, pz: pz,
+      len: len, halfWidth: halfWidth
+    };
+  }
+
+  SK.props = { PROPS, Parts, mergeParts, makePropField, buildBuilding, buildKeep, buildCitadel,
+    buildLane, buildingPalette };
 })(window.SK);

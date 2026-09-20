@@ -35,6 +35,7 @@
   const STRUCT_MUL_VS_PLAYER = 0.12;
   const MAX_ALLIES = 14;
   const FIELD_LEN = 95;
+  const LANE_HALF = 15;   // half-width of the road the fight happens on
 
   const _tc = new THREE.Color(), _tc2 = new THREE.Color();
   function tintPalette(base, tint) {
@@ -74,42 +75,29 @@
     this.t = 0;
     this.units = [];
     this.boss = null;
-    this.aiTimer = citadel ? 7 : 6;
-    this.playerDown = 0;
+    this.spectating = false;
     this.result = null;
     this.endT = 0;
     this.tier = citadel ? citadel.tier : territory.tier;
 
     const S = game.state;
-    const lab = 1 + (S.buildings.lab || 0) * 0.05;
-    const reactor = S.buildings.reactor || 0;
+    this.allyBuff = 1 + (S.buildings.lab || 0) * 0.05;
     const shield = 1 + (S.buildings.shield || 0) * 0.10;
-    this.allyBuff = lab;
-    // A maxed deck costs 10 energy a unit, so a maxed Reactor has to be able
-    // to actually sustain one. Without this the late fights are decided by
-    // the AI's free deployments rather than by the army you built.
-    this.energyRate = 0.9 * (1 + reactor * 0.2);
-    this.maxEnergy = 10 + Math.round(reactor * 1.5);
-    this.energy = Math.min(this.maxEnergy, 7);
 
     const cx = citadel ? citadel.x : territory.x;
     const cz = citadel ? citadel.z : territory.z;
     this.center = { x: cx, z: cz };
 
-    if (citadel && !world.citadelRig) {
-      // Normally syncCitadel has already raised it; make sure regardless so a
-      // missing structure can never take the fight down with it.
-      world.syncCitadel(game.state, true, false);
-    }
+    if (citadel && !world.citadelRig) world.syncCitadel(game.state, true, false);
     const ek = citadel ? world.citadelRig : world.keeps[territory.id];
     this.enemyKeep = {
       team: 1, pos: new THREE.Vector3(cx, world.heightAt(cx, cz), cz),
       hp: st.keepHp, maxHp: st.keepHp, rig: ek, cooldown: 0, radius: citadel ? 9 : 7
     };
 
-    /* Staging keep on the side you approached from. The terrain mesh is
-       already built, so heightAt() must not be altered here — pick the
-       flattest real ground in that arc instead. */
+    /* Your keep goes on the side you walked in from, on the flattest real
+       ground in that arc — the terrain mesh is already built, so heightAt
+       must not be altered here. */
     const px = game.player.pos.x, pz = game.player.pos.z;
     let dx = px - cx, dz = pz - cz;
     const dl = Math.hypot(dx, dz) || 1;
@@ -143,50 +131,68 @@
       rig: pk, cooldown: 0, radius: 6
     };
 
-    /* The only line worth drawing is the rule the player can break. */
-    this.noDropR = FIELD_LEN * 0.46;
-    const ring = B.decor(B.ring(1, 1.028), B.glowMat(0xff4d6d, 0.34), 0, 0, 0);
-    ring.rotation.x = -Math.PI / 2;
-    ring.scale.setScalar(this.noDropR);
-    ring.position.set(cx, world.heightAt(cx, cz) + 1.0, cz);
-    world.scene.add(ring);
-    this.ring = ring;
-    const pylons = new THREE.Group();
-    for (let i = 0; i < 16; i++) {
-      const a = (i / 16) * U.TAU;
-      const qx = cx + Math.cos(a) * this.noDropR;
-      const qz = cz + Math.sin(a) * this.noDropR;
-      pylons.add(B.decor(B.box(0.35, 2.6, 0.35), B.glowMat(0xff4d6d, 0.5),
-        qx, world.heightAt(qx, qz) + 1.3, qz));
-    }
-    world.scene.add(pylons);
-    this.deployRing = pylons;
+    /* The lane. Both armies stand on it from the first second; there is no
+       energy bar and nothing to deploy. */
+    this.lane = SK.props.buildLane(world, this.homeKeep.pos, this.enemyKeep.pos, LANE_HALF, 0x35e0ff);
+    world.scene.add(this.lane.group);
 
-    /* Garrison, so you arrive at a defended position. */
-    const garrisonLevel = Math.max(1, Math.round(this.tier * 0.8));
-    for (let i = 0; i < st.garrison; i++) {
+    /* Your army: every soldier you own, lined up at your end. */
+    const roster = game.roster();
+    roster.forEach((ent, i) => {
+      const def = D.unit(ent.id);
+      if (!def) return;
+      const col = i % 4, row = Math.floor(i / 4);
+      const p = this.lanePoint(12 + row * 7, (col - 1.5) * 6.5);
+      this.spawnUnit(def, 0, p.x, p.z, ent.lv || 1);
+    });
+    this.allyStart = roster.length;
+
+    /* Their army: a fixed force scaled to the target, plus the Warlord on a
+       Citadel. Nobody gets reinforcements — what stands here decides it. */
+    const foeCount = Math.min(16, (citadel ? 7 : 4) + Math.round(this.tier * (citadel ? 1.0 : 0.9)));
+    const foeLevel = Math.max(1, Math.round(this.tier * 0.8));
+    for (let i = 0; i < foeCount; i++) {
       const def = this.pickEnemyDef(i);
       if (!def) continue;
-      const a = (i / st.garrison) * U.TAU + 0.3;
-      const r = 13 + (i % 2) * 5;
-      const gu = this.spawnUnit(def, 1, cx + Math.cos(a) * r, cz + Math.sin(a) * r, garrisonLevel);
-      // The garrison defends: it holds a post and only chases what comes to
-      // it. Otherwise seven high-tier units sprint your keep before you have
-      // the energy to answer.
-      gu.guard = true;
-      gu.post = { pos: new THREE.Vector3(gu.pos.x, gu.pos.y, gu.pos.z) };
+      const col = i % 4, row = Math.floor(i / 4);
+      const p = this.lanePoint(this.lane.len - (12 + row * 7), (col - 1.5) * 6.5);
+      this.spawnUnit(def, 1, p.x, p.z, foeLevel);
     }
+    this.foeStart = foeCount;
 
-    /* The Warlord: a Citadel is won by killing it, not the keep. */
     if (citadel) {
       this.boss = this.spawnBoss(citadel);
       game.toast(citadel.warlord.name + ': "' + citadel.warlord.taunt + '"', 'bad');
     }
 
-    game.player.spawn(world, hx + this.homeDir.x * 9, hz + this.homeDir.z * 9);
+    game.player.spawn(world, hx + this.homeDir.x * 7, hz + this.homeDir.z * 7);
     game.player.health = 100;
+    game.player.group.visible = true;
     SK.Audio.tone({ type: 'sawtooth', f0: 90, f1: citadel ? 200 : 260, dur: 1.3, gain: 0.22,
       filter: [300, 1800] });
+  };
+
+  /* A point on the lane: `along` metres from your keep, `across` sideways. */
+  Battle.prototype.lanePoint = function (along, across) {
+    const L = this.lane;
+    const x = L.ax + L.ux * along + L.px * across;
+    const z = L.az + L.uz * along + L.pz * across;
+    return { x: x, z: z };
+  };
+
+  /* Keep a unit on the road. */
+  Battle.prototype.clampToLane = function (u) {
+    const L = this.lane;
+    if (!L) return;
+    const rx = u.pos.x - L.ax, rz = u.pos.z - L.az;
+    const along = rx * L.ux + rz * L.uz;
+    const across = rx * L.px + rz * L.pz;
+    const lim = L.halfWidth - u.radius * 0.5;
+    if (across > lim || across < -lim) {
+      const c = U.clamp(across, -lim, lim);
+      u.pos.x = L.ax + L.ux * along + L.px * c;
+      u.pos.z = L.az + L.uz * along + L.pz * c;
+    }
   };
 
   Battle.prototype.pickEnemyDef = function (i) {
@@ -195,31 +201,6 @@
     const trait = U.pick(cfg.traits);
     const mark = U.clamp(Math.round(this.tier * 0.72), 1, 7);
     return D.unit(fam + '-' + mark + '-' + trait) || D.unit(fam + '-1-std');
-  };
-
-  /* ------------------------------------------------------ deployment */
-  Battle.prototype.deploy = function (defId) {
-    const def = D.unit(defId);
-    if (!def) return 'Unknown unit.';
-    if (this.energy < def.energy) return 'Not enough energy.';
-    const standing = this.units.filter((u) => u.team === 0 && !u.dead).length;
-    if (standing + def.count > MAX_ALLIES) return 'Your field command is at capacity.';
-    const p = this.game.player.pos;
-    let sx = p.x, sz = p.z;
-    let warned = null;
-    if (Math.hypot(sx - this.center.x, sz - this.center.z) < this.noDropR) {
-      sx = this.homeKeep.pos.x; sz = this.homeKeep.pos.z;
-      warned = 'Inside their perimeter. Drop rerouted to your keep.';
-    }
-    this.energy -= def.energy;
-    const lv = this.game.state.army[def.id] || 1;
-    for (let i = 0; i < def.count; i++) {
-      const a = (i / def.count) * U.TAU;
-      const r = def.count > 1 ? 1.6 : 0;
-      this.spawnUnit(def, 0, sx + Math.cos(a) * r, sz + Math.sin(a) * r, lv);
-    }
-    SK.Audio.deploy();
-    return warned;
   };
 
   /* ---------------------------------------------------- unit factory */
@@ -328,23 +309,6 @@
     return u;
   };
 
-  /* ---------------------------------------------------------- enemy AI */
-  Battle.prototype.aiDeploy = function () {
-    const alive = this.units.filter((u) => u.team === 1 && !u.dead).length;
-    if (alive >= this.stats.foeCap) return;
-    const k = this.enemyKeep.pos;
-    const level = Math.max(1, Math.round(this.tier * 0.8));
-    const squads = this.tier >= 6 ? 2 : 1;
-    for (let sq = 0; sq < squads; sq++) {
-      const def = this.pickEnemyDef();
-      if (!def) continue;
-      const a = U.rand(0, U.TAU);
-      for (let i = 0; i < def.count; i++) {
-        this.spawnUnit(def, 1, k.x + Math.cos(a) * (9 + i * 1.4), k.z + Math.sin(a) * (9 + i * 1.4), level);
-      }
-    }
-  };
-
   /* ------------------------------------------------------------- tick */
   Battle.prototype.update = function (dt) {
     if (!this.active) return;
@@ -354,34 +318,19 @@
 
     if (this.result) { this.endT += dt; this.updateUnits(dt, true); return; }
 
-    this.energy = Math.min(this.maxEnergy, this.energy + this.energyRate * dt);
-
-    this.aiTimer -= dt;
-    if (this.aiTimer <= 0) {
-      this.aiTimer = this.stats.aiInterval * U.rand(0.8, 1.25);
-      this.aiDeploy();
-    }
-
     this.updateUnits(dt, false);
     this.updateKeep(this.enemyKeep, dt);
     this.updateKeep(this.homeKeep, dt);
 
-    if (game.player.health <= 0 && this.playerDown <= 0) {
-      this.playerDown = 5;
-      game.fx.explosion(game.player.pos, 3, 0xff6a4a);
-      game.toast('You were taken down. Respawning at your keep.');
-      SK.Audio.defeat();
-    }
-    if (this.playerDown > 0) {
-      this.playerDown -= dt;
+    // Going down does not end the battle: you drop out and watch your army
+    // finish it from the air.
+    if (game.player.health <= 0 && !this.spectating) {
+      this.spectating = true;
+      game.fx.explosion(game.player.pos, 3.5, 0xff6a4a);
       game.player.group.visible = false;
-      if (this.playerDown <= 0) {
-        game.player.health = 100;
-        game.player.spawn(world, this.homeKeep.pos.x + this.homeDir.x * 8,
-          this.homeKeep.pos.z + this.homeDir.z * 8);
-        game.player.group.visible = true;
-        game.fx.teleportIn(game.player.pos, 0x35e0ff);
-      }
+      game.chase.shake = 1.0;
+      game.onSpectate();
+      SK.Audio.defeat();
     }
 
     if (this.isCitadel) {
@@ -405,7 +354,7 @@
       if (d < bestD) { bestD = d; best = u; }
     }
     const col = keep.team === 0 ? 0x35e0ff : this.planet.faction.trim;
-    if (!best && keep.team === 1 && !this.game.player.vehicle && this.playerDown <= 0) {
+    if (!best && keep.team === 1 && !this.game.player.vehicle && !this.spectating) {
       const pd = Math.hypot(this.game.player.pos.x - keep.pos.x, this.game.player.pos.z - keep.pos.z);
       if (pd < KEEP_RANGE) {
         keep.cooldown = 1.5;
@@ -500,7 +449,7 @@
           const d = Math.hypot(o.pos.x - u.pos.x, o.pos.z - u.pos.z);
           if (d < bestD) { bestD = d; best = o; }
         }
-        if (u.team === 1 && this.playerDown <= 0) {
+        if (u.team === 1 && !this.spectating) {
           const pd = Math.hypot(this.game.player.pos.x - u.pos.x, this.game.player.pos.z - u.pos.z);
           if (pd < bestD * 0.85) best = this.playerTarget();
         }
@@ -535,6 +484,7 @@
       const spd = u.speed * slowMul * (this.planet.gravity < 0.8 ? 1.12 : 1);
       u.pos.x += (mx * spd + sx * spd * 1.4) * dt;
       u.pos.z += (mz * spd + sz * spd * 1.4) * dt;
+      if (!u.boss) this.clampToLane(u);
       const groundY = world.heightAt(u.pos.x, u.pos.z) + u.hover;
       u.pos.y = U.damp(u.pos.y, groundY, u.hover ? 5 : 14, dt);
       u.yaw = U.dampAngle(u.yaw, Math.atan2(aim.pos.x - u.pos.x, aim.pos.z - u.pos.z), move ? 8 : 10, dt);
@@ -644,6 +594,8 @@
       this.game.toast(u.warlord.name + ' is charging a beam. Get out of the line.', 'bad');
       SK.Audio.warp();
     } else if (ability === 'summon') {
+      if ((u.summons || 0) >= 2) { u.abilityT = 2.5; return; }
+      u.summons = (u.summons || 0) + 1;
       const level = Math.max(1, Math.round(this.tier * 0.8));
       for (let i = 0; i < 3; i++) {
         const def = this.pickEnemyDef(i);
@@ -656,6 +608,16 @@
   };
 
   /* ------------------------------------------------------ player proxy */
+  Battle.prototype.counts = function () {
+    let ally = 0, foe = 0;
+    for (let i = 0; i < this.units.length; i++) {
+      const u = this.units[i];
+      if (u.dead) continue;
+      if (u.team === 0) ally++; else foe++;
+    }
+    return { ally: ally, foe: foe, allyStart: this.allyStart || 0, foeStart: this.foeStart || 0 };
+  };
+
   Battle.prototype.playerTarget = function () {
     const g = this.game;
     if (!this._playerProxy) {
@@ -664,7 +626,7 @@
         pos: g.player.pos, get hp() { return g.player.health; }, maxHp: 100
       };
     }
-    this._playerProxy.dead = g.player.health <= 0 || this.playerDown > 0;
+    this._playerProxy.dead = g.player.health <= 0 || this.spectating;
     return this._playerProxy.dead ? null : this._playerProxy;
   };
 
@@ -746,7 +708,7 @@
       if (Math.hypot(keep.pos.x - hitPos.x, keep.pos.z - hitPos.z) < attacker.splash + keep.radius) {
         this.damageKeep(keep, dmg * STRUCT_MUL * this.structBonus(attacker));
       }
-      if (attacker.team === 1 && this.playerDown <= 0) {
+      if (attacker.team === 1 && !this.spectating) {
         const pd = Math.hypot(this.game.player.pos.x - hitPos.x, this.game.player.pos.z - hitPos.z);
         if (pd <= attacker.splash) this.damagePlayer(dmg * 0.45);
       }
@@ -844,10 +806,7 @@
         if (d <= r) this.damageUnit(o, u.maxHp * 0.12 * u.deathBlast.dmg * (1 - d / (r * 1.6)), 0xff9a1a);
       }
     }
-    if (u.team === 1) {
-      this.game.state.stats.kills++;
-      this.energy = Math.min(this.maxEnergy, this.energy + (u.boss ? 4 : 0.35 + this.tier * 0.1));
-    }
+    if (u.team === 1) this.game.state.stats.kills++;
   };
 
   Battle.prototype.damageKeep = function (keep, dmg) {
@@ -939,8 +898,8 @@
     this.units.length = 0;
     this.boss = null;
     if (this.homeKeepRig) world.scene.remove(this.homeKeepRig.group);
-    if (this.ring) world.scene.remove(this.ring);
-    if (this.deployRing) world.scene.remove(this.deployRing);
+    if (this.lane) { world.scene.remove(this.lane.group); this.lane = null; }
+    this.spectating = false;
     this.active = false;
     this.result = null;
     this.game.fx.clear();

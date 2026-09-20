@@ -381,6 +381,56 @@ i.c-coin,i.c-crystal,i.c-alloy{width:15px;height:15px;display:inline-block;flex:
 #fatal p{max-width:44ch;color:var(--ink-2);line-height:1.7}
 
 
+/* ------------------------------------------- army counts during battle */
+.armybar{position:absolute;bottom:calc(20px + var(--safe-b));left:50%;transform:translateX(-50%);
+  display:flex;align-items:center;gap:16px;background:rgba(9,16,28,.82);border:1px solid var(--line);
+  padding:9px 20px;clip-path:var(--cut);backdrop-filter:blur(8px)}
+.ac{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:92px}
+.ac-label{font-family:var(--display);font-size:9.5px;letter-spacing:.2em;text-transform:uppercase;
+  color:var(--ink-3)}
+.ac b{font-family:var(--display);font-size:26px;font-variant-numeric:tabular-nums;line-height:1}
+.ac-you b{color:var(--cy)} .ac-them b{color:var(--bad)}
+.ac-vs{font-family:var(--display);font-size:12px;letter-spacing:.16em;color:var(--ink-3)}
+
+/* ------------------------------------------------------- spectating */
+#spectate{position:absolute;top:36%;left:50%;transform:translate(-50%,-50%) scale(.96);
+  opacity:0;pointer-events:none;transition:.3s;z-index:6}
+#spectate.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+.spec-inner{display:flex;align-items:center;gap:14px;background:rgba(9,16,28,.86);
+  border:1px solid rgba(255,77,109,.5);padding:14px 24px;clip-path:var(--cut);
+  backdrop-filter:blur(8px)}
+.spec-dot{width:11px;height:11px;border-radius:50%;background:var(--bad);flex:none;
+  box-shadow:0 0 0 0 rgba(255,77,109,.7);animation:specPulse 1.6s infinite}
+@keyframes specPulse{70%{box-shadow:0 0 0 12px rgba(255,77,109,0)}100%{box-shadow:0 0 0 0 rgba(255,77,109,0)}}
+.spec-title{font-family:var(--display);font-size:19px;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--bad)}
+.spec-sub{font-size:12.5px;color:var(--ink-2)}
+
+/* ------------------------------------------------- squad / shop tabs */
+.subtabs{display:flex;gap:6px}
+.subtab{flex:1;background:rgba(12,21,38,.7);border:1px solid var(--line);cursor:pointer;
+  font-family:var(--display);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--ink-3);padding:9px 8px;border-radius:3px;transition:.14s}
+.subtab:hover{color:var(--ink-2);border-color:var(--line-hot)}
+.subtab.on{background:rgba(53,224,255,.14);border-color:var(--cy);color:var(--cy)}
+.deck-slot .ds-lv{font-size:9.5px;color:var(--gold);font-family:var(--display);position:relative}
+.urow-price{font-family:var(--display);font-size:12px;color:var(--gold);display:flex;
+  align-items:center;gap:4px;justify-content:flex-end}
+.urow-price.poor{color:var(--bad);opacity:.7}
+.urow-own{font-size:9.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--good);
+  font-family:var(--display)}
+.rar-chip{border-left:3px solid currentColor}
+#shop-tools{display:flex;flex-direction:column;gap:9px}
+#shop-tools[hidden]{display:none}
+@media (max-width:560px){
+  .armybar{gap:10px;padding:7px 14px}
+  .ac{min-width:70px}
+  .ac b{font-size:21px}
+  .spec-title{font-size:15px}
+  .spec-sub{font-size:11px}
+  .spec-inner{padding:11px 16px;gap:10px}
+}
+
 /* ------------------------------------------------ kingdom shop tabs */
 .tabbar{display:flex;gap:2px;padding:0 16px;border-bottom:1px solid var(--line);
   background:rgba(8,14,24,.6);flex:none}
@@ -686,6 +736,16 @@ body.touch-mode #crosshair{opacity:.5}
     </div>
   </div>
 
+  <div id="spectate">
+    <div class="spec-inner">
+      <span class="spec-dot"></span>
+      <div>
+        <div class="spec-title">Spectating</div>
+        <div class="spec-sub">You are down. Your army is still fighting.</div>
+      </div>
+    </div>
+  </div>
+
   <div id="crosshair"><span></span></div>
   <div id="player-hp"><div id="player-hp-fill"></div></div>
   <div id="vehicle-tag"></div>
@@ -728,13 +788,10 @@ body.touch-mode #crosshair{opacity:.5}
     <div id="battle-title">Contested territory</div>
   </div>
 
-  <div class="deck">
-    <div class="energy">
-      <span class="energy-label">Energy</span>
-      <div class="energy-track"><i id="energy-fill"></i></div>
-      <span id="energy-num">5</span>
-    </div>
-    <div id="cards"></div>
+  <div class="armybar">
+    <div class="ac ac-you"><span class="ac-label">Your army</span><b id="ac-you">0</b></div>
+    <div class="ac-vs">vs</div>
+    <div class="ac ac-them"><span class="ac-label">Enemy</span><b id="ac-them">0</b></div>
   </div>
 </div>
 
@@ -776,21 +833,28 @@ body.touch-mode #crosshair{opacity:.5}
   <!-- --------------------------------------------------------- army -->
   <div class="tabpane" id="tab-army">
     <div class="army-tools">
-      <div class="tool-head">Your battle deck <b id="deck-count">0 / 4</b>
+      <div class="tool-head">Your army <b id="deck-count">5 / 7</b>
         <span id="army-power">+0% from research</span></div>
       <div id="deck-strip" class="deck-strip"></div>
-      <input id="army-search" type="search" placeholder="Search units by name, role or trait"
-             autocomplete="off" spellcheck="false" aria-label="Search units">
-      <div class="chiprow scrollx" id="army-families"></div>
-      <div class="chiprow tools2">
-        <span class="chiprow inline" id="army-sort">
-          <button class="chip on" data-sort="power">Power</button>
-          <button class="chip" data-sort="energy">Cost</button>
-          <button class="chip" data-sort="level">Level</button>
-          <button class="chip" data-sort="name">A&ndash;Z</button>
-        </span>
-        <button class="chip on" id="army-avail">Available only</button>
-        <span class="count" id="army-count">0</span>
+      <div class="subtabs">
+        <button class="subtab on" data-sub="squad">My squad</button>
+        <button class="subtab" data-sub="shop">Recruit</button>
+      </div>
+      <div id="shop-tools">
+        <input id="army-search" type="search" placeholder="Search soldiers by name, role or rarity"
+               autocomplete="off" spellcheck="false" aria-label="Search soldiers">
+        <div class="chiprow scrollx" id="army-rarities"></div>
+        <div class="chiprow scrollx" id="army-families"></div>
+        <div class="chiprow tools2">
+          <span class="chiprow inline" id="army-sort">
+            <button class="chip on" data-sort="power">Power</button>
+            <button class="chip" data-sort="price">Price</button>
+            <button class="chip" data-sort="rarity">Rarity</button>
+            <button class="chip" data-sort="name">A&ndash;Z</button>
+          </span>
+          <button class="chip on" id="army-avail">Available only</button>
+          <span class="count" id="army-count">0</span>
+        </div>
       </div>
     </div>
     <div class="army-scroll" id="army-scroll">

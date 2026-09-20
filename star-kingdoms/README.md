@@ -47,7 +47,6 @@ scheme appears on its own.
 | `F` | ride a nearby craft | dismount | — |
 | `E` (hold) | assault a territory, board the starship | — | land on a world |
 | `K` / `U` / `G` | kingdom shop: buildings / army / garage | | |
-| `1`-`8` | call that unit down to your position (in battle) | | |
 | `Esc` | close a panel, release the mouse | | |
 
 **Touch** — a real analogue thumbstick bottom-left, drag anywhere else to
@@ -80,21 +79,28 @@ straight to the tab you want.
 Starship is 1,600 and is the only way to reach the other four worlds.
 Anything you buy is parked outside your kingdom; walk up and press `F`.
 
-**Battles are fought, not simulated.** You stand on the field in third
-person with a blaster while your army fights around you. Energy refills
-over time; pressing `1`-`8` drops that unit at *your feet*, so where you
-stand decides where your reinforcements land. Drop too close to the enemy
-keep and the drop reroutes home — the red pylons mark that line.
+**Battles happen on a lane.** A road runs between your keep and theirs,
+lit along both edges and posted at the sides. Both armies are standing on
+it from the first second. There is no energy bar, no cards and nothing to
+deploy: what you own is what walks out there, and what they have is what
+meets it. Whichever side survives the clash pushes on and breaks the other
+keep.
+
+**You fight in it, and you can lose without losing.** You are down there
+in third person with a blaster. If you are killed the battle does not end
+and you do not respawn: the camera lifts into the air and follows the
+fight while your army finishes it. Your soldiers are never permanently
+lost either, so a defeat costs nothing but time.
 
 **Losing costs nothing.** A failed assault takes no resources and no
 territory. The result screen offers **Try again**, which drops you
 straight back in from the same approach. Territory you already hold is
 yours permanently — nothing ever attacks it back.
 
-**One ladder.** Coins build the kingdom (eight structures, each gated
-behind your Great Hall's level) and promote your army. Your deck — what
-you can actually call down mid-battle — is capped by the War Barracks, so
-choosing eight units out of a thousand is the real decision.
+**One ladder.** Coins build the kingdom, recruit soldiers and promote
+them. Your army starts at five and the War Barracks widens it to sixteen,
+so which soldiers you own — and which you dismiss to make room — is the
+real decision.
 
 **Every world ends with a Warlord.** Take all five territories on a
 planet and its **Citadel** appears: a fortress that was not on the map
@@ -146,9 +152,32 @@ set, gravity, ambient drone and enemy look. Nyxor's ground is carved into
 floating shelves; Duskara's is terraced and wind-rippled; Cryovault's is
 terraced ice under animated aurora ribbons.
 
-## The roster: 1,013 units
+## Your army and the shop
 
-The army is generated, not hand-listed, and no axis of it is a reskin.
+You begin with five Common soldiers. The **Recruit** tab of the kingdom
+shop sells more, priced from 75 coins for a Recruit up to a few thousand
+for a Mythic, and your army grows from five to sixteen slots as the War
+Barracks does. Everything you own marches onto the lane together.
+
+Six rarities, cheapest to rarest:
+
+| Rarity | Where it comes from |
+|---|---|
+| Common | Mark I and II of any family |
+| Uncommon | Mark III |
+| Rare | Mark IV |
+| Epic | Mark V |
+| Legendary | Mark VI |
+| Mythic | Mark VII, and the five Warlord trophies |
+
+Rarity is never locked behind a building, only behind price, so a Mythic
+is on the shop shelf from your first minute if you are willing to save for
+it. Buildings unlock new *families* and *traits* instead, widening what
+the shop stocks from 14 soldiers at the start to all 1,008.
+
+## The roster: 1,013 soldiers
+
+The roster is generated, not hand-listed, and no axis of it is a reskin.
 
 **12 families** decide role and silhouette: Vanguard, Lancer, Bulwark,
 Longshot, Skitter, Rocketeer, Aegis, Colossus, Phantom, Pyre, Warden and
@@ -172,16 +201,15 @@ more energy.
 That is 12 × 7 × 12 = 1,008, plus **5 Trophy units** taken from the
 Warlords.
 
-**Upgrades run deep.** Every unit promotes from level 1 to 20, and at
-levels 5, 10, 15 and 20 it learns a perk from its family's own line —
+**Upgrades run deep.** Every soldier promotes from level 1 to 20, and at
+levels 5, 10, 15 and 20 learns a perk from its family's own line —
 armour piercing, twin barrels, arc conduits, shield projectors, rally
 banners, launch surges. A level-20 Bulwark is a different unit from a
 level-1 Bulwark, not just a bigger one.
 
-Availability opens as you build: 4 units at the start, around 180 by
-mid-game, all 1,008 once the Command Spire, War Barracks and Research Lab
-are maxed. The army console has search, family filters, four sort orders
-and a detail sheet per unit.
+The shop stocks 14 soldiers at the start, 140 once the Barracks and Lab
+are part-built, and all 1,008 when they are maxed. It has search, rarity
+and family filters, four sort orders and a detail sheet per soldier.
 
 ## What's actually generated
 
@@ -245,11 +273,11 @@ death, Thorned reflects melee, Radiant raises ally damage, Seraphs sit
 above the ground, Pyres ignite their targets, and a level-20 unit carries
 all four of its perks.
 
-The same harness brackets difficulty. A mid-game deck beats the first
-Warlord in about a minute; a maxed deck beats it in thirteen seconds; an
-under-levelled deck loses the last Warlord with 94% of its health
-untouched; a maxed deck played passively gets it to 9%, which a player
-firing their own blaster closes comfortably.
+The same harness brackets difficulty. An eleven-soldier mid-game army
+beats the first Warlord comfortably; a sixteen-soldier maxed army beats
+the last one in about thirty-six seconds having lost seven of its number;
+an under-levelled army of eleven loses that fight with the Warlord's
+health untouched.
 
 Measured: 61-101 draw calls on a planet surface, ~290 in a battle,
 95-170k triangles. The army console keeps only 12 rows in the DOM while

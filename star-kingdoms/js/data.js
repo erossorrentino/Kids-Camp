@@ -48,7 +48,7 @@
         warlord: {
           name: 'Marrowking Vell', title: 'Root of the Covenant',
           taunt: 'You walk on my roots, sovereign. They remember.',
-          hp: 18000, dmg: 190, range: 9, speed: 3.6, atkRate: 1.1, scale: 3.0,
+          hp: 15000, dmg: 175, range: 9, speed: 3.6, atkRate: 1.1, scale: 3.0,
           abilities: ['slam', 'summon'],
           look: { weapon: 'staff', heavy: true, crest: 'horns', cape: true }
         }
@@ -99,7 +99,7 @@
         warlord: {
           name: 'Slagmarshal Orun', title: 'Keeper of the Pour',
           taunt: 'I have melted better crowns than yours.',
-          hp: 40000, dmg: 290, range: 13, speed: 3.2, atkRate: 1.3, scale: 3.3,
+          hp: 20000, dmg: 235, range: 13, speed: 3.2, atkRate: 1.3, scale: 3.3,
           abilities: ['slam', 'volley', 'summon'],
           look: { weapon: 'cannon', heavy: true, crest: 'horns', cape: true }
         }
@@ -151,7 +151,7 @@
         warlord: {
           name: 'Sentinel Prime Hesk', title: 'The Last Watch',
           taunt: 'The sleeper is not yours to wake.',
-          hp: 62000, dmg: 330, range: 17, speed: 2.9, atkRate: 1.35, scale: 3.5,
+          hp: 28000, dmg: 275, range: 17, speed: 2.9, atkRate: 1.35, scale: 3.5,
           abilities: ['beam', 'slam', 'summon'],
           look: { weapon: 'cannon', shield: true, heavy: true, crest: 'fin', cape: true }
         }
@@ -204,7 +204,7 @@
         warlord: {
           name: 'Salt-Queen Ifra', title: 'She Who Owns The Water',
           taunt: 'Out here I decide who drinks. Today, nobody.',
-          hp: 84000, dmg: 410, range: 24, speed: 4.6, atkRate: 1.1, scale: 3.2,
+          hp: 36000, dmg: 330, range: 24, speed: 4.6, atkRate: 1.1, scale: 3.2,
           abilities: ['volley', 'summon', 'beam'],
           look: { weapon: 'longrifle', crest: 'halo', cape: true }
         }
@@ -256,7 +256,7 @@
         warlord: {
           name: 'Thessaly the Unmade', title: 'Who Broke The Sky',
           taunt: 'I ended a world by sitting still. Try me.',
-          hp: 105000, dmg: 540, range: 20, speed: 5.4, atkRate: 0.95, scale: 3.6,
+          hp: 46000, dmg: 400, range: 20, speed: 5.4, atkRate: 0.95, scale: 3.6,
           abilities: ['beam', 'slam', 'volley', 'summon'],
           look: { weapon: 'staff', heavy: true, crest: 'halo', cape: true }
         }
@@ -417,12 +417,12 @@
   /* ---- seven marks ------------------------------------------------- */
   const MARKS = [
     { n: 1, roman: 'I', mul: 1.00, energy: 0, command: 1, rarity: 'Common', cost: 1.0 },
-    { n: 2, roman: 'II', mul: 1.30, energy: 0, command: 1, rarity: 'Common', cost: 1.5 },
-    { n: 3, roman: 'III', mul: 1.68, energy: 1, command: 2, rarity: 'Uncommon', cost: 2.3 },
-    { n: 4, roman: 'IV', mul: 2.15, energy: 1, command: 3, rarity: 'Uncommon', cost: 3.4 },
-    { n: 5, roman: 'V', mul: 2.75, energy: 2, command: 5, rarity: 'Rare', cost: 5.1 },
-    { n: 6, roman: 'VI', mul: 3.50, energy: 2, command: 7, rarity: 'Epic', cost: 7.6 },
-    { n: 7, roman: 'VII', mul: 4.45, energy: 3, command: 9, rarity: 'Legendary', cost: 11.4 }
+    { n: 2, roman: 'II', mul: 1.30, energy: 0, command: 1, rarity: 'Common', cost: 1.6 },
+    { n: 3, roman: 'III', mul: 1.68, energy: 1, command: 1, rarity: 'Uncommon', cost: 2.6 },
+    { n: 4, roman: 'IV', mul: 2.15, energy: 1, command: 1, rarity: 'Rare', cost: 4.2 },
+    { n: 5, roman: 'V', mul: 2.75, energy: 2, command: 1, rarity: 'Epic', cost: 6.8 },
+    { n: 6, roman: 'VI', mul: 3.50, energy: 2, command: 1, rarity: 'Legendary', cost: 11.0 },
+    { n: 7, roman: 'VII', mul: 4.45, energy: 3, command: 1, rarity: 'Mythic', cost: 18.0 }
   ];
 
   /* ---- twelve traits ----------------------------------------------- */
@@ -468,10 +468,15 @@
       desc: '+18% to health, damage and speed, but costs 1 more energy.' }
   ];
 
+  /* Six rarities, cheapest to rarest. Everything in the game that shows a
+     unit — shop rows, roster cards, name plates — colours it from here. */
+  const RARITIES = ['Common', 'Uncommon', 'Rare', 'Epic', 'Legendary', 'Mythic'];
   const RARITY_COLOR = {
     Common: '#9fb0c4', Uncommon: '#5dffa0', Rare: '#35e0ff',
-    Epic: '#c46bff', Legendary: '#ffb23f'
+    Epic: '#c46bff', Legendary: '#ffb23f', Mythic: '#ff4d8d'
   };
+  const RARITY_RANK = {};
+  RARITIES.forEach((r, i) => { RARITY_RANK[r] = i; });
 
   /* ---- generate the roster ----------------------------------------- */
   function buildRoster() {
@@ -510,6 +515,7 @@
             aura: tr.aura || fam.aura || null,
             barracks: fam.barracks, command: mk.command, lab: tr.lab,
             perks: fam.perks,
+            price: Math.round(55 * mk.cost * (1 + fam.energy * 0.12) * (tr.id === 'std' ? 1 : 1.18)),
             upgradeBase: Math.round(70 * mk.cost * (1 + fam.energy * 0.08)),
             desc: fam.desc, traitDesc: tr.desc,
             look: fam.look, traitTint: tr.tint || null
@@ -530,7 +536,7 @@
   const TROPHIES = [
     {
       id: 'trophy-verdania', planet: 'verdania', name: 'Thornborn Warden',
-      familyName: 'Thornborn', role: 'Regenerating bruiser', rarity: 'Legendary',
+      familyName: 'Thornborn', role: 'Regenerating bruiser', rarity: 'Mythic',
       energy: 6, hp: 3200, dmg: 132, range: 6, speed: 5.4, atkRate: 0.9, count: 1,
       reflect: 0.35, lifesteal: 0.2,
       perks: ['regen', 'tough', 'chain', 'rally'],
@@ -540,7 +546,7 @@
     },
     {
       id: 'trophy-emberforge', planet: 'emberforge', name: 'Magmaheart Reaver',
-      familyName: 'Magmaheart', role: 'Burning berserker', rarity: 'Legendary',
+      familyName: 'Magmaheart', role: 'Burning berserker', rarity: 'Mythic',
       energy: 6, hp: 2100, dmg: 190, range: 3.4, speed: 9.4, atkRate: 0.55, count: 1,
       burn: 1.1, splash: 4, deathBlast: { dmg: 1.4, radius: 10 },
       perks: ['haste', 'crit', 'splash', 'rapid'],
@@ -550,7 +556,7 @@
     },
     {
       id: 'trophy-cryovault', planet: 'cryovault', name: 'Rimewarden Sentinel',
-      familyName: 'Rimewarden', role: 'Freezing anchor', rarity: 'Legendary',
+      familyName: 'Rimewarden', role: 'Freezing anchor', rarity: 'Mythic',
       energy: 7, hp: 4600, dmg: 96, range: 13, speed: 3.2, atkRate: 1.3, count: 1,
       slow: { amount: 0.55, time: 3 }, aura: { dmg: 0, dr: 0.18, radius: 15 },
       perks: ['guard', 'bulwarkAura', 'tough', 'regen'],
@@ -560,7 +566,7 @@
     },
     {
       id: 'trophy-duskara', planet: 'duskara', name: 'Dunestalker Prime',
-      familyName: 'Dunestalker', role: 'Assassin', rarity: 'Legendary',
+      familyName: 'Dunestalker', role: 'Assassin', rarity: 'Mythic',
       energy: 5, hp: 1500, dmg: 320, range: 26, speed: 10.2, atkRate: 1.5, count: 1,
       keepDR: 0.7,
       perks: ['crit', 'overload', 'haste', 'pierce'],
@@ -570,7 +576,7 @@
     },
     {
       id: 'trophy-nyxor', planet: 'nyxor', name: 'Voidcrown Seraph',
-      familyName: 'Voidcrown', role: 'Flying commander', rarity: 'Legendary',
+      familyName: 'Voidcrown', role: 'Flying commander', rarity: 'Mythic',
       energy: 8, hp: 3400, dmg: 210, range: 22, speed: 8.8, atkRate: 0.95, count: 1,
       hover: 5.5, aura: { dmg: 0.22, dr: 0.1, radius: 16 }, splash: 4,
       perks: ['rally', 'multishot', 'reach', 'crit'],
@@ -585,7 +591,7 @@
     UNITS.push(Object.assign({
       family: t.id, mark: 7, markRoman: 'VII', trait: 'trophy', traitName: 'Trophy',
       heal: 0, splash: t.splash || 0, burn: t.burn || 0, hover: t.hover || 0,
-      keepDR: t.keepDR || 0, structMul: 1.35, lifesteal: t.lifesteal || 0,
+      keepDR: t.keepDR || 0, structMul: 1.35, lifesteal: t.lifesteal || 0, price: 0,
       deathBlast: t.deathBlast || null, slow: t.slow || null, reflect: t.reflect || 0,
       aura: t.aura || null, barracks: 1, command: 1, lab: 0,
       upgradeBase: 1400, traitDesc: 'Taken from a fallen Warlord. Cannot be found any other way.',
@@ -594,6 +600,15 @@
     }, t));
     UNIT_BY_ID[t.id] = UNITS[UNITS.length - 1];
   });
+
+  /* Your army is a squad you own outright, not a deck you spend energy on.
+     It starts at five soldiers and the War Barracks widens it. */
+  const ARMY_BASE = 5;
+  function armyCap(buildings) {
+    return Math.min(16, ARMY_BASE + (buildings.barracks || 1) * 2);
+  }
+  const STARTER_ARMY = ['vanguard-1-std', 'vanguard-1-std', 'lancer-1-std',
+    'bulwark-1-std', 'longshot-1-std'];
 
   const MAX_LEVEL = 20;
   function unitUpgradeCost(def, level) {
@@ -749,6 +764,7 @@
   SK.data = {
     PLANETS, UNITS, BUILDINGS, VEHICLES, VEHICLE_BY_ID, ENEMY_UNITS, tierStats, citadelStats,
     FAMILIES, MARKS, TRAITS, PERKS, PERK_LEVELS, RARITY_COLOR,
-    unit, unitUpgradeCost, unitPerksAt, unitUnlocked, MAX_LEVEL, UNIT_BY_ID, TROPHIES
+    unit, unitUpgradeCost, unitPerksAt, unitUnlocked, MAX_LEVEL, UNIT_BY_ID, TROPHIES,
+    RARITIES, RARITY_RANK, armyCap, ARMY_BASE, STARTER_ARMY
   };
 })(window.SK);
