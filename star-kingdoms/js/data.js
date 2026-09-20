@@ -665,20 +665,20 @@
     {
       id: 'command', name: 'Great Hall', max: 10, baseCost: 180, growth: 1.66,
       icon: 'spire',
-      effect: (lv) => 'Kingdom level ' + lv + ' · +' + (lv * 6) + '% coin income',
+      effect: (lv) => 'Kingdom level ' + lv + ' · +' + (lv * 4) + '% battle rewards',
       desc: 'The heart of your kingdom. Every other building is capped by its level.'
     },
     {
-      id: 'mine', name: 'Coin Mine', max: 12, baseCost: 90, growth: 1.5,
+      id: 'mine', name: 'Treasury', max: 12, baseCost: 110, growth: 1.52,
       icon: 'mine',
-      effect: (lv) => '+' + (lv * 12) + ' coins / min',
-      desc: 'Digs coins out of the ground. This is your main income while you hold little land.'
+      effect: (lv) => '+' + (lv * 12) + '% coins from every battle you win',
+      desc: 'Counts and keeps the spoils. Every level means a bigger payout for every victory.'
     },
     {
-      id: 'refinery', name: 'Trade Post', max: 12, baseCost: 120, growth: 1.52,
+      id: 'refinery', name: 'Market', max: 10, baseCost: 140, growth: 1.55,
       icon: 'refinery',
-      effect: (lv) => '+' + (lv * 9) + ' coins / min',
-      desc: 'Sells what your army brings home. A second, steady stream of coins.'
+      effect: (lv) => 'Soldiers cost ' + (lv * 4) + '% less to recruit',
+      desc: 'Traders who owe you favours. Knocks the price down on everything in the shop.'
     },
     {
       id: 'barracks', name: 'War Barracks', max: 6, baseCost: 240, growth: 1.82,
@@ -739,8 +739,7 @@
       aiInterval: Math.max(3.8, 8.0 - tier * 0.35),
       garrison: 1 + Math.floor(tier * 0.4),
       foeCap: 5 + Math.floor(tier * 0.55),
-      reward: { coins: 150 + tier * 130 },
-      income: { coins: 6 + tier * 5 }
+      reward: { coins: 220 + tier * 190 }
     };
   }
 
@@ -756,8 +755,7 @@
       aiInterval: Math.max(3.6, 7.6 - t * 0.35),
       garrison: 3 + Math.floor(t * 0.4),
       foeCap: 6 + Math.floor(t * 0.55),
-      reward: { coins: 900 + t * 400 },
-      income: { coins: 26 + t * 8 }
+      reward: { coins: 1200 + t * 520 }
     };
   }
 

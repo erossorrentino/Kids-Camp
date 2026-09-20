@@ -9,7 +9,6 @@
 
   const SAVE_KEY = 'star-kingdoms-save-v3';
   const LEGACY_KEYS = ['star-kingdoms-save-v2', 'star-kingdoms-save-v1'];
-  const OFFLINE_CAP_MIN = 8 * 60;
 
   const APPEARANCES = {
     skins: [0xf0c8a0, 0xd89b6c, 0xa9713f, 0x7a4b28, 0x4e2f1b, 0x8fd6c0],
@@ -186,30 +185,25 @@
       delete this.state.deck;
       delete this.state.army;
       if (legacy || (s.version && s.version < 3)) this.pendingMigrationNote = true;
-      this.collectOffline();
       return true;
     } catch (e) { return false; }
   };
 
-  Game.prototype.collectOffline = function () {
-    const mins = U.clamp((Date.now() - (this.state.lastTick || Date.now())) / 60000, 0, OFFLINE_CAP_MIN);
-    if (mins < 1) return;
-    const c = Math.floor(this.incomePerMin().coins * mins);
-    if (c <= 0) return;
-    this.state.coins += c;
-    this.offlineGain = { mins: Math.floor(mins), coins: c };
+  /* -------------------------------------------------------- economy */
+  /* Coins are only ever earned by winning. Buildings and captured land do
+     not trickle anything in; they make each victory pay more. */
+  Game.prototype.rewardMultiplier = function () {
+    const s = this.state;
+    const treasury = 1 + (s.buildings.mine || 0) * 0.12;
+    const hall = 1 + (s.buildings.command || 1) * 0.04;
+    const held = Object.keys(s.owned).length + Object.keys(s.conquered || {}).length;
+    return treasury * hall * (1 + held * 0.05);
   };
 
-  /* -------------------------------------------------------- economy */
-  Game.prototype.incomePerMin = function () {
-    const s = this.state;
-    const cmdBonus = 1 + (s.buildings.command || 1) * 0.06;
-    let coins = (s.buildings.mine || 0) * 12 + (s.buildings.refinery || 0) * 9;
-    D.PLANETS.forEach((p) => {
-      p.territories.forEach((t) => { if (s.owned[t.id]) coins += D.tierStats(t.tier).income.coins; });
-      if (s.conquered[p.id]) coins += D.citadelStats(p.citadel).income.coins;
-    });
-    return { coins: Math.round(coins * cmdBonus) };
+  /* What the Market knocks off a soldier's price. */
+  Game.prototype.soldierPrice = function (def) {
+    const off = Math.min(0.4, (this.state.buildings.refinery || 0) * 0.04);
+    return Math.max(10, Math.round(def.price * (1 - off)));
   };
 
   Game.prototype.tickEconomy = function (dt) {
@@ -217,10 +211,8 @@
     if (this.incomeAcc < 1) return;
     const secs = this.incomeAcc;
     this.incomeAcc = 0;
-    this.state.coins += this.incomePerMin().coins * secs / 60;
-    this.ui.syncResources();
     this.saveAcc = (this.saveAcc || 0) + secs;
-    if (this.saveAcc > 8) { this.saveAcc = 0; this.save(); }
+    if (this.saveAcc > 8) { this.saveAcc = 0; this.save(true); }
   };
 
   Game.prototype.upgradeBuilding = function (id) {
@@ -234,7 +226,7 @@
       return false;
     }
     const cost = SK.costOf(b, lv);
-    if (s.coins < cost) { this.toast('Not enough coins.', 'bad'); SK.Audio.deny(); return false; }
+    if (s.coins < cost) { this.toast('Not enough coins. Win a battle to earn more.', 'bad'); SK.Audio.deny(); return false; }
     const before = this.unitsAvailable();
     s.coins -= cost;
     s.buildings[id] = lv + 1;
@@ -257,7 +249,7 @@
     const lv = s.army[id] || 1;
     if (lv >= D.MAX_LEVEL) { this.toast('Already at maximum rank.', 'bad'); return false; }
     const cost = D.unitUpgradeCost(def, lv);
-    if (s.coins < cost) { this.toast('Not enough coins.', 'bad'); SK.Audio.deny(); return false; }
+    if (s.coins < cost) { this.toast('Not enough coins. Win a battle to earn more.', 'bad'); SK.Audio.deny(); return false; }
     s.coins -= cost;
     const next = lv + 1;
     s.army[id] = next;
@@ -292,8 +284,9 @@
       this.toast('Your army is full. Upgrade the War Barracks for more room.', 'bad');
       SK.Audio.deny(); return false;
     }
-    if (s.coins < def.price) { this.toast('Not enough coins.', 'bad'); SK.Audio.deny(); return false; }
-    s.coins -= def.price;
+    const price = this.soldierPrice(def);
+    if (s.coins < price) { this.toast('Not enough coins. Win a battle to earn more.', 'bad'); SK.Audio.deny(); return false; }
+    s.coins -= price;
     this.roster().push({ id: defId, lv: 1 });
     SK.Audio.build();
     this.toast(def.name + ' joined your army.', 'good');
@@ -307,7 +300,7 @@
     if (!ent) return false;
     if (r.length <= 1) { this.toast('You cannot sell your last soldier.', 'bad'); SK.Audio.deny(); return false; }
     const def = D.unit(ent.id);
-    const refund = Math.round((def.price + D.unitUpgradeCost(def, 1) * (ent.lv - 1)) * 0.5);
+    const refund = Math.round((this.soldierPrice(def) + D.unitUpgradeCost(def, 1) * (ent.lv - 1)) * 0.5);
     r.splice(index, 1);
     this.state.coins += refund;
     SK.Audio.confirm();
@@ -323,7 +316,7 @@
     const s = this.state;
     if (ent.lv >= D.MAX_LEVEL) { this.toast('Already at maximum rank.', 'bad'); return false; }
     const cost = D.unitUpgradeCost(def, ent.lv);
-    if (s.coins < cost) { this.toast('Not enough coins.', 'bad'); SK.Audio.deny(); return false; }
+    if (s.coins < cost) { this.toast('Not enough coins. Win a battle to earn more.', 'bad'); SK.Audio.deny(); return false; }
     s.coins -= cost;
     ent.lv++;
     SK.Audio.build();
@@ -341,7 +334,7 @@
     const s = this.state;
     if (!v) return false;
     if (this.ownsVehicle(id)) return false;
-    if (s.coins < v.cost) { this.toast('Not enough coins for the ' + v.name + '.', 'bad'); SK.Audio.deny(); return false; }
+    if (s.coins < v.cost) { this.toast('Not enough coins for the ' + v.name + '. Win a battle to earn more.', 'bad'); SK.Audio.deny(); return false; }
     s.coins -= v.cost;
     s.vehicles[id] = true;
     SK.Audio.build();
@@ -543,10 +536,6 @@
           self.pendingMigrationNote = false;
           self.toast('The roster grew to over a thousand units, so your army restarted at level 1.', 'info');
           setTimeout(() => self.toast('Your kingdom, resources and territory are untouched.', 'info'), 2600);
-        } else if (self.offlineGain && self.offlineGain.mins >= 1) {
-          const g = self.offlineGain;
-          self.toast('While you were away you earned ' + U.fmt(g.coins) + ' coins.', 'good');
-          self.offlineGain = null;
         }
       });
     });
@@ -672,9 +661,9 @@
             : 'The ' + self.planet.faction.name + ' hold ' + tr.name +
               '. Strengthen the Aegis Shield, promote your units, and come back. It costs you nothing to try again.'),
         rewards: won
-          ? '<span><i class="c-coin"></i>+' + U.fmt(reward.coins) + '</span>' +
-            '<span class="rw-inc">+' + (isCit ? D.citadelStats(cit).income.coins
-              : D.tierStats(tr.tier).income.coins) + ' coins/min</span>' +
+          ? '<span><i class="c-coin"></i>+' + U.fmt(Math.round(reward.coins * self.rewardMultiplier())) + '</span>' +
+            (self.rewardMultiplier() > 1.05
+              ? '<span class="rw-inc">&times;' + self.rewardMultiplier().toFixed(2) + ' from your kingdom</span>' : '') +
             (trophy ? '<span class="rw-trophy">Unlocked: ' + trophy.name + '</span>' : '')
           : null,
         actions: [

@@ -56,7 +56,11 @@
   UI.prototype.syncResources = function () {
     const s = this.game.state;
     this.el.coins.textContent = U.fmt(s.coins);
-    this.el.income.textContent = '+' + U.fmt(this.game.incomePerMin().coins) + ' coins per minute';
+    // No trickle income: this line tells you what a win is worth instead.
+    const mul = this.game.rewardMultiplier();
+    this.el.income.textContent = mul > 1.02
+      ? 'Battle rewards \u00d7' + mul.toFixed(2)
+      : 'Coins come from winning battles';
     const fc = $('#foot-coins');
     if (fc) fc.textContent = U.fmt(s.coins);
   };
@@ -153,6 +157,14 @@
   UI.prototype.bindPanels = function () {
     const self = this;
     U.$$('[data-close]').forEach((b) => b.addEventListener('click', () => self.closePanel()));
+    const scrim = $('#panel-scrim');
+    if (scrim) {
+      scrim.addEventListener('click', function () {
+        // one tap outside backs out of the sheet, a second closes the shop
+        if (self.detailId != null) self.hideDetail();
+        else self.closePanel();
+      });
+    }
     U.$$('[data-open]').forEach((b) => b.addEventListener('click', () => self.showPanel(b.getAttribute('data-open'))));
   };
 
@@ -174,7 +186,7 @@
     const hint = $('#panel-hint');
     if (hint) {
       hint.textContent = tab === 'build'
-        ? 'Build and upgrade with coins. Buildings appear around your kingdom as you raise them.'
+        ? 'Coins only come from winning. The Treasury raises every payout; the Market cuts shop prices.'
         : tab === 'army'
           ? 'Your whole army walks onto the lane at once. Recruit more, promote the ones you have.'
           : 'Bought vehicles are parked at your kingdom. Walk up and press F to ride.';
@@ -442,7 +454,8 @@
       const squad = this.sub === 'squad';
       const lv = squad ? def.__lv : 1;
       const unlocked = D.unitUnlocked(def, s.buildings, s.conquered);
-      const afford = s.coins >= def.price;
+      const price = this.game.soldierPrice(def);
+      const afford = s.coins >= price;
       node.style.display = '';
       node.style.transform = 'translateY(' + (idx * ROW_H) + 'px)';
       node.className = 'urow' + (squad ? ' in-deck' : '') + (unlocked ? '' : ' locked');
@@ -471,7 +484,7 @@
             ? '<span class="urow-lv">Lv ' + lv + '</span><span class="urow-own">In army</span>'
             : (unlocked
               ? '<span class="urow-price' + (afford ? '' : ' poor') + '"><i class="c-coin"></i>' +
-                U.fmt(def.price) + '</span>'
+                U.fmt(price) + '</span>'
               : '<span class="urow-lv">Locked</span>')) +
           '<span class="urow-pw">' + U.fmt(def.power) + ' pwr</span>' +
         '</span>';
@@ -551,10 +564,11 @@
     this.detailSlot = -1;
     const unlocked = D.unitUnlocked(def, s.buildings, s.conquered);
     const full = g.roster().length >= g.armyCap();
-    const afford = s.coins >= def.price;
+    const price = this.game.soldierPrice(def);
+    const afford = s.coins >= price;
     const btn = U.el('button', 'btn btn-buy' + (afford && unlocked && !full ? '' : ' btn-poor'),
       (full ? 'Army full' : 'Recruit') +
-      '<span class="cost"><i class="c-coin"></i>' + U.fmt(def.price) + '</span>');
+      '<span class="cost"><i class="c-coin"></i>' + U.fmt(price) + '</span>');
     if (!unlocked || full) btn.setAttribute('disabled', '');
     btn.addEventListener('click', () => {
       if (g.buySoldier(id)) {

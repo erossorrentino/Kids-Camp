@@ -49,11 +49,14 @@ scheme appears on its own.
 | `K` / `U` / `G` | kingdom shop: buildings / army / garage | | |
 | `Esc` | close a panel, release the mouse | | |
 
-**Touch** — a real analogue thumbstick bottom-left, drag anywhere else to
-look, and four buttons bottom-right: `FIRE`, jump, `E` to act, `F` to
-ride. The kingdom and army consoles are buttons in the top-right corner.
-The whole interface reflows for phone widths, and the army list scrolls
-1,013 units without dropping frames.
+**Touch** — a real analogue thumbstick bottom-left, drag anywhere else on
+the world to look around, and four buttons bottom-right: `FIRE`, jump,
+`E` to act, `F` to ride. The radar does not swallow drags, so the whole
+top-right corner still turns the camera. The kingdom shop is a button in
+the same corner. Everything inside it scrolls with a finger: the roster,
+the 1,008-soldier shop list, the rarity and family filter rows sideways,
+the soldier sheet and the buildings tab. Tapping outside the sheet backs
+out of it, tapping outside again closes the shop.
 
 **Gamepad** — left stick moves, right stick looks, `A` jumps, right
 trigger fires, `X` acts, `B` rides.
@@ -65,9 +68,14 @@ home world, 300 coins, one mine, one barracks and no land at all. Five
 enemy targets sit in a ring around you, numbered 1 to 5 on the radar and
 on signs floating over each one. Attack them in order.
 
-**Everything is coins.** One currency for buildings, army promotions and
-vehicles, so there is never a question of which pile to spend. Territory
-you capture pays coins every minute, forever.
+**Coins are only ever earned by winning.** Nothing trickles in. There is
+no income per minute and nothing accumulates while you are away: every
+coin you spend came out of a battle you won. Your kingdom does not
+generate money, it makes victories pay better — the **Treasury** raises
+every payout by 12% a level, the **Market** knocks 4% a level off shop
+prices, the **Great Hall** adds 4% a level, and each territory you hold
+adds another 5%. The HUD shows the running multiplier instead of an
+income figure.
 
 **Your kingdom is the shop.** Walk up to it and press `E`. Three tabs:
 **Buildings** to grow the kingdom, **Army** to promote units and pick
@@ -92,15 +100,16 @@ and you do not respawn: the camera lifts into the air and follows the
 fight while your army finishes it. Your soldiers are never permanently
 lost either, so a defeat costs nothing but time.
 
-**Losing costs nothing.** A failed assault takes no resources and no
-territory. The result screen offers **Try again**, which drops you
+**Losing costs nothing.** A failed assault takes no coins, no territory
+and no soldiers. The result screen offers **Try again**, which drops you
 straight back in from the same approach. Territory you already hold is
 yours permanently — nothing ever attacks it back.
 
 **One ladder.** Coins build the kingdom, recruit soldiers and promote
 them. Your army starts at five and the War Barracks widens it to sixteen,
 so which soldiers you own — and which you dismiss to make room — is the
-real decision.
+real decision. Since coins only come from winning, every purchase is
+funded by a fight you already took.
 
 **Every world ends with a Warlord.** Take all five territories on a
 planet and its **Citadel** appears: a fortress that was not on the map
@@ -112,7 +121,9 @@ only silences the guns.
 
 **Getting to a new world costs coins.** Buy the Starship, board it, fly to
 a world on the galaxy map and hold `E` to chart it. Later worlds are far
-more expensive and far more dangerous.
+more expensive and far more dangerous, and their battles pay accordingly:
+a first-world target is worth around 400 coins, the last Warlord over
+5,000 before multipliers.
 
 **Progress saves itself.** Every purchase, promotion and won battle writes
 to the browser immediately, and a small *Saved* badge flashes in the
@@ -265,6 +276,12 @@ exercised: title, all five planet surfaces, both hover vehicles, the
 kingdom and army consoles, a full battle through to victory, a Citadel
 assault through to a Warlord kill, the galaxy map, planet-to-planet
 travel, and a save/reload round trip.
+
+Touch is verified with trusted input dispatched through the browser's own
+input pipeline rather than synthetic events, because synthetic touches do
+not drive native scrolling and would have passed while a real finger
+failed. Looking, list scrolling, sideways chip scrolling and the
+buildings tab were all confirmed that way at 414x896.
 
 Combat is also stepped deterministically at a fixed timestep, which is
 how the trait rules were confirmed rather than assumed: leeching heals

@@ -881,7 +881,7 @@
     if (won) {
       SK.Audio.victory();
       const reward = this.stats.reward;
-      g.state.coins += reward.coins;
+      g.state.coins += Math.round(reward.coins * g.rewardMultiplier());
       g.state.stats.battlesWon++;
       if (this.isCitadel) g.onCitadelTaken(this.planet, this.citadel, reward);
       else { g.state.owned[this.territory.id] = true; g.onTerritoryCaptured(this.territory, reward); }
