@@ -48,6 +48,40 @@
     return t;
   }
 
+  /* A floating sign over every objective, so the map reads without a
+     legend: big name, a line of status, colour-coded by ownership. */
+  function makeLabel(title, sub, color) {
+    const c = document.createElement('canvas');
+    c.width = 512; c.height = 160;
+    const ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, 512, 160);
+    ctx.fillStyle = 'rgba(8,13,24,0.82)';
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 5;
+    const r = 18, w = 500, h = 120, x = 6, y = 8;
+    ctx.beginPath();
+    ctx.moveTo(x + r, y); ctx.lineTo(x + w - r, y); ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+    ctx.lineTo(x + w, y + h - r); ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+    ctx.lineTo(x + r, y + h); ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+    ctx.lineTo(x, y + r); ctx.quadraticCurveTo(x, y, x + r, y);
+    ctx.closePath(); ctx.fill(); ctx.stroke();
+    ctx.textAlign = 'center';
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 44px "Chakra Petch", system-ui, sans-serif';
+    ctx.fillText(title, 256, 62, 470);
+    ctx.fillStyle = color;
+    ctx.font = 'bold 28px "Chakra Petch", system-ui, sans-serif';
+    ctx.fillText(sub, 256, 104, 470);
+    const tex = new THREE.CanvasTexture(c);
+    tex.encoding = THREE.sRGBEncoding;
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: tex, transparent: true, depthTest: false, depthWrite: false, fog: false
+    }));
+    sp.scale.set(26, 8.1, 1);
+    sp.renderOrder = 950;
+    return sp;
+  }
+
   /* ================================================================== */
   function PlanetWorld(planet, opts) {
     opts = opts || {};
@@ -103,33 +137,39 @@
       const c = planet.citadel;
       this.pads.push({ x: c.x, z: c.z, r: 44, flat: 28, y: raw(c.x, c.z) });
     }
-    // Pick a landing site that is dry, fairly level, and clear of every keep.
-    const wl = T.water ? T.water.level : -9999;
-    const t0 = planet.territories[0];
-    let land = null, bestScore = -Infinity;
-    const lrng = U.makeRng(planet.seed + 4001);
-    for (let i = 0; i < 260; i++) {
-      const a = lrng.range(0, U.TAU);
-      const d = lrng.range(42, 72);
-      const cx = t0.x + Math.cos(a) * d, cz = t0.z + Math.sin(a) * d;
-      if (Math.hypot(cx, cz) > WORLD_R * 0.82) continue;
-      let clear = true;
-      for (let k = 0; k < planet.territories.length; k++) {
-        const tr = planet.territories[k];
-        if (Math.hypot(cx - tr.x, cz - tr.z) < 38) { clear = false; break; }
-      }
-      if (clear && planet.citadel &&
-        Math.hypot(cx - planet.citadel.x, cz - planet.citadel.z) < 62) clear = false;
-      if (!clear) continue;
-      const y = raw(cx, cz);
-      if (y < wl + 4) continue;                       // never land in water
-      // flattest candidate wins; prefer sites a little above the waterline
-      const slope = Math.abs(raw(cx + 9, cz) - y) + Math.abs(raw(cx, cz + 9) - y) +
-        Math.abs(raw(cx - 9, cz) - y) + Math.abs(raw(cx, cz - 9) - y);
-      const score = -slope * 2 - Math.abs(y - (wl + 14)) * 0.15;
-      if (score > bestScore) { bestScore = score; land = { x: cx, z: cz }; }
+    if (planet.kingdom) {
+      const k = planet.kingdom;
+      this.pads.push({ x: k.x, z: k.z, r: 52, flat: 34, y: raw(k.x, k.z) });
     }
-    if (!land) land = { x: t0.x + 52, z: t0.z + 52 };
+    // On your home world everything starts at the kingdom in the middle.
+    // Elsewhere, pick a dry, level spot clear of the ring and the Citadel.
+    const wl = T.water ? T.water.level : -9999;
+    let land = null;
+    if (planet.kingdom) {
+      land = { x: planet.kingdom.x, z: planet.kingdom.z + 30 };
+    } else {
+      const t0 = planet.territories[0];
+      let bestScore = -Infinity;
+      const lrng = U.makeRng(planet.seed + 4001);
+      for (let i = 0; i < 300; i++) {
+        const a = lrng.range(0, U.TAU);
+        const d = lrng.range(158, 184);
+        const cx = Math.cos(a) * d, cz = Math.sin(a) * d;
+        let clear = true;
+        for (let k = 0; k < planet.territories.length; k++) {
+          const tr = planet.territories[k];
+          if (Math.hypot(cx - tr.x, cz - tr.z) < 44) { clear = false; break; }
+        }
+        if (!clear) continue;
+        const y = raw(cx, cz);
+        if (y < wl + 4) continue;
+        const slope = Math.abs(raw(cx + 9, cz) - y) + Math.abs(raw(cx, cz + 9) - y) +
+          Math.abs(raw(cx - 9, cz) - y) + Math.abs(raw(cx, cz - 9) - y);
+        const score = -slope * 2 - Math.abs(y - (wl + 14)) * 0.15;
+        if (score > bestScore) { bestScore = score; land = { x: cx, z: cz }; }
+      }
+      if (!land) land = { x: t0.x * 1.5, z: t0.z * 1.5 };
+    }
     this.landingSite = land;
     this.pads.push({ x: land.x, z: land.z, r: 18, flat: 10, y: raw(land.x, land.z) });
 
@@ -408,6 +448,7 @@
     }
 
     /* --------------------------------------------------- landing pad */
+    if (!planet.kingdom) {
     const padG = B.grp(land.x, land.y, land.z);
     const padMat = B.mat(0x333c48, { rough: 0.72, metal: 0.4 });
     const padDeck = B.mat(0x47525f, { rough: 0.8, metal: 0.25 });
@@ -424,8 +465,15 @@
     padG.add(B.m(B.box(4.4, 0.08, 0.45), B.mat(0xffb23f, { emissive: 0xffb23f, emissiveI: 0.9 }), 0, 0.68, 0));
     this.scene.add(padG);
     this.padRing = padRing;
+    }
 
     /* ----------------------------------------------------------- keeps */
+    this.homeBase = planet.kingdom
+      ? { x: planet.kingdom.x, z: planet.kingdom.z, y: this.heightAt(planet.kingdom.x, planet.kingdom.z) }
+      : null;
+    this.labels = [];
+    this.kingdomRig = null;
+    this.citadelLabel = null;
     this.keeps = {};
     this.citadelRig = null;
     this.citadelConquered = null;
@@ -436,27 +484,57 @@
     this.tmpV = new THREE.Vector3();
   }
 
-  /* Rebuild keeps and the settlement whenever ownership changes. */
+  /* Rebuild keeps, labels and the settlement whenever ownership changes. */
   PlanetWorld.prototype.syncOwnership = function (state) {
     const planet = this.planet;
     const playerPal = { trim: 0x35e0ff, accent: 0xffb23f, suit: 0x2a4a72 };
-    // keeps
+
+    // clear old signs
+    this.labels.forEach((l) => this.scene.remove(l));
+    this.labels = [];
+
     planet.territories.forEach((tr) => {
       const owned = !!state.owned[tr.id];
       const existing = this.keeps[tr.id];
-      if (existing && existing.owned === owned) return;
-      if (existing) { this.scene.remove(existing.group); }
-      const pal = owned ? playerPal : planet.faction;
-      const k = P.buildKeep(pal, owned);
-      k.group.position.set(tr.x, this.heightAt(tr.x, tr.z) - 0.5, tr.z);
-      k.owned = owned;
-      k.territory = tr;
-      this.scene.add(k.group);
-      this.keeps[tr.id] = k;
+      if (!existing || existing.owned !== owned) {
+        if (existing) this.scene.remove(existing.group);
+        const k = SK.props.buildKeep(owned ? playerPal : planet.faction, owned);
+        k.group.position.set(tr.x, this.heightAt(tr.x, tr.z) - 0.5, tr.z);
+        k.owned = owned;
+        k.territory = tr;
+        this.scene.add(k.group);
+        this.keeps[tr.id] = k;
+      }
+      const sign = makeLabel(tr.name,
+        owned ? 'YOURS' : 'TARGET ' + tr.order + '  ·  ATTACK',
+        owned ? '#35e0ff' : '#ff4d6d');
+      sign.position.set(tr.x, this.heightAt(tr.x, tr.z) + 19, tr.z);
+      this.scene.add(sign);
+      this.labels.push(sign);
     });
 
-    // settlement: sits on the first territory you took on this planet
-    const capital = planet.territories.filter((t) => state.owned[t.id])[0];
+    // Your kingdom: always present on the home world, never a battle target.
+    if (this.homeBase) {
+      const k = this.homeBase;
+      if (!this.kingdomRig) {
+        const rig = SK.props.buildKeep(playerPal, true);
+        rig.group.position.set(k.x, k.y - 0.5, k.z);
+        rig.group.scale.setScalar(1.45);
+        this.scene.add(rig.group);
+        this.kingdomRig = rig;
+      }
+      const sign = makeLabel('Your Kingdom', 'HOME  ·  SHOP  ·  SAFE', '#5dffa0');
+      sign.position.set(k.x, k.y + 22, k.z);
+      sign.scale.set(30, 9.4, 1);
+      this.scene.add(sign);
+      this.labels.push(sign);
+    }
+
+    // settlement: at your kingdom on the home world, otherwise on the first
+    // territory you took here
+    const capital = this.homeBase
+      ? { x: this.homeBase.x, z: this.homeBase.z }
+      : planet.territories.filter((t) => state.owned[t.id])[0];
     while (this.settlementGroup.children.length) {
       this.settlementGroup.remove(this.settlementGroup.children[0]);
     }
@@ -464,19 +542,18 @@
     if (!capital) { this.capital = null; return; }
     this.capital = capital;
     const built = SK.data.BUILDINGS.filter((b) => (state.buildings[b.id] || 0) > 0);
-    const R = 27;
+    const R = 30;
     built.forEach((b, i) => {
       const a = (i / Math.max(6, built.length)) * U.TAU + 0.35;
       const x = capital.x + Math.cos(a) * R;
       const z = capital.z + Math.sin(a) * R;
-      const inst = P.buildBuilding(b.id, state.buildings[b.id], playerPal);
+      const inst = SK.props.buildBuilding(b.id, state.buildings[b.id], playerPal);
       inst.group.position.set(x, this.heightAt(x, z) - 0.3, z);
       inst.group.rotation.y = -a + Math.PI / 2;
       inst.id = b.id;
       this.settlementGroup.add(inst.group);
       this.buildings.push(inst);
     });
-    // connecting walkways so the settlement reads as a built place
     const walk = B.mat(0x4a5464, { rough: 0.8, metal: 0.2 });
     built.forEach((b, i) => {
       const a = (i / Math.max(6, built.length)) * U.TAU + 0.35;
@@ -498,6 +575,7 @@
     const want = available || conquered;
     if (!want) {
       if (this.citadelRig) { this.scene.remove(this.citadelRig.group); this.citadelRig = null; }
+      if (this.citadelLabel) { this.scene.remove(this.citadelLabel); this.citadelLabel = null; }
       this.citadelConquered = null;
       return;
     }
@@ -508,6 +586,13 @@
     this.scene.add(rig.group);
     this.citadelRig = rig;
     this.citadelConquered = conquered;
+    if (this.citadelLabel) this.scene.remove(this.citadelLabel);
+    const sign = makeLabel(c.name, conquered ? 'CONQUERED' : 'FINAL BATTLE  ·  ' + c.warlord.name,
+      conquered ? '#5dffa0' : '#ffb23f');
+    sign.position.set(c.x, this.heightAt(c.x, c.z) + 44, c.z);
+    sign.scale.set(34, 10.6, 1);
+    this.scene.add(sign);
+    this.citadelLabel = sign;
   };
 
   PlanetWorld.prototype.update = function (dt, focus) {
@@ -549,6 +634,26 @@
     for (let i = 0; i < this.updaters.length; i++) this.updaters[i](dt, t);
     for (const k in this.keeps) this.keeps[k].update(dt);
     if (this.citadelRig) this.citadelRig.update(dt);
+    if (this.kingdomRig) this.kingdomRig.update(dt);
+    if (focus) {
+      // Signs shrink with distance rather than vanish, so the ring of
+      // targets stays readable from anywhere on the map.
+      for (let i = 0; i < this.labels.length; i++) {
+        const l = this.labels[i];
+        const d = Math.hypot(l.position.x - focus.x, l.position.z - focus.z);
+        const k = U.clamp(d / 160, 0.55, 2.4);
+        l.material.opacity = d < 30 ? U.clamp((d - 12) / 18, 0, 1) : 1;
+        const base = l.userData.w || (l.userData.w = l.scale.x);
+        l.scale.set(base * k, base * k * (l.scale.y / l.scale.x || 0.315), 1);
+      }
+      if (this.citadelLabel) {
+        const l = this.citadelLabel;
+        const d = Math.hypot(l.position.x - focus.x, l.position.z - focus.z);
+        const k = U.clamp(d / 160, 0.6, 2.6);
+        const base = l.userData.w || (l.userData.w = 34);
+        l.scale.set(base * k, base * k * 0.312, 1);
+      }
+    }
     for (let i = 0; i < this.buildings.length; i++) this.buildings[i].update(dt);
   };
 

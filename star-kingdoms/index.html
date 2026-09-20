@@ -123,11 +123,16 @@ kbd{
 .res{display:flex;align-items:center;gap:8px;background:rgba(9,16,28,.78);border:1px solid var(--line);
   padding:7px 13px 7px 10px;clip-path:var(--cut);backdrop-filter:blur(8px)}
 .res b{font-family:var(--display);font-size:16px;font-variant-numeric:tabular-nums;letter-spacing:.02em}
-i.c-crystal,i.c-alloy{width:13px;height:13px;display:inline-block;flex:none}
-i.c-crystal{background:linear-gradient(150deg,#9df0ff,#1fa8d6);
-  clip-path:polygon(50% 0,100% 36%,76% 100%,24% 100%,0 36%)}
-i.c-alloy{background:linear-gradient(150deg,#ffd98a,#d1791b);
-  clip-path:polygon(18% 0,82% 0,100% 50%,82% 100%,18% 100%,0 50%)}
+i.c-coin,i.c-crystal,i.c-alloy{width:15px;height:15px;display:inline-block;flex:none;border-radius:50%;
+  background:radial-gradient(circle at 34% 30%,#fff3c0,#ffc247 46%,#c8820e);
+  box-shadow:inset 0 0 0 1.5px rgba(120,70,0,.45)}
+.res-coin b{color:#ffd76a}
+.save-badge{display:flex;align-items:center;gap:5px;font-family:var(--display);font-size:10px;
+  letter-spacing:.16em;text-transform:uppercase;color:var(--good);background:rgba(9,16,28,.78);
+  border:1px solid rgba(93,255,160,.4);padding:0 10px;opacity:0;transition:opacity .25s;
+  clip-path:var(--cut)}
+.save-badge.show{opacity:1}
+.save-badge::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--good)}
 #res-income{font-size:11.5px;color:var(--ink-3);letter-spacing:.05em;padding:0 4px;
   background:rgba(9,16,28,.6);line-height:1.5;margin-bottom:3px}
 .planet-plate{background:rgba(9,16,28,.7);border-left:2px solid var(--cy);padding:6px 14px;
@@ -375,6 +380,42 @@ i.c-alloy{background:linear-gradient(150deg,#ffd98a,#d1791b);
 #fatal.show{display:grid}
 #fatal p{max-width:44ch;color:var(--ink-2);line-height:1.7}
 
+
+/* ------------------------------------------------ kingdom shop tabs */
+.tabbar{display:flex;gap:2px;padding:0 16px;border-bottom:1px solid var(--line);
+  background:rgba(8,14,24,.6);flex:none}
+.tab{flex:1;background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;
+  font-family:var(--display);font-size:12.5px;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--ink-3);padding:13px 8px;transition:.15s}
+.tab:hover{color:var(--ink-2)}
+.tab.on{color:var(--cy);border-bottom-color:var(--cy)}
+.tab:focus-visible{outline:2px solid var(--cy);outline-offset:-2px}
+.tabpane{display:none;flex:1;min-height:0;flex-direction:column}
+.tabpane.on{display:flex}
+.tool-head{display:flex;align-items:baseline;gap:10px;font-size:12px;color:var(--ink-3);
+  font-family:var(--display);letter-spacing:.08em;text-transform:uppercase;flex-wrap:wrap}
+.tool-head b{color:var(--cy);font-size:13px}
+.tool-head span{margin-left:auto;text-transform:none;letter-spacing:0;font-family:var(--body)}
+
+/* garage */
+.veh-row{align-items:center}
+.veh-row.owned{border-color:rgba(93,255,160,.4);background:rgba(20,52,40,.4)}
+.owned-tag{color:var(--good)}
+.row-icon.v-bike,.row-icon.v-car,.row-icon.v-ship{background:linear-gradient(150deg,#bfe8ff,#2a6f96)}
+.row-icon.v-car{background:linear-gradient(150deg,#ffd9a8,#b06a20)}
+.row-icon.v-ship{background:linear-gradient(150deg,#d9c0ff,#6a3fc0)}
+.v-bike::after{clip-path:polygon(4% 62%,26% 36%,62% 36%,80% 16%,96% 30%,80% 48%,96% 62%,62% 62%,30% 84%)}
+.v-car::after{clip-path:polygon(4% 66%,18% 40%,40% 26%,68% 26%,88% 42%,98% 66%,80% 78%,20% 78%)}
+.v-ship::after{clip-path:polygon(50% 0,64% 34%,98% 74%,64% 66%,50% 100%,36% 66%,2% 74%,36% 34%)}
+.statline b{color:var(--ink);font-weight:500}
+
+/* the panel is one shop now, so its body sizing lives on the panes */
+#tab-build .panel-body,#tab-garage .panel-body{flex:1;overflow-y:auto}
+@media (max-width:560px){
+  .tab{font-size:11px;padding:11px 4px;letter-spacing:.08em}
+  .tabbar{padding:0 8px}
+  .veh-row .row-act{flex-direction:column}
+}
 
 /* ------------------------------------------------- army console */
 .army-tools{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:9px;
@@ -626,10 +667,10 @@ body.touch-mode #crosshair{opacity:.5}
 <div id="hud">
   <div class="hud-tl">
     <div class="res-bar">
-      <div class="res"><i class="c-crystal"></i><b id="res-crystal">0</b></div>
-      <div class="res"><i class="c-alloy"></i><b id="res-alloy">0</b></div>
+      <div class="res res-coin"><i class="c-coin"></i><b id="res-coins">300</b></div>
+      <div class="save-badge" id="save-badge">Saved</div>
     </div>
-    <div id="res-income">+0 / +0 per min</div>
+    <div id="res-income">+0 coins per minute</div>
     <div class="planet-plate">
       <div id="planet-name">Verdania Prime</div>
       <div id="planet-sub">Cradle of the Bloom</div>
@@ -641,6 +682,7 @@ body.touch-mode #crosshair{opacity:.5}
     <div class="hud-btns">
       <button class="hud-btn" data-open="kingdom">Kingdom<kbd>K</kbd></button>
       <button class="hud-btn" data-open="army">Army<kbd>U</kbd></button>
+      <button class="hud-btn" data-open="garage">Garage<kbd>G</kbd></button>
     </div>
   </div>
 
@@ -710,57 +752,61 @@ body.touch-mode #crosshair{opacity:.5}
 <!-- ============================= PANELS ============================ -->
 <div id="panel-scrim"></div>
 
-<section class="panel" id="panel-kingdom" aria-label="Kingdom console">
+<section class="panel" id="panel-kingdom" aria-label="Your kingdom">
   <div class="panel-head">
     <div>
-      <h2>Kingdom</h2>
+      <h2>Your Kingdom</h2>
       <div class="sub"><span id="kingdom-dynasty">House Aurelin</span> &middot;
-        <b id="kingdom-tier">Empire tier 1</b> &middot; <span id="kingdom-holdings">1 territory</span></div>
+        <b id="kingdom-tier">Level 1</b> &middot; <span id="kingdom-holdings">no land yet</span></div>
     </div>
     <button class="panel-close" data-close aria-label="Close">&times;</button>
   </div>
-  <div class="panel-body" id="kingdom-list"></div>
-  <div class="panel-foot">
-    <div class="res"><i class="c-crystal"></i><b id="foot-crystal">0</b></div>
-    <span>Construction is paid in crystal. Mines and captured territory pay it back every minute.</span>
-  </div>
-</section>
 
-<section class="panel" id="panel-army" aria-label="Army console">
-  <div class="panel-head">
-    <div>
-      <h2>Army</h2>
-      <div class="sub"><span>Deck <b id="deck-count">0 / 4</b></span> &middot;
+  <div class="tabbar" role="tablist">
+    <button class="tab on" data-tab="build" role="tab">Buildings</button>
+    <button class="tab" data-tab="army" role="tab">Army</button>
+    <button class="tab" data-tab="garage" role="tab">Garage</button>
+  </div>
+
+  <!-- ---------------------------------------------------- buildings -->
+  <div class="tabpane on" id="tab-build">
+    <div class="panel-body" id="kingdom-list"></div>
+  </div>
+
+  <!-- --------------------------------------------------------- army -->
+  <div class="tabpane" id="tab-army">
+    <div class="army-tools">
+      <div class="tool-head">Your battle deck <b id="deck-count">0 / 4</b>
         <span id="army-power">+0% from research</span></div>
+      <div id="deck-strip" class="deck-strip"></div>
+      <input id="army-search" type="search" placeholder="Search units by name, role or trait"
+             autocomplete="off" spellcheck="false" aria-label="Search units">
+      <div class="chiprow scrollx" id="army-families"></div>
+      <div class="chiprow tools2">
+        <span class="chiprow inline" id="army-sort">
+          <button class="chip on" data-sort="power">Power</button>
+          <button class="chip" data-sort="energy">Cost</button>
+          <button class="chip" data-sort="level">Level</button>
+          <button class="chip" data-sort="name">A&ndash;Z</button>
+        </span>
+        <button class="chip on" id="army-avail">Available only</button>
+        <span class="count" id="army-count">0</span>
+      </div>
     </div>
-    <button class="panel-close" data-close aria-label="Close">&times;</button>
+    <div class="army-scroll" id="army-scroll">
+      <div id="army-spacer"></div>
+      <div id="army-rows"></div>
+    </div>
   </div>
 
-  <div class="army-tools">
-    <div id="deck-strip" class="deck-strip"></div>
-    <input id="army-search" type="search" placeholder="Search the roster by name, role or trait"
-           autocomplete="off" spellcheck="false" aria-label="Search units">
-    <div class="chiprow scrollx" id="army-families"></div>
-    <div class="chiprow tools2">
-      <span class="chiprow inline" id="army-sort">
-        <button class="chip on" data-sort="power">Power</button>
-        <button class="chip" data-sort="energy">Energy</button>
-        <button class="chip" data-sort="level">Level</button>
-        <button class="chip" data-sort="name">A&ndash;Z</button>
-      </span>
-      <button class="chip on" id="army-avail">Available only</button>
-      <span class="count" id="army-count">0</span>
-    </div>
-  </div>
-
-  <div class="army-scroll" id="army-scroll">
-    <div id="army-spacer"></div>
-    <div id="army-rows"></div>
+  <!-- ------------------------------------------------------- garage -->
+  <div class="tabpane" id="tab-garage">
+    <div class="panel-body" id="garage-list"></div>
   </div>
 
   <div class="panel-foot">
-    <div class="res"><i class="c-alloy"></i><b id="foot-alloy">0</b></div>
-    <span>Tap a unit for its perks and to promote it. Your deck is what you can call down mid-battle.</span>
+    <div class="res"><i class="c-coin"></i><b id="foot-coins">0</b></div>
+    <span id="panel-hint">Everything in your kingdom is paid for in coins.</span>
   </div>
 
   <div class="unit-detail" id="unit-detail"></div>
@@ -821,7 +867,7 @@ body.touch-mode #crosshair{opacity:.5}
       <span><b>WASD</b> move &middot; <b>Shift</b> sprint &middot; <b>Space</b> jump</span>
       <span><b>Mouse</b> look &middot; <b>Click</b> fire</span>
       <span><b>F</b> ride a vehicle &middot; <b>E</b> hold to act</span>
-      <span><b>K</b> kingdom &middot; <b>U</b> army &middot; <b>1-8</b> deploy</span>
+      <span><b>K</b> kingdom shop &middot; <b>G</b> garage &middot; <b>1-8</b> deploy</span>
     </div>
    </div>
   </div>

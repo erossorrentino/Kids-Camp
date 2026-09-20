@@ -15,7 +15,7 @@
   function UI(game) {
     this.game = game;
     this.el = {
-      hud: $('#hud'), crystal: $('#res-crystal'), alloy: $('#res-alloy'), income: $('#res-income'),
+      hud: $('#hud'), coins: $('#res-coins'), income: $('#res-income'),
       planetName: $('#planet-name'), planetSub: $('#planet-sub'),
       prompt: $('#prompt'), promptKey: $('#prompt-key'), promptText: $('#prompt-text'),
       radar: $('#radar'), vehicleTag: $('#vehicle-tag'),
@@ -36,7 +36,9 @@
     this.rowPool = [];
     this.visible = [];
     this.detailId = null;
+    this.tab = 'build';
     this.bindPanels();
+    this.bindTabs();
     this.bindArmyControls();
   }
 
@@ -53,13 +55,10 @@
   /* ------------------------------------------------------------- HUD */
   UI.prototype.syncResources = function () {
     const s = this.game.state;
-    this.el.crystal.textContent = U.fmt(s.crystal);
-    this.el.alloy.textContent = U.fmt(s.alloy);
-    const inc = this.game.incomePerMin();
-    this.el.income.textContent = '+' + U.fmt(inc.crystal) + ' / +' + U.fmt(inc.alloy) + ' per min';
-    const fc = $('#foot-crystal'), fa = $('#foot-alloy');
-    if (fc) fc.textContent = U.fmt(s.crystal);
-    if (fa) fa.textContent = U.fmt(s.alloy);
+    this.el.coins.textContent = U.fmt(s.coins);
+    this.el.income.textContent = '+' + U.fmt(this.game.incomePerMin().coins) + ' coins per minute';
+    const fc = $('#foot-coins');
+    if (fc) fc.textContent = U.fmt(s.coins);
   };
 
   UI.prototype.setPlanet = function (planet, ownedCount, conquered, citadelOpen) {
@@ -116,34 +115,30 @@
       return { sx, sy, clipped };
     };
 
+    // Numbered targets: the radar and the world signs use the same numbers,
+    // so "go to Target 2" is unambiguous.
+    ctx.font = 'bold 9px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
     g.planet.territories.forEach((t) => {
       const q = plot(t.x, t.z);
       const owned = !!g.state.owned[t.id];
       ctx.fillStyle = owned ? '#35e0ff' : '#ff4d6d';
-      ctx.beginPath(); ctx.arc(q.sx, q.sy, q.clipped ? 2.6 : 4.2, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(q.sx, q.sy, q.clipped ? 4 : 7, 0, Math.PI * 2); ctx.fill();
       if (!q.clipped) {
-        ctx.strokeStyle = owned ? 'rgba(53,224,255,0.45)' : 'rgba(255,77,109,0.45)';
-        ctx.lineWidth = 1.4;
-        ctx.beginPath(); ctx.arc(q.sx, q.sy, 7.5, 0, Math.PI * 2); ctx.stroke();
+        ctx.fillStyle = '#04070d';
+        ctx.fillText(owned ? '\u2713' : String(t.order), q.sx, q.sy + 0.5);
       }
     });
 
-    // the Citadel gets a star, and only appears when it is reachable
-    const cit = g.planet.citadel;
-    if (cit && (g.citadelAvailable(g.planet) || g.state.conquered[g.planet.id])) {
-      const q = plot(cit.x, cit.z);
-      const done = !!g.state.conquered[g.planet.id];
-      ctx.fillStyle = done ? '#5dffa0' : '#ffb23f';
-      ctx.beginPath();
-      for (let i = 0; i < 10; i++) {
-        const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
-        const r = i % 2 ? 3.1 : 7;
-        const fx = q.sx + Math.cos(a) * r, fy = q.sy + Math.sin(a) * r;
-        i === 0 ? ctx.moveTo(fx, fy) : ctx.lineTo(fx, fy);
-      }
-      ctx.closePath(); ctx.fill();
+    // your kingdom
+    if (g.world && g.world.homeBase) {
+      const q = plot(g.world.homeBase.x, g.world.homeBase.z);
+      ctx.fillStyle = '#5dffa0';
+      ctx.beginPath(); ctx.arc(q.sx, q.sy, 7.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#04070d';
+      ctx.fillText('\u2302', q.sx, q.sy + 0.5);
     }
-
     ctx.fillStyle = '#ffb23f';
     ctx.beginPath();
     ctx.moveTo(half, half - 6); ctx.lineTo(half - 4.5, half + 5); ctx.lineTo(half + 4.5, half + 5);
@@ -161,17 +156,45 @@
     U.$$('[data-open]').forEach((b) => b.addEventListener('click', () => self.showPanel(b.getAttribute('data-open'))));
   };
 
+  UI.prototype.bindTabs = function () {
+    const self = this;
+    U.$$('.tabbar .tab').forEach(function (t) {
+      t.addEventListener('click', function () {
+        self.showTab(t.getAttribute('data-tab'));
+        SK.Audio.click();
+      });
+    });
+  };
+
+  UI.prototype.showTab = function (tab) {
+    this.tab = tab;
+    U.$$('.tabbar .tab').forEach((t) => t.classList.toggle('on', t.getAttribute('data-tab') === tab));
+    U.$$('.tabpane').forEach((p) => p.classList.toggle('on', p.id === 'tab-' + tab));
+    this.hideDetail();
+    const hint = $('#panel-hint');
+    if (hint) {
+      hint.textContent = tab === 'build'
+        ? 'Build and upgrade with coins. Buildings appear around your kingdom as you raise them.'
+        : tab === 'army'
+          ? 'Tap a unit to promote it. Your deck is what you can call into battle.'
+          : 'Bought vehicles are parked at your kingdom. Walk up and press F to ride.';
+    }
+    if (tab === 'build') this.renderKingdom();
+    else if (tab === 'army') this.renderArmy();
+    else this.renderGarage();
+  };
+
+  /* Kingdom, Army and Garage are three tabs of one shop; the old separate
+     ids still work so K, U and G all land in the right place. */
   UI.prototype.showPanel = function (id) {
-    if (this.openPanel === id) { this.closePanel(); return; }
-    this.closePanel(true);
-    const node = $('#panel-' + id);
-    if (!node) return;
-    this.openPanel = id;
-    node.classList.add('open');
+    const tab = id === 'army' ? 'army' : id === 'garage' ? 'garage' : 'build';
+    if (this.openPanel === 'kingdom' && this.tab === tab) { this.closePanel(); return; }
+    const already = this.openPanel === 'kingdom';
+    this.openPanel = 'kingdom';
+    $('#panel-kingdom').classList.add('open');
     $('#panel-scrim').classList.add('open');
-    if (id === 'kingdom') this.renderKingdom();
-    if (id === 'army') this.renderArmy();
-    this.game.onPanelOpen();
+    this.showTab(tab);
+    if (!already) this.game.onPanelOpen();
     SK.Audio.click();
   };
 
@@ -191,10 +214,11 @@
     const cmd = s.buildings.command || 1;
     const dyn = $('#kingdom-dynasty');
     if (dyn) dyn.textContent = s.dynasty || 'House Aurelin';
-    $('#kingdom-tier').textContent = 'Empire tier ' + cmd;
+    $('#kingdom-tier').textContent = 'Level ' + cmd;
+    const held = Object.keys(s.owned).length;
     const conq = Object.keys(s.conquered || {}).length;
-    $('#kingdom-holdings').textContent = Object.keys(s.owned).length + ' territories · ' +
-      conq + '/5 worlds conquered · ' + U.fmt(this.game.unitsAvailable()) + ' units available';
+    $('#kingdom-holdings').textContent = (held === 0 ? 'no land yet' : held + ' territories held') +
+      (conq ? ' · ' + conq + '/5 worlds conquered' : '');
 
     D.BUILDINGS.forEach((b) => {
       const lv = s.buildings[b.id] || 0;
@@ -213,10 +237,10 @@
         '</div>';
       const act = U.el('div', 'row-act');
       if (atMax) act.innerHTML = '<span class="maxed">MAX</span>';
-      else if (cappedByCommand) act.innerHTML = '<span class="locked">Needs Command Spire ' + (lv + 1) + '</span>';
+      else if (cappedByCommand) act.innerHTML = '<span class="locked">Raise the Great Hall first</span>';
       else {
         const btn = U.el('button', 'btn btn-buy' + (afford ? '' : ' btn-poor'),
-          (lv ? 'Upgrade' : 'Build') + '<span class="cost"><i class="c-crystal"></i>' + U.fmt(cost) + '</span>');
+          (lv ? 'Upgrade' : 'Build') + '<span class="cost"><i class="c-coin"></i>' + U.fmt(cost) + '</span>');
         btn.addEventListener('click', () => { if (this.game.upgradeBuilding(b.id)) this.renderKingdom(); });
         act.appendChild(btn);
       }
@@ -435,7 +459,7 @@
       if (def.trophy) need.push('conquer ' + (D.PLANETS.filter((p) => p.id === def.trophy)[0] || {}).name);
       else {
         if ((s.buildings.barracks || 0) < def.barracks) need.push('War Barracks ' + def.barracks);
-        if ((s.buildings.command || 0) < def.command) need.push('Command Spire ' + def.command);
+        if ((s.buildings.command || 0) < def.command) need.push('Great Hall ' + def.command);
         if ((s.buildings.lab || 0) < def.lab) need.push('Research Lab ' + def.lab);
       }
       gate = '<div class="ud-gate">Locked · needs ' + need.join(', ') + '</div>';
@@ -479,7 +503,7 @@
           ? '<span class="maxed">MAX RANK</span>'
           : '<button class="btn btn-buy' + (afford && unlocked ? '' : ' btn-poor') + '" id="ud-up"' +
             (unlocked ? '' : ' disabled') + '>Promote to Lv ' + (lv + 1) +
-            '<span class="cost"><i class="c-alloy"></i>' + U.fmt(cost) + '</span></button>') +
+            '<span class="cost"><i class="c-coin"></i>' + U.fmt(cost) + '</span></button>') +
       '</div>';
 
     sheet.classList.add('open');
@@ -509,6 +533,46 @@
     const sheet = $('#unit-detail');
     if (sheet) sheet.classList.remove('open');
     this.detailId = null;
+  };
+
+  /* --------------------------------------------------------- garage */
+  UI.prototype.renderGarage = function () {
+    const g = this.game;
+    const s = g.state;
+    const host = $('#garage-list');
+    if (!host) return;
+    host.innerHTML = '';
+    D.VEHICLES.forEach((v) => {
+      const owned = g.ownsVehicle(v.id);
+      const afford = s.coins >= v.cost;
+      const row = U.el('div', 'row veh-row' + (owned ? ' owned' : ''));
+      row.innerHTML =
+        '<div class="row-icon v-' + v.id + '"></div>' +
+        '<div class="row-main">' +
+          '<div class="row-head"><span class="row-name">' + v.name + '</span>' +
+            '<span class="tag">' + v.tagline + '</span>' +
+            (owned ? '<span class="lv owned-tag">OWNED</span>' : '') +
+          '</div>' +
+          '<div class="row-effect">' + v.desc + '</div>' +
+          '<div class="statline">' +
+            v.stats.map((st) => '<span>' + st[0] + ' <b>' + st[1] + '</b></span>').join('') +
+          '</div>' +
+        '</div>';
+      const act = U.el('div', 'row-act');
+      if (owned) {
+        act.innerHTML = '<span class="maxed">PARKED</span>';
+      } else {
+        const btn = U.el('button', 'btn btn-buy' + (afford ? '' : ' btn-poor'),
+          'Buy<span class="cost"><i class="c-coin"></i>' + U.fmt(v.cost) + '</span>');
+        btn.addEventListener('click', () => {
+          if (g.buyVehicle(v.id)) { this.renderGarage(); this.syncResources(); }
+        });
+        act.appendChild(btn);
+      }
+      row.appendChild(act);
+      host.appendChild(row);
+    });
+    this.syncResources();
   };
 
   /* --------------------------------------------------------- battle */
@@ -608,7 +672,7 @@
       (unlocked
         ? '<div class="gt-cta">Hold <kbd>E</kbd> to land</div>'
         : '<div class="gt-row"><span>Survey cost</span><b class="' +
-            (state.crystal >= p.unlockCost ? 'ok' : 'no') + '">' + U.fmt(p.unlockCost) + ' crystal</b></div>' +
+            (state.coins >= p.unlockCost ? 'ok' : 'no') + '">' + U.fmt(p.unlockCost) + ' coins</b></div>' +
           '<div class="gt-cta">Hold <kbd>E</kbd> to chart this world</div>');
   };
 

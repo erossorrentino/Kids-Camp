@@ -15,6 +15,8 @@
       blurb: 'A humid jungle world of spore-lit canopies and mushroom towers. Your dynasty was founded under its green moons.',
       order: 0,
       unlockCost: 0,
+      home: true,
+      kingdom: { x: 0, z: 0 },
       seed: 1337,
       audioRoot: 98,
       gravity: 1.0,
@@ -41,7 +43,7 @@
       ],
       weather: { kind: 'spores', color: 0xcaff8a, count: 900, speed: 0.6, size: 0.55 },
       citadel: {
-        id: 'v-citadel', name: 'The Hollow Throne', tier: 3, x: -25, z: -175,
+        id: 'v-citadel', name: 'The Hollow Throne', tier: 3, x: 0, z: -186,
         blurb: 'The Covenant grew their capital inside a dead god-tree. Everything in it is alive and everything in it is angry.',
         warlord: {
           name: 'Marrowking Vell', title: 'Root of the Covenant',
@@ -52,11 +54,11 @@
         }
       },
       territories: [
-        { id: 'v1', name: 'Hollowroot Basin', tier: 1, x: 0, z: 0, home: true },
-        { id: 'v2', name: 'Sporefall Terrace', tier: 1, x: -120, z: -95 },
-        { id: 'v3', name: 'The Green Spine', tier: 2, x: 140, z: -70 },
-        { id: 'v4', name: 'Mirewater Delta', tier: 2, x: -95, z: 135 },
-        { id: 'v5', name: 'Canopy Throne', tier: 3, x: 120, z: 130 }
+        { id: 'v1', name: 'Hollowroot Basin', tier: 1, order: 1, x: 0.0, z: -120.0 },
+        { id: 'v2', name: 'Sporefall Terrace', tier: 1, order: 2, x: 114.1, z: -37.1 },
+        { id: 'v3', name: 'The Green Spine', tier: 2, order: 3, x: 70.5, z: 97.1 },
+        { id: 'v4', name: 'Mirewater Delta', tier: 2, order: 4, x: -70.5, z: 97.1 },
+        { id: 'v5', name: 'Canopy Throne', tier: 3, order: 5, x: -114.1, z: -37.1 }
       ]
     },
 
@@ -92,7 +94,7 @@
       ],
       weather: { kind: 'embers', color: 0xff8a3a, count: 700, speed: 2.2, size: 0.4, rising: true },
       citadel: {
-        id: 'e-citadel', name: 'The Forge Crown', tier: 5, x: -30, z: 170,
+        id: 'e-citadel', name: 'The Forge Crown', tier: 5, x: 0, z: 0,
         blurb: 'A foundry built straight into the caldera wall, where the Legion pours its warmachines still glowing.',
         warlord: {
           name: 'Slagmarshal Orun', title: 'Keeper of the Pour',
@@ -103,11 +105,11 @@
         }
       },
       territories: [
-        { id: 'e1', name: 'Cinder Flats', tier: 2, x: -110, z: 60 },
-        { id: 'e2', name: 'Slagvent Reach', tier: 2, x: 125, z: 100 },
-        { id: 'e3', name: 'The Forge Mouth', tier: 3, x: 20, z: -130 },
-        { id: 'e4', name: 'Obsidian Crown', tier: 3, x: -150, z: -120 },
-        { id: 'e5', name: 'Caldera Prime', tier: 4, x: 155, z: -40 }
+        { id: 'e1', name: 'Cinder Flats', tier: 2, order: 1, x: 0.0, z: -120.0 },
+        { id: 'e2', name: 'Slagvent Reach', tier: 2, order: 2, x: 114.1, z: -37.1 },
+        { id: 'e3', name: 'The Forge Mouth', tier: 3, order: 3, x: 70.5, z: 97.1 },
+        { id: 'e4', name: 'Obsidian Crown', tier: 3, order: 4, x: -70.5, z: 97.1 },
+        { id: 'e5', name: 'Caldera Prime', tier: 4, order: 5, x: -114.1, z: -37.1 }
       ]
     },
 
@@ -144,7 +146,7 @@
       ],
       weather: { kind: 'snow', color: 0xffffff, count: 1400, speed: 1.1, size: 0.35 },
       citadel: {
-        id: 'c-citadel', name: 'Vault Zero Gate', tier: 6, x: 30, z: 175,
+        id: 'c-citadel', name: 'Vault Zero Gate', tier: 6, x: 0, z: 0,
         blurb: 'Whatever the Sentinels were built to guard is directly beneath this gate. They would rather you never found out.',
         warlord: {
           name: 'Sentinel Prime Hesk', title: 'The Last Watch',
@@ -155,11 +157,11 @@
         }
       },
       territories: [
-        { id: 'c1', name: 'Rimefall Shelf', tier: 3, x: 100, z: 80 },
-        { id: 'c2', name: 'Glasslake Hollow', tier: 3, x: -130, z: 40 },
-        { id: 'c3', name: 'The Shatterfield', tier: 4, x: 40, z: -140 },
-        { id: 'c4', name: 'Aurora Gate', tier: 4, x: -90, z: -130 },
-        { id: 'c5', name: 'Vault Zero', tier: 5, x: 160, z: -60 }
+        { id: 'c1', name: 'Rimefall Shelf', tier: 3, order: 1, x: 0.0, z: -120.0 },
+        { id: 'c2', name: 'Glasslake Hollow', tier: 3, order: 2, x: 114.1, z: -37.1 },
+        { id: 'c3', name: 'The Shatterfield', tier: 4, order: 3, x: 70.5, z: 97.1 },
+        { id: 'c4', name: 'Aurora Gate', tier: 4, order: 4, x: -70.5, z: 97.1 },
+        { id: 'c5', name: 'Vault Zero', tier: 5, order: 5, x: -114.1, z: -37.1 }
       ]
     },
 
@@ -197,7 +199,7 @@
       ],
       weather: { kind: 'sand', color: 0xe8b77a, count: 1100, speed: 3.0, size: 0.45, horizontal: true },
       citadel: {
-        id: 'd-citadel', name: 'The Thirst Market', tier: 7, x: -170, z: -30,
+        id: 'd-citadel', name: 'The Thirst Market', tier: 7, x: 0, z: 0,
         blurb: 'Every well on Duskara is owned by whoever holds this mesa. The Raiders have held it for two hundred years.',
         warlord: {
           name: 'Salt-Queen Ifra', title: 'She Who Owns The Water',
@@ -208,11 +210,11 @@
         }
       },
       territories: [
-        { id: 'd1', name: 'Saltglass Pan', tier: 4, x: -120, z: 110 },
-        { id: 'd2', name: 'Rustwind Gully', tier: 4, x: 140, z: 60 },
-        { id: 'd3', name: 'The Bone Market', tier: 5, x: -60, z: -120 },
-        { id: 'd4', name: 'Mesa Nine', tier: 5, x: 150, z: -120 },
-        { id: 'd5', name: 'The Last Well', tier: 6, x: 0, z: 160 }
+        { id: 'd1', name: 'Saltglass Pan', tier: 4, order: 1, x: 0.0, z: -120.0 },
+        { id: 'd2', name: 'Rustwind Gully', tier: 4, order: 2, x: 114.1, z: -37.1 },
+        { id: 'd3', name: 'The Bone Market', tier: 5, order: 3, x: 70.5, z: 97.1 },
+        { id: 'd4', name: 'Mesa Nine', tier: 5, order: 4, x: -70.5, z: 97.1 },
+        { id: 'd5', name: 'The Last Well', tier: 6, order: 5, x: -114.1, z: -37.1 }
       ]
     },
 
@@ -249,7 +251,7 @@
       ],
       weather: { kind: 'motes', color: 0xc46bff, count: 1000, speed: 0.4, size: 0.6 },
       citadel: {
-        id: 'n-citadel', name: 'The Broken Crown', tier: 8, x: -30, z: 178,
+        id: 'n-citadel', name: 'The Broken Crown', tier: 8, x: 0, z: 0,
         blurb: 'The throne that shattered this sky is still up there, and something has been sitting on it the whole time.',
         warlord: {
           name: 'Thessaly the Unmade', title: 'Who Broke The Sky',
@@ -260,11 +262,11 @@
         }
       },
       territories: [
-        { id: 'n1', name: 'Shardfall', tier: 5, x: 110, z: 110 },
-        { id: 'n2', name: 'The Hush', tier: 6, x: -140, z: 70 },
-        { id: 'n3', name: 'Gravewell Spire', tier: 6, x: 60, z: -150 },
-        { id: 'n4', name: 'Chorus Deep', tier: 7, x: -110, z: -120 },
-        { id: 'n5', name: 'The Broken Throne', tier: 8, x: 165, z: -30 }
+        { id: 'n1', name: 'Shardfall', tier: 5, order: 1, x: 0.0, z: -120.0 },
+        { id: 'n2', name: 'The Hush', tier: 5, order: 2, x: 114.1, z: -37.1 },
+        { id: 'n3', name: 'Gravewell Spire', tier: 6, order: 3, x: 70.5, z: 97.1 },
+        { id: 'n4', name: 'Chorus Deep', tier: 6, order: 4, x: -70.5, z: 97.1 },
+        { id: 'n5', name: 'The Broken Throne', tier: 7, order: 5, x: -114.1, z: -37.1 }
       ]
     }
   ];
@@ -612,54 +614,83 @@
       (buildings.lab || 0) >= def.lab;
   }
 
+
+  /* ==================================================================
+     VEHICLES — bought once with coins, then parked at your kingdom and
+     at every landing pad you visit. You start on foot with none of them.
+     ================================================================== */
+  const VEHICLES = [
+    {
+      id: 'bike', name: 'Hoverbike', cost: 300, icon: 'bike',
+      tagline: 'Fast and nimble',
+      desc: 'Skims the ground at nearly twice running speed and turns on a coin. The cheapest way to stop walking.',
+      stats: [['Top speed', 'Very fast'], ['Handling', 'Nimble'], ['Seats', '1']]
+    },
+    {
+      id: 'car', name: 'Hovercar', cost: 800, icon: 'car',
+      tagline: 'Heavy and stable',
+      desc: 'Slower to turn than the bike but far steadier over rough ground, with a stronger boost.',
+      stats: [['Top speed', 'Fast'], ['Handling', 'Steady'], ['Seats', '1']]
+    },
+    {
+      id: 'ship', name: 'Starship', cost: 1600, icon: 'ship',
+      tagline: 'Flies to other worlds',
+      desc: 'The only way off this planet. Board it to open the galaxy map and fly to the other four worlds.',
+      stats: [['Top speed', 'Extreme'], ['Range', 'Interplanetary'], ['Seats', '1']],
+      unlocksTravel: true
+    }
+  ];
+  const VEHICLE_BY_ID = {};
+  VEHICLES.forEach((v) => { VEHICLE_BY_ID[v.id] = v; });
+
   /* ==================================================================
      KINGDOM BUILDINGS
      ================================================================== */
   const BUILDINGS = [
     {
-      id: 'command', name: 'Command Spire', max: 10, baseCost: 260, growth: 1.72,
+      id: 'command', name: 'Great Hall', max: 10, baseCost: 180, growth: 1.66,
       icon: 'spire',
-      effect: (lv) => 'Empire tier ' + lv + ' · +' + (lv * 6) + '% all resource income',
-      desc: 'The seat of your dynasty. Its level caps every other building and sets your empire tier.'
+      effect: (lv) => 'Kingdom level ' + lv + ' · +' + (lv * 6) + '% coin income',
+      desc: 'The heart of your kingdom. Every other building is capped by its level.'
     },
     {
-      id: 'mine', name: 'Crystal Mine', max: 12, baseCost: 150, growth: 1.55,
-      icon: 'mine', currency: 'crystal',
-      effect: (lv) => '+' + (lv * 14) + ' crystal / min',
-      desc: 'Bores into the mantle for raw power crystal. Crystal pays for construction.'
+      id: 'mine', name: 'Coin Mine', max: 12, baseCost: 90, growth: 1.5,
+      icon: 'mine',
+      effect: (lv) => '+' + (lv * 12) + ' coins / min',
+      desc: 'Digs coins out of the ground. This is your main income while you hold little land.'
     },
     {
-      id: 'refinery', name: 'Alloy Refinery', max: 12, baseCost: 180, growth: 1.58,
-      icon: 'refinery', currency: 'alloy',
-      effect: (lv) => '+' + (lv * 10) + ' alloy / min',
-      desc: 'Smelts scavenged hull plate into battle alloy. Alloy pays for your army.'
+      id: 'refinery', name: 'Trade Post', max: 12, baseCost: 120, growth: 1.52,
+      icon: 'refinery',
+      effect: (lv) => '+' + (lv * 9) + ' coins / min',
+      desc: 'Sells what your army brings home. A second, steady stream of coins.'
     },
     {
-      id: 'barracks', name: 'War Barracks', max: 6, baseCost: 340, growth: 1.9,
+      id: 'barracks', name: 'War Barracks', max: 6, baseCost: 240, growth: 1.82,
       icon: 'barracks',
       effect: (lv) => 'Unlocks unit tier ' + lv + ' · deck size ' + Math.min(8, 3 + lv),
       desc: 'Every level unlocks a new unit type and widens the deck you carry into battle.'
     },
     {
-      id: 'lab', name: 'Research Lab', max: 10, baseCost: 300, growth: 1.8,
+      id: 'lab', name: 'Research Lab', max: 10, baseCost: 220, growth: 1.74,
       icon: 'lab',
       effect: (lv) => '+' + (lv * 5) + '% army damage and health',
       desc: 'Empire-wide combat doctrine. Buffs every unit you will ever deploy.'
     },
     {
-      id: 'reactor', name: 'Fusion Reactor', max: 8, baseCost: 280, growth: 1.75,
+      id: 'reactor', name: 'Fusion Reactor', max: 8, baseCost: 200, growth: 1.7,
       icon: 'reactor',
       effect: (lv) => '+' + (lv * 20) + '% battle energy, +' + Math.round(lv * 1.5) + ' max energy',
       desc: 'Field reactors let you deploy faster and bank more energy. Expensive late-game units are unusable without it.'
     },
     {
-      id: 'hangar', name: 'Sky Hangar', max: 8, baseCost: 240, growth: 1.7,
+      id: 'hangar', name: 'Sky Hangar', max: 8, baseCost: 180, growth: 1.66,
       icon: 'hangar',
       effect: (lv) => '+' + (lv * 7) + '% vehicle speed and boost',
-      desc: 'Tunes your hoverbike, hovercar and starship. Pure quality of life, and worth it.'
+      desc: 'Tunes every vehicle you own. Also where bought vehicles are parked.'
     },
     {
-      id: 'shield', name: 'Aegis Shield', max: 8, baseCost: 380, growth: 1.85,
+      id: 'shield', name: 'Aegis Shield', max: 8, baseCost: 260, growth: 1.78,
       icon: 'shield',
       effect: (lv) => '+' + (lv * 10) + '% keep health in battle',
       desc: 'Hardens the Keep you must defend during every territory assault.'
@@ -693,8 +724,8 @@
       aiInterval: Math.max(3.8, 8.0 - tier * 0.35),
       garrison: 1 + Math.floor(tier * 0.4),
       foeCap: 5 + Math.floor(tier * 0.55),
-      reward: { crystal: 180 + tier * 145, alloy: 120 + tier * 110 },
-      income: { crystal: 5 + tier * 4, alloy: 4 + tier * 3 }
+      reward: { coins: 150 + tier * 130 },
+      income: { coins: 6 + tier * 5 }
     };
   }
 
@@ -710,13 +741,13 @@
       aiInterval: Math.max(3.6, 7.6 - t * 0.35),
       garrison: 3 + Math.floor(t * 0.4),
       foeCap: 6 + Math.floor(t * 0.55),
-      reward: { crystal: 900 + t * 420, alloy: 700 + t * 340 },
-      income: { crystal: 22 + t * 6, alloy: 18 + t * 5 }
+      reward: { coins: 900 + t * 400 },
+      income: { coins: 26 + t * 8 }
     };
   }
 
   SK.data = {
-    PLANETS, UNITS, BUILDINGS, ENEMY_UNITS, tierStats, citadelStats,
+    PLANETS, UNITS, BUILDINGS, VEHICLES, VEHICLE_BY_ID, ENEMY_UNITS, tierStats, citadelStats,
     FAMILIES, MARKS, TRAITS, PERKS, PERK_LEVELS, RARITY_COLOR,
     unit, unitUpgradeCost, unitPerksAt, unitUnlocked, MAX_LEVEL, UNIT_BY_ID, TROPHIES
   };

@@ -88,12 +88,18 @@
     }
 
     /* ------------------------------------ keep the save honest on exit */
-    window.addEventListener('beforeunload', function () {
-      if (game.mode !== 'title' && game.mode !== 'boot') game.save();
-    });
+    // Save on every way a page can go away. pagehide is the one that
+    // actually fires on mobile Safari when you switch apps.
+    const saveNow = function () {
+      if (game.mode !== 'title' && game.mode !== 'boot') game.save(true);
+    };
+    window.addEventListener('beforeunload', saveNow);
+    window.addEventListener('pagehide', saveNow);
+    window.addEventListener('blur', saveNow);
     document.addEventListener('visibilitychange', function () {
-      if (document.hidden && game.mode !== 'title' && game.mode !== 'boot') game.save();
+      if (document.hidden) saveNow();
     });
+    setInterval(saveNow, 20000);
 
     // Clicking the world re-captures the mouse after a panel or a tab switch.
     canvas.addEventListener('click', function () {
@@ -112,7 +118,7 @@
           '<span><b>Left stick</b> move</span>' +
           '<span><b>Drag</b> anywhere to look</span>' +
           '<span><b>E</b> act &middot; <b>F</b> ride &middot; <b>FIRE</b> shoot</span>' +
-          '<span><b>Kingdom</b> / <b>Army</b> buttons, top right</span>';
+          '<span><b>Kingdom</b> button, top right, is the shop</span>';
       }
     }
 

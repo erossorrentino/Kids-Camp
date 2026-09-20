@@ -7,8 +7,8 @@
   const D = SK.data;
   const $ = U.$;
 
-  const SAVE_KEY = 'star-kingdoms-save-v2';
-  const LEGACY_KEYS = ['star-kingdoms-save-v1'];
+  const SAVE_KEY = 'star-kingdoms-save-v3';
+  const LEGACY_KEYS = ['star-kingdoms-save-v2', 'star-kingdoms-save-v1'];
   const OFFLINE_CAP_MIN = 8 * 60;
 
   const APPEARANCES = {
@@ -26,12 +26,15 @@
 
   function defaultState() {
     return {
-      version: 2,
-      crystal: 600, alloy: 400,
-      buildings: { command: 1, mine: 1, refinery: 1, barracks: 1, lab: 0, reactor: 0, hangar: 0, shield: 0 },
+      version: 3,
+      coins: 300,
+      // You begin with a small kingdom in the middle of your home world and
+      // nothing else: no land, no vehicles, no fancy buildings.
+      buildings: { command: 1, mine: 1, refinery: 0, barracks: 1, lab: 0, reactor: 0, hangar: 0, shield: 0 },
       army: {},                 // unit id -> level, absent means level 1
       deck: STARTER_DECK.slice(),
-      owned: { v1: true },
+      vehicles: {},             // vehicle id -> true once bought
+      owned: {},                // territory id -> true; you start holding none
       unlocked: { verdania: true },
       conquered: {},            // planet id -> true once its Warlord falls
       planet: 'verdania',
@@ -115,11 +118,31 @@
   };
 
   /* ------------------------------------------------------- save/load */
-  Game.prototype.save = function () {
+  Game.prototype.save = function (quiet) {
     try {
       this.state.lastTick = Date.now();
       localStorage.setItem(SAVE_KEY, JSON.stringify(this.state));
-    } catch (e) { /* private mode or blocked storage — play on without saving */ }
+      this.saveOk = true;
+      if (!quiet) this.flashSaved();
+      return true;
+    } catch (e) {
+      // Private windows and blocked site data both land here.
+      if (this.saveOk !== false) {
+        this.saveOk = false;
+        this.toast('This browser is blocking saved data, so progress will not be kept.', 'bad');
+      }
+      return false;
+    }
+  };
+
+  Game.prototype.flashSaved = function () {
+    const b = $('#save-badge');
+    if (!b) return;
+    b.classList.remove('show');
+    void b.offsetWidth;
+    b.classList.add('show');
+    clearTimeout(this._saveT);
+    this._saveT = setTimeout(function () { b.classList.remove('show'); }, 1400);
   };
 
   Game.prototype.hasSave = function () {
@@ -143,7 +166,15 @@
       this.state.appearance = Object.assign(base.appearance, s.appearance || {});
       this.state.stats = Object.assign(base.stats, s.stats || {});
       this.state.conquered = s.conquered || {};
-      this.state.version = 2;
+      this.state.vehicles = s.vehicles || {};
+      // Older saves had two currencies and a free starting territory.
+      if (s.coins == null) {
+        this.state.coins = Math.round((s.crystal || 0) + (s.alloy || 0)) || 300;
+        this.pendingMigrationNote = true;
+      }
+      delete this.state.crystal;   // the old two-currency fields
+      delete this.state.alloy;
+      this.state.version = 3;
       // The roster was replaced wholesale, so old unit ids no longer exist.
       // Buildings, resources and conquests carry over; the army restarts.
       const army = {};
@@ -151,9 +182,7 @@
       this.state.army = army;
       const deck = (s.deck || []).filter((id) => D.unit(id));
       this.state.deck = deck.length ? deck : STARTER_DECK.slice();
-      if (legacy || (s.version && s.version < 2)) {
-        this.pendingMigrationNote = true;
-      }
+      if (legacy || (s.version && s.version < 3)) this.pendingMigrationNote = true;
       this.collectOffline();
       return true;
     } catch (e) { return false; }
@@ -162,29 +191,22 @@
   Game.prototype.collectOffline = function () {
     const mins = U.clamp((Date.now() - (this.state.lastTick || Date.now())) / 60000, 0, OFFLINE_CAP_MIN);
     if (mins < 1) return;
-    const inc = this.incomePerMin();
-    const c = Math.floor(inc.crystal * mins), a = Math.floor(inc.alloy * mins);
-    this.state.crystal += c;
-    this.state.alloy += a;
-    this.offlineGain = { mins: Math.floor(mins), crystal: c, alloy: a };
+    const c = Math.floor(this.incomePerMin().coins * mins);
+    if (c <= 0) return;
+    this.state.coins += c;
+    this.offlineGain = { mins: Math.floor(mins), coins: c };
   };
 
   /* -------------------------------------------------------- economy */
   Game.prototype.incomePerMin = function () {
     const s = this.state;
     const cmdBonus = 1 + (s.buildings.command || 1) * 0.06;
-    let crystal = (s.buildings.mine || 0) * 14;
-    let alloy = (s.buildings.refinery || 0) * 10;
+    let coins = (s.buildings.mine || 0) * 12 + (s.buildings.refinery || 0) * 9;
     D.PLANETS.forEach((p) => {
-      p.territories.forEach((t) => {
-        if (s.owned[t.id]) {
-          const st = D.tierStats(t.tier);
-          crystal += st.income.crystal;
-          alloy += st.income.alloy;
-        }
-      });
+      p.territories.forEach((t) => { if (s.owned[t.id]) coins += D.tierStats(t.tier).income.coins; });
+      if (s.conquered[p.id]) coins += D.citadelStats(p.citadel).income.coins;
     });
-    return { crystal: Math.round(crystal * cmdBonus), alloy: Math.round(alloy * cmdBonus) };
+    return { coins: Math.round(coins * cmdBonus) };
   };
 
   Game.prototype.tickEconomy = function (dt) {
@@ -192,12 +214,10 @@
     if (this.incomeAcc < 1) return;
     const secs = this.incomeAcc;
     this.incomeAcc = 0;
-    const inc = this.incomePerMin();
-    this.state.crystal += inc.crystal * secs / 60;
-    this.state.alloy += inc.alloy * secs / 60;
+    this.state.coins += this.incomePerMin().coins * secs / 60;
     this.ui.syncResources();
     this.saveAcc = (this.saveAcc || 0) + secs;
-    if (this.saveAcc > 12) { this.saveAcc = 0; this.save(); }
+    if (this.saveAcc > 8) { this.saveAcc = 0; this.save(); }
   };
 
   Game.prototype.upgradeBuilding = function (id) {
@@ -211,9 +231,9 @@
       return false;
     }
     const cost = SK.costOf(b, lv);
-    if (s.crystal < cost) { this.toast('Not enough crystal.', 'bad'); SK.Audio.deny(); return false; }
+    if (s.coins < cost) { this.toast('Not enough coins.', 'bad'); SK.Audio.deny(); return false; }
     const before = this.unitsAvailable();
-    s.crystal -= cost;
+    s.coins -= cost;
     s.buildings[id] = lv + 1;
     SK.Audio.build();
     this.toast(b.name + ' is now level ' + (lv + 1) + '.', 'good');
@@ -234,8 +254,8 @@
     const lv = s.army[id] || 1;
     if (lv >= D.MAX_LEVEL) { this.toast('Already at maximum rank.', 'bad'); return false; }
     const cost = D.unitUpgradeCost(def, lv);
-    if (s.alloy < cost) { this.toast('Not enough alloy.', 'bad'); SK.Audio.deny(); return false; }
-    s.alloy -= cost;
+    if (s.coins < cost) { this.toast('Not enough coins.', 'bad'); SK.Audio.deny(); return false; }
+    s.coins -= cost;
     const next = lv + 1;
     s.army[id] = next;
     SK.Audio.build();
@@ -249,6 +269,52 @@
     this.save();
     this.ui.renderCards();
     return true;
+  };
+
+  Game.prototype.ownsVehicle = function (id) { return !!(this.state.vehicles || {})[id]; };
+
+  Game.prototype.buyVehicle = function (id) {
+    const v = D.VEHICLE_BY_ID[id];
+    const s = this.state;
+    if (!v) return false;
+    if (this.ownsVehicle(id)) return false;
+    if (s.coins < v.cost) { this.toast('Not enough coins for the ' + v.name + '.', 'bad'); SK.Audio.deny(); return false; }
+    s.coins -= v.cost;
+    s.vehicles[id] = true;
+    SK.Audio.build();
+    this.toast(v.name + ' bought. It is parked at your kingdom.', 'good');
+    this.save();
+    this.spawnOwnedVehicles();
+    return true;
+  };
+
+  /* Park whatever you own next to the kingdom (home world) or the landing
+     pad (everywhere else), and remove anything you have not bought. */
+  Game.prototype.spawnOwnedVehicles = function () {
+    const world = this.world;
+    if (!world) return;
+    const riding = this.player && this.player.vehicle ? this.player.vehicle.kind : null;
+    this.vehicles.forEach((v) => { if (v.kind !== riding) world.scene.remove(v.rig.group); });
+    this.vehicles = this.vehicles.filter((v) => v.kind === riding);
+    const base = world.homeBase || world.landingSite;
+    const pal = { body: 0xdfe8f4, trim: this.state.appearance.trim };
+    // parked in a row in front of the gate, between you and the keep
+    const spots = {
+      bike: [base.x + 14, base.z + 30, -0.5],
+      car: [base.x - 16, base.z + 30, 0.5],
+      ship: [base.x + 34, base.z + 6, Math.PI * 0.5]
+    };
+    ['bike', 'car', 'ship'].forEach((id) => {
+      if (!this.ownsVehicle(id) || id === riding) return;
+      const sp = spots[id];
+      const y = world.heightAt(sp[0], sp[1]) + (id === 'bike' ? 1.7 : id === 'car' ? 2.1 : 3.2);
+      const veh = SK.makeVehicle(id, pal, sp[0], y, sp[1], sp[2]);
+      if (id === 'ship') veh.rig.group.scale.setScalar(1.15);
+      world.scene.add(veh.rig.group);
+      this.vehicles.push(veh);
+      if (id === 'ship') this.shipVehicle = veh;
+    });
+    if (!this.ownsVehicle('ship')) this.shipVehicle = null;
   };
 
   Game.prototype.unitsAvailable = function () {
@@ -314,23 +380,19 @@
       world.syncOwnership(self.state);
       world.syncCitadel(self.state, self.citadelAvailable(planet), !!self.state.conquered[planet.id]);
 
-      // craft parked at the landing pad
+      // only vehicles you have actually bought are parked
       self.vehicles = [];
-      const L = world.landingSite;
-      const pal = { body: 0xdfe8f4, trim: self.state.appearance.trim };
-      const bike = SK.makeVehicle('bike', pal, L.x + 13, L.y + 1.7, L.z - 6, -0.9);
-      const car = SK.makeVehicle('car', pal, L.x - 14, L.y + 2.1, L.z - 5, 0.9);
-      const ship = SK.makeVehicle('ship', pal, L.x, L.y + 3.2, L.z, Math.PI);
-      ship.rig.group.scale.setScalar(1.15);
-      [bike, car, ship].forEach((v) => { world.scene.add(v.rig.group); self.vehicles.push(v); });
-      self.shipVehicle = ship;
+      self.spawnOwnedVehicles();
 
-      self.player.spawn(world, L.x, L.z + 13);
+      const start = world.homeBase || world.landingSite;
+      self.player.spawn(world, start.x, start.z + 38);
       self.player.mode = 'foot';
       self.player.vehicle = null;
-      self.chase.yaw = Math.PI;
-      self.chase.targetDist = 8.5;
-      self.chase.pitch = 0.2;
+      // yaw 0 puts the camera behind the player looking toward -Z, which is
+      // straight at the kingdom (or the pad) they just spawned in front of.
+      self.chase.yaw = 0;
+      self.chase.targetDist = 13;
+      self.chase.pitch = 0.3;
       self.chase.snap(self.player.pos, 'foot');
 
       self.ui.setPlanet(planet, planet.territories.filter((t) => self.state.owned[t.id]).length,
@@ -378,15 +440,15 @@
         self.ui.renderCards();
         self.fade('in', 520);
         if (isNew) {
-          self.toast('Welcome home, sovereign.', 'good');
-          setTimeout(() => self.toast('Press M to open the galaxy. K for your kingdom.', 'info'), 2200);
+          self.toast('This is your kingdom. Press E to go inside and spend your 300 coins.', 'good');
+          setTimeout(() => self.toast('Then attack Target 1 on the radar. Five targets ring your kingdom.', 'info'), 3000);
         } else if (self.pendingMigrationNote) {
           self.pendingMigrationNote = false;
           self.toast('The roster grew to over a thousand units, so your army restarted at level 1.', 'info');
           setTimeout(() => self.toast('Your kingdom, resources and territory are untouched.', 'info'), 2600);
         } else if (self.offlineGain && self.offlineGain.mins >= 1) {
           const g = self.offlineGain;
-          self.toast('While you were away: +' + U.fmt(g.crystal) + ' crystal, +' + U.fmt(g.alloy) + ' alloy.', 'good');
+          self.toast('While you were away you earned ' + U.fmt(g.coins) + ' coins.', 'good');
           self.offlineGain = null;
         }
       });
@@ -412,12 +474,12 @@
     const self = this;
     const planet = D.PLANETS.find((p) => p.id === planetId);
     if (!this.state.unlocked[planetId]) {
-      if (this.state.crystal < planet.unlockCost) {
-        this.toast('You need ' + U.fmt(planet.unlockCost) + ' crystal to chart ' + planet.name + '.', 'bad');
+      if (this.state.coins < planet.unlockCost) {
+        this.toast('You need ' + U.fmt(planet.unlockCost) + ' coins to chart ' + planet.name + '.', 'bad');
         SK.Audio.deny();
         return;
       }
-      this.state.crystal -= planet.unlockCost;
+      this.state.coins -= planet.unlockCost;
       this.state.unlocked[planetId] = true;
       this.save();
       this.toast(planet.name + ' charted. Its coordinates are yours.', 'good');
@@ -523,11 +585,10 @@
             : 'The ' + self.planet.faction.name + ' hold ' + tr.name +
               '. Strengthen the Aegis Shield, promote your units, and come back. It costs you nothing to try again.'),
         rewards: won
-          ? '<span><i class="c-crystal"></i>+' + U.fmt(reward.crystal) + '</span>' +
-            '<span><i class="c-alloy"></i>+' + U.fmt(reward.alloy) + '</span>' +
-            (trophy ? '<span class="rw-trophy">Unlocked: ' + trophy.name + '</span>'
-              : '<span class="rw-inc">+' + (isCit ? D.citadelStats(cit).income.crystal
-                : D.tierStats(tr.tier).income.crystal) + '/min income</span>')
+          ? '<span><i class="c-coin"></i>+' + U.fmt(reward.coins) + '</span>' +
+            '<span class="rw-inc">+' + (isCit ? D.citadelStats(cit).income.coins
+              : D.tierStats(tr.tier).income.coins) + ' coins/min</span>' +
+            (trophy ? '<span class="rw-trophy">Unlocked: ' + trophy.name + '</span>' : '')
           : null,
         actions: [
           { label: won ? 'Return to the surface' : 'Try again', primary: true,
@@ -566,8 +627,8 @@
       }
       self.ui.showBattle(false);
       self.setMode('planet');
-      const L = self.world.landingSite;
-      self.player.spawn(self.world, L.x, L.z + 13);
+      const back = self.world.homeBase || self.world.landingSite;
+      self.player.spawn(self.world, back.x, back.z + 36);
       self.player.health = 100;
       self.player.group.visible = true;
       self.chase.snap(self.player.pos, 'foot');
@@ -607,6 +668,12 @@
     if (best && best.kind === 'ship') {
       return { key: 'E', text: 'Board the starship', act: 'launch', hold: 0.9 };
     }
+    // your kingdom: the shop, and where everything is parked
+    const kb = this.world.homeBase;
+    if (kb && Math.hypot(kb.x - p.x, kb.z - p.z) < 44) {
+      return { key: 'E', text: 'Enter your kingdom — buildings, army and vehicles',
+        act: 'kingdom', hold: 0.5 };
+    }
     // the Citadel, once every territory on this world is held
     const cit = this.planet.citadel;
     if (cit && this.citadelAvailable(this.planet)) {
@@ -624,11 +691,11 @@
     });
     if (t) {
       if (this.state.owned[t.id]) {
-        return { key: 'K', text: t.name + ' — yours. Open the kingdom console', act: 'kingdom', hold: 0 };
+        return { key: 'E', text: t.name + ' is yours. Nothing left to fight here.', act: null, hold: 0 };
       }
       return {
-        key: 'E', text: 'Assault ' + t.name + ' · Tier ' + t.tier + ' · ' + this.planet.faction.name,
-        act: 'battle', target: t, hold: 1.1
+        key: 'E', text: 'Attack ' + t.name + '  ·  Target ' + t.order + ' of 5  ·  ' +
+          this.planet.faction.name, act: 'battle', target: t, hold: 1.1
       };
     }
     return null;
@@ -721,6 +788,7 @@
     // panels and menus
     if (input.consumeKey('KeyK')) this.ui.showPanel('kingdom');
     if (input.consumeKey('KeyU')) this.ui.showPanel('army');
+    if (input.consumeKey('KeyG')) this.ui.showPanel('garage');
     if (input.consumeKey('Escape')) {
       if (this.ui.openPanel) this.ui.closePanel();
       else this.input.exitLock();

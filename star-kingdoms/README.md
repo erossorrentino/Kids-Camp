@@ -46,7 +46,7 @@ scheme appears on its own.
 | Left click | fire blaster | — | — |
 | `F` | ride a nearby craft | dismount | — |
 | `E` (hold) | assault a territory, board the starship | — | land on a world |
-| `K` / `U` | kingdom console / army console | | |
+| `K` / `U` / `G` | kingdom shop: buildings / army / garage | | |
 | `1`-`8` | call that unit down to your position (in battle) | | |
 | `Esc` | close a panel, release the mouse | | |
 
@@ -61,9 +61,24 @@ trigger fires, `X` acts, `B` rides.
 
 ## How the game works
 
-**Territory is the whole economy.** Every planet has five territories held
-by its faction. Take one and it pays crystal and alloy every minute,
-forever, and your settlement physically grows on the ground you captured.
+**You start with almost nothing.** A small kingdom in the middle of your
+home world, 300 coins, one mine, one barracks and no land at all. Five
+enemy targets sit in a ring around you, numbered 1 to 5 on the radar and
+on signs floating over each one. Attack them in order.
+
+**Everything is coins.** One currency for buildings, army promotions and
+vehicles, so there is never a question of which pile to spend. Territory
+you capture pays coins every minute, forever.
+
+**Your kingdom is the shop.** Walk up to it and press `E`. Three tabs:
+**Buildings** to grow the kingdom, **Army** to promote units and pick
+your battle deck, **Garage** to buy vehicles. `K`, `U` and `G` open it
+straight to the tab you want.
+
+**Vehicles are bought, not found.** You begin on foot. The Hoverbike is
+300 coins, which is exactly what you start with. The Hovercar is 800. The
+Starship is 1,600 and is the only way to reach the other four worlds.
+Anything you buy is parked outside your kingdom; walk up and press `F`.
 
 **Battles are fought, not simulated.** You stand on the field in third
 person with a blaster while your army fights around you. Energy refills
@@ -76,11 +91,10 @@ territory. The result screen offers **Try again**, which drops you
 straight back in from the same approach. Territory you already hold is
 yours permanently — nothing ever attacks it back.
 
-**Two currencies, two ladders.** Crystal builds the kingdom (eight
-structures, each gated behind your Command Spire's level). Alloy promotes
-your army. Your deck — what you can actually call down mid-battle — is
-capped by the War Barracks, so choosing eight units out of a thousand is
-the real decision.
+**One ladder.** Coins build the kingdom (eight structures, each gated
+behind your Great Hall's level) and promote your army. Your deck — what
+you can actually call down mid-battle — is capped by the War Barracks, so
+choosing eight units out of a thousand is the real decision.
 
 **Every world ends with a Warlord.** Take all five territories on a
 planet and its **Citadel** appears: a fortress that was not on the map
@@ -90,9 +104,24 @@ world, and its guard joins your roster as a unique **Trophy** unit you
 cannot get any other way. The keep beside it is optional: destroying it
 only silences the guns.
 
-**Getting to a new world costs crystal.** Fly the starship out to it on the
-galaxy map and hold `E` to chart it. Later worlds are far more expensive
-and far more dangerous.
+**Getting to a new world costs coins.** Buy the Starship, board it, fly to
+a world on the galaxy map and hold `E` to chart it. Later worlds are far
+more expensive and far more dangerous.
+
+**Progress saves itself.** Every purchase, promotion and won battle writes
+to the browser immediately, and a small *Saved* badge flashes in the
+corner so you can see it happen. It also saves every twenty seconds, when
+the tab loses focus, and when you close it. If a browser blocks saved
+data the game says so rather than losing your work quietly.
+
+### Reading the map
+
+Every world uses the same shape, so it only has to be learned once. Five
+targets sit evenly spaced in a ring, numbered 1 to 5 clockwise from north.
+The middle holds either your kingdom (home world) or the enemy Citadel
+(everywhere else). Each objective carries a floating sign with its name
+and status, and the radar shows the same numbers, a green house for your
+kingdom and a star for the Citadel.
 
 ### The five worlds
 

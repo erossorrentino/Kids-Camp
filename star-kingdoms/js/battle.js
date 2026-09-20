@@ -921,12 +921,11 @@
     const g = this.game;
     if (won) {
       SK.Audio.victory();
-      const r = this.stats.reward;
-      g.state.crystal += r.crystal;
-      g.state.alloy += r.alloy;
+      const reward = this.stats.reward;
+      g.state.coins += reward.coins;
       g.state.stats.battlesWon++;
-      if (this.isCitadel) g.onCitadelTaken(this.planet, this.citadel, r);
-      else { g.state.owned[this.territory.id] = true; g.onTerritoryCaptured(this.territory, r); }
+      if (this.isCitadel) g.onCitadelTaken(this.planet, this.citadel, reward);
+      else { g.state.owned[this.territory.id] = true; g.onTerritoryCaptured(this.territory, reward); }
     } else {
       SK.Audio.defeat();
       g.state.stats.battlesLost++;
