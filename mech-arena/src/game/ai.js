@@ -56,6 +56,9 @@ export class BotBrain {
     this.lastPos = mech.position.clone();
     this.jumpCooldown = 0;
     this.preferredRange = this._computePreferredRange();
+    // Range targets move and dodge so they are worth shooting at, but never
+    // fire back. The flag is set by the match after construction.
+    this.passive = false;
     this.isSupport = mech.weapons.some(w => w && (w.def.flags || []).includes('heal'));
   }
 
@@ -519,6 +522,7 @@ export class BotBrain {
   }
 
   _shoot(target, dist, dt, indirectOnly = false) {
+    if (this.passive) return;
     const m = this.mech;
 
     // Only pull the trigger once the torso is actually pointed at them.
@@ -558,6 +562,7 @@ export class BotBrain {
   /* ---- abilities ---- */
   _considerAbility(dt) {
     const m = this.mech;
+    if (this.passive) return;
     if (m.abilityCd > 0 || m.abilityActive || m.shutdown) return;
     if (!this.rng.chance(dt * 6 * this.d.abilityIQ)) return;
 

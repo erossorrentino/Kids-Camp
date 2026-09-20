@@ -1,3 +1,14 @@
+# Kids-Camp
+
+Two games live in this repository.
+
+| Project | What it is | Status |
+| --- | --- | --- |
+| [`mech-arena/`](mech-arena/README.md) | **Iron Vanguard** — a 3D mech battle arena that runs in a browser | Playable now: open `mech-arena/index.html` over any static server |
+| Root Unity project | **Crime City** — an open-world crime game in the GTA tradition | C# systems and generated data; needs the Unity Editor to build |
+
+---
+
 # Crime City (working title)
 
 An open-world crime game in the GTA tradition: steal cars, plan and run

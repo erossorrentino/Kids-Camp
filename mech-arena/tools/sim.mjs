@@ -101,7 +101,9 @@ for (const mapId of maps) {
     };
   }, [mapId, MODE, DIFF, SECONDS]);
   rows.push(r);
-  const bad = r.damage < 500 || r.nanSeen;
+  // The training range has no hostile fire and no human at the controls,
+  // so zero damage there is the correct result, not a failure.
+  const bad = r.nanSeen || (MODE !== 'training' && r.damage < 500);
   console.log(
     `${bad ? 'BAD ' : '    '}${r.map.padEnd(13)} t=${String(r.time).padStart(3)}s ` +
     `dmg=${String(r.damage).padStart(6)} kills=${String(r.kills).padStart(3)} ` +
@@ -112,7 +114,7 @@ for (const mapId of maps) {
 await browser.close();
 server.close();
 
-const bad = rows.filter(r => r.damage < 500 || r.nanSeen);
+const bad = rows.filter(r => r.nanSeen || (MODE !== 'training' && r.damage < 500));
 const totalKills = rows.reduce((a, r) => a + r.kills, 0);
 console.log(`\n${rows.length} arenas, ${totalKills} kills, median damage ` +
   `${median(rows.map(r => r.damage))}`);

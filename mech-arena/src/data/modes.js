@@ -43,6 +43,13 @@ export const MODES = {
     objective:'elimination', respawn:false, hangarSize:5, livesPerPlayer:5,
     desc:'No respawn timer -- your hangar is your lives. Lose all five mechs and you are out for good.',
   },
+  training: {
+    id:'training', name:'TRAINING RANGE', short:'RANGE',
+    teams:2, perTeam:1, duration:600, scoreLimit:0,
+    objective:'training', respawn:true, hangarSize:5,
+    enemyCount:6, passiveEnemies:true, tutorial:true,
+    desc:'A safe range with target mechs that move but do not shoot back. Learn a chassis, test a loadout, practise leading a sprinting light.',
+  },
   juggernaut: {
     id:'juggernaut', name:'JUGGERNAUT', short:'JUGG',
     teams:2, perTeam:5, duration:300, scoreLimit:25,

@@ -18,6 +18,7 @@ import { HUD } from './ui/hud.js';
 import { Menus } from './ui/menus.js';
 import { HangarScene } from './ui/hangarScene.js';
 import { Progression } from './ui/progression.js';
+import { Tutorial } from './ui/tutorial.js';
 import { MAPS, MAP_BY_ID, mapsForMode, BIOMES } from './data/maps.js';
 import { clamp } from './core/rng.js';
 
@@ -48,6 +49,7 @@ class Game {
     this.hud.setFpsVisible(s.showFps);
 
     this.sky = new Sky(this.engine.scene);
+    this.tutorial = new Tutorial(this.audio);
     this.hangarScene = new HangarScene(this.engine);
 
     this.menus = new Menus({
@@ -198,6 +200,11 @@ class Game {
     this.hud.show();
     this.hud.hideRespawn();
     this.hud.toast(def.name, BIOMES[def.biome].label);
+    if (this.match.mode.tutorial) {
+      this.tutorial.start({ mech: this.match.player.mech, match: this.match, controller: this.controller, input: this.input });
+    } else {
+      this.tutorial.stop();
+    }
     this.input.requestLock();
     this.accumulator = 0;
     this.lastTime = performance.now();
@@ -211,6 +218,7 @@ class Game {
     if (chassisId) this.progression.recordMechUse(chassisId, seconds);
 
     this.state = 'menu';
+    this.tutorial.stop();
     this.menus.suspended = false;
     this.input.releaseLock();
     this.hud.hide();
@@ -227,6 +235,7 @@ class Game {
 
   onMatchEvent(e) {
     this.hud.onMatchEvent(e);
+    this._lastEvent = e;
     if (e.type === 'playerDown') {
       this._pendingRespawn = true;
       this.input.releaseLock();
@@ -323,6 +332,12 @@ class Game {
     if (shake > 0) this.engine.shake(shake);
 
     const mech = m.player?.mech;
+    if (this.tutorial.active) {
+      this.tutorial.update(dt,
+        { mech, match: m, controller: this.controller, input: this.input },
+        this._lastEvent);
+      this._lastEvent = null;
+    }
     this._fadeCloseMechs(m, mech);
     this.hud.update(m, mech, this.controller, dt);
     this.hud.setScoreboard(m, this.controller.scoreboardOpen);

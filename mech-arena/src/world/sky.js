@@ -89,12 +89,12 @@ const SkyShader = {
 
 /* Per-hazard weather presets. */
 const WEATHER = {
-  blizzard: { count: 2600, color: 0xeaf4fa, size: 0.42, fall: 5.5, drift: 9, swirl: 2.2, fogMul: 0.45 },
+  blizzard: { count: 2600, color: 0xeaf4fa, size: 0.3, fall: 5.5, drift: 9, swirl: 2.2, alpha: 0.7, fogMul: 0.45 },
   ash:      { count: 1800, color: 0x9a9088, size: 0.36, fall: 3.4, drift: 3.2, swirl: 1.4, fogMul: 0.7 },
   rain:     { count: 3200, color: 0xa8c4d8, size: 0.16, fall: 46, drift: 5, swirl: 0.2, streak: 3.4, fogMul: 0.75 },
-  dust:     { count: 1400, color: 0xd8c49a, size: 0.5, fall: 0.6, drift: 14, swirl: 1.0, fogMul: 0.8 },
+  dust:     { count: 1100, color: 0xd8c49a, size: 0.22, fall: 0.6, drift: 14, swirl: 1.0, alpha: 0.4, fogMul: 0.8 },
   lightning:{ count: 3000, color: 0xa8c4d8, size: 0.16, fall: 52, drift: 8, swirl: 0.3, streak: 4.0, fogMul: 0.7 },
-  ember:    { count: 900,  color: 0xff8a3d, size: 0.3, fall: -2.2, drift: 2.4, swirl: 1.8, fogMul: 1.0 },
+  ember:    { count: 900,  color: 0xff8a3d, size: 0.22, fall: -2.2, drift: 2.4, swirl: 1.8, alpha: 0.75, fogMul: 1.0 },
 };
 
 /** Which weather a map gets, from its biome and declared hazard. */
@@ -189,6 +189,7 @@ export class Sky {
         uBox: { value: new THREE.Vector2(this.box.w, this.box.h) },
         uOrigin: { value: new THREE.Vector3() },
         uStreak: { value: preset.streak || 0 },
+        uAlpha: { value: preset.alpha ?? 0.85 },
         uScale: { value: innerHeight },
       },
       vertexShader: /* glsl */`
@@ -219,14 +220,14 @@ export class Sky {
         }`,
       fragmentShader: /* glsl */`
         uniform vec3 uColor;
-        uniform float uStreak;
+        uniform float uStreak, uAlpha;
         varying float vFade;
         void main(){
           vec2 d = gl_PointCoord - 0.5;
           if (uStreak > 0.0) d.y /= uStreak;    // rain reads as a streak, not a dot
           float r = dot(d, d);
           if (r > 0.25) discard;
-          gl_FragColor = vec4(uColor, smoothstep(0.25, 0.0, r) * vFade * 0.85);
+          gl_FragColor = vec4(uColor, smoothstep(0.25, 0.0, r) * vFade * uAlpha);
         }`,
       transparent: true, depthWrite: false, fog: false,
       blending: kind === 'ember' ? THREE.AdditiveBlending : THREE.NormalBlending,

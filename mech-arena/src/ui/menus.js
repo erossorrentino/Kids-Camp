@@ -108,7 +108,11 @@ export class Menus {
       <div class="logo">IRON<br><span>VANGUARD</span></div>
       <div class="tagline">HEAVY METAL COMBAT · ${MECHS.length} CHASSIS · ${WEAPONS.length} WEAPONS · ${MAPS.length} ARENAS</div>
       <div class="title-menu">
-        <button class="btn primary lg" data-go="deploy">DEPLOY</button>
+        ${p.matches === 0
+          ? `<button class="btn primary lg" data-action="training">TRAINING RANGE</button>
+             <button class="btn" data-go="deploy">DEPLOY</button>`
+          : `<button class="btn primary lg" data-go="deploy">DEPLOY</button>
+             <button class="btn" data-action="training">TRAINING RANGE</button>`}
         <button class="btn" data-go="hangar">HANGAR</button>
         <button class="btn" data-go="garage">GARAGE</button>
         <button class="btn" data-go="pilot">PILOT</button>
@@ -637,6 +641,10 @@ export class Menus {
         this.progression.removeHangarSlot(this.slot);
         this.slot = Math.max(0, this.slot - 1);
         this.audio.play('uiBack'); this.render();
+        break;
+      case 'training':
+        this.audio.play('ui');
+        this.onDeploy({ mode: 'training', mapId: 'saltflat', difficulty: 'recruit' });
         break;
       case 'launch':
         this.audio.play('ui');

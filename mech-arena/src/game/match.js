@@ -92,7 +92,9 @@ export class Match {
 
     let slot = 0;
     for (const team of teams) {
-      for (let i = 0; i < m.perTeam; i++) {
+      // The training range is one pilot against a squad of target mechs.
+      const count = m.enemyCount && team === 'b' ? m.enemyCount : m.perTeam;
+      for (let i = 0; i < count; i++) {
         const isHuman = slot === 0;
         const entry = {
           id: slot,
@@ -109,6 +111,7 @@ export class Match {
           score: 0, kills: 0, deaths: 0, assists: 0, damage: 0, healing: 0,
           mech: null,
           juggernaut: false,
+          passive: !!m.passiveEnemies && team === 'b',
         };
         this.players.push(entry);
         if (isHuman) this.player = entry;
@@ -186,7 +189,9 @@ export class Match {
     entry.alive = true;
 
     if (!entry.isPlayer) {
-      this.brains.set(mech.id, new BotBrain(mech, this, this._botDifficulty()));
+      const brain = new BotBrain(mech, this, entry.passive ? 'recruit' : this._botDifficulty());
+      brain.passive = entry.passive;
+      this.brains.set(mech.id, brain);
     }
     return mech;
   }
@@ -425,7 +430,9 @@ export class Match {
     entry.livesLeft--;
     entry.current = (entry.current + 1) % entry.hangar.length;
     const out = entry.livesLeft <= 0 && !this.mode.respawn;
-    entry.respawnIn = out ? Infinity : (entry.isPlayer ? 0 : 4.5 + this.rng.range(0, 2.5));
+    entry.respawnIn = out ? Infinity
+      : entry.passive ? 2.5
+      : (entry.isPlayer ? 0 : 4.5 + this.rng.range(0, 2.5));
     entry.eliminated = out;
 
     this.scene.remove(mech.root);
@@ -673,6 +680,11 @@ export class Match {
   _checkEnd() {
     if (this.state === 'over') return;
     const m = this.mode;
+    // The range has no win condition; it ends when the pilot leaves.
+    if (m.objective === 'training') {
+      if (this.clock <= 0) this._end('a', 'RANGE SESSION COMPLETE');
+      return;
+    }
     let winner = null, reason = '';
 
     if (m.objective === 'elimination') {
