@@ -237,13 +237,15 @@
     this.yaw -= mouse.dx * 0.0022;
     this.pitch = U.clamp(this.pitch - mouse.dy * 0.0018, -1.2, 1.2);
     let rollInput = 0;
-    if (st.left) rollInput += 1;
-    if (st.right) rollInput -= 1;
+    if (Math.abs(st.axisX || 0) > 0.06) rollInput = -(st.axisX || 0);
+    else { if (st.left) rollInput += 1; if (st.right) rollInput -= 1; }
     this.yaw += rollInput * dt * 0.7;
     this.roll = U.damp(this.roll, rollInput * 0.55, 5, dt);
 
     const boost = st.jump || st.sprint;
-    const target = (st.forward ? 78 : st.back ? 8 : 34) * tune * (boost ? 1.9 : 1);
+    const ay = st.axisY || 0;
+    const thrust = Math.abs(ay) > 0.06 ? (ay < 0 ? 1 : -1) : (st.forward ? 1 : st.back ? -1 : 0);
+    const target = (thrust > 0 ? 78 : thrust < 0 ? 8 : 34) * tune * (boost ? 1.9 : 1);
     this.speed = U.damp(this.speed, target, 1.6, dt);
 
     const e = new THREE.Euler(this.pitch, this.yaw, this.roll, 'YXZ');

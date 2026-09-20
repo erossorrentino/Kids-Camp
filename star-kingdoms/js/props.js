@@ -499,5 +499,95 @@
         ringGlow.material.opacity = 0.35 + Math.sin(this.t * 1.6) * 0.18; } };
   }
 
-  SK.props = { PROPS, Parts, mergeParts, makePropField, buildBuilding, buildKeep, buildingPalette };
+
+  /* ================================================================
+     CITADEL — a world's final objective. Deliberately larger and
+     darker than an ordinary keep so it reads as the end of a planet.
+     ================================================================ */
+  function buildCitadel(pal, conquered) {
+    const P = buildingPalette(conquered ? { trim: 0x35e0ff, accent: 0xffb23f } : pal);
+    const g = B.grp();
+    const stone = B.mat(conquered ? 0x9fb0c6 : 0x3a3142, { rough: 0.85, metal: 0.15 });
+    const stone2 = B.mat(conquered ? 0x74879f : 0x261f2e, { rough: 0.88, metal: 0.18 });
+    const trimM = B.mat(conquered ? 0x35e0ff : pal.trim,
+      { emissive: conquered ? 0x35e0ff : pal.trim, emissiveI: 1.7, rough: 0.35 });
+
+    // stepped foundation
+    g.add(B.m(B.cyl(17, 19, 1.8, 8), stone2, 0, 0.9, 0));
+    g.add(B.m(B.cyl(14, 15.5, 1.6, 8), stone, 0, 2.5, 0));
+    g.add(B.m(B.cyl(11, 12, 1.4, 8), stone2, 0, 3.9, 0));
+
+    // outer wall with gate
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * U.TAU;
+      if (i === 0) continue;                       // leave a gate
+      const w = B.m(B.box(11, 7.5, 1.8), stone, Math.cos(a) * 16, 5.4, Math.sin(a) * 16);
+      w.rotation.y = -a + Math.PI / 2;
+      g.add(w);
+      for (let k = -1; k <= 1; k++) {
+        const ca = a + k * 0.14;
+        g.add(B.m(B.box(1.7, 1.8, 1.9), stone2, Math.cos(ca) * 16, 10, Math.sin(ca) * 16));
+      }
+    }
+    // gate pillars
+    for (let sgn = -1; sgn <= 1; sgn += 2) {
+      const a = sgn * 0.42;
+      g.add(B.m(B.cyl(2.0, 2.4, 12, 8), stone, Math.cos(a) * 16, 7, Math.sin(a) * 16));
+      g.add(B.decor(B.sphere(0.8, 12), P.glow(0.9), Math.cos(a) * 16, 13.6, Math.sin(a) * 16));
+    }
+
+    // corner towers
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * U.TAU + Math.PI / 4;
+      const x = Math.cos(a) * 15.5, z = Math.sin(a) * 15.5;
+      g.add(B.m(B.cyl(2.6, 3.1, 17, 9), stone, x, 9, z));
+      g.add(B.m(B.cyl(3.5, 3.0, 1.4, 9), stone2, x, 17.8, z));
+      g.add(B.m(B.cone(3.4, 5.2, 9), trimM, x, 21, z));
+      const orb = B.decor(B.sphere(0.6, 12), P.glow(0.9), x, 24.2, z);
+      g.add(orb);
+    }
+
+    // the throne spire
+    g.add(B.m(B.cyl(6.5, 8, 16, 10), stone, 0, 12, 0));
+    g.add(B.m(B.cyl(8.4, 7.5, 1.6, 10), stone2, 0, 20.5, 0));
+    for (let i = 0; i < 10; i++) {
+      const a = (i / 10) * U.TAU;
+      g.add(B.m(B.box(1.5, 2.2, 1.2), stone, Math.cos(a) * 7.8, 22.4, Math.sin(a) * 7.8));
+    }
+    g.add(B.m(B.taperGeo(1.6, 4.4, 14, 8), stone, 0, 29, 0));
+    g.add(B.m(B.cone(3.6, 6, 8), trimM, 0, 38, 0));
+    const crown = B.decor(B.ico(1.6, 1), P.glow(0.95), 0, 42.5, 0);
+    g.add(crown);
+    const halo = B.decor(B.torus(4.2, 0.16, 28), P.glow(0.6), 0, 40, 0);
+    halo.rotation.x = Math.PI / 2;
+    g.add(halo);
+
+    // faction banners down the spire
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * U.TAU + 0.4;
+      g.add(B.m(B.box(0.16, 7, 3.4), trimM, Math.cos(a) * 6.6, 16, Math.sin(a) * 6.6));
+      g.children[g.children.length - 1].rotation.y = -a;
+    }
+
+    const ground = B.decor(B.ring(18.5, 20.5), P.glow(0.45), 0, 0.12, 0);
+    ground.rotation.x = -Math.PI / 2;
+    g.add(ground);
+
+    g.traverse((o) => {
+      if (o.isMesh && o.material && o.material.blending !== THREE.AdditiveBlending) {
+        o.castShadow = true; o.receiveShadow = true;
+      }
+    });
+    return {
+      group: g, t: 0,
+      update(dt) {
+        this.t += dt;
+        crown.scale.setScalar(1 + Math.sin(this.t * 1.8) * 0.12);
+        halo.rotation.z += dt * 0.35;
+        ground.material.opacity = 0.3 + Math.sin(this.t * 1.3) * 0.15;
+      }
+    };
+  }
+
+  SK.props = { PROPS, Parts, mergeParts, makePropField, buildBuilding, buildKeep, buildCitadel, buildingPalette };
 })(window.SK);

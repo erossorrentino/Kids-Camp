@@ -99,6 +99,10 @@
     planet.territories.forEach((tr) => {
       this.pads.push({ x: tr.x, z: tr.z, r: 26, flat: 16, y: raw(tr.x, tr.z) });
     });
+    if (planet.citadel) {
+      const c = planet.citadel;
+      this.pads.push({ x: c.x, z: c.z, r: 44, flat: 28, y: raw(c.x, c.z) });
+    }
     // Pick a landing site that is dry, fairly level, and clear of every keep.
     const wl = T.water ? T.water.level : -9999;
     const t0 = planet.territories[0];
@@ -114,6 +118,8 @@
         const tr = planet.territories[k];
         if (Math.hypot(cx - tr.x, cz - tr.z) < 38) { clear = false; break; }
       }
+      if (clear && planet.citadel &&
+        Math.hypot(cx - planet.citadel.x, cz - planet.citadel.z) < 62) clear = false;
       if (!clear) continue;
       const y = raw(cx, cz);
       if (y < wl + 4) continue;                       // never land in water
@@ -421,6 +427,8 @@
 
     /* ----------------------------------------------------------- keeps */
     this.keeps = {};
+    this.citadelRig = null;
+    this.citadelConquered = null;
     this.buildings = [];
     this.settlementGroup = new THREE.Group();
     this.scene.add(this.settlementGroup);
@@ -482,6 +490,26 @@
     });
   };
 
+  /* The Citadel only exists once every territory on the world is held.
+     Before that it is not on the map at all, which is the point. */
+  PlanetWorld.prototype.syncCitadel = function (state, available, conquered) {
+    const c = this.planet.citadel;
+    if (!c) return;
+    const want = available || conquered;
+    if (!want) {
+      if (this.citadelRig) { this.scene.remove(this.citadelRig.group); this.citadelRig = null; }
+      this.citadelConquered = null;
+      return;
+    }
+    if (this.citadelRig && this.citadelConquered === conquered) return;
+    if (this.citadelRig) this.scene.remove(this.citadelRig.group);
+    const rig = P.buildCitadel(this.planet.faction, conquered);
+    rig.group.position.set(c.x, this.heightAt(c.x, c.z) - 0.6, c.z);
+    this.scene.add(rig.group);
+    this.citadelRig = rig;
+    this.citadelConquered = conquered;
+  };
+
   PlanetWorld.prototype.update = function (dt, focus) {
     this.t += dt;
     const t = this.t;
@@ -520,6 +548,7 @@
     if (this.padRing) this.padRing.material.opacity = 0.4 + Math.sin(t * 2) * 0.2;
     for (let i = 0; i < this.updaters.length; i++) this.updaters[i](dt, t);
     for (const k in this.keeps) this.keeps[k].update(dt);
+    if (this.citadelRig) this.citadelRig.update(dt);
     for (let i = 0; i < this.buildings.length; i++) this.buildings[i].update(dt);
   };
 

@@ -97,11 +97,24 @@
 
     // Clicking the world re-captures the mouse after a panel or a tab switch.
     canvas.addEventListener('click', function () {
+      if (game.input.isTouch) return;          // touch never needs pointer lock
       if ((game.mode === 'planet' || game.mode === 'battle' || game.mode === 'galaxy') &&
         !game.ui.openPanel && !document.pointerLockElement) {
         game.input.requestLock();
       }
     });
+
+    // On a touch device the keyboard hints are noise; show the real controls.
+    if (game.input.isTouch) {
+      const hints = U.$('.keyhints');
+      if (hints) {
+        hints.innerHTML =
+          '<span><b>Left stick</b> move</span>' +
+          '<span><b>Drag</b> anywhere to look</span>' +
+          '<span><b>E</b> act &middot; <b>F</b> ride &middot; <b>FIRE</b> shoot</span>' +
+          '<span><b>Kingdom</b> / <b>Army</b> buttons, top right</span>';
+      }
+    }
 
     game.setMode('title');
     game.start();

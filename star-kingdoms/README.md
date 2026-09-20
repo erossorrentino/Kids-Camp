@@ -26,6 +26,11 @@ planet — is generated in code at runtime. There are no asset files.
 
 ## Controls
 
+Plays on desktop, phone, tablet and with a gamepad. The right control
+scheme appears on its own.
+
+**Keyboard and mouse**
+
 | Input | On foot | In a vehicle | In space |
 |---|---|---|---|
 | `W` `A` `S` `D` | move | throttle / steer | throttle / roll |
@@ -39,7 +44,14 @@ planet — is generated in code at runtime. There are no asset files.
 | `1`-`8` | call that unit down to your position (in battle) | | |
 | `Esc` | close a panel, release the mouse | | |
 
-Touch works too: drag on the left half to move, the right half to look.
+**Touch** — a real analogue thumbstick bottom-left, drag anywhere else to
+look, and four buttons bottom-right: `FIRE`, jump, `E` to act, `F` to
+ride. The kingdom and army consoles are buttons in the top-right corner.
+The whole interface reflows for phone widths, and the army list scrolls
+1,013 units without dropping frames.
+
+**Gamepad** — left stick moves, right stick looks, `A` jumps, right
+trigger fires, `X` acts, `B` rides.
 
 ## How the game works
 
@@ -53,11 +65,24 @@ over time; pressing `1`-`8` drops that unit at *your feet*, so where you
 stand decides where your reinforcements land. Drop too close to the enemy
 keep and the drop reroutes home — the red pylons mark that line.
 
+**Losing costs nothing.** A failed assault takes no resources and no
+territory. The result screen offers **Try again**, which drops you
+straight back in from the same approach. Territory you already hold is
+yours permanently — nothing ever attacks it back.
+
 **Two currencies, two ladders.** Crystal builds the kingdom (eight
 structures, each gated behind your Command Spire's level). Alloy promotes
-your army (eight unit types, each unlocked by a War Barracks level). Your
-deck — what you can actually call down mid-battle — is capped by the
-Barracks too, so deciding what to leave behind matters.
+your army. Your deck — what you can actually call down mid-battle — is
+capped by the War Barracks, so choosing eight units out of a thousand is
+the real decision.
+
+**Every world ends with a Warlord.** Take all five territories on a
+planet and its **Citadel** appears: a fortress that was not on the map
+before. Inside is a named Warlord with its own abilities — ground slams,
+volleys, sweeping beams, reinforcement calls. Killing it conquers the
+world, and its guard joins your roster as a unique **Trophy** unit you
+cannot get any other way. The keep beside it is optional: destroying it
+only silences the guns.
 
 **Getting to a new world costs crystal.** Fly the starship out to it on the
 galaxy map and hold `E` to chart it. Later worlds are far more expensive
@@ -73,10 +98,55 @@ and far more dangerous.
 | **Duskara** | Rust dunes and bone arches under two suns | Dune Raiders |
 | **Nyxor** | Shattered violet void, floating rock, crystal | Void Syndicate |
 
+| World | Citadel | Warlord |
+|---|---|---|
+| Verdania Prime | The Hollow Throne | Marrowking Vell |
+| Emberforge | The Forge Crown | Slagmarshal Orun |
+| Cryovault | Vault Zero Gate | Sentinel Prime Hesk |
+| Duskara | The Thirst Market | Salt-Queen Ifra |
+| Nyxor | The Broken Crown | Thessaly the Unmade |
+
 Each one has its own terrain generator, palette, weather system, scenery
 set, gravity, ambient drone and enemy look. Nyxor's ground is carved into
 floating shelves; Duskara's is terraced and wind-rippled; Cryovault's is
 terraced ice under animated aurora ribbons.
+
+## The roster: 1,013 units
+
+The army is generated, not hand-listed, and no axis of it is a reskin.
+
+**12 families** decide role and silhouette: Vanguard, Lancer, Bulwark,
+Longshot, Skitter, Rocketeer, Aegis, Colossus, Phantom, Pyre, Warden and
+Seraph. A Phantom runs past keep fire almost untouched; a Seraph hovers
+above the terrain entirely; an Aegis never fires a shot and only heals;
+a Warden makes everything standing near it better.
+
+**7 marks** (I to VII) set the power band, the energy cost and the
+rarity, from Common up to Legendary. Each family has its own seven rank
+names, so a mark VII Colossus is an *Apocalypse* and a mark I Vanguard is
+a *Recruit*.
+
+**12 traits** each apply a real rule in combat, verified in the test
+suite: *Warded* and *Ashen* trade health against damage, *Swift* trades
+health for speed, *Siege* hits keeps 55% harder, *Leech* heals from the
+damage it deals, *Volatile* detonates when it dies, *Frosted* slows what
+it hits, *Veiled* shrugs off keep fire, *Thorned* reflects melee back,
+*Radiant* buffs nearby allies, and *Gilded* raises everything for one
+more energy.
+
+That is 12 × 7 × 12 = 1,008, plus **5 Trophy units** taken from the
+Warlords.
+
+**Upgrades run deep.** Every unit promotes from level 1 to 20, and at
+levels 5, 10, 15 and 20 it learns a perk from its family's own line —
+armour piercing, twin barrels, arc conduits, shield projectors, rally
+banners, launch surges. A level-20 Bulwark is a different unit from a
+level-1 Bulwark, not just a bigger one.
+
+Availability opens as you build: 4 units at the start, around 180 by
+mid-game, all 1,008 once the Command Spire, War Barracks and Research Lab
+are maxed. The army console has search, family filters, four sort orders
+and a detail sheet per unit.
 
 ## What's actually generated
 
@@ -129,12 +199,25 @@ eight hours of offline income when you come back.
 
 Driven headlessly with Playwright against software WebGL. Every mode was
 exercised: title, all five planet surfaces, both hover vehicles, the
-kingdom and army consoles, a full battle through to victory, the galaxy
-map, planet-to-planet travel, and a save/reload round trip. Combat was also
-stepped deterministically at a fixed timestep to check balance and to
-confirm the medic heals, splash weapons hit multiple targets, and the
-whole roster builds and fights.
+kingdom and army consoles, a full battle through to victory, a Citadel
+assault through to a Warlord kill, the galaxy map, planet-to-planet
+travel, and a save/reload round trip.
 
-Measured on that pass: 64-101 draw calls on a planet surface, ~600 with 26
-units fighting, 100-210k triangles. Frame rate was not measured
-meaningfully because the test machine has no GPU.
+Combat is also stepped deterministically at a fixed timestep, which is
+how the trait rules were confirmed rather than assumed: leeching heals
+its attacker, Frosted applies a real slow, Volatile damages neighbours on
+death, Thorned reflects melee, Radiant raises ally damage, Seraphs sit
+above the ground, Pyres ignite their targets, and a level-20 unit carries
+all four of its perks.
+
+The same harness brackets difficulty. A mid-game deck beats the first
+Warlord in about a minute; a maxed deck beats it in thirteen seconds; an
+under-levelled deck loses the last Warlord with 94% of its health
+untouched; a maxed deck played passively gets it to 9%, which a player
+firing their own blaster closes comfortably.
+
+Measured: 61-101 draw calls on a planet surface, ~290 in a battle,
+95-170k triangles. The army console keeps only 12 rows in the DOM while
+scrolling all 1,013 units. Phone layout verified at 414x896 with no
+horizontal scroll. Frame rate was not measured meaningfully because the
+test machine has no GPU.

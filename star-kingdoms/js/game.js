@@ -7,7 +7,8 @@
   const D = SK.data;
   const $ = U.$;
 
-  const SAVE_KEY = 'star-kingdoms-save-v1';
+  const SAVE_KEY = 'star-kingdoms-save-v2';
+  const LEGACY_KEYS = ['star-kingdoms-save-v1'];
   const OFFLINE_CAP_MIN = 8 * 60;
 
   const APPEARANCES = {
@@ -21,18 +22,21 @@
     crests: ['fin', 'halo', 'horns', null]
   };
 
+  const STARTER_DECK = ['vanguard-1-std', 'lancer-1-std', 'vanguard-2-std', 'lancer-2-std'];
+
   function defaultState() {
     return {
-      version: 1,
+      version: 2,
       crystal: 600, alloy: 400,
       buildings: { command: 1, mine: 1, refinery: 1, barracks: 1, lab: 0, reactor: 0, hangar: 0, shield: 0 },
-      army: { trooper: 1, lancer: 1, bulwark: 1, sniper: 1, swarm: 1, rocketeer: 1, medic: 1, warbot: 1 },
-      deck: ['trooper', 'lancer', 'bulwark', 'sniper'],
+      army: {},                 // unit id -> level, absent means level 1
+      deck: STARTER_DECK.slice(),
       owned: { v1: true },
       unlocked: { verdania: true },
+      conquered: {},            // planet id -> true once its Warlord falls
       planet: 'verdania',
       appearance: { skin: APPEARANCES.skins[1], suit: 0x24467a, trim: 0x35e0ff, accent: 0x9df0ff, crest: 'fin' },
-      stats: { kills: 0, battlesWon: 0, battlesLost: 0 },
+      stats: { kills: 0, battlesWon: 0, battlesLost: 0, warlords: 0 },
       lastTick: Date.now()
     };
   }
@@ -94,9 +98,11 @@
 
   Game.prototype.detectQuality = function () {
     const mem = navigator.deviceMemory || 4;
-    const mobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
-    if (mobile || mem <= 2) return 'low';
-    if (mem <= 4) return 'medium';
+    const cores = navigator.hardwareConcurrency || 4;
+    const touch = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
+    const small = Math.min(window.innerWidth, window.innerHeight) < 700;
+    if ((touch && small) || mem <= 2 || cores <= 2) return 'low';
+    if (mem <= 4 || cores <= 4 || touch) return 'medium';
     return 'high';
   };
 
@@ -122,16 +128,32 @@
 
   Game.prototype.load = function () {
     try {
-      const raw = localStorage.getItem(SAVE_KEY);
+      let raw = localStorage.getItem(SAVE_KEY);
+      let legacy = false;
+      if (!raw) {
+        for (let i = 0; i < LEGACY_KEYS.length && !raw; i++) raw = localStorage.getItem(LEGACY_KEYS[i]);
+        legacy = !!raw;
+      }
       if (!raw) return false;
       const s = JSON.parse(raw);
-      if (!s || s.version !== 1) return false;
+      if (!s) return false;
       const base = defaultState();
       this.state = Object.assign(base, s);
       this.state.buildings = Object.assign(base.buildings, s.buildings || {});
-      this.state.army = Object.assign(base.army, s.army || {});
       this.state.appearance = Object.assign(base.appearance, s.appearance || {});
       this.state.stats = Object.assign(base.stats, s.stats || {});
+      this.state.conquered = s.conquered || {};
+      this.state.version = 2;
+      // The roster was replaced wholesale, so old unit ids no longer exist.
+      // Buildings, resources and conquests carry over; the army restarts.
+      const army = {};
+      Object.keys(s.army || {}).forEach((k) => { if (D.unit(k)) army[k] = s.army[k]; });
+      this.state.army = army;
+      const deck = (s.deck || []).filter((id) => D.unit(id));
+      this.state.deck = deck.length ? deck : STARTER_DECK.slice();
+      if (legacy || (s.version && s.version < 2)) {
+        this.pendingMigrationNote = true;
+      }
       this.collectOffline();
       return true;
     } catch (e) { return false; }
@@ -190,13 +212,15 @@
     }
     const cost = SK.costOf(b, lv);
     if (s.crystal < cost) { this.toast('Not enough crystal.', 'bad'); SK.Audio.deny(); return false; }
+    const before = this.unitsAvailable();
     s.crystal -= cost;
     s.buildings[id] = lv + 1;
     SK.Audio.build();
     this.toast(b.name + ' is now level ' + (lv + 1) + '.', 'good');
-    if (id === 'barracks') {
-      const newly = D.UNITS.filter((u) => u.barracks === lv + 1);
-      newly.forEach((u) => this.toast(u.name + ' unlocked.', 'good'));
+    if (id === 'barracks' || id === 'command' || id === 'lab') {
+      const after = this.unitsAvailable();
+      const gained = after - before;
+      if (gained > 0) this.toast(gained + ' more unit types are now available.', 'good');
     }
     this.save();
     if (this.world) this.world.syncOwnership(s);
@@ -204,19 +228,39 @@
   };
 
   Game.prototype.upgradeUnit = function (id) {
-    const def = D.UNITS.find((u) => u.id === id);
+    const def = D.unit(id);
     const s = this.state;
+    if (!def) return false;
     const lv = s.army[id] || 1;
-    if (lv >= 12) { this.toast('Already at maximum rank.', 'bad'); return false; }
-    const cost = SK.unitCost(def, lv);
+    if (lv >= D.MAX_LEVEL) { this.toast('Already at maximum rank.', 'bad'); return false; }
+    const cost = D.unitUpgradeCost(def, lv);
     if (s.alloy < cost) { this.toast('Not enough alloy.', 'bad'); SK.Audio.deny(); return false; }
     s.alloy -= cost;
-    s.army[id] = lv + 1;
+    const next = lv + 1;
+    s.army[id] = next;
     SK.Audio.build();
-    this.toast(def.name + ' promoted to level ' + (lv + 1) + '.', 'good');
+    const perkIdx = D.PERK_LEVELS.indexOf(next);
+    if (perkIdx >= 0 && def.perks[perkIdx]) {
+      const perk = D.PERKS[def.perks[perkIdx]];
+      this.toast(def.name + ' learned ' + perk.name + '.', 'good');
+    } else {
+      this.toast(def.name + ' promoted to level ' + next + '.', 'good');
+    }
     this.save();
     this.ui.renderCards();
     return true;
+  };
+
+  Game.prototype.unitsAvailable = function () {
+    const s = this.state;
+    return D.UNITS.filter((u) => D.unitUnlocked(u, s.buildings, s.conquered)).length;
+  };
+
+  Game.prototype.planetHeld = function (planet) {
+    return planet.territories.every((t) => this.state.owned[t.id]);
+  };
+  Game.prototype.citadelAvailable = function (planet) {
+    return this.planetHeld(planet) && !this.state.conquered[planet.id];
   };
 
   Game.prototype.planetsUnlocked = function () {
@@ -268,6 +312,7 @@
       world.scene.add(self.player.group);
 
       world.syncOwnership(self.state);
+      world.syncCitadel(self.state, self.citadelAvailable(planet), !!self.state.conquered[planet.id]);
 
       // craft parked at the landing pad
       self.vehicles = [];
@@ -288,7 +333,8 @@
       self.chase.pitch = 0.2;
       self.chase.snap(self.player.pos, 'foot');
 
-      self.ui.setPlanet(planet, planet.territories.filter((t) => self.state.owned[t.id]).length);
+      self.ui.setPlanet(planet, planet.territories.filter((t) => self.state.owned[t.id]).length,
+        !!self.state.conquered[planet.id], self.citadelAvailable(planet));
       SK.Audio.setAmbient(planet.audioRoot, true);
 
       $('#loading').classList.remove('show');
@@ -304,6 +350,8 @@
     this.ui.showGalaxy(mode === 'galaxy');
     this.ui.showBattle(mode === 'battle');
     $('#title').classList.toggle('show', mode === 'title');
+    const touch = $('#touch');
+    if (touch && this.input.isTouch) touch.hidden = (mode === 'title' || mode === 'boot');
     this.ui.setPrompt(null);
     this.input.releaseAll();
     if (mode === 'title') this.input.exitLock();
@@ -332,6 +380,10 @@
         if (isNew) {
           self.toast('Welcome home, sovereign.', 'good');
           setTimeout(() => self.toast('Press M to open the galaxy. K for your kingdom.', 'info'), 2200);
+        } else if (self.pendingMigrationNote) {
+          self.pendingMigrationNote = false;
+          self.toast('The roster grew to over a thousand units, so your army restarted at level 1.', 'info');
+          setTimeout(() => self.toast('Your kingdom, resources and territory are untouched.', 'info'), 2600);
         } else if (self.offlineGain && self.offlineGain.mins >= 1) {
           const g = self.offlineGain;
           self.toast('While you were away: +' + U.fmt(g.crystal) + ' crystal, +' + U.fmt(g.alloy) + ' alloy.', 'good');
@@ -352,7 +404,7 @@
       self.ui.showGalaxy(true);
       SK.Audio.warp();
       self.fade('in', 500);
-      self.input.requestLock();
+      if (!self.input.isTouch) self.input.requestLock();
     });
   };
 
@@ -399,10 +451,36 @@
     });
   };
 
+  Game.prototype.startCitadel = function () {
+    const self = this;
+    const planet = this.planet;
+    const cit = planet.citadel;
+    if (!this.citadelAvailable(planet)) return;
+    if (this.state.deck.length === 0) {
+      this.toast('Your deck is empty. Open the army console first.', 'bad');
+      return;
+    }
+    this.fade('out', 380, function () {
+      self.battle.start(null, cit);
+      self.setMode('battle');
+      self.ui.showBattle(true, cit.name + ' · Warlord assault');
+      self.chase.snap(self.player.pos, 'foot');
+      self.fade('in', 460);
+      self.toast('Kill ' + cit.warlord.name + ' to take this world. The keep is optional.', 'info');
+    });
+  };
+
+  Game.prototype.onCitadelTaken = function (planet, citadel, reward) {
+    this.state.conquered[planet.id] = true;
+    this.state.stats.warlords++;
+    this.save();
+  };
+
   Game.prototype.tryDeploy = function (id) {
     if (this.mode !== 'battle' || !this.battle.active || this.battle.result) return;
     if (this.state.deck.indexOf(id) < 0) return;
-    const def = D.UNITS.find((u) => u.id === id);
+    const def = D.unit(id);
+    if (!def) return;
     if (this.battle.energy < def.energy) { SK.Audio.deny(); this.toast('Not enough energy.', 'bad'); return; }
     const msg = this.battle.deploy(id);
     if (msg) this.toast(msg, 'info');
@@ -410,42 +488,82 @@
 
   Game.prototype.onTerritoryCaptured = function (territory, reward) {
     this.world.syncOwnership(this.state);
-    this.ui.setPlanet(this.planet, this.planet.territories.filter((t) => this.state.owned[t.id]).length);
+    this.world.syncCitadel(this.state, this.citadelAvailable(this.planet), !!this.state.conquered[this.planet.id]);
+    this.ui.setPlanet(this.planet, this.planet.territories.filter((t) => this.state.owned[t.id]).length,
+      !!this.state.conquered[this.planet.id], this.citadelAvailable(this.planet));
     this.save();
   };
 
   Game.prototype.showBattleResult = function (won, reward) {
     const self = this;
-    const tr = this.battle.territory;
-    const allHeld = this.planet.territories.every((t) => this.state.owned[t.id]);
+    const b = this.battle;
+    const isCit = b.isCitadel;
+    const cit = b.citadel;
+    const tr = b.territory;
+    const allHeld = !isCit && this.planet.territories.every((t) => this.state.owned[t.id]);
+    const trophy = isCit ? D.TROPHIES.filter((t) => t.planet === this.planet.id)[0] : null;
     setTimeout(function () {
+      if (!self.battle.active || self.battle.result !== (won ? 'win' : 'lose')) return;
       self.ui.showResult({
         tone: won ? 'win' : 'lose',
-        eyebrow: won ? 'Territory claimed' : 'Assault repelled',
-        title: won ? tr.name + ' is yours' : 'Your keep has fallen',
+        eyebrow: won ? (isCit ? 'World conquered' : 'Territory claimed') : 'Assault repelled',
+        title: won
+          ? (isCit ? cit.warlord.name + ' has fallen' : tr.name + ' is yours')
+          : 'Your keep has fallen',
         body: won
-          ? (allHeld
-            ? 'Every territory on ' + self.planet.name + ' now flies your banner. The ' +
-              self.planet.faction.name + ' have nothing left here.'
-            : 'The ' + self.planet.faction.name + ' pull back. Your settlement expands onto the captured ground.')
-          : 'The ' + self.planet.faction.name + ' hold ' + tr.name + '. Strengthen the Aegis Shield, promote your units, and come back.',
+          ? (isCit
+            ? self.planet.name + ' is yours entirely. The ' + self.planet.faction.name +
+              ' have no capital left, and ' + cit.warlord.name + "'s guard has joined your roster."
+            : (allHeld
+              ? 'Every territory on ' + self.planet.name + ' now flies your banner. ' +
+                cit.name + ' has opened — their Warlord is waiting.'
+              : 'The ' + self.planet.faction.name + ' pull back. Your settlement expands onto the captured ground.'))
+          : (isCit
+            ? cit.warlord.name + ' still holds ' + cit.name + '. Promote your units, widen your deck, and come back.'
+            : 'The ' + self.planet.faction.name + ' hold ' + tr.name +
+              '. Strengthen the Aegis Shield, promote your units, and come back. It costs you nothing to try again.'),
         rewards: won
           ? '<span><i class="c-crystal"></i>+' + U.fmt(reward.crystal) + '</span>' +
             '<span><i class="c-alloy"></i>+' + U.fmt(reward.alloy) + '</span>' +
-            '<span class="rw-inc">+' + D.tierStats(tr.tier).income.crystal + '/min income</span>'
+            (trophy ? '<span class="rw-trophy">Unlocked: ' + trophy.name + '</span>'
+              : '<span class="rw-inc">+' + (isCit ? D.citadelStats(cit).income.crystal
+                : D.tierStats(tr.tier).income.crystal) + '/min income</span>')
           : null,
         actions: [
-          { label: 'Return to the surface', primary: true, fn: function () { self.endBattle(); } }
-        ]
+          { label: won ? 'Return to the surface' : 'Try again', primary: true,
+            fn: function () { self.endBattle(won ? null : (isCit ? 'citadel' : tr)); } },
+          won ? null : { label: 'Back to the surface', fn: function () { self.endBattle(); } }
+        ].filter(Boolean)
       });
-    }, won ? 1500 : 900);
+    }, won ? 1600 : 900);
   };
 
-  Game.prototype.endBattle = function () {
+  Game.prototype.endBattle = function (retry) {
     const self = this;
     this.ui.hideResult();
     this.fade('out', 320, function () {
       self.battle.cleanup();
+      self.world.syncOwnership(self.state);
+      self.world.syncCitadel(self.state, self.citadelAvailable(self.planet),
+        !!self.state.conquered[self.planet.id]);
+      if (retry) {
+        // Retrying costs nothing: straight back in from the same approach.
+        const center = retry === 'citadel'
+          ? { x: self.planet.citadel.x, z: self.planet.citadel.z } : { x: retry.x, z: retry.z };
+        self.player.spawn(self.world, center.x + 70, center.z + 70);
+        self.player.health = 100;
+        self.player.group.visible = true;
+        if (retry === 'citadel') self.battle.start(null, self.planet.citadel);
+        else self.battle.start(retry);
+        self.setMode('battle');
+        self.ui.showBattle(true, retry === 'citadel'
+          ? self.planet.citadel.name + ' · Warlord assault'
+          : retry.name + ' · Tier ' + retry.tier);
+        self.chase.snap(self.player.pos, 'foot');
+        self.fade('in', 420);
+        self.ui.syncResources();
+        return;
+      }
       self.ui.showBattle(false);
       self.setMode('planet');
       const L = self.world.landingSite;
@@ -453,16 +571,22 @@
       self.player.health = 100;
       self.player.group.visible = true;
       self.chase.snap(self.player.pos, 'foot');
-      self.world.syncOwnership(self.state);
       self.fade('in', 420);
       self.ui.syncResources();
     });
   };
 
   /* --------------------------------------------------- panel hooks */
-  Game.prototype.onPanelOpen = function () { this.input.exitLock(); this.input.releaseAll(); };
+  Game.prototype.onPanelOpen = function () {
+    this.input.exitLock();
+    this.input.releaseAll();
+    const t = $('#touch');
+    if (t && this.input.isTouch) t.hidden = true;
+  };
   Game.prototype.onPanelClose = function () {
-    if (this.mode === 'planet' || this.mode === 'battle') this.input.requestLock();
+    const t = $('#touch');
+    if (t && this.input.isTouch && this.mode !== 'title') t.hidden = false;
+    if (!this.input.isTouch && (this.mode === 'planet' || this.mode === 'battle')) this.input.requestLock();
   };
 
   /* ------------------------------------------------- interactions */
@@ -482,6 +606,15 @@
     }
     if (best && best.kind === 'ship') {
       return { key: 'E', text: 'Board the starship', act: 'launch', hold: 0.9 };
+    }
+    // the Citadel, once every territory on this world is held
+    const cit = this.planet.citadel;
+    if (cit && this.citadelAvailable(this.planet)) {
+      const cd = Math.hypot(cit.x - p.x, cit.z - p.z);
+      if (cd < 34) {
+        return { key: 'E', text: 'Assault ' + cit.name + ' · ' + cit.warlord.name,
+          act: 'citadel', hold: 1.4 };
+      }
     }
     // territories
     let t = null, td = 26;
@@ -507,6 +640,7 @@
     else if (it.act === 'dismount') { this.player.dismount(); }
     else if (it.act === 'launch') { this.openGalaxy(); }
     else if (it.act === 'battle') { this.startBattle(it.target); }
+    else if (it.act === 'citadel') { this.startCitadel(); }
     else if (it.act === 'kingdom') { this.ui.showPanel('kingdom'); }
   };
 
@@ -527,6 +661,7 @@
   Game.prototype.tick = function (dt) {
     const input = this.input;
     const st = input.state;
+    input.pollGamepad();
 
     if (this.mode === 'title') {
       this.tickTitle(dt);
@@ -594,8 +729,11 @@
 
     // camera look
     const mouse = input.consumeMouse();
-    if (!menuOpen && (st.locked || document.pointerLockElement)) this.chase.rotate(mouse.dx, mouse.dy);
-    else if (!menuOpen && st.fire && !st.locked) this.chase.rotate(mouse.dx, mouse.dy);
+    if (!menuOpen && (st.locked || document.pointerLockElement || input.isTouch)) {
+      this.chase.rotate(mouse.dx, mouse.dy);
+    } else if (!menuOpen && st.fire && !st.locked) {
+      this.chase.rotate(mouse.dx, mouse.dy);
+    }
     if (mouse.wheel) this.chase.zoom(mouse.wheel);
 
     if (!menuOpen) {

@@ -1,5 +1,7 @@
-/* Star Kingdoms — interface: HUD, radar, kingdom and army consoles,
-   battle deck, and the result screens. */
+/* Star Kingdoms — interface: HUD, radar, kingdom console, the 1,013-unit
+   army console, battle deck and result screens. The army list is
+   virtualised: only the rows on screen exist in the DOM, so a phone can
+   scroll the whole roster without dropping frames. */
 (function (SK) {
   'use strict';
   const U = SK.util;
@@ -7,54 +9,45 @@
   const $ = U.$;
 
   function costOf(b, level) { return Math.round(b.baseCost * Math.pow(b.growth, level)); }
-  function unitCost(def, level) { return Math.round(def.upgradeBase * Math.pow(1.62, level - 1)); }
   function deckSize(state) { return Math.min(8, 3 + (state.buildings.barracks || 1)); }
+  const ROW_H = 78;
 
   function UI(game) {
     this.game = game;
     this.el = {
-      hud: $('#hud'),
-      crystal: $('#res-crystal'),
-      alloy: $('#res-alloy'),
-      income: $('#res-income'),
-      planetName: $('#planet-name'),
-      planetSub: $('#planet-sub'),
-      prompt: $('#prompt'),
-      promptKey: $('#prompt-key'),
-      promptText: $('#prompt-text'),
-      radar: $('#radar'),
-      vehicleTag: $('#vehicle-tag'),
-      playerHp: $('#player-hp-fill'),
-      playerHpWrap: $('#player-hp'),
-      battle: $('#battle-hud'),
-      energyFill: $('#energy-fill'),
-      energyNum: $('#energy-num'),
+      hud: $('#hud'), crystal: $('#res-crystal'), alloy: $('#res-alloy'), income: $('#res-income'),
+      planetName: $('#planet-name'), planetSub: $('#planet-sub'),
+      prompt: $('#prompt'), promptKey: $('#prompt-key'), promptText: $('#prompt-text'),
+      radar: $('#radar'), vehicleTag: $('#vehicle-tag'),
+      playerHp: $('#player-hp-fill'), playerHpWrap: $('#player-hp'),
+      battle: $('#battle-hud'), energyFill: $('#energy-fill'), energyNum: $('#energy-num'),
       cards: $('#cards'),
-      keepYou: $('#keep-you-fill'),
-      keepThem: $('#keep-them-fill'),
-      keepYouNum: $('#keep-you-num'),
-      keepThemNum: $('#keep-them-num'),
+      keepYou: $('#keep-you-fill'), keepThem: $('#keep-them-fill'),
+      keepYouNum: $('#keep-you-num'), keepThemNum: $('#keep-them-num'),
+      keepThemLabel: $('#keep-them-label'), bossRow: $('#boss-row'),
+      bossFill: $('#boss-fill'), bossName: $('#boss-name'), bossNum: $('#boss-num'),
       battleTitle: $('#battle-title'),
-      toasts: $('#toasts'),
-      result: $('#result'),
-      dmg: $('#dmg-layer'),
-      galaxyHud: $('#galaxy-hud'),
-      galaxyTarget: $('#galaxy-target')
+      toasts: $('#toasts'), result: $('#result'), dmg: $('#dmg-layer'),
+      galaxyHud: $('#galaxy-hud'), galaxyTarget: $('#galaxy-target')
     };
     this.radarCtx = this.el.radar ? this.el.radar.getContext('2d') : null;
     this.openPanel = null;
+    this.filter = { q: '', family: 'all', sort: 'power', availOnly: true };
+    this.rowPool = [];
+    this.visible = [];
+    this.detailId = null;
     this.bindPanels();
+    this.bindArmyControls();
   }
 
   /* ------------------------------------------------------------ toast */
   UI.prototype.toast = function (msg, tone) {
     const host = this.el.toasts;
-    // A burst of upgrades can queue a dozen at once; keep the newest few.
     while (host.children.length >= 4) host.removeChild(host.firstChild);
     const n = U.el('div', 'toast' + (tone ? ' toast-' + tone : ''), msg);
     host.appendChild(n);
-    setTimeout(() => { n.classList.add('out'); }, 2600);
-    setTimeout(() => { n.remove(); }, 3200);
+    setTimeout(() => { n.classList.add('out'); }, 2800);
+    setTimeout(() => { n.remove(); }, 3400);
   };
 
   /* ------------------------------------------------------------- HUD */
@@ -69,10 +62,13 @@
     if (fa) fa.textContent = U.fmt(s.alloy);
   };
 
-  UI.prototype.setPlanet = function (planet, ownedCount) {
+  UI.prototype.setPlanet = function (planet, ownedCount, conquered, citadelOpen) {
     this.el.planetName.textContent = planet.name;
-    this.el.planetSub.textContent = planet.epithet + ' · ' + ownedCount + '/' +
-      planet.territories.length + ' territories held';
+    let sub = planet.epithet + ' · ' + ownedCount + '/' + planet.territories.length + ' held';
+    if (conquered) sub = planet.epithet + ' · conquered';
+    else if (citadelOpen) sub = planet.epithet + ' · ' + planet.citadel.name + ' is open';
+    this.el.planetSub.textContent = sub;
+    this.el.planetName.classList.toggle('conquered', !!conquered);
   };
 
   UI.prototype.setPrompt = function (key, text) {
@@ -81,12 +77,10 @@
     this.el.promptKey.textContent = key;
     this.el.promptText.textContent = text;
   };
-
   UI.prototype.setVehicleTag = function (txt) {
     this.el.vehicleTag.textContent = txt || '';
     this.el.vehicleTag.style.opacity = txt ? '1' : '0';
   };
-
   UI.prototype.setPlayerHealth = function (hp, show) {
     this.el.playerHpWrap.style.opacity = show ? '1' : '0';
     this.el.playerHp.style.width = U.clamp(hp, 0, 100) + '%';
@@ -98,59 +92,63 @@
     const ctx = this.radarCtx;
     if (!ctx) return;
     const g = this.game;
-    const size = 150, half = size / 2, range = 220;
+    const size = this.el.radar.width, half = size / 2, range = 230;
     ctx.clearRect(0, 0, size, size);
-
     ctx.save();
     ctx.beginPath(); ctx.arc(half, half, half - 2, 0, Math.PI * 2); ctx.clip();
     ctx.fillStyle = 'rgba(8,14,24,0.72)';
     ctx.fillRect(0, 0, size, size);
     ctx.strokeStyle = 'rgba(53,224,255,0.16)';
     ctx.lineWidth = 1;
-    for (let r = 1; r <= 3; r++) {
-      ctx.beginPath(); ctx.arc(half, half, (half - 2) * r / 3, 0, Math.PI * 2); ctx.stroke();
-    }
+    for (let r = 1; r <= 3; r++) { ctx.beginPath(); ctx.arc(half, half, (half - 2) * r / 3, 0, Math.PI * 2); ctx.stroke(); }
     ctx.beginPath(); ctx.moveTo(half, 0); ctx.lineTo(half, size);
     ctx.moveTo(0, half); ctx.lineTo(size, half); ctx.stroke();
 
-    const p = g.player.pos;
-    const yaw = g.chase.yaw;
+    const p = g.player.pos, yaw = g.chase.yaw;
     const cos = Math.cos(-yaw), sin = Math.sin(-yaw);
-
-    g.planet.territories.forEach((t) => {
-      const dx = t.x - p.x, dz = t.z - p.z;
-      let rx = dx * cos - dz * sin;
-      let rz = dx * sin + dz * cos;
-      let sx = half + (rx / range) * (half - 10);
-      let sy = half + (rz / range) * (half - 10);
+    const plot = (wx, wz) => {
+      const dx = wx - p.x, dz = wz - p.z;
+      let sx = half + ((dx * cos - dz * sin) / range) * (half - 10);
+      let sy = half + ((dx * sin + dz * cos) / range) * (half - 10);
       const edge = Math.hypot(sx - half, sy - half);
       let clipped = false;
-      if (edge > half - 8) {
-        const s = (half - 8) / edge;
-        sx = half + (sx - half) * s; sy = half + (sy - half) * s;
-        clipped = true;
-      }
+      if (edge > half - 8) { const k = (half - 8) / edge; sx = half + (sx - half) * k; sy = half + (sy - half) * k; clipped = true; }
+      return { sx, sy, clipped };
+    };
+
+    g.planet.territories.forEach((t) => {
+      const q = plot(t.x, t.z);
       const owned = !!g.state.owned[t.id];
       ctx.fillStyle = owned ? '#35e0ff' : '#ff4d6d';
-      ctx.beginPath();
-      ctx.arc(sx, sy, clipped ? 2.6 : 4.2, 0, Math.PI * 2);
-      ctx.fill();
-      if (!clipped) {
+      ctx.beginPath(); ctx.arc(q.sx, q.sy, q.clipped ? 2.6 : 4.2, 0, Math.PI * 2); ctx.fill();
+      if (!q.clipped) {
         ctx.strokeStyle = owned ? 'rgba(53,224,255,0.45)' : 'rgba(255,77,109,0.45)';
         ctx.lineWidth = 1.4;
-        ctx.beginPath(); ctx.arc(sx, sy, 7.5, 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(q.sx, q.sy, 7.5, 0, Math.PI * 2); ctx.stroke();
       }
     });
 
-    // player arrow, always centred and pointing up
+    // the Citadel gets a star, and only appears when it is reachable
+    const cit = g.planet.citadel;
+    if (cit && (g.citadelAvailable(g.planet) || g.state.conquered[g.planet.id])) {
+      const q = plot(cit.x, cit.z);
+      const done = !!g.state.conquered[g.planet.id];
+      ctx.fillStyle = done ? '#5dffa0' : '#ffb23f';
+      ctx.beginPath();
+      for (let i = 0; i < 10; i++) {
+        const a = (i / 10) * Math.PI * 2 - Math.PI / 2;
+        const r = i % 2 ? 3.1 : 7;
+        const fx = q.sx + Math.cos(a) * r, fy = q.sy + Math.sin(a) * r;
+        i === 0 ? ctx.moveTo(fx, fy) : ctx.lineTo(fx, fy);
+      }
+      ctx.closePath(); ctx.fill();
+    }
+
     ctx.fillStyle = '#ffb23f';
     ctx.beginPath();
-    ctx.moveTo(half, half - 6);
-    ctx.lineTo(half - 4.5, half + 5);
-    ctx.lineTo(half + 4.5, half + 5);
+    ctx.moveTo(half, half - 6); ctx.lineTo(half - 4.5, half + 5); ctx.lineTo(half + 4.5, half + 5);
     ctx.closePath(); ctx.fill();
     ctx.restore();
-
     ctx.strokeStyle = 'rgba(53,224,255,0.35)';
     ctx.lineWidth = 1.5;
     ctx.beginPath(); ctx.arc(half, half, half - 2, 0, Math.PI * 2); ctx.stroke();
@@ -180,6 +178,7 @@
   UI.prototype.closePanel = function (silent) {
     U.$$('.panel').forEach((p) => p.classList.remove('open'));
     $('#panel-scrim').classList.remove('open');
+    this.hideDetail();
     this.openPanel = null;
     if (!silent) this.game.onPanelClose();
   };
@@ -190,12 +189,12 @@
     const host = $('#kingdom-list');
     host.innerHTML = '';
     const cmd = s.buildings.command || 1;
-
     const dyn = $('#kingdom-dynasty');
     if (dyn) dyn.textContent = s.dynasty || 'House Aurelin';
     $('#kingdom-tier').textContent = 'Empire tier ' + cmd;
+    const conq = Object.keys(s.conquered || {}).length;
     $('#kingdom-holdings').textContent = Object.keys(s.owned).length + ' territories · ' +
-      this.game.planetsUnlocked() + '/5 worlds';
+      conq + '/5 worlds conquered · ' + U.fmt(this.game.unitsAvailable()) + ' units available';
 
     D.BUILDINGS.forEach((b) => {
       const lv = s.buildings[b.id] || 0;
@@ -203,7 +202,6 @@
       const cappedByCommand = b.id !== 'command' && lv >= cmd && cmd < 10;
       const cost = costOf(b, lv);
       const afford = s.crystal >= cost;
-
       const row = U.el('div', 'row' + (atMax ? ' row-max' : ''));
       row.innerHTML =
         '<div class="row-icon i-' + b.id + '"></div>' +
@@ -214,16 +212,12 @@
           (lv && !atMax ? '<div class="row-next">Next: ' + b.effect(lv + 1) + '</div>' : '') +
         '</div>';
       const act = U.el('div', 'row-act');
-      if (atMax) {
-        act.innerHTML = '<span class="maxed">MAX</span>';
-      } else if (cappedByCommand) {
-        act.innerHTML = '<span class="locked">Needs Command Spire ' + (lv + 1) + '</span>';
-      } else {
+      if (atMax) act.innerHTML = '<span class="maxed">MAX</span>';
+      else if (cappedByCommand) act.innerHTML = '<span class="locked">Needs Command Spire ' + (lv + 1) + '</span>';
+      else {
         const btn = U.el('button', 'btn btn-buy' + (afford ? '' : ' btn-poor'),
           (lv ? 'Upgrade' : 'Build') + '<span class="cost"><i class="c-crystal"></i>' + U.fmt(cost) + '</span>');
-        btn.addEventListener('click', () => {
-          if (this.game.upgradeBuilding(b.id)) this.renderKingdom();
-        });
+        btn.addEventListener('click', () => { if (this.game.upgradeBuilding(b.id)) this.renderKingdom(); });
         act.appendChild(btn);
       }
       row.appendChild(act);
@@ -232,68 +226,289 @@
     this.syncResources();
   };
 
-  /* --------------------------------------------------------- army UI */
-  UI.prototype.renderArmy = function () {
-    const s = this.game.state;
-    const host = $('#army-list');
-    host.innerHTML = '';
-    const barracks = s.buildings.barracks || 1;
-    const cap = deckSize(s);
-    $('#deck-count').textContent = s.deck.length + ' / ' + cap;
-    $('#army-power').textContent = '+' + ((s.buildings.lab || 0) * 5) + '% from research';
-
-    D.UNITS.forEach((def) => {
-      const unlocked = barracks >= def.barracks;
-      const lv = s.army[def.id] || 1;
-      const cost = unitCost(def, lv);
-      const afford = s.alloy >= cost;
-      const inDeck = s.deck.indexOf(def.id) >= 0;
-      const lvMul = 1 + (lv - 1) * 0.18;
-
-      const row = U.el('div', 'row unit-row' + (unlocked ? '' : ' row-locked') + (inDeck ? ' in-deck' : ''));
-      row.innerHTML =
-        '<div class="row-icon u-' + def.id + '"><span class="energy-pip">' + def.energy + '</span></div>' +
-        '<div class="row-main">' +
-          '<div class="row-head"><span class="row-name">' + def.name + '</span>' +
-          '<span class="tag">' + def.role + '</span>' +
-          (unlocked ? '<span class="lv">Lv ' + lv + '</span>' : '<span class="lv lock">Barracks ' + def.barracks + '</span>') +
-          '</div>' +
-          '<div class="row-effect">' + def.desc + '</div>' +
-          '<div class="statline">' +
-            '<span><b>' + Math.round(def.hp * lvMul) + '</b> hp</span>' +
-            '<span><b>' + (def.heal ? '+' + Math.round(def.heal * lvMul) : Math.round(def.dmg * lvMul)) + '</b> ' +
-              (def.heal ? 'heal' : 'dmg') + '</span>' +
-            '<span><b>' + (def.range > 4 ? Math.round(def.range) + 'm' : 'melee') + '</b></span>' +
-            '<span><b>' + def.speed.toFixed(1) + '</b> spd</span>' +
-            (def.count > 1 ? '<span><b>x' + def.count + '</b></span>' : '') +
-          '</div>' +
-        '</div>';
-      const act = U.el('div', 'row-act');
-      if (!unlocked) {
-        act.innerHTML = '<span class="locked">Locked</span>';
-      } else {
-        const deckBtn = U.el('button', 'btn btn-deck' + (inDeck ? ' on' : ''), inDeck ? 'In deck' : 'Add to deck');
-        deckBtn.addEventListener('click', () => {
-          const i = s.deck.indexOf(def.id);
-          if (i >= 0) { s.deck.splice(i, 1); SK.Audio.click(); }
-          else if (s.deck.length >= cap) { this.toast('Deck is full. Upgrade the War Barracks.', 'bad'); SK.Audio.deny(); return; }
-          else { s.deck.push(def.id); SK.Audio.confirm(); }
-          this.game.save();
-          this.renderArmy();
-          this.renderCards();
+  /* ==================================================================
+     ARMY CONSOLE
+     ================================================================== */
+  UI.prototype.bindArmyControls = function () {
+    const self = this;
+    const q = $('#army-search');
+    if (q) {
+      q.addEventListener('input', function () {
+        self.filter.q = q.value.trim().toLowerCase();
+        self.refreshArmy();
+      });
+    }
+    const famHost = $('#army-families');
+    if (famHost) {
+      const mk = (id, label) => {
+        const c = U.el('button', 'chip' + (id === 'all' ? ' on' : ''), label);
+        c.setAttribute('data-fam', id);
+        c.addEventListener('click', function () {
+          self.filter.family = id;
+          U.$$('#army-families .chip').forEach((o) => o.classList.toggle('on', o === c));
+          self.refreshArmy();
+          SK.Audio.click();
         });
-        act.appendChild(deckBtn);
-        const up = U.el('button', 'btn btn-buy' + (afford ? '' : ' btn-poor'),
-          'Upgrade<span class="cost"><i class="c-alloy"></i>' + U.fmt(cost) + '</span>');
-        up.addEventListener('click', () => {
-          if (this.game.upgradeUnit(def.id)) this.renderArmy();
-        });
-        act.appendChild(up);
-      }
-      row.appendChild(act);
-      host.appendChild(row);
+        famHost.appendChild(c);
+      };
+      mk('all', 'All');
+      D.FAMILIES.forEach((f) => mk(f.id, f.name));
+      mk('trophy', 'Trophies');
+    }
+    U.$$('#army-sort .chip').forEach((c) => {
+      c.addEventListener('click', function () {
+        self.filter.sort = c.getAttribute('data-sort');
+        U.$$('#army-sort .chip').forEach((o) => o.classList.toggle('on', o === c));
+        self.refreshArmy();
+        SK.Audio.click();
+      });
     });
+    const av = $('#army-avail');
+    if (av) {
+      av.addEventListener('click', function () {
+        self.filter.availOnly = !self.filter.availOnly;
+        av.classList.toggle('on', self.filter.availOnly);
+        av.textContent = self.filter.availOnly ? 'Available only' : 'Show all 1,013';
+        self.refreshArmy();
+        SK.Audio.click();
+      });
+    }
+    const scroller = $('#army-scroll');
+    if (scroller) scroller.addEventListener('scroll', function () { self.paintRows(); });
+    const close = $('#detail-close');
+    if (close) close.addEventListener('click', function () { self.hideDetail(); });
+  };
+
+  UI.prototype.renderArmy = function () {
+    this.renderDeckStrip();
+    this.refreshArmy();
     this.syncResources();
+  };
+
+  UI.prototype.renderDeckStrip = function () {
+    const s = this.game.state;
+    const host = $('#deck-strip');
+    if (!host) return;
+    const cap = deckSize(s);
+    host.innerHTML = '';
+    $('#deck-count').textContent = s.deck.length + ' / ' + cap;
+    for (let i = 0; i < cap; i++) {
+      const id = s.deck[i];
+      const def = id ? D.unit(id) : null;
+      const slot = U.el('button', 'deck-slot' + (def ? ' filled' : ''));
+      if (def) {
+        const lv = s.army[id] || 1;
+        slot.innerHTML = '<span class="ds-icon f-' + def.family + '"></span>' +
+          '<span class="ds-name">' + def.name + '</span>' +
+          '<span class="ds-meta">Lv ' + lv + ' · ' + def.energy + '⚡</span>';
+        slot.style.borderColor = D.RARITY_COLOR[def.rarity] || 'var(--line)';
+        slot.addEventListener('click', () => {
+          s.deck.splice(s.deck.indexOf(id), 1);
+          this.game.save(); this.renderDeckStrip(); this.paintRows(); this.renderCards();
+          SK.Audio.click();
+        });
+        slot.title = 'Remove ' + def.name + ' from the deck';
+      } else {
+        slot.innerHTML = '<span class="ds-empty">Empty</span>';
+      }
+      host.appendChild(slot);
+    }
+  };
+
+  UI.prototype.filteredUnits = function () {
+    const s = this.game.state;
+    const f = this.filter;
+    let list = D.UNITS;
+    if (f.availOnly) list = list.filter((u) => D.unitUnlocked(u, s.buildings, s.conquered));
+    if (f.family === 'trophy') list = list.filter((u) => u.trophy);
+    else if (f.family !== 'all') list = list.filter((u) => u.family === f.family);
+    if (f.q) {
+      const q = f.q;
+      list = list.filter((u) =>
+        u.name.toLowerCase().indexOf(q) >= 0 ||
+        (u.familyName || '').toLowerCase().indexOf(q) >= 0 ||
+        (u.traitName || '').toLowerCase().indexOf(q) >= 0 ||
+        (u.role || '').toLowerCase().indexOf(q) >= 0 ||
+        (u.rarity || '').toLowerCase().indexOf(q) >= 0);
+    }
+    const sort = f.sort;
+    list = list.slice().sort((a, b) => {
+      if (sort === 'energy') return a.energy - b.energy || b.power - a.power;
+      if (sort === 'name') return a.name.localeCompare(b.name);
+      if (sort === 'level') return ((s.army[b.id] || 1) - (s.army[a.id] || 1)) || b.power - a.power;
+      return b.power - a.power;
+    });
+    return list;
+  };
+
+  UI.prototype.refreshArmy = function () {
+    this.visible = this.filteredUnits();
+    const spacer = $('#army-spacer');
+    if (spacer) spacer.style.height = (this.visible.length * ROW_H) + 'px';
+    const scroller = $('#army-scroll');
+    if (scroller) scroller.scrollTop = 0;
+    const cnt = $('#army-count');
+    if (cnt) cnt.textContent = U.fmt(this.visible.length) + ' of ' + U.fmt(D.UNITS.length);
+    const pw = $('#army-power');
+    if (pw) pw.textContent = '+' + ((this.game.state.buildings.lab || 0) * 5) + '% from research';
+    this.paintRows();
+  };
+
+  /* Only the rows on screen exist. Nodes are recycled as you scroll. */
+  UI.prototype.paintRows = function () {
+    const scroller = $('#army-scroll');
+    const host = $('#army-rows');
+    if (!scroller || !host) return;
+    const s = this.game.state;
+    const top = scroller.scrollTop;
+    const h = scroller.clientHeight || 400;
+    const first = Math.max(0, Math.floor(top / ROW_H) - 3);
+    const count = Math.ceil(h / ROW_H) + 6;
+    const last = Math.min(this.visible.length, first + count);
+
+    while (this.rowPool.length < last - first) {
+      const n = U.el('div', 'urow');
+      n.addEventListener('click', () => {
+        if (n.__id) this.showDetail(n.__id);
+      });
+      host.appendChild(n);
+      this.rowPool.push(n);
+    }
+    for (let i = 0; i < this.rowPool.length; i++) {
+      const node = this.rowPool[i];
+      const idx = first + i;
+      if (idx >= last) { node.style.display = 'none'; node.__id = null; continue; }
+      const def = this.visible[idx];
+      const lv = s.army[def.id] || 1;
+      const unlocked = D.unitUnlocked(def, s.buildings, s.conquered);
+      const inDeck = s.deck.indexOf(def.id) >= 0;
+      node.style.display = '';
+      node.style.transform = 'translateY(' + (idx * ROW_H) + 'px)';
+      node.className = 'urow' + (inDeck ? ' in-deck' : '') + (unlocked ? '' : ' locked');
+      node.__id = def.id;
+      node.style.setProperty('--rar', D.RARITY_COLOR[def.rarity] || '#9fb0c4');
+      node.innerHTML =
+        '<span class="urow-rar"></span>' +
+        '<span class="urow-icon f-' + def.family + '"><i>' + def.energy + '</i></span>' +
+        '<span class="urow-main">' +
+          '<span class="urow-top"><b>' + def.name + '</b>' +
+            (inDeck ? '<em class="tag-deck">In deck</em>' : '') +
+            (def.trophy ? '<em class="tag-trophy">Trophy</em>' : '') +
+          '</span>' +
+          '<span class="urow-sub">' + (def.familyName || '') + ' · ' + def.role +
+            (def.trophy ? '' : ' · Mk ' + def.markRoman) + '</span>' +
+          '<span class="urow-stats">' +
+            '<i>' + U.fmt(def.hp) + ' hp</i>' +
+            '<i>' + (def.heal ? '+' + Math.round(def.heal) + ' heal' : Math.round(def.dmg) + ' dmg') + '</i>' +
+            '<i>' + (def.range > 4 ? Math.round(def.range) + 'm' : 'melee') + '</i>' +
+            (def.count > 1 ? '<i>x' + def.count + '</i>' : '') +
+          '</span>' +
+        '</span>' +
+        '<span class="urow-right">' +
+          '<span class="urow-lv">' + (unlocked ? 'Lv ' + lv : 'Locked') + '</span>' +
+          '<span class="urow-pw">' + U.fmt(def.power) + ' pwr</span>' +
+        '</span>';
+    }
+  };
+
+  /* --------------------------------------------------- detail sheet */
+  UI.prototype.showDetail = function (id) {
+    const def = D.unit(id);
+    if (!def) return;
+    const s = this.game.state;
+    const sheet = $('#unit-detail');
+    if (!sheet) return;
+    this.detailId = id;
+    const lv = s.army[id] || 1;
+    const unlocked = D.unitUnlocked(def, s.buildings, s.conquered);
+    const inDeck = s.deck.indexOf(id) >= 0;
+    const cap = deckSize(s);
+    const maxed = lv >= D.MAX_LEVEL;
+    const cost = D.unitUpgradeCost(def, lv);
+    const afford = s.alloy >= cost;
+    const lvMul = 1 + (lv - 1) * 0.14;
+    const perksNow = D.unitPerksAt(def, lv);
+
+    let gate = '';
+    if (!unlocked) {
+      const need = [];
+      if (def.trophy) need.push('conquer ' + (D.PLANETS.filter((p) => p.id === def.trophy)[0] || {}).name);
+      else {
+        if ((s.buildings.barracks || 0) < def.barracks) need.push('War Barracks ' + def.barracks);
+        if ((s.buildings.command || 0) < def.command) need.push('Command Spire ' + def.command);
+        if ((s.buildings.lab || 0) < def.lab) need.push('Research Lab ' + def.lab);
+      }
+      gate = '<div class="ud-gate">Locked · needs ' + need.join(', ') + '</div>';
+    }
+
+    const perkRows = def.perks.map((pk, i) => {
+      const at = D.PERK_LEVELS[i];
+      const have = lv >= at;
+      const P = D.PERKS[pk];
+      return '<div class="ud-perk' + (have ? ' have' : '') + '">' +
+        '<b>Lv ' + at + '</b><span><em>' + P.name + '</em> ' + P.desc + '</span></div>';
+    }).join('');
+
+    sheet.innerHTML =
+      '<div class="ud-head" style="--rar:' + (D.RARITY_COLOR[def.rarity] || '#9fb0c4') + '">' +
+        '<span class="ud-icon f-' + def.family + '"></span>' +
+        '<div class="ud-title"><h3>' + def.name + '</h3>' +
+          '<div class="ud-meta"><span class="ud-rar">' + def.rarity + '</span> · ' +
+          (def.familyName || '') + (def.trophy ? '' : ' Mk ' + def.markRoman) + ' · ' + def.role + '</div>' +
+        '</div>' +
+        '<button class="panel-close" id="detail-close" aria-label="Close">&times;</button>' +
+      '</div>' +
+      gate +
+      '<p class="ud-desc">' + def.desc + '</p>' +
+      (def.traitDesc && def.trait !== 'std'
+        ? '<div class="ud-trait"><b>' + (def.traitName || 'Trophy') + '</b> ' + def.traitDesc + '</div>' : '') +
+      '<div class="ud-stats">' +
+        '<div><span>Health</span><b>' + U.fmt(Math.round(def.hp * lvMul)) + '</b></div>' +
+        '<div><span>' + (def.heal ? 'Heal' : 'Damage') + '</span><b>' +
+          Math.round((def.heal || def.dmg) * lvMul) + '</b></div>' +
+        '<div><span>Range</span><b>' + (def.range > 4 ? Math.round(def.range) + 'm' : 'Melee') + '</b></div>' +
+        '<div><span>Speed</span><b>' + def.speed.toFixed(1) + '</b></div>' +
+        '<div><span>Energy</span><b>' + def.energy + '</b></div>' +
+        '<div><span>Squad</span><b>' + def.count + '</b></div>' +
+      '</div>' +
+      '<div class="ud-perks"><h4>Perks</h4>' + perkRows + '</div>' +
+      '<div class="ud-actions">' +
+        '<button class="btn btn-deck' + (inDeck ? ' on' : '') + '" id="ud-deck"' +
+          (unlocked ? '' : ' disabled') + '>' + (inDeck ? 'Remove from deck' : 'Add to deck') + '</button>' +
+        (maxed
+          ? '<span class="maxed">MAX RANK</span>'
+          : '<button class="btn btn-buy' + (afford && unlocked ? '' : ' btn-poor') + '" id="ud-up"' +
+            (unlocked ? '' : ' disabled') + '>Promote to Lv ' + (lv + 1) +
+            '<span class="cost"><i class="c-alloy"></i>' + U.fmt(cost) + '</span></button>') +
+      '</div>';
+
+    sheet.classList.add('open');
+    const self = this;
+    $('#detail-close').addEventListener('click', function () { self.hideDetail(); });
+    const dk = $('#ud-deck');
+    if (dk) dk.addEventListener('click', function () {
+      if (!unlocked) return;
+      const i = s.deck.indexOf(id);
+      if (i >= 0) { s.deck.splice(i, 1); SK.Audio.click(); }
+      else if (s.deck.length >= cap) {
+        self.toast('Deck is full. Upgrade the War Barracks for another slot.', 'bad');
+        SK.Audio.deny(); return;
+      } else { s.deck.push(id); SK.Audio.confirm(); }
+      self.game.save();
+      self.renderDeckStrip(); self.paintRows(); self.renderCards();
+      self.showDetail(id);
+    });
+    const up = $('#ud-up');
+    if (up) up.addEventListener('click', function () {
+      if (!unlocked) return;
+      if (self.game.upgradeUnit(id)) { self.paintRows(); self.showDetail(id); self.syncResources(); }
+    });
+  };
+
+  UI.prototype.hideDetail = function () {
+    const sheet = $('#unit-detail');
+    if (sheet) sheet.classList.remove('open');
+    this.detailId = null;
   };
 
   /* --------------------------------------------------------- battle */
@@ -309,14 +524,15 @@
     host.innerHTML = '';
     this.cardNodes = [];
     s.deck.forEach((id, i) => {
-      const def = D.UNITS.find((u) => u.id === id);
+      const def = D.unit(id);
       if (!def) return;
       const lv = s.army[id] || 1;
-      const card = U.el('button', 'card u-' + id);
+      const card = U.el('button', 'card f-' + def.family);
+      card.style.setProperty('--rar', D.RARITY_COLOR[def.rarity] || '#9fb0c4');
       card.innerHTML =
         '<span class="card-key">' + (i + 1) + '</span>' +
-        '<span class="card-art u-' + id + '"></span>' +
-        '<span class="card-name">' + def.name.split(' ').slice(-1)[0] + '</span>' +
+        '<span class="card-art f-' + def.family + '"></span>' +
+        '<span class="card-name">' + def.name + '</span>' +
         '<span class="card-lv">Lv ' + lv + '</span>' +
         '<span class="card-cost">' + def.energy + '</span>';
       card.addEventListener('click', (e) => { e.preventDefault(); this.game.tryDeploy(id); });
@@ -327,21 +543,28 @@
 
   UI.prototype.syncBattle = function (b) {
     if (!b || !b.active) return;
-    const pct = (b.energy / b.maxEnergy) * 100;
-    this.el.energyFill.style.width = pct + '%';
+    this.el.energyFill.style.width = (b.energy / b.maxEnergy) * 100 + '%';
     this.el.energyNum.textContent = Math.floor(b.energy);
-    (this.cardNodes || []).forEach((c) => {
-      c.node.classList.toggle('ready', b.energy >= c.def.energy);
-    });
+    (this.cardNodes || []).forEach((c) => c.node.classList.toggle('ready', b.energy >= c.def.energy));
     const you = b.homeKeep.hp / b.homeKeep.maxHp;
     const them = b.enemyKeep.hp / b.enemyKeep.maxHp;
     this.el.keepYou.style.width = U.clamp(you * 100, 0, 100) + '%';
     this.el.keepThem.style.width = U.clamp(them * 100, 0, 100) + '%';
     this.el.keepYouNum.textContent = Math.max(0, Math.ceil(b.homeKeep.hp));
     this.el.keepThemNum.textContent = Math.max(0, Math.ceil(b.enemyKeep.hp));
+    this.el.keepThemLabel.textContent = b.isCitadel ? 'Their keep (optional)' : 'Enemy keep';
+    // Warlord bar only exists during a Citadel assault
+    const boss = b.boss;
+    this.el.bossRow.classList.toggle('show', !!boss);
+    if (boss) {
+      const f = Math.max(0, boss.hp) / boss.maxHp;
+      this.el.bossFill.style.width = U.clamp(f * 100, 0, 100) + '%';
+      this.el.bossName.textContent = boss.warlord ? boss.warlord.name : 'Warlord';
+      this.el.bossNum.textContent = U.fmt(Math.max(0, boss.hp));
+    }
   };
 
-  /* --------------------------------------------------------- results */
+  /* -------------------------------------------------------- results */
   UI.prototype.showResult = function (opts) {
     const r = this.el.result;
     r.innerHTML = '';
@@ -361,30 +584,27 @@
     r.appendChild(card);
     r.classList.add('show');
   };
-
   UI.prototype.hideResult = function () { this.el.result.classList.remove('show'); };
 
-  /* ---------------------------------------------------------- galaxy */
-  UI.prototype.showGalaxy = function (on) {
-    this.el.galaxyHud.classList.toggle('show', !!on);
-  };
+  /* --------------------------------------------------------- galaxy */
+  UI.prototype.showGalaxy = function (on) { this.el.galaxyHud.classList.toggle('show', !!on); };
 
   UI.prototype.setGalaxyTarget = function (node, state, dist) {
     const host = this.el.galaxyTarget;
-    if (!node) {
-      host.classList.remove('show');
-      return;
-    }
+    if (!node) { host.classList.remove('show'); return; }
     host.classList.add('show');
     const p = node.planet;
     const unlocked = !!state.unlocked[p.id];
     const owned = p.territories.filter((t) => state.owned[t.id]).length;
+    const done = !!state.conquered[p.id];
     host.innerHTML =
       '<div class="gt-name">' + p.name + '</div>' +
       '<div class="gt-epi">' + p.epithet + '</div>' +
       '<p class="gt-blurb">' + p.blurb + '</p>' +
       '<div class="gt-row"><span>Faction</span><b>' + p.faction.name + '</b></div>' +
       '<div class="gt-row"><span>Held</span><b>' + owned + ' / ' + p.territories.length + '</b></div>' +
+      '<div class="gt-row"><span>Warlord</span><b class="' + (done ? 'ok' : '') + '">' +
+        (done ? 'Defeated' : p.citadel.warlord.name) + '</b></div>' +
       (unlocked
         ? '<div class="gt-cta">Hold <kbd>E</kbd> to land</div>'
         : '<div class="gt-row"><span>Survey cost</span><b class="' +
@@ -394,6 +614,5 @@
 
   SK.UI = UI;
   SK.costOf = costOf;
-  SK.unitCost = unitCost;
   SK.deckSize = deckSize;
 })(window.SK);

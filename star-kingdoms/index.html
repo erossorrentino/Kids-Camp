@@ -375,6 +375,233 @@ i.c-alloy{background:linear-gradient(150deg,#ffd98a,#d1791b);
 #fatal.show{display:grid}
 #fatal p{max-width:44ch;color:var(--ink-2);line-height:1.7}
 
+
+/* ------------------------------------------------- army console */
+.army-tools{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:9px;
+  background:rgba(8,14,24,.5)}
+.deck-strip{display:grid;grid-template-columns:repeat(auto-fill,minmax(104px,1fr));gap:6px}
+.deck-slot{display:flex;flex-direction:column;gap:1px;align-items:flex-start;text-align:left;
+  background:rgba(12,21,38,.8);border:1px solid var(--line);border-radius:4px;padding:6px 8px;
+  cursor:pointer;min-height:50px;transition:.14s;position:relative;overflow:hidden}
+.deck-slot.filled{border-left-width:3px}
+.deck-slot:hover.filled{background:rgba(30,50,80,.8)}
+.ds-icon{position:absolute;right:-8px;top:-6px;width:34px;height:34px;opacity:.18}
+.ds-name{font-family:var(--display);font-size:11.5px;letter-spacing:.02em;line-height:1.15;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;position:relative}
+.ds-meta{font-size:10px;color:var(--ink-3);position:relative}
+.ds-empty{font-size:10.5px;color:var(--ink-3);letter-spacing:.1em;text-transform:uppercase;
+  font-family:var(--display);margin:auto}
+#army-search{background:rgba(6,11,20,.85);border:1px solid var(--line);color:var(--ink);
+  padding:9px 12px;font-family:var(--body);font-size:14px;border-radius:3px;width:100%}
+#army-search:focus{outline:2px solid var(--cy);outline-offset:1px;border-color:var(--cy)}
+.chiprow{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.chiprow.scrollx{flex-wrap:nowrap;overflow-x:auto;padding-bottom:3px;scrollbar-width:thin;
+  -webkit-mask-image:linear-gradient(90deg,#000 0,#000 90%,transparent 100%);
+  mask-image:linear-gradient(90deg,#000 0,#000 90%,transparent 100%)}
+.chiprow.scrollx::-webkit-scrollbar{height:4px}
+.chiprow.scrollx::-webkit-scrollbar-thumb{background:rgba(120,170,215,.3);border-radius:2px}
+.chiprow.inline{display:inline-flex;flex-wrap:nowrap;gap:4px}
+.chiprow .chip{flex:none;font-size:11px;padding:5px 10px}
+.chiprow .chip.on{background:rgba(53,224,255,.14);border-color:var(--cy);color:var(--cy)}
+.tools2{justify-content:space-between}
+.count{font-size:11px;color:var(--ink-3);font-variant-numeric:tabular-nums;margin-left:auto}
+
+.army-scroll{flex:1;overflow-y:auto;position:relative;padding:0 12px;
+  -webkit-overflow-scrolling:touch}
+#army-spacer{width:1px}
+#army-rows{position:absolute;top:0;left:12px;right:12px}
+.urow{position:absolute;top:0;left:0;right:0;height:72px;display:flex;align-items:center;gap:10px;
+  padding:8px 10px 8px 12px;background:rgba(17,29,51,.5);border:1px solid var(--line);
+  border-radius:4px;cursor:pointer;overflow:hidden;transition:background .12s,border-color .12s;
+  will-change:transform}
+.urow:hover{background:rgba(26,44,74,.66);border-color:rgba(120,170,215,.38)}
+.urow.in-deck{border-color:var(--line-hot);background:rgba(20,44,66,.5)}
+.urow.locked{opacity:.42}
+.urow-rar{position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--rar,#9fb0c4)}
+.urow-icon{width:38px;height:38px;flex:none;border-radius:8px;position:relative;
+  border:1px solid rgba(120,170,215,.22)}
+.urow-icon::after{content:"";position:absolute;inset:10px;background:rgba(255,255,255,.92)}
+.urow-icon i{position:absolute;bottom:-5px;right:-5px;width:17px;height:17px;border-radius:50%;
+  background:var(--violet);color:#1a0a2a;font-family:var(--display);font-size:10px;font-style:normal;
+  display:grid;place-items:center;border:1px solid rgba(255,255,255,.3)}
+.urow-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.urow-top{display:flex;align-items:baseline;gap:7px;min-width:0}
+.urow-top b{font-family:var(--display);font-size:14px;letter-spacing:.02em;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.tag-deck,.tag-trophy{font-style:normal;font-size:9px;letter-spacing:.12em;text-transform:uppercase;
+  padding:1px 6px;border-radius:99px;flex:none}
+.tag-deck{color:var(--cy);border:1px solid rgba(53,224,255,.5)}
+.tag-trophy{color:var(--gold);border:1px solid rgba(255,178,63,.5)}
+.urow-sub{font-size:11px;color:var(--ink-3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.urow-stats{display:flex;gap:9px;font-size:10.5px;color:var(--ink-2);flex-wrap:wrap}
+.urow-stats i{font-style:normal;font-variant-numeric:tabular-nums}
+.urow-right{flex:none;text-align:right;display:flex;flex-direction:column;gap:2px}
+.urow-lv{font-family:var(--display);font-size:11px;letter-spacing:.1em;color:var(--gold)}
+.urow.locked .urow-lv{color:var(--ink-3)}
+.urow-pw{font-size:10px;color:var(--ink-3);font-variant-numeric:tabular-nums}
+
+/* unit detail sheet */
+.unit-detail{position:absolute;left:0;right:0;bottom:0;max-height:88%;overflow-y:auto;z-index:4;
+  background:linear-gradient(180deg,#101c31,#0a1120);border-top:1px solid var(--line-hot);
+  transform:translateY(102%);transition:transform .26s cubic-bezier(.3,.8,.35,1);
+  padding:0 18px calc(20px + var(--safe-b));box-shadow:0 -24px 50px rgba(0,0,0,.55)}
+.unit-detail.open{transform:translateY(0)}
+.ud-head{display:flex;align-items:center;gap:12px;padding:16px 0 12px;position:sticky;top:0;
+  background:linear-gradient(180deg,#101c31 70%,rgba(16,28,49,0));z-index:2}
+.ud-icon{width:44px;height:44px;flex:none;border-radius:9px;position:relative;
+  border:1px solid rgba(120,170,215,.25)}
+.ud-icon::after{content:"";position:absolute;inset:11px;background:rgba(255,255,255,.92)}
+.ud-title{flex:1;min-width:0}
+.ud-title h3{font-family:var(--display);font-size:19px;margin:0;letter-spacing:.02em}
+.ud-meta{font-size:11.5px;color:var(--ink-3)}
+.ud-rar{color:var(--rar,#9fb0c4);font-family:var(--display);letter-spacing:.1em;text-transform:uppercase;
+  font-size:10.5px}
+.ud-gate{background:rgba(255,77,109,.12);border:1px solid rgba(255,77,109,.35);color:#ffb3c1;
+  padding:8px 11px;border-radius:3px;font-size:12.5px;margin-bottom:10px}
+.ud-desc{font-size:13.5px;line-height:1.6;color:var(--ink-2);margin:0 0 10px}
+.ud-trait{background:rgba(53,224,255,.09);border-left:2px solid var(--cy);padding:8px 11px;
+  font-size:12.5px;color:var(--ink);margin-bottom:12px;line-height:1.5}
+.ud-trait b{font-family:var(--display);color:var(--cy);letter-spacing:.04em}
+.ud-stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(88px,1fr));gap:7px;margin-bottom:14px}
+.ud-stats div{background:rgba(22,36,60,.55);border:1px solid var(--line);border-radius:3px;
+  padding:7px 9px;display:flex;flex-direction:column;gap:1px}
+.ud-stats span{font-size:10px;color:var(--ink-3);letter-spacing:.1em;text-transform:uppercase}
+.ud-stats b{font-family:var(--display);font-size:15px;font-variant-numeric:tabular-nums}
+.ud-perks h4{font-family:var(--display);font-size:10.5px;letter-spacing:.22em;text-transform:uppercase;
+  color:var(--ink-3);margin:0 0 7px}
+.ud-perk{display:flex;gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:12.5px;
+  color:var(--ink-3);line-height:1.45}
+.ud-perk b{font-family:var(--display);font-size:11px;letter-spacing:.08em;color:var(--ink-3);
+  min-width:42px;flex:none}
+.ud-perk.have{color:var(--ink-2)}
+.ud-perk.have b{color:var(--good)}
+.ud-perk em{font-style:normal;font-family:var(--display);color:var(--ink);letter-spacing:.02em}
+.ud-actions{display:flex;gap:9px;margin-top:16px;flex-wrap:wrap;align-items:center}
+.ud-actions .btn{flex:1;min-width:140px}
+.ud-actions .btn[disabled]{opacity:.4;cursor:not-allowed}
+
+/* family colour coding, shared by rows, cards and the deck strip */
+.f-vanguard{background:linear-gradient(150deg,#9df0ff,#1b7fa0)}
+.f-lancer{background:linear-gradient(150deg,#8ff4e0,#158f86)}
+.f-bulwark{background:linear-gradient(150deg,#c3d1e2,#5a7392)}
+.f-longshot{background:linear-gradient(150deg,#d6b3ff,#6a35c0)}
+.f-skitter{background:linear-gradient(150deg,#c6ff8a,#4a9a2a)}
+.f-rocketeer{background:linear-gradient(150deg,#ffb894,#c04a22)}
+.f-aegis{background:linear-gradient(150deg,#a6ffd0,#1f9a68)}
+.f-colossus{background:linear-gradient(150deg,#ffe08a,#a8690c)}
+.f-phantom{background:linear-gradient(150deg,#c9a6ff,#4a2a80)}
+.f-pyre{background:linear-gradient(150deg,#ffc07a,#c0330f)}
+.f-warden{background:linear-gradient(150deg,#8ff0e6,#1d6e82)}
+.f-seraph{background:linear-gradient(150deg,#fff0c0,#c9a63a)}
+[class*="f-trophy"]{background:linear-gradient(150deg,#ffe9a8,#c07a10)}
+.f-vanguard::after{clip-path:polygon(38% 0,62% 0,62% 42%,100% 42%,100% 62%,62% 62%,62% 100%,38% 100%,38% 62%,0 62%,0 42%,38% 42%)}
+.f-lancer::after{clip-path:polygon(50% 0,72% 78%,50% 100%,28% 78%)}
+.f-bulwark::after{clip-path:polygon(50% 0,100% 22%,86% 100%,14% 100%,0 22%)}
+.f-longshot::after{clip-path:polygon(0 42%,78% 42%,78% 22%,100% 50%,78% 78%,78% 58%,0 58%)}
+.f-skitter::after{clip-path:polygon(26% 0,50% 22%,74% 0,100% 26%,78% 50%,100% 74%,74% 100%,50% 78%,26% 100%,0 74%,22% 50%,0 26%)}
+.f-rocketeer::after{clip-path:polygon(50% 0,74% 34%,74% 78%,88% 100%,12% 100%,26% 78%,26% 34%)}
+.f-aegis::after{clip-path:polygon(36% 0,64% 0,64% 36%,100% 36%,100% 64%,64% 64%,64% 100%,36% 100%,36% 64%,0 64%,0 36%,36% 36%)}
+.f-colossus::after{clip-path:polygon(16% 0,84% 0,100% 30%,84% 46%,100% 74%,72% 100%,28% 100%,0 74%,16% 46%,0 30%)}
+.f-phantom::after{clip-path:polygon(50% 0,86% 20%,68% 50%,86% 80%,50% 100%,72% 50%)}
+.f-pyre::after{clip-path:polygon(50% 0,74% 34%,68% 54%,84% 74%,50% 100%,16% 74%,32% 54%,26% 34%)}
+.f-warden::after{clip-path:polygon(0 100%,14% 28%,32% 54%,50% 8%,68% 54%,86% 28%,100% 100%)}
+.f-seraph::after{clip-path:polygon(50% 20%,96% 0,74% 46%,96% 92%,50% 66%,4% 92%,26% 46%,4% 0)}
+[class*="f-trophy"]::after{clip-path:polygon(50% 0,61% 35%,98% 35%,68% 57%,79% 92%,50% 70%,21% 92%,32% 57%,2% 35%,39% 35%)}
+.card.f-vanguard,.card.f-lancer,.card.f-bulwark,.card.f-longshot,.card.f-skitter,
+.card.f-rocketeer,.card.f-aegis,.card.f-colossus,.card.f-phantom,.card.f-pyre,
+.card.f-warden,.card.f-seraph{background:rgba(10,18,32,.9)}
+.card{border-top:2px solid var(--rar,#9fb0c4)}
+.card-name{font-size:9.5px;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* warlord bar */
+.boss-row{display:none;flex-direction:column;gap:5px;margin-top:8px;min-width:min(420px,88vw)}
+.boss-row.show{display:flex}
+.boss-row .keep-label{color:var(--gold)}
+.keep-track.boss{height:12px}
+.keep-track.boss i{background:linear-gradient(90deg,#8a3a00,var(--gold),#ffe08a)}
+.rewards .rw-trophy{color:var(--gold)}
+#planet-name.conquered::after{content:" ✦";color:var(--good)}
+
+/* ------------------------------------------------ touch controls */
+.touch{position:absolute;inset:0;pointer-events:none;z-index:24}
+.stick{position:absolute;left:calc(26px + var(--safe-l));bottom:calc(30px + var(--safe-b));
+  width:128px;height:128px;pointer-events:auto;touch-action:none;opacity:.5;transition:opacity .2s}
+.stick.active{opacity:.95}
+.stick-ring{position:absolute;inset:0;border-radius:50%;border:2px solid rgba(53,224,255,.45);
+  background:rgba(9,16,28,.5)}
+.stick-knob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;
+  border-radius:50%;background:rgba(53,224,255,.3);border:2px solid var(--cy);
+  box-shadow:0 0 18px rgba(53,224,255,.5)}
+.tbtns{position:absolute;right:calc(20px + var(--safe-r));bottom:calc(26px + var(--safe-b));
+  display:grid;grid-template-columns:repeat(2,64px);gap:10px;pointer-events:auto}
+.tbtn{width:64px;height:64px;border-radius:50%;border:2px solid var(--line-hot);
+  background:rgba(9,16,28,.72);color:var(--ink);font-family:var(--display);font-size:13px;
+  letter-spacing:.06em;cursor:pointer;touch-action:none;-webkit-user-select:none;user-select:none;
+  display:grid;place-items:center;transition:.1s}
+.tbtn:active,.tbtn.down{background:rgba(53,224,255,.3);border-color:var(--cy);transform:scale(.94)}
+.tbtn.t-fire{width:78px;height:78px;font-size:14px;border-color:var(--gold);color:var(--gold);
+  grid-column:2;grid-row:1/span 2;align-self:end}
+.tbtn.t-act{grid-column:1;grid-row:1}
+.tbtn.t-ride{grid-column:1;grid-row:2}
+.tbtn.t-jump{grid-column:2;grid-row:1;width:58px;height:58px;justify-self:end}
+body.touch-mode #crosshair{opacity:.5}
+
+/* ---------------------------------------------- narrow screens */
+@media (max-width:820px){
+  .panel{width:100%;border-left:none}
+  .army-tools{padding:10px 12px}
+  .deck-strip{grid-template-columns:repeat(auto-fill,minmax(88px,1fr))}
+  .urow{height:70px;padding-left:11px}
+  .urow-icon{width:34px;height:34px}
+  .urow-top b{font-size:13px}
+  .urow-stats{gap:7px;font-size:10px}
+  .panel-body{padding-left:12px;padding-right:12px}
+  .row{padding:10px}
+  .row-act{flex-direction:row;flex-wrap:wrap}
+  .keeps{flex-direction:column;gap:7px;padding:7px 12px}
+  .keeps .vs{display:none}
+  .keep{min-width:min(300px,84vw)}
+  .boss-row{min-width:min(300px,84vw)}
+}
+@media (max-width:560px){
+  .hud-tl{max-width:60vw}
+  .planet-plate{padding:4px 10px}
+  #planet-name{font-size:14px}
+  #planet-sub{font-size:10px}
+  #res-income{font-size:10px}
+  .res{padding:5px 10px 5px 8px}
+  .res b{font-size:14px}
+  #radar{width:92px;height:92px}
+  .hud-btn{padding:7px 9px;font-size:10px}
+  .hud-btn kbd{display:none}
+  .card{width:58px;height:74px;padding:4px 3px 5px}
+  .card-art{width:26px;height:26px;margin-top:8px;margin-bottom:2px}
+  .card-name{font-size:8.5px}
+  .card-lv{font-size:8px}
+  .card-cost{font-size:10px;padding:0 4px}
+  .deck{gap:6px}
+  .energy{padding:4px 9px}
+  #prompt{bottom:calc(150px + var(--safe-b));padding:8px 13px 8px 9px;max-width:88vw}
+  #prompt-text{font-size:12.5px}
+  #toasts{bottom:calc(238px + var(--safe-b));width:94vw}
+  .toast{font-size:12px;padding:7px 12px}
+  #player-hp{bottom:calc(196px + var(--safe-b));width:150px}
+  #vehicle-tag{bottom:calc(112px + var(--safe-b));font-size:11px}
+  .stick{width:108px;height:108px;left:calc(16px + var(--safe-l));bottom:calc(96px + var(--safe-b))}
+  .stick-knob{width:44px;height:44px;margin:-22px 0 0 -22px}
+  .tbtns{grid-template-columns:repeat(2,54px);gap:8px;bottom:calc(96px + var(--safe-b))}
+  .tbtn{width:54px;height:54px;font-size:12px}
+  .tbtn.t-fire{width:64px;height:64px;font-size:12px}
+  .tbtn.t-jump{width:48px;height:48px}
+  .ud-stats{grid-template-columns:repeat(3,1fr)}
+  .result-card{padding:22px 18px 20px}
+}
+@media (max-height:520px){
+  .stick{width:96px;height:96px;bottom:calc(14px + var(--safe-b))}
+  .tbtns{bottom:calc(14px + var(--safe-b))}
+  .card{height:68px}
+}
+
 @media (max-width:760px){
   #radar{width:108px;height:108px}
   .card{width:62px;height:82px}
@@ -421,6 +648,16 @@ i.c-alloy{background:linear-gradient(150deg,#ffd98a,#d1791b);
   <div id="player-hp"><div id="player-hp-fill"></div></div>
   <div id="vehicle-tag"></div>
 
+  <div class="touch" id="touch" hidden>
+    <div class="stick" id="stick"><span class="stick-ring"></span><span class="stick-knob" id="stick-knob"></span></div>
+    <div class="tbtns">
+      <button class="tbtn t-act" id="t-act" aria-label="Interact">E</button>
+      <button class="tbtn t-ride" id="t-ride" aria-label="Ride or exit vehicle">F</button>
+      <button class="tbtn t-jump" id="t-jump" aria-label="Jump or boost">&#9650;</button>
+      <button class="tbtn t-fire" id="t-fire" aria-label="Fire">FIRE</button>
+    </div>
+  </div>
+
   <div id="prompt">
     <div id="prompt-key">E</div>
     <div id="prompt-text">Interact</div>
@@ -438,9 +675,13 @@ i.c-alloy{background:linear-gradient(150deg,#ffd98a,#d1791b);
       </div>
       <div class="vs">VS</div>
       <div class="keep them">
-        <div class="keep-label"><span>Enemy keep</span><b id="keep-them-num">0</b></div>
+        <div class="keep-label"><span id="keep-them-label">Enemy keep</span><b id="keep-them-num">0</b></div>
         <div class="keep-track"><i id="keep-them-fill"></i></div>
       </div>
+    </div>
+    <div class="boss-row" id="boss-row">
+      <div class="keep-label"><span id="boss-name">Warlord</span><b id="boss-num">0</b></div>
+      <div class="keep-track boss"><i id="boss-fill"></i></div>
     </div>
     <div id="battle-title">Contested territory</div>
   </div>
@@ -494,11 +735,35 @@ i.c-alloy{background:linear-gradient(150deg,#ffd98a,#d1791b);
     </div>
     <button class="panel-close" data-close aria-label="Close">&times;</button>
   </div>
-  <div class="panel-body" id="army-list"></div>
+
+  <div class="army-tools">
+    <div id="deck-strip" class="deck-strip"></div>
+    <input id="army-search" type="search" placeholder="Search the roster by name, role or trait"
+           autocomplete="off" spellcheck="false" aria-label="Search units">
+    <div class="chiprow scrollx" id="army-families"></div>
+    <div class="chiprow tools2">
+      <span class="chiprow inline" id="army-sort">
+        <button class="chip on" data-sort="power">Power</button>
+        <button class="chip" data-sort="energy">Energy</button>
+        <button class="chip" data-sort="level">Level</button>
+        <button class="chip" data-sort="name">A&ndash;Z</button>
+      </span>
+      <button class="chip on" id="army-avail">Available only</button>
+      <span class="count" id="army-count">0</span>
+    </div>
+  </div>
+
+  <div class="army-scroll" id="army-scroll">
+    <div id="army-spacer"></div>
+    <div id="army-rows"></div>
+  </div>
+
   <div class="panel-foot">
     <div class="res"><i class="c-alloy"></i><b id="foot-alloy">0</b></div>
-    <span>Promotions cost alloy. Your deck is what you can call down mid-battle.</span>
+    <span>Tap a unit for its perks and to promote it. Your deck is what you can call down mid-battle.</span>
   </div>
+
+  <div class="unit-detail" id="unit-detail"></div>
 </section>
 
 <div id="toasts"></div>

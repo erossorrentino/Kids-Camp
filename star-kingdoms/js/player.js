@@ -67,23 +67,33 @@
 
   Player.prototype.updateFoot = function (dt, input, cam) {
     const w = this.world;
-    const run = input.sprint ? 1.85 : 1.0;
+    const run = (input.sprint || (input.axisMag || 0) > 0.88) ? 1.85 : 1.0;
     const maxSpeed = 7.2 * run * this.speedScalar;
 
     // movement is relative to where the camera looks
     const f = this._v.set(-Math.sin(cam.yaw), 0, -Math.cos(cam.yaw));
     const r = this._v2.set(Math.cos(cam.yaw), 0, -Math.sin(cam.yaw));
     const wish = new THREE.Vector3();
-    if (input.forward) wish.add(f);
-    if (input.back) wish.sub(f);
-    if (input.right) wish.add(r);
-    if (input.left) wish.sub(r);
-    const moving = wish.lengthSq() > 0.001;
+    const ax = input.axisX || 0, ay = input.axisY || 0;
+    const analog = Math.abs(ax) + Math.abs(ay) > 0.06;
+    if (analog) {
+      // stick or gamepad: keep the magnitude so you can walk as well as run
+      wish.addScaledVector(f, -ay);
+      wish.addScaledVector(r, ax);
+    } else {
+      if (input.forward) wish.add(f);
+      if (input.back) wish.sub(f);
+      if (input.right) wish.add(r);
+      if (input.left) wish.sub(r);
+    }
+    const mag = Math.min(1, wish.length());
+    const moving = mag > 0.06;
     if (moving) wish.normalize();
 
     const accel = this.grounded ? 34 : 9;
-    this.vel.x = U.damp(this.vel.x, wish.x * maxSpeed, accel / 5, dt);
-    this.vel.z = U.damp(this.vel.z, wish.z * maxSpeed, accel / 5, dt);
+    const want = maxSpeed * (analog ? Math.max(0.35, mag) : 1);
+    this.vel.x = U.damp(this.vel.x, wish.x * want, accel / 5, dt);
+    this.vel.z = U.damp(this.vel.z, wish.z * want, accel / 5, dt);
 
     // gravity + jump
     const g = 26 * (this.world.planet.gravity || 1);
@@ -158,12 +168,17 @@
     const accel = isCar ? 18 : 26;
     const turn = (isCar ? 1.5 : 2.4) * (1 - Math.min(0.55, v.speed / (maxSpeed * 1.6)));
 
-    let throttle = 0;
-    if (input.forward) throttle += 1;
-    if (input.back) throttle -= 0.75;
-    let steer = 0;
-    if (input.left) steer += 1;
-    if (input.right) steer -= 1;
+    let throttle = 0, steer = 0;
+    if (Math.abs(input.axisY || 0) > 0.06 || Math.abs(input.axisX || 0) > 0.06) {
+      throttle = -(input.axisY || 0);
+      if (throttle < 0) throttle *= 0.75;
+      steer = -(input.axisX || 0);
+    } else {
+      if (input.forward) throttle += 1;
+      if (input.back) throttle -= 0.75;
+      if (input.left) steer += 1;
+      if (input.right) steer -= 1;
+    }
 
     v.speed = U.damp(v.speed, throttle * maxSpeed, throttle !== 0 ? accel / 8 : 1.4, dt);
     if (Math.abs(v.speed) > 0.4) v.yaw += steer * turn * dt * U.clamp(Math.abs(v.speed) / 12, 0.25, 1.4) * Math.sign(v.speed);
@@ -403,46 +418,138 @@
     this.dom = dom;
 
     /* ------------------------------------------------ touch controls */
-    this.touch = { move: null, look: null };
-    const tState = { moveId: -1, lookId: -1, mx0: 0, my0: 0, lx: 0, ly: 0 };
-    dom.addEventListener('touchstart', function (e) {
+    this.isTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0;
+    st.axisX = 0; st.axisY = 0; st.axisMag = 0;
+    this._setupTouch(dom);
+    this._gamepadIndex = null;
+    window.addEventListener('gamepadconnected', (e) => { this._gamepadIndex = e.gamepad.index; });
+    window.addEventListener('gamepaddisconnected', () => { this._gamepadIndex = null; });
+  }
+
+  /* A real thumbstick plus four action buttons. The canvas only ever
+     handles look, because the controls sit above it and swallow their
+     own touches. */
+  Input.prototype._setupTouch = function (dom) {
+    const st = this.state;
+    const self = this;
+    const layer = document.getElementById('touch');
+    const stick = document.getElementById('stick');
+    const knob = document.getElementById('stick-knob');
+    if (!layer || !stick || !knob) return;
+
+    if (this.isTouch) {
+      layer.hidden = false;
+      document.body.classList.add('touch-mode');
+    }
+
+    let stickId = -1, cx = 0, cy = 0, radius = 52;
+    const setKnob = (dx, dy) => {
+      knob.style.transform = 'translate(' + dx.toFixed(1) + 'px,' + dy.toFixed(1) + 'px)';
+    };
+    const onStickMove = (t) => {
+      let dx = t.clientX - cx, dy = t.clientY - cy;
+      const d = Math.hypot(dx, dy);
+      if (d > radius) { dx = dx / d * radius; dy = dy / d * radius; }
+      setKnob(dx, dy);
+      st.axisX = dx / radius;
+      st.axisY = dy / radius;
+      st.axisMag = Math.min(1, d / radius);
+    };
+    stick.addEventListener('touchstart', function (e) {
+      const t = e.changedTouches[0];
+      stickId = t.identifier;
+      const r = stick.getBoundingClientRect();
+      cx = r.left + r.width / 2; cy = r.top + r.height / 2;
+      radius = r.width * 0.4;
+      stick.classList.add('active');
+      onStickMove(t);
+      e.preventDefault();
+    }, { passive: false });
+    const stickEnd = function (e) {
+      for (let i = 0; i < e.changedTouches.length; i++) {
+        if (e.changedTouches[i].identifier !== stickId) continue;
+        stickId = -1;
+        stick.classList.remove('active');
+        setKnob(0, 0);
+        st.axisX = 0; st.axisY = 0; st.axisMag = 0;
+      }
+    };
+    window.addEventListener('touchmove', function (e) {
       for (let i = 0; i < e.changedTouches.length; i++) {
         const t = e.changedTouches[i];
-        if (t.clientX < window.innerWidth * 0.45 && tState.moveId < 0) {
-          tState.moveId = t.identifier; tState.mx0 = t.clientX; tState.my0 = t.clientY;
-        } else if (tState.lookId < 0) {
-          tState.lookId = t.identifier; tState.lx = t.clientX; tState.ly = t.clientY;
-        }
+        if (t.identifier === stickId) { onStickMove(t); e.preventDefault(); }
       }
+    }, { passive: false });
+    window.addEventListener('touchend', stickEnd, { passive: true });
+    window.addEventListener('touchcancel', stickEnd, { passive: true });
+
+    /* action buttons */
+    const hold = (id, down, up) => {
+      const b = document.getElementById(id);
+      if (!b) return;
+      b.addEventListener('touchstart', function (e) { b.classList.add('down'); down(); e.preventDefault(); }, { passive: false });
+      b.addEventListener('touchend', function (e) { b.classList.remove('down'); if (up) up(); e.preventDefault(); }, { passive: false });
+      b.addEventListener('touchcancel', function () { b.classList.remove('down'); if (up) up(); });
+      b.addEventListener('mousedown', function () { b.classList.add('down'); down(); });
+      b.addEventListener('mouseup', function () { b.classList.remove('down'); if (up) up(); });
+      b.addEventListener('mouseleave', function () { if (b.classList.contains('down')) { b.classList.remove('down'); if (up) up(); } });
+    };
+    hold('t-fire', () => { st.fire = true; }, () => { st.fire = false; });
+    hold('t-jump', () => { st.jump = true; }, () => { st.jump = false; });
+    hold('t-act', () => { st.pressed.KeyE = true; }, () => { st.pressed.KeyE = false; });
+    hold('t-ride', () => { st.pressed.KeyF = true; st.justPressed.KeyF = true; },
+      () => { st.pressed.KeyF = false; });
+
+    /* look: any touch on the canvas that is not a control */
+    let lookId = -1, lx = 0, ly = 0;
+    dom.addEventListener('touchstart', function (e) {
+      if (lookId >= 0) return;
+      const t = e.changedTouches[0];
+      lookId = t.identifier; lx = t.clientX; ly = t.clientY;
     }, { passive: true });
     dom.addEventListener('touchmove', function (e) {
       for (let i = 0; i < e.changedTouches.length; i++) {
         const t = e.changedTouches[i];
-        if (t.identifier === tState.moveId) {
-          const dx = t.clientX - tState.mx0, dy = t.clientY - tState.my0;
-          st.forward = dy < -18; st.back = dy > 18;
-          st.left = dx < -18; st.right = dx > 18;
-          st.sprint = Math.hypot(dx, dy) > 70;
-        } else if (t.identifier === tState.lookId) {
-          st.mx += t.clientX - tState.lx; st.my += t.clientY - tState.ly;
-          tState.lx = t.clientX; tState.ly = t.clientY;
-        }
+        if (t.identifier !== lookId) continue;
+        st.mx += (t.clientX - lx) * 1.5;
+        st.my += (t.clientY - ly) * 1.5;
+        lx = t.clientX; ly = t.clientY;
       }
       e.preventDefault();
     }, { passive: false });
-    const endTouch = function (e) {
+    const lookEnd = function (e) {
       for (let i = 0; i < e.changedTouches.length; i++) {
-        const t = e.changedTouches[i];
-        if (t.identifier === tState.moveId) {
-          tState.moveId = -1;
-          st.forward = st.back = st.left = st.right = st.sprint = false;
-        }
-        if (t.identifier === tState.lookId) tState.lookId = -1;
+        if (e.changedTouches[i].identifier === lookId) lookId = -1;
       }
     };
-    dom.addEventListener('touchend', endTouch, { passive: true });
-    dom.addEventListener('touchcancel', endTouch, { passive: true });
-  }
+    dom.addEventListener('touchend', lookEnd, { passive: true });
+    dom.addEventListener('touchcancel', lookEnd, { passive: true });
+  };
+
+  /* Gamepads feed the same axes the thumbstick does. */
+  Input.prototype.pollGamepad = function () {
+    if (!navigator.getGamepads) return;
+    const pads = navigator.getGamepads();
+    let pad = null;
+    for (let i = 0; i < pads.length; i++) { if (pads[i] && pads[i].connected) { pad = pads[i]; break; } }
+    if (!pad) return;
+    const st = this.state;
+    const dz = (v) => (Math.abs(v) < 0.18 ? 0 : v);
+    const lx = dz(pad.axes[0] || 0), ly = dz(pad.axes[1] || 0);
+    if (lx || ly) { st.axisX = lx; st.axisY = ly; st.axisMag = Math.min(1, Math.hypot(lx, ly)); }
+    const rx = dz(pad.axes[2] || 0), ry = dz(pad.axes[3] || 0);
+    st.mx += rx * 16; st.my += ry * 12;
+    const btn = (i) => !!(pad.buttons[i] && pad.buttons[i].pressed);
+    st.jump = st.jump || btn(0);
+    st.fire = st.fire || btn(7) || btn(5);
+    st.sprint = st.sprint || btn(10) || btn(6);
+    if (btn(2)) st.pressed.KeyE = true; else if (this._padE) st.pressed.KeyE = false;
+    this._padE = btn(2);
+    if (btn(1) && !this._padF) st.justPressed.KeyF = true;
+    this._padF = btn(1);
+    if (btn(3) && !this._padY) st.justPressed.KeyU = true;
+    this._padY = btn(3);
+  };
 
   Input.prototype.consumeMouse = function () {
     const st = this.state;
@@ -458,7 +565,10 @@
   Input.prototype.releaseAll = function () {
     const st = this.state;
     st.forward = st.back = st.left = st.right = st.sprint = st.jump = st.fire = st.aim = false;
+    st.axisX = 0; st.axisY = 0; st.axisMag = 0;
     st.pressed = {}; st.justPressed = {};
+    const k = document.getElementById('stick-knob');
+    if (k) k.style.transform = 'translate(0px,0px)';
   };
   Input.prototype.requestLock = function () {
     if (this.dom.requestPointerLock) this.dom.requestPointerLock();
