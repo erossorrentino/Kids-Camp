@@ -3,26 +3,33 @@
 /* ---------- Data ---------- */
 
 const TIERS = [
-  { mult: 2,   label: '×2',   color: '#7ee787' },
-  { mult: 3,   label: '×3',   color: '#5fd0e0' },
-  { mult: 5,   label: '×5',   color: '#6ea8fe' },
-  { mult: 8,   label: '×8',   color: '#b98cf0' },
-  { mult: 12,  label: '×12',  color: '#f087c5' },
-  { mult: 20,  label: '×20',  color: '#ff9d5c' },
-  { mult: 35,  label: '×35',  color: '#ffd43b' },
-  { mult: 60,  label: '×60',  color: '#ff6b6b' },
-  { mult: 100, label: '×100', color: '#ff4fd8' },
-  { mult: 200, label: '×200', color: '#ffd700' },
+  { mult: 2,    label: '×2',    color: '#7ee787' },
+  { mult: 3,    label: '×3',    color: '#5fd0e0' },
+  { mult: 5,    label: '×5',    color: '#6ea8fe' },
+  { mult: 8,    label: '×8',    color: '#b98cf0' },
+  { mult: 12,   label: '×12',   color: '#f087c5' },
+  { mult: 20,   label: '×20',   color: '#ff9d5c' },
+  { mult: 35,   label: '×35',   color: '#ffd43b' },
+  { mult: 60,   label: '×60',   color: '#ff6b6b' },
+  { mult: 100,  label: '×100',  color: '#ff4fd8' },
+  { mult: 200,  label: '×200',  color: '#ffd700' },
+  { mult: 350,  label: '×350',  color: '#8fffb0' },
+  { mult: 600,  label: '×600',  color: '#7de6ff' },
+  { mult: 1000, label: '×1000', color: '#c99bff' },
+  { mult: 1750, label: '×1750', color: '#ff9ce0' },
+  { mult: 3000, label: '×3000', color: '#fff4b8' },
 ];
+// The top tier has nowhere higher to merge into, so 3-of-a-kind at this
+// tier just stays as 3 separate tiles instead of merging or cashing out.
 const MAX_TIER = TIERS.length - 1;
 const SLOT_COUNT = 10;
 
 const CHESTS = [
-  { id: 'wood',    name: 'Wooden Chest',  emoji: '📦', cost: 50,    weights: [60, 30, 10, 0, 0, 0, 0, 0, 0, 0] },
-  { id: 'bronze',  name: 'Bronze Chest',  emoji: '🥉', cost: 300,   weights: [35, 30, 20, 10, 5, 0, 0, 0, 0, 0] },
-  { id: 'silver',  name: 'Silver Chest',  emoji: '🥈', cost: 1500,  weights: [10, 20, 25, 20, 15, 7, 3, 0, 0, 0] },
-  { id: 'gold',    name: 'Gold Chest',    emoji: '🥇', cost: 8000,  weights: [0, 5, 15, 20, 20, 20, 12, 6, 2, 0] },
-  { id: 'diamond', name: 'Diamond Chest', emoji: '💎', cost: 40000, weights: [0, 0, 5, 10, 15, 20, 20, 15, 10, 5] },
+  { id: 'wood',    name: 'Wooden Chest',  emoji: '📦', cost: 50,     weights: [60, 30, 10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+  { id: 'bronze',  name: 'Bronze Chest',  emoji: '🥉', cost: 2000,   weights: [30, 30, 20, 12, 6, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+  { id: 'silver',  name: 'Silver Chest',  emoji: '🥈', cost: 15000,  weights: [10, 15, 20, 20, 15, 10, 6, 3, 1, 0, 0, 0, 0, 0, 0] },
+  { id: 'gold',    name: 'Gold Chest',    emoji: '🥇', cost: 100000, weights: [0, 3, 8, 12, 15, 18, 18, 14, 8, 3, 1, 0, 0, 0, 0] },
+  { id: 'diamond', name: 'Diamond Chest', emoji: '💎', cost: 500000, weights: [0, 0, 2, 4, 8, 12, 15, 16, 14, 11, 8, 5, 3, 1, 1] },
 ];
 
 const SELL_VALUE = TIERS.map(t => Math.round(t.mult * 15));
@@ -352,18 +359,8 @@ function checkStorageMerges() {
         break;
       }
     }
-    if (mergedAny) continue;
-    const topIdxs = [];
-    state.tray.forEach((t, i) => {
-      if (t === MAX_TIER && topIdxs.length < 3) topIdxs.push(i);
-    });
-    if (topIdxs.length === 3) {
-      topIdxs.sort((a, b) => b - a).forEach(i => state.tray.splice(i, 1));
-      const bonus = SELL_VALUE[MAX_TIER] * 10;
-      state.money += bonus;
-      toast(`Merged 3× ${TIERS[MAX_TIER].label} for a $${fmt(bonus)} bonus!`);
-      mergedAny = true;
-    }
+    // Tiles at MAX_TIER have nowhere higher to merge into, so 3-of-a-kind
+    // there is left alone — they just stay as 3 separate tiles.
   }
   selectedStorageIndex = null;
 }
@@ -412,20 +409,8 @@ function checkMerges() {
         break;
       }
     }
-    if (mergedAny) continue;
-    // Merging 3 max-tier tiles gives a cash bonus since there's no higher tier.
-    const topIndices = [];
-    for (let i = 0; i < SLOT_COUNT; i++) {
-      if (state.slots[i] === MAX_TIER) topIndices.push(i);
-      if (topIndices.length === 3) break;
-    }
-    if (topIndices.length === 3) {
-      topIndices.slice(1).forEach(i => (state.slots[i] = null));
-      const bonus = SELL_VALUE[MAX_TIER] * 10;
-      state.money += bonus;
-      toast(`Merged 3× ${TIERS[MAX_TIER].label} for a $${fmt(bonus)} bonus!`);
-      mergedAny = true;
-    }
+    // Tiles at MAX_TIER have nowhere higher to merge into, so 3-of-a-kind
+    // there is left alone — they just stay as 3 separate tiles.
   }
 }
 

@@ -24,17 +24,20 @@ spend your earnings in the chest shop or on upgrades.
   you're aiming for. Let go and it drops back into free fall from
   wherever you released it. Tapping without grabbing a ball still
   equips/unequips a multiplier on whichever board slot you tap.
-- Any slot holding a multiplier tile (×2, ×3, ×5, ... up to ×200)
+- Any slot holding a multiplier tile (×2, ×3, ×5, ... up to ×3000)
   multiplies the ball's value if it bounces into it on the way down.
 - Buy chests in the shop with your money to get random multiplier
-  tiles, delivered straight to your **Multiplier Storage**. Pricier
-  chests have better odds of high-tier multipliers.
+  tiles, delivered straight to your **Multiplier Storage**. The Wooden
+  Chest stays cheap as a starter; Bronze, Silver, Gold, and Diamond
+  cost a lot more but reach much higher tiers.
 - Storage automatically merges 3 identical tiles into one tile of the
   next tier up, any time it changes. Tap a stored tile then tap an
   empty board slot to equip it there (equipping onto the board can
   also trigger a separate 3-of-a-kind merge on the board itself). Tap
   a filled board slot to unequip it back to storage, or select a
   stored tile and hit **Sell** to cash it in directly.
+- ×3000 is the top tier — it has nowhere higher to merge into, so 3 of
+  them just stay as 3 separate tiles instead of merging or cashing out.
 - **Ball Speed** upgrades shrink the spawn interval and, every couple
   of levels, unlock another launch lane at the top of the board (up to
   5), so balls come out both faster and from more places at once.
