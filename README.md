@@ -1,3 +1,19 @@
+# Kids-Camp
+
+Two game projects live in this repository.
+
+## [Star Kingdoms](star-kingdoms/) — playable now
+
+A 3D browser game: fly a starship between five planets, fight for
+territory, and build a kingdom on the ground you take. Open
+`star-kingdoms/index.html` and play — no install, no build step. Every
+model, texture and sound is generated in code at runtime.
+
+See [`star-kingdoms/README.md`](star-kingdoms/README.md) for controls and
+how the systems work.
+
+---
+
 # Crime City (working title)
 
 An open-world crime game in the GTA tradition: steal cars, plan and run
