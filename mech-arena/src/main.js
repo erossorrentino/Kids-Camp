@@ -12,7 +12,8 @@ import { Audio } from './core/audio.js';
 import { FX } from './world/fx.js';
 import { Arena } from './world/arena.js';
 import { Sky } from './world/sky.js';
-import { Match } from './game/match.js';
+import { CockpitRig } from './world/cockpitRig.js';
+import { Match, setTeamPalette, TEAM_COLORS } from './game/match.js';
 import { PlayerController } from './game/player.js';
 import { HUD } from './ui/hud.js';
 import { Menus } from './ui/menus.js';
@@ -51,6 +52,7 @@ class Game {
     this.hud.setFpsVisible(s.showFps);
 
     this.sky = new Sky(this.engine.scene);
+    this.cockpit = new CockpitRig(this.engine.scene);
     this.tutorial = new Tutorial(this.audio);
     this.markers = new Markers(this.engine.camera);
     this.markers.setVisible(false);
@@ -76,12 +78,20 @@ class Game {
     this.paused = false;
     this._pendingRespawn = false;
     this.killCam = null;
+    this.intro = null;
 
     // Adaptive quality: a mech arena is unplayable below ~40fps, and the
     // right response to a slow machine is fewer shadows, not a slideshow.
     this.autoQuality = s.autoQuality !== false;
     this._perfWindow = [];
     this._perfCooldown = 6;
+
+    // Apply the saved accessibility settings before anything renders.
+    this.shakeScale = s.shake ?? 1;
+    this._applyTeamPalette(s.colourMode || 'default');
+    this._applyUiScale(s.uiScale ?? 1);
+    this.markers.showNumbers = s.damageNumbers !== false;
+    this.markers.showPlates = s.nameplates !== false;
 
     this._wireGlobal();
   }
@@ -114,6 +124,29 @@ class Game {
     addEventListener('keydown', resume, { once: false });
   }
 
+  /**
+   * Scale the HUD and menus. The stylesheet is written in pixels, so this
+   * uses `zoom` on the two containers rather than the root font size, which
+   * would do nothing. World markers are deliberately excluded: their
+   * positions are computed in screen pixels and zoom would offset them.
+   */
+  _applyUiScale(scale) {
+    const z = Math.max(0.6, Math.min(2, scale || 1));
+    for (const id of ['hud', 'ui-root']) {
+      const el = document.getElementById(id);
+      if (el) el.style.zoom = z === 1 ? '' : String(z);
+    }
+    document.documentElement.style.setProperty('--ui-scale', String(z));
+  }
+
+  /** Push a team palette into both the 3D accents and the CSS variables. */
+  _applyTeamPalette(name) {
+    const p = setTeamPalette(name);
+    const hex = (n) => '#' + n.toString(16).padStart(6, '0');
+    document.documentElement.style.setProperty('--team-a', hex(p.a));
+    document.documentElement.style.setProperty('--team-b', hex(p.b));
+  }
+
   applySetting(key, value) {
     switch (key) {
       case 'quality':
@@ -126,6 +159,11 @@ class Game {
       case 'fov': this.engine.fovBase = value; this.engine.fovTarget = value; break;
       case 'showFps': this.hud.setFpsVisible(value); break;
       case 'autoQuality': this.autoQuality = value !== false; break;
+      case 'colourMode': this._applyTeamPalette(value); break;
+      case 'uiScale': this._applyUiScale(value); break;
+      case 'shake': this.shakeScale = value ?? 1; break;
+      case 'damageNumbers': this.markers.showNumbers = value !== false; break;
+      case 'nameplates': this.markers.showPlates = value !== false; break;
     }
   }
 
@@ -205,17 +243,30 @@ class Game {
     this.paused = false;
     this._pendingRespawn = false;
     this.killCam = null;
+    this.intro = null;
     this.hud.show();
     this.markers.setVisible(true);
     this.hud.hideRespawn();
-    this.hud.toast(
-      tournament ? `${tournament.name} — ROUND ${tournament.round + 1}/${tournament.total}` : def.name,
-      tournament ? `${tournament.label} · ${def.name}` : BIOMES[def.biome].label);
+    // The intro card names the arena, so the centre-screen toast would just
+    // be the same words twice.
+    this.hud.toast('', '');
     if (this.match.mode.tutorial) {
       this.tutorial.start({ mech: this.match.player.mech, match: this.match, controller: this.controller, input: this.input });
     } else {
       this.tutorial.stop();
     }
+    // A short establishing sweep before the drop. It runs inside the
+    // countdown, so it costs no match time, and any input skips it.
+    this.intro = {
+      time: 4.2, total: 4.2,
+      centre: new THREE.Vector3(0, this.arena.safeGround(0, 0), 0),
+      radius: this.arena.half * 0.9,
+      angle: Math.random() * Math.PI * 2,
+      height: this.arena.half * 0.55,
+    };
+    this.match.countdown += this.intro.total;
+    this.hud.setIntro(def, this.match.mode, tournament);
+
     this.audio.ambience(def.biome);
     this.input.requestLock();
     this.accumulator = 0;
@@ -234,7 +285,9 @@ class Game {
     this.state = 'menu';
     this.tutorial.stop();
     this.killCam = null;
+    this.intro = null;
     this.hud.hideKillCam();
+    this.cockpit.setVisible(false);
     this.markers.setVisible(false);
     this.menus.suspended = false;
     this.input.releaseLock();
@@ -329,11 +382,13 @@ class Game {
     if (this.state === 'match' && this.match) {
       this._updateMatch(dt);
     } else {
+      this._cockpitMech = null;
       this.hangarScene.update(dt);
       this.fx.update(dt);
     }
 
     this.engine.update(dt, this._grade());
+    if (this._cockpitMech) this.cockpit.update(dt, this.engine.camera, this._cockpitMech);
     this.engine.render();
     this.input.endFrame();
   };
@@ -351,15 +406,27 @@ class Game {
     }
     if (steps >= 12) this.accumulator = 0;   // give up rather than spiral
 
-    if (this.killCam) this._updateKillCam(dt);
+    const mech = m.player?.mech;
+
+    if (this.intro) this._updateIntro(dt, mech);
+    else if (this.killCam) this._updateKillCam(dt);
+
+    // The cockpit frame only exists in first person, and only while alive.
+    // It is seated on the camera after engine.update() applies shake, so the
+    // frame shakes with the view instead of against it.
+    const inCockpit = this.controller.view === 'cockpit' && !!mech?.alive && !this.killCam && !this.intro;
+    this.cockpit.setVisible(inCockpit);
+    if (inCockpit && this._cockpitSkinFor !== mech.id) {
+      this._cockpitSkinFor = mech.id;
+      this.cockpit.applySkin(mech.model.materials.skin);
+    }
+    this._cockpitMech = inCockpit ? mech : null;
 
     // Visual systems run at frame rate.
     this.sky.update(dt, this.engine.camera);
     this.fx.update(dt);
-    const shake = this.fx.consumeShake();
+    const shake = this.fx.consumeShake() * this.shakeScale;
     if (shake > 0) this.engine.shake(shake);
-
-    const mech = m.player?.mech;
     if (this.tutorial.active) {
       this.tutorial.update(dt,
         { mech, match: m, controller: this.controller, input: this.input },
@@ -367,6 +434,9 @@ class Game {
       this._lastEvent = null;
     }
     this._fadeCloseMechs(m, mech);
+    // Nameplates over an establishing flyover are noise, and they collide
+    // with the intro card.
+    this.markers.setVisible(!this.intro);
     this.markers.update(dt, m, mech, this.controller);
     this.hud.update(m, mech, this.controller, dt);
     this.hud.setScoreboard(m, this.controller.scoreboardOpen);
@@ -418,6 +488,54 @@ class Game {
   }
 
   /**
+   * Establishing sweep: a slow high orbit that eases down onto the
+   * player's mech, handing over to the normal chase camera as it lands.
+   */
+  _updateIntro(dt, mech) {
+    const it = this.intro;
+    it.time -= dt;
+    const t = clamp(1 - it.time / it.total, 0, 1);
+    const ease = t * t * (3 - 2 * t);
+
+    it.angle += dt * 0.22;
+    const cam = this.engine.camera;
+
+    // Start high and wide over the arena, finish just behind the mech.
+    const wide = _introA.set(
+      it.centre.x + Math.cos(it.angle) * it.radius,
+      it.centre.y + it.height,
+      it.centre.z + Math.sin(it.angle) * it.radius,
+    );
+    let look = it.centre;
+
+    if (mech) {
+      const back = _introB.set(-Math.sin(mech.aimYaw), 0, -Math.cos(mech.aimYaw));
+      const close = _introC.copy(mech.position)
+        .addScaledVector(back, mech.height * 1.9)
+        .setY(mech.position.y + mech.height * 1.1);
+      wide.lerp(close, ease * ease);
+      look = _introD.copy(it.centre).lerp(
+        _introE.copy(mech.position).setY(mech.position.y + mech.height * 0.6), ease);
+    }
+
+    cam.position.copy(wide);
+    cam.lookAt(look);
+
+    // Skipping: any movement key, a click, or the ability key.
+    const skipped = this.input.mouse.left || this.input.mouseEdges.left
+      || this.input.isDown('forward') || this.input.isDown('jump') || this.input.pressed('ability');
+    if (it.time <= 0 || skipped) this._endIntro();
+  }
+
+  _endIntro() {
+    if (!this.intro) return;
+    // Give the countdown back whatever sweep time is left.
+    if (this.match) this.match.countdown = Math.min(this.match.countdown, 3.4);
+    this.intro = null;
+    this.hud.clearIntro();
+  }
+
+  /**
    * Orbit the killer (or the wreck) while the death beat plays, then hand
    * over to the respawn picker.
    */
@@ -451,6 +569,7 @@ class Game {
     if (kc.time > 0) return;
 
     this.killCam = null;
+    this.intro = null;
     this.hud.hideKillCam();
     if (this.state !== 'match' || !this.match) return;
     this.hud.showRespawn(kc.entry, kc.name, (i) => {
@@ -516,6 +635,11 @@ function frame() { return new Promise(r => requestAnimationFrame(() => setTimeou
 const _fwd = new THREE.Vector3();
 const _kcWant = new THREE.Vector3();
 const _kcDir = new THREE.Vector3();
+const _introA = new THREE.Vector3();
+const _introB = new THREE.Vector3();
+const _introC = new THREE.Vector3();
+const _introD = new THREE.Vector3();
+const _introE = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
 

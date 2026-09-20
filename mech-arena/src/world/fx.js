@@ -333,7 +333,9 @@ export class FX {
     this.flash(pos, 0xffe0a0, 7 * scale, 0.11);
     this.light(pos, color, 60 * scale, 0.35, 150 * scale);
     this.ring(pos, 0.5, 14 * scale, color, 0.45);
-    this.scorch(pos, 4 * scale, 30);
+    // Scorch radius grows far more slowly than blast radius: a mech dying
+    // should not leave a thirty-metre stain on the ground.
+    this.scorch(pos, 3 + scale * 1.6, 30);
     this.shakeRequest = Math.max(this.shakeRequest, 0.45 * scale);
   }
 

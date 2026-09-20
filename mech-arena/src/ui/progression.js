@@ -48,6 +48,7 @@ function freshProfile() {
     settings: {
       quality: 'high', sensitivity: 0.0022, invertY: false, volume: 0.6,
       fov: 72, showFps: false, difficulty: 'regular', autoQuality: true,
+      colourMode: 'default', uiScale: 1, shake: 1, damageNumbers: true, nameplates: true,
     },
     stats: { bestKills: 0, bestDamage: 0, favouriteMech: null, mechUse: {} },
     tournaments: { completed: [], best: {}, run: null },

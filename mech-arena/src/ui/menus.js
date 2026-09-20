@@ -460,6 +460,20 @@ export class Menus {
           <div class="kv"><span>SCOREBOARD</span><b>TAB</b></div>
           <div class="kv"><span>MANUAL SHUTDOWN</span><b>P</b></div>
         </div>
+        <div class="panel"><h3>ACCESSIBILITY</h3>
+          <div class="tiny muted">TEAM COLOURS</div>
+          <div class="tabs" data-setting="colourMode">
+            ${[['default', 'DEFAULT'], ['deuter', 'DEUTERANOPIA'], ['trit', 'TRITANOPIA'], ['high', 'HIGH CONTRAST']]
+              .map(([v, l]) => `<button class="tab${v === (s.colourMode || 'default') ? ' on' : ''}" data-set="${v}">${l}</button>`).join('')}
+          </div>
+          <div class="tiny muted" style="line-height:1.6;margin-top:6px">Applies to the HUD immediately and to mech accent lighting from the next match.</div>
+          <div class="tiny muted" style="margin-top:8px">INTERFACE SCALE — <b class="mono">${Math.round((s.uiScale ?? 1) * 100)}%</b></div>
+          <input type="range" min="80" max="150" value="${Math.round((s.uiScale ?? 1) * 100)}" data-range="uiScale" style="width:100%">
+          <div class="tiny muted" style="margin-top:8px">SCREEN SHAKE — <b class="mono">${Math.round((s.shake ?? 1) * 100)}%</b></div>
+          <input type="range" min="0" max="150" value="${Math.round((s.shake ?? 1) * 100)}" data-range="shake" style="width:100%">
+          <div class="tabs" data-setting="damageNumbers">${[true, false].map(v => `<button class="tab${v === (s.damageNumbers !== false) ? ' on' : ''}" data-set="${v}">DAMAGE NUMBERS ${v ? 'ON' : 'OFF'}</button>`).join('')}</div>
+          <div class="tabs" data-setting="nameplates">${[true, false].map(v => `<button class="tab${v === (s.nameplates !== false) ? ' on' : ''}" data-set="${v}">NAMEPLATES ${v ? 'ON' : 'OFF'}</button>`).join('')}</div>
+        </div>
         <div class="panel"><h3>AUDIO</h3>
           <div class="tiny muted">MASTER VOLUME — <b class="mono">${Math.round(s.volume * 100)}%</b></div>
           <input type="range" min="0" max="100" value="${Math.round(s.volume * 100)}" data-range="volume" style="width:100%">

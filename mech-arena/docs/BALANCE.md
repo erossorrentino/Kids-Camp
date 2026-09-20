@@ -142,6 +142,27 @@ trading fire — Downtown managed 1.2k damage where its peers were doing 15k.
 Cutting two boulevards through the grid brought it to 12.9k without making
 it an open field.
 
+## Bugs the tools found
+
+Worth recording, because each was invisible from a screenshot:
+
+- **Canyon arenas were unwinnable.** The trench walls formed a continuous
+  barrier between the two spawn sides, so the teams could never meet.
+  `sim.mjs` reported zero damage on those maps.
+- **Three modes had no arena.** The map table's default mode list predated
+  Hardpoint, Last Lance and Juggernaut, so choosing any of them would have
+  crashed. `validate.mjs` found it in a fraction of a second.
+- **One-shot kills were credited to nobody.** `takeDamage` set
+  `lastDamagedBy` *after* resolving the damage, but resolving it can destroy
+  the mech synchronously, and the death handler reads that field. A kill that
+  was also the victim's first damage showed up in the killfeed as "THE
+  ARENA" and scored nothing.
+- **Convergence made dense maps worse before it made them better.** See
+  above.
+- **The ability panel declared `position` twice**, so it rendered at the top
+  left of the screen with its cooldown bar stretched across the viewport.
+  CSS has no error for this; it just silently takes the last declaration.
+
 ## Known tensions
 
 - **Assault mechs are strong in Control and weak in Free For All.** This is

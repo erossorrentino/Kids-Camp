@@ -98,6 +98,13 @@ into motion, and **weapon convergence** — hardpoints are metres apart on a
 mech's body, so fire control angles every barrel at what you are actually
 aiming at rather than firing them all parallel.
 
+`F` switches to the **cockpit**, which is a real canopy: struts, a
+dashboard with live structure, heat and jet strips, and side consoles that
+sway as the mech walks. It is harder to fly and much better for gunnery.
+
+Destroyed mechs leave **wrecks** on the field, burning for a while and then
+going cold — the map tells you where the fighting has been.
+
 ---
 
 ## Game modes
@@ -127,6 +134,20 @@ escalating opposition:
 - A **loss ends the run**. You keep what you earned in the rounds you won.
 - Finishing one pays a purse far above the same number of casual matches
   and grants a trophy you cannot buy: a paint scheme, or a chassis.
+
+---
+
+## Accessibility
+
+Settings → Accessibility covers:
+
+- **Team colours**: the default blue/orange, plus deuteranopia (blue/yellow),
+  tritanopia (magenta/green) and a high-contrast white/red pair. The palette
+  drives the HUD immediately and mech accent lighting from the next match.
+- **Interface scale**, 80–150%.
+- **Screen shake**, 0–150% — set it to zero if motion is a problem; nothing
+  else in the game depends on it.
+- **Damage numbers** and **nameplates** can each be turned off.
 
 ---
 
@@ -161,6 +182,7 @@ src/
     skinTexture.js  paint schemes painted into canvases at runtime
     sky.js          shader skydome and per-biome weather volumes
     pickups.js      coolant, ammunition, repair and shield resupply pads
+    cockpitRig.js   first-person canopy with live instrument strips
     fx.js           pooled particles, tracers, beams, decals, shockwaves
   game/
     mech.js         one machine: movement, thermals, damage, animation

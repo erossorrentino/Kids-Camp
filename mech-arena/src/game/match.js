@@ -17,7 +17,27 @@ import { PILOTS } from '../data/pilots.js';
 import { skinForSeed, DEFAULT_SKIN } from '../data/skins.js';
 import { clamp, lerp, makeRng } from '../core/rng.js';
 
-export const TEAM_COLORS = { a: 0x49d6ff, b: 0xff6a4d };
+/**
+ * Team colours. The default blue/orange pair is already fairly safe, but
+ * red/green confusion is the single most common form of colour blindness
+ * and the arena is full of red hazard lighting, so alternatives matter.
+ */
+export const TEAM_PALETTES = {
+  default: { a: 0x49d6ff, b: 0xff6a4d },
+  deuter:  { a: 0x3ba7ff, b: 0xffd21f },   // blue / yellow
+  trit:    { a: 0xff4fd8, b: 0x36e06a },   // magenta / green
+  high:    { a: 0xffffff, b: 0xff1f4f },   // white / hot red
+};
+
+export const TEAM_COLORS = { ...TEAM_PALETTES.default };
+
+/** Switch the active palette. Call before building a match. */
+export function setTeamPalette(name) {
+  const p = TEAM_PALETTES[name] || TEAM_PALETTES.default;
+  TEAM_COLORS.a = p.a;
+  TEAM_COLORS.b = p.b;
+  return TEAM_COLORS;
+}
 
 const CALLSIGNS = [
   'Ripsaw', 'Halberd', 'Kestrel', 'Bulwark', 'Ozone', 'Tarpit', 'Nightjar', 'Cinder',
@@ -60,6 +80,10 @@ export class Match {
     this.reveals = [];               // { team, until }
     this.zones = world.zones;
     this.zoneTickAcc = 0;
+    // Destroyed mechs leave a wreck behind rather than blinking out. Capped,
+    // because a long Free-For-All would otherwise fill the map with them.
+    this.wrecks = [];
+    this.maxWrecks = 8;
     this.kingTimer = this.mode.rotateEvery || 0;
     this.activeZone = 0;
     this.onEvent = null;             // UI hook
@@ -441,7 +465,7 @@ export class Match {
       : (entry.isPlayer ? 0 : 4.5 + this.rng.range(0, 2.5));
     entry.eliminated = out;
 
-    this.scene.remove(mech.root);
+    this._leaveWreck(mech);
     this.brains.delete(mech.id);
     const i = this.mechs.indexOf(mech);
     if (i >= 0) this.mechs.splice(i, 1);
@@ -451,6 +475,80 @@ export class Match {
       this.onEvent?.({ type: 'playerDown', entry, killer, lastPosition: pos });
     }
     this._checkEnd();
+  }
+
+  /**
+   * Convert a destroyed mech's model into a static wreck: collapsed pose,
+   * scorched materials, and smoke for a while. The model is detached from
+   * the Mech, which is discarded, so nothing keeps animating it.
+   */
+  _leaveWreck(mech) {
+    const root = mech.root;
+    root.visible = true;
+
+    // Collapse: drop to the knees, slump the torso, splay the arms.
+    const rig = mech.rig;
+    rig.legL.thigh.rotation.x = 0.9; rig.legL.knee.rotation.x = -1.5;
+    rig.legR.thigh.rotation.x = 0.5; rig.legR.knee.rotation.x = -1.1;
+    rig.torsoPitch.rotation.x = 0.55;
+    rig.torsoYaw.rotation.y = this.rng.range(-0.6, 0.6);
+    rig.armL.upper.rotation.x = this.rng.range(-0.4, 1.4);
+    rig.armR.upper.rotation.x = this.rng.range(-0.4, 1.4);
+    root.rotation.z = this.rng.range(-0.22, 0.22);
+    root.rotation.x = this.rng.range(-0.1, 0.18);
+    root.position.y = this.world.safeGround(root.position.x, root.position.z) - mech.height * 0.12;
+
+    // Scorch everything that was still wearing paint.
+    const burnt = mech.model.materials.hullCritical;
+    root.traverse(o => {
+      if (!o.isMesh) return;
+      if (o.material === mech.model.materials.hull
+        || o.material === mech.model.materials.hullDamaged) o.material = burnt;
+      o.material.transparent = false;
+      o.material.opacity = 1;
+      o.castShadow = true;
+    });
+
+    this.wrecks.push({
+      root,
+      materials: mech.model.materials,
+      height: mech.height,
+      position: root.position.clone(),
+      smoke: 26,          // seconds of smoke before it goes cold
+      age: 0,
+    });
+    while (this.wrecks.length > this.maxWrecks) this._removeWreck(this.wrecks.shift());
+  }
+
+  _removeWreck(w) {
+    if (!w) return;
+    this.scene.remove(w.root);
+    w.root.traverse(o => { if (o.isMesh) o.geometry?.dispose?.(); });
+    for (const m of Object.values(w.materials)) m?.dispose?.();
+  }
+
+  _updateWrecks(dt) {
+    for (const w of this.wrecks) {
+      w.age += dt;
+      if (w.smoke <= 0) continue;
+      w.smoke -= dt;
+      // Thinning smoke column, plus embers while it is still burning.
+      const rate = clamp(w.smoke / 26, 0, 1);
+      if (Math.random() < dt * 16 * rate) {
+        const p = w.position;
+        this.fx.particle(
+          p.x + (Math.random() - 0.5) * 3, p.y + w.height * 0.35, p.z + (Math.random() - 0.5) * 3,
+          (Math.random() - 0.5) * 1.5, 2.5 + Math.random() * 3, (Math.random() - 0.5) * 1.5,
+          { life: 2.2, size: 1.0, size1: 6.5, color: 0x2e2a26, color1: 0x101010, drag: 0.6, grav: 1.1 });
+      }
+      if (rate > 0.55 && Math.random() < dt * 5) {
+        const p = w.position;
+        this.fx.particle(
+          p.x + (Math.random() - 0.5) * 2, p.y + w.height * 0.3, p.z + (Math.random() - 0.5) * 2,
+          0, 2 + Math.random() * 4, 0,
+          { life: 0.5, size: 0.5, size1: 0.05, color: 0xffb45a, color1: 0xff3a10, drag: 1.4, grav: 0.4 });
+      }
+    }
   }
 
   _addScore(team, n) {
@@ -524,6 +622,8 @@ export class Match {
       });
     }
     this.world.update(dt, this.engine.camera.position);
+
+    this._updateWrecks(dt);
 
     if (live) {
       this._updateRespawns(dt);
@@ -745,6 +845,8 @@ export class Match {
   dispose() {
     this.pickups?.dispose();
     this.pickups = null;
+    for (const w of this.wrecks) this._removeWreck(w);
+    this.wrecks.length = 0;
     for (const m of this.mechs) { this.scene.remove(m.root); }
     this.mechs.length = 0;
     this.brains.clear();

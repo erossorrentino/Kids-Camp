@@ -839,11 +839,16 @@ export class Mech {
       if (dmg <= 0.01) return absorbed;
     }
 
+    // Credit the attacker BEFORE resolving the damage. _damageSection can
+    // destroy the mech synchronously, and the death handler reads
+    // lastDamagedBy -- so setting it afterwards means a one-shot kill is
+    // credited to whoever hit them previously, or to nobody at all.
+    if (opts.attacker && opts.attacker !== this) this.lastDamagedBy = opts.attacker;
+
     const dealt = this._damageSection(location, dmg, opts);
     this.damageTaken += dealt;
     this.lastDamageTime = performance.now() * 0.001;
     if (opts.attacker && opts.attacker !== this) {
-      this.lastDamagedBy = opts.attacker;
       this.assistCredit.set(opts.attacker.id, (this.assistCredit.get(opts.attacker.id) || 0) + dealt);
     }
     return dealt;

@@ -450,6 +450,7 @@ export class HUD {
   }
 
   toast(text, sub = '') {
+    if (!text) { this.el.toast.classList.remove('show'); this._toastTimer = 0; return; }
     this.el.toast.innerHTML = escape(text) + (sub ? `<small>${escape(sub)}</small>` : '');
     this.el.toast.classList.add('show');
     this._toastTimer = 2.2;
@@ -460,6 +461,35 @@ export class HUD {
       this._toastTimer -= dt;
       if (this._toastTimer <= 0) this.el.toast.classList.remove('show');
     }
+  }
+
+  /* ---- match intro ---- */
+  setIntro(mapDef, mode, tournament) {
+    if (!this._introEl) {
+      const el = document.createElement('div');
+      el.id = 'intro-card';
+      el.innerHTML = `<div class="in-mode"></div><div class="in-map"></div>
+        <div class="in-sub"></div><div class="in-skip">any key to skip</div>`;
+      this.root.appendChild(el);
+      this._introEl = el;
+    }
+    const el = this._introEl;
+    el.style.display = '';
+    el.classList.remove('gone');
+    void el.offsetWidth;
+    el.querySelector('.in-mode').textContent = tournament
+      ? `${tournament.name} · ROUND ${tournament.round + 1}/${tournament.total}`
+      : mode.name;
+    el.querySelector('.in-map').textContent = mapDef.name;
+    el.querySelector('.in-sub').textContent = tournament
+      ? tournament.label
+      : (mapDef.blurb || '');
+  }
+
+  clearIntro() {
+    if (!this._introEl) return;
+    this._introEl.classList.add('gone');
+    setTimeout(() => { if (this._introEl?.classList.contains('gone')) this._introEl.style.display = 'none'; }, 700);
   }
 
   /* ---- kill cam ---- */

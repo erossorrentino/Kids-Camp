@@ -143,6 +143,26 @@ await step('combat frame', async () => {
 });
 await page.screenshot({ path: join(OUT, '09-combat.png') });
 
+await step('a one-shot kill credits the killer', async () => {
+  const r = await page.evaluate(() => {
+    const g = window.__game, m = g.match;
+    m.state = 'live'; m.countdown = 0;
+    const victim = m.mechs.find(x => x.alive && !x.isPlayer && x.healthFraction > 0.99);
+    const killer = m.mechs.find(x => x.alive && x !== victim && x.team !== victim.team);
+    if (!victim || !killer) return { skipped: true };
+    victim.iFrames = 0;
+    victim.lastDamagedBy = null;      // never been hit before
+    const killsBefore = killer.kills;
+    m.applyDamage(victim, killer, 1e6, { location: 'CT' });
+    const feed = m.events[m.events.length - 1];
+    return { killer: killer.name, feedKiller: feed?.killer, credited: killer.kills - killsBefore };
+  });
+  if (r.skipped) return;
+  if (r.credited !== 1) throw new Error(`killer was not credited (${r.credited} kills)`);
+  if (r.feedKiller !== r.killer) throw new Error(`killfeed says "${r.feedKiller}", expected "${r.killer}"`);
+  console.log('\n   ', JSON.stringify(r));
+});
+
 await step('death -> kill cam -> respawn', async () => {
   const downed = await page.evaluate(() => {
     const g = window.__game;
@@ -188,7 +208,27 @@ await page.screenshot({ path: join(OUT, '13-respawned.png') });
 
 await step('cockpit view', async () => {
   await page.evaluate(() => { window.__game.controller.view = 'cockpit'; });
-  await page.waitForTimeout(900);
+  await page.waitForTimeout(1600);
+  const ok = await page.evaluate(() => ({
+    rigVisible: window.__game.cockpit.visible,
+    inScene: !!window.__game.cockpit.group.parent,
+    bars: window.__game.cockpit.bars.length,
+  }));
+  if (!ok.rigVisible || !ok.inScene) throw new Error('cockpit rig did not appear: ' + JSON.stringify(ok));
+  if (ok.bars !== 3) throw new Error('cockpit instruments missing');
+  // Present is not the same as visible: project each strip and check it
+  // lands inside the viewport.
+  const onScreen = await page.evaluate(() => {
+    const g = window.__game, cam = g.engine.camera;
+    cam.updateMatrixWorld();
+    return g.cockpit.bars.map(b => {
+      const p = b.mesh.getWorldPosition(new b.mesh.position.constructor()).project(cam);
+      return { x: +p.x.toFixed(2), y: +p.y.toFixed(2), inside: Math.abs(p.x) < 1 && Math.abs(p.y) < 1 && p.z < 1 };
+    });
+  });
+  if (!onScreen.every(b => b.inside)) {
+    throw new Error('cockpit instruments are off screen: ' + JSON.stringify(onScreen));
+  }
 });
 await page.screenshot({ path: join(OUT, '11-cockpit.png') });
 await page.evaluate(() => { window.__game.controller.view = 'chase'; });
@@ -211,6 +251,14 @@ await step('long sim (60s of match time)', async () => {
   });
   console.log('\n   ', JSON.stringify(st));
   if (st.damage === 0) throw new Error('no damage dealt in 60s of combat — bots are not fighting');
+  const wrecks = await page.evaluate(() => {
+    const m = window.__game.match;
+    return { count: m.wrecks.length, inScene: m.wrecks.filter(w => !!w.root.parent).length, cap: m.maxWrecks };
+  });
+  console.log('    wrecks', JSON.stringify(wrecks));
+  if (st.kills > 0 && wrecks.count === 0) throw new Error('kills happened but no wrecks were left');
+  if (wrecks.count !== wrecks.inScene) throw new Error('a wreck was detached from the scene but still tracked');
+  if (wrecks.count > wrecks.cap) throw new Error('wreck cap exceeded');
   if (st.kills === 0 && st.damage < 2500) throw new Error(`only ${st.damage} damage and no kills in 60s`);
 });
 await page.screenshot({ path: join(OUT, '12-after-sim.png') });

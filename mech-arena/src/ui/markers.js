@@ -66,6 +66,8 @@ export class Markers {
     }
 
     this.visible = true;
+    this.showNumbers = true;
+    this.showPlates = true;
     this._v = new THREE.Vector3();
   }
 
@@ -76,6 +78,7 @@ export class Markers {
 
   /** Spawn a floating damage number at a world position. */
   damage(pos, amount, kind = 'hit') {
+    if (!this.showNumbers) return;
     const rec = this.numbers[this.numHead];
     this.numHead = (this.numHead + 1) % this.numbers.length;
     rec.life = kind === 'kill' ? 1.6 : 1.0;
@@ -127,7 +130,7 @@ export class Markers {
 
   _updatePlates(match, me) {
     let i = 0;
-    if (me) {
+    if (me && this.showPlates) {
       const now = match.time;
       // Sort by distance so the nearest contacts always get a plate.
       const candidates = match.aliveMechs()
