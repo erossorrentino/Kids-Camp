@@ -20,9 +20,15 @@ python3 -m http.server 8000
 # open http://localhost:8000
 ```
 
-Three.js r128 is pulled from a CDN at startup, so the first load needs an
-internet connection. Everything else — every model, texture, sound and
-planet — is generated in code at runtime. There are no asset files.
+**No internet required.** Three.js r128 ships with the game in
+`js/vendor/`, so it runs offline, from a `file://` double-click, or behind
+a blocked CDN. Everything else — every model, texture, sound and planet —
+is generated in code at runtime. There are no asset files. The web fonts
+are the one optional extra, and the page falls back to system fonts
+without them.
+
+Bundled third-party code: [three.js](https://threejs.org) r128, MIT
+licensed, unmodified, with its licence header intact.
 
 ## Controls
 

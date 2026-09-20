@@ -832,15 +832,20 @@ body.touch-mode #crosshair{opacity:.5}
 <div id="fatal">
   <div>
     <h2 style="font-family:'Chakra Petch',sans-serif">Could not start the engine</h2>
-    <p>Star Kingdoms needs WebGL and loads its 3D library from a CDN. Check your connection,
-       or try a different browser, then reload.</p>
+    <p>Star Kingdoms needs WebGL. Your browser either has it turned off or your
+       graphics driver is blocking it. Try a different browser, or enable hardware
+       acceleration in your browser settings, then reload.</p>
   </div>
 </div>
 
 <script>
 /* Load three.js r128 from the allowed CDNs, with a fallback host. */
 (function () {
+  // three.js r128 ships with the game, so it runs with no network at all —
+  // from a file:// double-click, offline, or behind a blocked CDN. The two
+  // CDN entries are only a fallback if the local copy is ever missing.
   var urls = [
+    'js/vendor/three.min.js',
     'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
     'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js'
   ];
