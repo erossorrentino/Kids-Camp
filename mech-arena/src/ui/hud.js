@@ -450,6 +450,10 @@ export class HUD {
       case 'comms':
         this._pushComms(e.line);
         break;
+      case 'cookoff':
+        this.toast('AMMUNITION COOK-OFF', `${LOCATION_NAMES[e.loc] || e.loc} detonated`);
+        this.audio.play('warn');
+        break;
     }
   }
 

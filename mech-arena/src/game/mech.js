@@ -907,11 +907,24 @@ export class Mech {
     this.fx.explosion(worldPos, 0.8);
     this.audio.explosion(worldPos, 0.7);
 
-    // Weapons mounted in the section go with it.
+    // Weapons mounted in the section go with it -- and anything with rounds
+    // still in the rack cooks off, which is why carrying a full AC/20 bin in
+    // a side torso is a real decision rather than free damage.
+    let cookOff = 0;
     for (const w of this.weapons) {
       if (!w || w.loc !== loc) continue;
       w.destroyed = true;
       w.group.visible = false;
+      if (w.def.ammo > 0) {
+        const rounds = Math.max(0, w.ammo) + Math.max(0, w.mag);
+        const full = Math.max(1, w.def.ammo);
+        // Pellet count is damped: a full LRM-20 bin should be frightening,
+        // not an automatic centre-torso kill on anything it is bolted to.
+        const perRound = w.def.dmg * Math.sqrt(w.def.pellets || 1);
+        cookOff += perRound * Math.min(1, rounds / full) * 1.8;
+        w.ammo = 0;
+        w.mag = 0;
+      }
     }
     // Side torso loss takes the arm on that side too.
     if (loc === 'LT' && !this.destroyed.LA) this._destroySection('LA');
@@ -921,6 +934,8 @@ export class Mech {
       const g = loc === 'LA' ? this.rig.armL.group : this.rig.armR.group;
       g.visible = false;
     }
+    if (cookOff > 0.5) this._cookOff(loc, cookOff);
+
     if (loc === 'CT' || loc === 'HD') {
       // Gravewalker pilots get one reprieve at the very end.
       if (this.lastStand && !this._usedLastStand) {
@@ -933,6 +948,22 @@ export class Mech {
       }
       this.onDestroyed?.();
     }
+  }
+
+  /**
+   * Ammunition detonating inside a destroyed section. It hurts the centre
+   * torso rather than the section that is already gone, so losing a loaded
+   * arm can genuinely finish a mech.
+   */
+  _cookOff(loc, amount) {
+    const pos = this.position.clone().setY(this.position.y + this.height * 0.5);
+    this.fx.explosion(pos, 1.3, 0xffb45a);
+    this.audio.explosion(pos, 1.1);
+    if (this.isPlayer) this.fx.shakeRequest = Math.max(this.fx.shakeRequest, 0.9);
+    // Reactive plating vents a good deal of it outward instead of inward.
+    const inward = Math.min(amount, this.maxStructure.CT * 1.2) * (1 - this.explosiveResist);
+    this.onCookOff?.(loc, amount);
+    this._damageSection('CT', inward, { source: 'cookoff', noOverflow: true });
   }
 
   repair(amount) {
@@ -1098,6 +1129,15 @@ export class Mech {
         o.material.depthWrite = !transparent;
         o.material.opacity = alpha;
       });
+    }
+
+    // Reactor state on the hull: running lights die with the reactor.
+    const lit = this.shutdown ? 0.12 : this.heatFraction > 0.85 ? 3.4 : 2.4;
+    if (this._litState !== lit) {
+      this._litState = lit;
+      const mats = this.model.materials;
+      mats.accent.emissiveIntensity = lit;
+      mats.glass.emissiveIntensity = lit * 0.23;
     }
 
     if (this.jetting) this.fx.thrusterTrail(this, dt);

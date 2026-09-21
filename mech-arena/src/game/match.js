@@ -212,6 +212,9 @@ export class Match {
     const spawn = this._spawnPointFor(entry);
     mech.spawn(spawn.pos, spawn.yaw);
     mech.onDestroyed = () => this._onMechDestroyed(mech);
+    mech.onCookOff = (loc, amount) => {
+      if (mech.isPlayer) this.onEvent?.({ type: 'cookoff', loc, amount });
+    };
     mech.onVoidDeath = () => this._onVoidDeath(mech);
     mech.onSlam = (r, d) => this._slamDamage(mech, r, d);
 

@@ -162,6 +162,34 @@ await step('combat frame', async () => {
 });
 await page.screenshot({ path: join(OUT, '09-combat.png') });
 
+await step('ammunition cooks off when its section dies', async () => {
+  const r = await page.evaluate(() => {
+    const m = window.__game.match;
+    m.state = 'live'; m.countdown = 0;
+    const victim = m.mechs.find(x => x.alive && !x.isPlayer);
+    victim.iFrames = 0;
+
+    // Give it a full ammo bin in the left torso, then destroy that section.
+    const w = victim.weapons.find(x => x) || null;
+    if (!w) return { skipped: true };
+    w.loc = 'LT';
+    w.def = { ...w.def, ammo: 100, dmg: 90, pellets: 1 };
+    w.ammo = 100; w.mag = 5; w.destroyed = false;
+
+    const ctBefore = victim.armour.CT + victim.structure.CT;
+    let fired = null;
+    victim.onCookOff = (loc, amount) => { fired = { loc, amount: Math.round(amount) }; };
+    victim._destroySection('LT');
+    const ctAfter = victim.armour.CT + victim.structure.CT;
+    return { fired, ctBefore, ctAfter, ctLost: ctBefore - ctAfter, ammoLeft: w.ammo + w.mag };
+  });
+  if (r.skipped) return;
+  if (!r.fired) throw new Error('a loaded section was destroyed and nothing cooked off');
+  if (r.ctLost <= 0) throw new Error('cook-off did no damage to the centre torso');
+  if (r.ammoLeft !== 0) throw new Error('cooked-off ammunition was not consumed');
+  console.log('\n   ', JSON.stringify(r));
+});
+
 await step('a one-shot kill credits the killer', async () => {
   const r = await page.evaluate(() => {
     const g = window.__game, m = g.match;

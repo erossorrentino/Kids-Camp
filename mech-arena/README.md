@@ -82,7 +82,9 @@ two legs — each with its own armour plate and internal structure. Strip a
 side torso and the weapons mounted in it are gone with it. Destroy a leg
 and the mech limps at half speed. Damage that overflows a destroyed section
 rolls into the centre torso at half value. The paper doll in the corner is
-the target you are shooting, not a single health bar.
+the target you are shooting, not a single health bar. And a section holding
+live rounds **cooks off** when it dies, detonating into the centre torso —
+so a full ammunition bin is a liability you choose to carry.
 
 **The legs lag the torso.** The torso twists independently of the hips, and
 the hips turn at the chassis's rate, not yours. A hundred-ton Annihilator

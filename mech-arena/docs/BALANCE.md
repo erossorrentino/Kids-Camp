@@ -130,6 +130,27 @@ forty metres away while the target is two hundred metres down the street,
 and every arm-mounted shot went wide. Downtown fell from 7.8k damage to 1.2k
 over the same 75 seconds. Converging on the target's range instead fixed it.
 
+## Ammunition cook-off
+
+Destroying a section that still holds magazine-fed rounds detonates them
+into the centre torso:
+
+```
+damage = dmg * sqrt(pellets) * (roundsLeft / fullBin) * 1.8
+capped at the centre torso's maximum structure * 1.2
+```
+
+The `sqrt(pellets)` damping matters. Using the raw pellet count, a full
+LRM-20 bin cooked off for 832, which was an automatic centre-torso kill on
+anything it was bolted to. Damped, a full bin runs 129 for an LRM-20, 173
+for an AC/20 and 331 for a Heavy Torpedo rack — against 580 of centre-torso
+structure on an Atlas and 106 on a Wasp.
+
+The intent is a real build decision rather than a gotcha: a fat ammunition
+bin in a side torso is a liability you accept for sustained fire, energy
+weapons never cook off at all, and Reactive Plating vents most of the blast
+outward.
+
 ## Arena pacing
 
 `tools/sim.mjs` reports damage and kills per arena over a fixed simulated
