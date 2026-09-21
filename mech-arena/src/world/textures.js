@@ -18,8 +18,22 @@ import { makeRng } from '../core/rng.js';
  * arenas' worth is all that is ever live at once, so cap the cache well
  * above that and evict the oldest rather than growing for a whole session.
  */
-const MAX_CACHED_SURFACES = 16;
+let MAX_CACHED_SURFACES = 16;
+let TEX_SIZE = 512;
 const cache = new Map();
+
+/**
+ * Shrink the surface set for a weak GPU. Three 512px maps per set is
+ * 3MB before mipmaps; sixteen sets of those is most of a phone's texture
+ * budget on their own, and running out of it loses the WebGL context --
+ * which reads, to a player, as the screen going blank.
+ * @param {{size?:number, sets?:number}} o
+ */
+export function setSurfaceBudget({ size, sets } = {}) {
+  if (size && size !== TEX_SIZE) { TEX_SIZE = size; disposeTextureCache(); }
+  if (sets) MAX_CACHED_SURFACES = sets;
+  evictOldestSurfaces();
+}
 
 function evictOldestSurfaces() {
   while (cache.size > MAX_CACHED_SURFACES) {
@@ -118,7 +132,7 @@ function tex(cv, repeat = 1, srgb = false) {
 
 /** Ground: large-scale noise tinted toward the biome colour, plus grit. */
 function groundMaps(colorHex, { style = 'rock', seed = 1 }) {
-  const S = 512;
+  const S = TEX_SIZE;
   const height = canvas(S);
   const hctx = height.getContext('2d');
   noiseInto(hctx, S, { scale: 6, octaves: 5, seed, contrast: 1.1, base: 0.5 });
@@ -178,7 +192,7 @@ function groundMaps(colorHex, { style = 'rock', seed = 1 }) {
 
 /** Concrete: panel joints, stains, chipped edges. */
 function concreteMaps(colorHex, { seed = 1 }) {
-  const S = 512;
+  const S = TEX_SIZE;
   const rng = makeRng(seed);
   const height = canvas(S);
   const h = height.getContext('2d');
@@ -221,7 +235,7 @@ function concreteMaps(colorHex, { seed = 1 }) {
 
 /** Industrial metal: brushed finish, rivets, rust blooms. */
 function metalMaps(colorHex, { seed = 1 }) {
-  const S = 512;
+  const S = TEX_SIZE;
   const rng = makeRng(seed);
   const height = canvas(S);
   const h = height.getContext('2d');

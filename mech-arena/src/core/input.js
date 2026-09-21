@@ -37,12 +37,24 @@ export class Input {
      * the further the cursor sits from the centre of the viewport, the
      * faster the torso swings that way, with a dead zone in the middle.
      */
-    this.aimMode = 'lock';          // 'lock' | 'steer'
+    this.aimMode = 'lock';          // 'lock' | 'steer' | 'touch'
     this.lockDenied = false;
     this.cursor = { x: 0, y: 0, inside: false };
     this.steerSpeed = 2.6;          // radians per second at full deflection
     this.steerDeadzone = 0.08;
     this.onAimModeChange = null;
+
+    /* ---- touch ----
+     * A phone has no keyboard, no mouse buttons and no pointer lock. The
+     * on-screen controls write the same intent the keys and mouse write --
+     * a virtual action set beside the key set, a stick vector beside the
+     * WASD vector, drag pixels beside mouse pixels -- so nothing downstream
+     * has to know which one a player is using.
+     */
+    this.touch = { move:{ x:0, z:0 }, aimDx:0, aimDy:0, active:false };
+    this.touchSensitivity = 0.0052;
+    this.virtual = new Set();       // actions held by an on-screen button
+    this.virtualEdges = new Set();  // and their press edges
 
     this._bind();
   }
@@ -55,7 +67,12 @@ export class Input {
       this.edges.add(e.code);
     });
     addEventListener('keyup', (e) => this.down.delete(e.code));
-    addEventListener('blur', () => { this.down.clear(); this.mouse.left = this.mouse.right = false; });
+    addEventListener('blur', () => {
+      this.down.clear();
+      this.virtual.clear();
+      this.touch.move.x = this.touch.move.z = 0;
+      this.mouse.left = this.mouse.right = false;
+    });
 
     this.canvas.addEventListener('mousedown', (e) => {
       // In steering mode there is no lock to gate on -- a click on the
@@ -92,7 +109,7 @@ export class Input {
   }
 
   requestLock() {
-    if (this.locked || this.aimMode === 'steer') return;
+    if (this.locked || this.aimMode !== 'lock') return;
     let p;
     try { p = this.canvas.requestPointerLock?.(); } catch { this._denyLock(); return; }
     // Chrome returns a promise; a frame without pointer-lock permission
@@ -119,9 +136,39 @@ export class Input {
   }
   releaseLock() { if (this.locked) document.exitPointerLock?.(); }
 
+  /* ---- on-screen controls ---------------------------------------- */
+
+  /** Switch aiming to drag-to-look and movement to the virtual stick. */
+  setTouchMode(on) {
+    const mode = on ? 'touch' : 'lock';
+    if (this.aimMode === mode) return;
+    this.touch.active = !!on;
+    if (on) this.releaseLock();
+    this.aimMode = mode;
+    this.onAimModeChange?.(mode);
+  }
+
+  /** Hold or release an action from an on-screen button. */
+  holdVirtual(action, on) {
+    if (on) {
+      if (!this.virtual.has(action)) this.virtualEdges.add(action);
+      this.virtual.add(action);
+    } else this.virtual.delete(action);
+  }
+
+  /** Fire one press edge without a hold -- for taps on an on-screen button. */
+  tapVirtual(action) { this.virtualEdges.add(action); }
+
+  /** Stick deflection: x = strafe, z = forward, each -1..1. */
+  setTouchMove(x, z) { this.touch.move.x = x; this.touch.move.z = z; }
+
+  /** Drag pixels for this frame, consumed like mouse-lock deltas. */
+  addTouchAim(dx, dy) { this.touch.aimDx += dx; this.touch.aimDy += dy; }
+
   /** True while any key bound to `action` is held. */
   isDown(action) {
     if (!this.enabled) return false;
+    if (this.virtual.has(action)) return true;
     const codes = this.binds[action];
     if (!codes) return false;
     for (const c of codes) if (this.down.has(c)) return true;
@@ -131,6 +178,7 @@ export class Input {
   /** True exactly once per physical press. */
   pressed(action) {
     if (!this.enabled) return false;
+    if (this.virtualEdges.has(action)) return true;
     const codes = this.binds[action];
     if (!codes) return false;
     for (const c of codes) if (this.edges.has(c)) return true;
@@ -150,6 +198,12 @@ export class Input {
    */
   aimDelta(dt, zoom = 1) {
     const scale = 1 / Math.max(0.4, zoom);
+    if (this.aimMode === 'touch') {
+      if (!this.enabled) return ZERO_AIM;
+      _aim.x = this.touch.aimDx * this.touchSensitivity * scale;
+      _aim.y = this.touch.aimDy * this.touchSensitivity * scale * (this.invertY ? -1 : 1);
+      return _aim;
+    }
     if (this.aimMode === 'lock') {
       if (!this.locked || !this.enabled) return ZERO_AIM;
       _aim.x = this.mouse.dx * this.sensitivity * scale;
@@ -173,6 +227,7 @@ export class Input {
   /** Movement vector in local space: x = strafe, z = forward. */
   moveVector() {
     let x = 0, z = 0;
+    if (this.touch.move.x || this.touch.move.z) { x = this.touch.move.x; z = this.touch.move.z; }
     if (this.isDown('forward')) z += 1;
     if (this.isDown('back')) z -= 1;
     if (this.isDown('right')) x += 1;
@@ -184,6 +239,8 @@ export class Input {
   /** Consume per-frame deltas. Called once at the end of every update. */
   endFrame() {
     this.edges.clear();
+    this.virtualEdges.clear();
+    this.touch.aimDx = 0; this.touch.aimDy = 0;
     this.mouse.dx = 0; this.mouse.dy = 0; this.mouse.wheel = 0;
     this.mouseEdges.left = false; this.mouseEdges.right = false;
   }

@@ -61,7 +61,45 @@ frame times stay poor, so it degrades rather than stutters.
 | Pause | `Esc` |
 | Toggle the FPS readout | `` ` `` |
 
-Click the viewport to capture the mouse.
+Click the viewport to capture the mouse. Where pointer lock is unavailable —
+an embedded frame without permission for it — aiming falls back to steering:
+move the cursor toward an edge of the view to swing the torso that way.
+
+### On a phone, tablet or Chromebook
+
+Touch devices get on-screen controls instead: a stick on the left walks,
+dragging anywhere else on the view aims, and the pad on the right holds the
+trigger, the jets, the chassis ability, melee, zoom, target lock and
+fire-everything. The in-match readouts move to the top of the frame so the
+bottom corners stay clear for thumbs.
+
+A Chromebook or a laptop with a touchscreen reports a mouse as well, so it
+does not look like a phone until somebody taps the screen — the first touch
+turns the controls on. Settings → Controls has the switch if you would
+rather have them always on, always off, and a separate look speed for
+dragging.
+
+The hangar reshapes itself as well. Below 880px it becomes a fixed frame:
+the bay keeps a band across the top with the mech standing in it, and one
+panel at a time — CHASSIS, LOADOUT, or neither under VIEW MECH — scrolls
+underneath. The camera frames the mech into whatever rectangle the layout
+leaves clear, so it is on screen at every width.
+
+### Weak devices
+
+The preset is chosen for the machine on first run — a phone, a small
+tablet or a four-core laptop starts on **low**, which shrinks the generated
+textures (256px instead of 512px) and how many stay resident, not just the
+shadows and the bloom. That budget is the thing that matters: running out
+of texture memory does not make a phone slow, it takes the WebGL context
+away, and a canvas without a context is transparent, which on a light page
+reads as the screen going white.
+
+If the context is lost anyway the game says so, waits for it, comes back at
+the lightest preset and keeps playing. If it never comes back there is a
+panel with a reload button and a *reload in low graphics* button that
+writes the preset into the saved profile first. Picking a preset by hand in
+Settings turns the automatic choice off for good.
 
 ---
 
@@ -177,7 +215,7 @@ src/
   main.js           app state machine, fixed-step loop, adaptive quality
   core/
     engine.js       renderer, lights, IBL environment, post chain
-    input.js        keyboard + pointer lock, remappable actions
+    input.js        keyboard, pointer lock, steering and touch intent
     audio.js        fully synthesised WebAudio mixer — no audio files
     rng.js          seeded PRNG and frame-rate-independent maths helpers
   data/             pure data, no behaviour
@@ -211,6 +249,7 @@ src/
     hangarScene.js  the 3D hangar bay used as the menu backdrop
     tutorial.js     ten lessons that watch the live match state
     markers.js      nameplates, damage numbers, hit direction, waypoints
+    touch.js        on-screen stick, trigger and action pad
     progression.js  credits, ranks, unlocks, circuits, localStorage profile
 
 tools/
@@ -220,6 +259,12 @@ tools/
   smoke.mjs         boots the game in headless Chromium, walks the menus,
                     plays matches on several arenas, screenshots each,
                     and drives a death through the kill cam to respawn
+  mobile.mjs        loads the published build inside the Artifact host's own
+                    document at phone, tablet and desktop sizes, checks the
+                    frame is painted and the hangar mech is on screen and
+                    unobstructed, then plays a match with a finger
+  png.mjs           a small PNG reader so a test can assert on pixels
+  build-artifact.mjs  rewrites index.html into a publishable body fragment
   sim.mjs           headless combat simulation across every arena
   circuit.mjs       plays a tournament end to end and checks the bookkeeping
   leak.mjs          starts and tears down ten matches, watching the
@@ -273,6 +318,7 @@ new scoring rule needs a case in `Match._updateObjective`.
 ./tools/check.sh                    # parse every module (catches typos)
 node tools/validate.mjs             # data integrity, no browser needed
 node tools/smoke.mjs                # boot, walk menus, play, screenshot
+node tools/mobile.mjs               # phone/tablet layout, touch controls
 node tools/sim.mjs                  # simulate combat on all 41 arenas
 node tools/circuit.mjs              # play a tournament end to end
 node tools/leak.mjs                 # resource leaks across ten matches
@@ -282,6 +328,12 @@ node tools/sim.mjs refinery,mesa    # specific arenas
 
 `tools/smoke.mjs` and `tools/sim.mjs` need Playwright and a Chromium
 build; set `CHROME_BIN` if yours is not at the default path.
+
+`mobile.mjs` is the one that finds the bugs a player reports as "I can't
+see anything". It decodes the screenshot and fails if the frame is mostly
+white — a canvas that never painted shows the host page through it — and it
+projects the hangar mech to screen coordinates to prove it is inside the
+rectangle the layout left for it and not behind a panel.
 
 `sim.mjs` is the one that finds real bugs. It reported zero damage on the
 canyon maps, which turned out to be walls forming a continuous impassable

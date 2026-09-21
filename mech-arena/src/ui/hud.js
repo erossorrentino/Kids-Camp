@@ -552,6 +552,9 @@ export class HUD {
   /* ---- respawn screen ---- */
   showRespawn(entry, killerName, onPick) {
     this.el.respawn.classList.remove('hidden');
+    // The on-screen controls sit above the HUD, so they step aside while
+    // there is something to choose.
+    document.body.classList.add('respawning');
     this.el.respawnKiller.textContent = killerName ? `Destroyed by ${killerName}` : '';
     this.el.respawnChoices.innerHTML = '';
     entry.hangar.forEach((b, i) => {
@@ -568,7 +571,10 @@ export class HUD {
     });
   }
 
-  hideRespawn() { this.el.respawn.classList.add('hidden'); }
+  hideRespawn() {
+    this.el.respawn.classList.add('hidden');
+    document.body.classList.remove('respawning');
+  }
 
   /* ---- scoreboard ---- */
   setScoreboard(match, open) {

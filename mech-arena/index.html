@@ -19,6 +19,26 @@
 <body>
 <canvas id="viewport"></canvas>
 
+<!-- ============ ON-SCREEN CONTROLS (touch devices) ============ -->
+<div id="touch-controls" class="hidden" aria-hidden="true">
+  <div id="tc-stick"><div id="tc-ring"></div><div id="tc-knob"></div></div>
+  <div id="tc-pad">
+    <div class="tc-row">
+      <button id="tc-zoom" class="tc-btn">ZOOM</button>
+      <button id="tc-target" class="tc-btn">LOCK</button>
+      <button id="tc-group" class="tc-btn">ALL</button>
+    </div>
+    <div class="tc-row">
+      <button id="tc-jets" class="tc-btn">JETS</button>
+      <button id="tc-ability" class="tc-btn">ABIL</button>
+      <button id="tc-melee" class="tc-btn">MELEE</button>
+    </div>
+    <button id="tc-fire" class="tc-btn tc-big">FIRE</button>
+  </div>
+  <button id="tc-menu" class="tc-btn tc-corner">MENU</button>
+  <div id="tc-hint">DRAG TO LOOK · STICK TO WALK</div>
+</div>
+
 <!-- ============ IN-MATCH HUD ============ -->
 <div id="hud" class="hidden" aria-hidden="true">
   <svg id="reticle" viewBox="0 0 200 200" width="200" height="200">
@@ -113,6 +133,110 @@
   move the cursor toward an edge of the view to swing the torso that way,
   and click to fire. Everything else is unchanged.
 </div>
+
+<div id="gpu-notice" class="hidden">
+  <b>GRAPHICS RESET</b>
+  The device took the 3D context back, usually to free memory.
+  Rebuilding at a lighter setting…
+</div>
+
+<!-- ============ BOOT DIAGNOSTICS ============ -->
+<!-- A page that cannot start has to say so. Without this, a failed module
+     load or a refused WebGL context leaves an empty frame and nothing to
+     read, which looks like a blank white page rather than an error. -->
+<div id="boot-error" class="hidden">
+  <div class="be-card">
+    <h2>THE ARENA DID NOT START</h2>
+    <p id="be-msg">Something went wrong while loading.</p>
+    <pre id="be-detail" class="hidden"></pre>
+    <div class="row" style="justify-content:center;margin-top:14px">
+      <button class="btn primary" id="be-reload">RELOAD</button>
+      <button class="btn" id="be-safe">RELOAD IN LOW GRAPHICS</button>
+    </div>
+    <p class="be-foot">If it keeps happening, try a different browser, or a desktop
+      one — the arena needs WebGL and a few megabytes of graphics memory.</p>
+  </div>
+</div>
+
+<script>
+/* Runs before the module graph: whatever fails afterwards, there is already
+   somewhere for the message to go. */
+(function () {
+  var errs = [];
+  function note(m) {
+    m = String(m || '').slice(0, 300);
+    if (m && errs.indexOf(m) < 0 && errs.length < 6) errs.push(m);
+  }
+  addEventListener('error', function (e) {
+    if (e && e.target && (e.target.src || e.target.href)) note('Could not load ' + (e.target.src || e.target.href));
+    else note(e && e.message);
+  }, true);
+  addEventListener('unhandledrejection', function (e) {
+    note((e && e.reason && e.reason.message) || (e && e.reason));
+  });
+
+  window.__bootErrors = errs;
+  window.__booted = false;
+  window.__bootFail = function (msg, detail) {
+    var box = document.getElementById('boot-error');
+    if (!box || box.dataset.shown) return;
+    box.dataset.shown = '1';
+    var load = document.getElementById('loading');
+    if (load && load.parentNode) load.parentNode.removeChild(load);
+    var m = document.getElementById('be-msg');
+    if (m) m.textContent = msg || 'Something went wrong while loading.';
+    var d = document.getElementById('be-detail');
+    var text = [detail && (detail.message || detail)].concat(errs).filter(Boolean).join('\n');
+    if (d && text) { d.textContent = text; d.className = ''; }
+    box.className = '';
+  };
+  var reload = document.getElementById('be-reload');
+  if (reload) reload.addEventListener('click', function () { location.reload(); });
+
+  // Safe mode writes the lightest preset straight into the saved profile,
+  // so the reload comes up with a texture budget a weak device can carry.
+  var safe = document.getElementById('be-safe');
+  if (safe) safe.addEventListener('click', function () {
+    try {
+      var KEY = 'ironvanguard.profile.v1';
+      var p = JSON.parse(localStorage.getItem(KEY) || '{}');
+      p.settings = p.settings || {};
+      p.settings.quality = 'low';
+      p.settings.qualityAuto = false;
+      p.settings.autoQuality = false;
+      localStorage.setItem(KEY, JSON.stringify(p));
+    } catch (e) { /* private mode: the reload still gets the device guess */ }
+    location.reload();
+  });
+
+  // WebGL is the one hard requirement. Check it here rather than waiting for
+  // the renderer to throw somewhere the player cannot see.
+  var gl = null;
+  try {
+    var probe = document.createElement('canvas');
+    gl = probe.getContext('webgl2') || probe.getContext('webgl') || probe.getContext('experimental-webgl');
+  } catch (e) { note(e && e.message); }
+  window.__hasWebGL = !!gl;
+  // Release the probe context: some browsers allow only a handful at once.
+  if (gl && gl.getExtension) {
+    var lose = gl.getExtension('WEBGL_lose_context');
+    if (lose) lose.loseContext();
+  }
+  if (!gl) {
+    window.__bootFail('This browser cannot open a 3D graphics context (WebGL).',
+      'Hardware acceleration may be switched off, or the page may be running in a mode that blocks WebGL.');
+  }
+
+  // Last line of defence: if nothing has booted after fifteen seconds,
+  // something is wrong that the player should hear about.
+  setTimeout(function () {
+    if (!window.__booted) {
+      window.__bootFail('The arena is taking too long to load.',
+        errs.length ? null : 'The game files may not have finished downloading.');
+    }
+  }, 15000);
+})();
+</script>
 
 <script type="module" src="./src/main.js"></script>
 </body>

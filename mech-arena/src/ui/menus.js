@@ -43,6 +43,13 @@ export class Menus {
     this.deployMap = 'random';
     this.lastResult = null;
     this._modalStack = [];
+    // Narrow screens show one hangar panel at a time so the bay itself is
+    // never buried: 'chassis', 'loadout' or 'view' (panels hidden entirely).
+    this.hangarTab = 'loadout';
+    // Re-frame the mech whenever the stage rectangle moves.
+    addEventListener('resize', () => {
+      if (this.root.classList.contains('active')) this._syncPreview();
+    });
   }
 
   open(screen = 'title') {
@@ -181,10 +188,15 @@ export class Menus {
 
     const skin = SKIN_BY_ID[build.skinId] || SKIN_BY_ID[DEFAULT_SKIN];
 
-    return `<div class="screen">${this.header('HANGAR · LANCE', 'title')}
+    return `<div class="screen hangar-screen">${this.header('HANGAR · LANCE', 'title')}
       <div class="loadout-strip">${strip}</div>
-      <div class="hangar-layout">
-        <div class="panel">
+      <div class="hangar-layout with-stage tab-${this.hangarTab}">
+        <div class="hangar-tabs">
+          <button class="tab ${this.hangarTab === 'chassis' ? 'on' : ''}" data-htab="chassis">CHASSIS</button>
+          <button class="tab ${this.hangarTab === 'loadout' ? 'on' : ''}" data-htab="loadout">LOADOUT</button>
+          <button class="tab ${this.hangarTab === 'view' ? 'on' : ''}" data-htab="view">VIEW MECH</button>
+        </div>
+        <div class="panel col-chassis">
           <h3>CHASSIS</h3>
           <h4 style="font-size:17px;letter-spacing:.1em">${esc(chassis.name)}</h4>
           <div class="sub" style="margin-bottom:8px">
@@ -206,12 +218,14 @@ export class Menus {
           </div>
         </div>
 
-        <div class="panel" style="background:transparent;border-color:transparent;pointer-events:none">
-          <div style="height:60vh"></div>
-          <div class="tiny muted" style="text-align:center;pointer-events:auto">DRAG TO ROTATE · SCROLL TO ZOOM</div>
+        <!-- The bay shows through here: an empty rectangle the camera frames
+             the mech into, whatever the screen is shaped like. -->
+        <div class="hangar-stage" data-stage>
+          <div class="stage-window" data-stage-window></div>
+          <div class="tiny muted stage-hint">DRAG TO ROTATE · SCROLL TO ZOOM</div>
         </div>
 
-        <div class="panel">
+        <div class="panel col-loadout">
           <h3>HARDPOINTS</h3>
           ${hardpoints}
           <div class="tonnage ${over ? 'over' : ''}">
@@ -439,8 +453,10 @@ export class Menus {
     return `<div class="screen">${this.header('SETTINGS', 'title')}
       <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(320px,1fr))">
         <div class="panel"><h3>GRAPHICS</h3>
-          <div class="tiny muted">QUALITY</div>
+          <div class="tiny muted">QUALITY${s.qualityAuto !== false ? ' — <b class="mono">CHOSEN FOR THIS DEVICE</b>' : ''}</div>
           <div class="tabs" data-setting="quality">${['low', 'medium', 'high', 'ultra'].map(v => opt(v, s.quality)).join('')}</div>
+          <div class="tiny muted" style="line-height:1.6;margin-top:6px">LOW shrinks the generated textures as well as the effects. On a phone or a
+            small laptop that is the difference between a match and a blank screen.</div>
           <div class="tiny muted">FIELD OF VIEW — <b class="mono">${s.fov}</b></div>
           <input type="range" min="60" max="105" value="${s.fov}" data-range="fov" style="width:100%">
           <div class="tabs" data-setting="showFps">${[false, true].map(v => `<button class="tab${v === s.showFps ? ' on' : ''}" data-set="${v}">FPS ${v ? 'ON' : 'OFF'}</button>`).join('')}</div>
@@ -448,7 +464,16 @@ export class Menus {
           <div class="tiny muted" style="line-height:1.6;margin-top:6px">Auto drops the preset a step if frame times stay poor, and raises it again when there is headroom.</div>
         </div>
         <div class="panel"><h3>CONTROLS</h3>
-          <div class="tiny muted">MOUSE SENSITIVITY — <b class="mono">${(s.sensitivity * 1000).toFixed(1)}</b></div>
+          <div class="tiny muted">ON-SCREEN CONTROLS</div>
+          <div class="tabs" data-setting="touchControls">
+            ${[['auto', 'AUTO'], ['on', 'ALWAYS ON'], ['off', 'OFF']]
+              .map(([v, l]) => `<button class="tab${v === (s.touchControls || 'auto') ? ' on' : ''}" data-set="${v}">${l}</button>`).join('')}
+          </div>
+          <div class="tiny muted" style="line-height:1.6;margin-top:6px">A stick, a trigger and an action pad drawn over the view. AUTO turns them on
+            for a touch screen and the first time you tap one — useful on a Chromebook, which has both.</div>
+          <div class="tiny muted" style="margin-top:8px">TOUCH LOOK SPEED — <b class="mono">${((s.touchSensitivity ?? 0.0052) * 1000).toFixed(1)}</b></div>
+          <input type="range" min="15" max="120" value="${Math.round((s.touchSensitivity ?? 0.0052) * 10000)}" data-range="touchSensitivity" style="width:100%">
+          <div class="tiny muted" style="margin-top:10px">MOUSE SENSITIVITY — <b class="mono">${(s.sensitivity * 1000).toFixed(1)}</b></div>
           <input type="range" min="5" max="60" value="${Math.round(s.sensitivity * 10000)}" data-range="sensitivity" style="width:100%">
           <div class="tabs" data-setting="invertY">${[false, true].map(v => `<button class="tab${v === s.invertY ? ' on' : ''}" data-set="${v}">INVERT Y ${v ? 'ON' : 'OFF'}</button>`).join('')}</div>
           <h3 style="margin-top:16px">BINDINGS</h3>
@@ -680,10 +705,36 @@ export class Menus {
     }
     if (this.screen === 'hangar') this.hangarScene.highlightHardpoint(this.hardpoint, chassis);
     else this.hangarScene.highlightHardpoint(null);
-    // The title menu occupies the left column, so push the mech right.
-    this.hangarScene.setFraming(this.screen === 'title' ? -11 : 0);
+    // Frame the mech into whatever rectangle this screen leaves clear. When
+    // there is one it decides the placement on its own, so the old lateral
+    // nudge only applies to screens without a stage.
+    const stage = this._stageRect();
+    this.hangarScene.setStage(stage);
+    this.hangarScene.setFraming(stage ? 0 : (this.screen === 'title' ? -11 : 0));
     const surface = this.root.querySelector('.screen');
     if (surface) this.hangarScene.attachDrag(surface);
+  }
+
+  /**
+   * The part of the window this screen has left clear for the mech.
+   * @returns {?{x:number,y:number,w:number,h:number}} CSS pixels, or null to
+   *          frame against the whole window.
+   */
+  _stageRect() {
+    const el = this.root.querySelector('[data-stage-window]');
+    if (el) {
+      const r = el.getBoundingClientRect();
+      if (r.width > 8 && r.height > 8) return { x: r.left, y: r.top, w: r.width, h: r.height };
+    }
+    if (this.screen === 'title') {
+      // The title screen has no stage element; its menu column is on the
+      // left on a wide screen and across the middle on a narrow one.
+      const vw = innerWidth, vh = innerHeight;
+      return vw > 880
+        ? { x: vw * 0.44, y: vh * 0.08, w: vw * 0.52, h: vh * 0.84 }
+        : { x: vw * 0.06, y: vh * 0.03, w: vw * 0.88, h: vh * 0.33 };
+    }
+    return null;
   }
 
   /* ---- event wiring ---- */
@@ -698,6 +749,7 @@ export class Menus {
       this.hardpoint = +el.dataset.hp; this.audio.play('ui'); this.render();
     });
     q('[data-tab]').forEach(el => el.onclick = () => { this.garageTab = el.dataset.tab; this.audio.play('ui'); this.render(); });
+    q('[data-htab]').forEach(el => el.onclick = () => { this.hangarTab = el.dataset.htab; this.audio.play('ui'); this.render(); });
     q('[data-filter]').forEach(el => el.onclick = () => { this.weaponFilter = el.dataset.filter; this.audio.play('ui'); this.render(); });
     q('[data-mode]').forEach(el => el.onclick = () => {
       this.deployMode = el.dataset.mode;
@@ -732,6 +784,8 @@ export class Menus {
       [...group.querySelectorAll('[data-set]')].forEach(b => b.onclick = () => {
         let v = b.dataset.set;
         if (v === 'true') v = true; else if (v === 'false') v = false;
+        // Picking a preset by hand turns off the device-based guess.
+        if (key === 'quality') this.progression.setSetting('qualityAuto', false);
         this.progression.setSetting(key, v);
         this.onSetting?.(key, v);
         this.audio.play('ui');
@@ -741,12 +795,15 @@ export class Menus {
     q('[data-range]').forEach(el => el.oninput = () => {
       const key = el.dataset.range;
       let v = +el.value;
-      if (key === 'sensitivity') v = v / 10000;
+      if (key === 'sensitivity' || key === 'touchSensitivity') v = v / 10000;
       if (key === 'volume') v = v / 100;
       this.progression.setSetting(key, v);
       this.onSetting?.(key, v);
       const label = el.previousElementSibling?.querySelector('b');
-      if (label) label.textContent = key === 'sensitivity' ? (v * 1000).toFixed(1) : key === 'volume' ? Math.round(v * 100) + '%' : v;
+      if (label) {
+        label.textContent = (key === 'sensitivity' || key === 'touchSensitivity') ? (v * 1000).toFixed(1)
+          : key === 'volume' ? Math.round(v * 100) + '%' : v;
+      }
     });
   }
 

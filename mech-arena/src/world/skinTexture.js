@@ -10,7 +10,8 @@ import * as THREE from 'three';
 import { makeRng } from '../core/rng.js';
 import { SKIN_BY_ID, DEFAULT_SKIN } from '../data/skins.js';
 
-const SIZE = 512;
+let SIZE = 512;
+let ROUGH_SIZE = 256;
 
 /**
  * Painted skins are cached by id, but there are 2,496 of them and bots roll
@@ -18,8 +19,22 @@ const SIZE = 512;
  * session lasts. A small insertion-ordered cache with the oldest entries
  * evicted keeps a match's worth resident and bounds the total.
  */
-const MAX_CACHED_SKINS = 32;
+let MAX_CACHED_SKINS = 32;
 const cache = new Map();
+
+/**
+ * Shrink painted skins for a weak GPU: ten mechs each wearing a 512px
+ * albedo plus a roughness map is tens of megabytes of texture.
+ * @param {{size?:number, rough?:number, skins?:number}} o
+ */
+export function setSkinBudget({ size, rough, skins } = {}) {
+  let flush = false;
+  if (size && size !== SIZE) { SIZE = size; flush = true; }
+  if (rough && rough !== ROUGH_SIZE) { ROUGH_SIZE = rough; flush = true; }
+  if (skins) MAX_CACHED_SKINS = skins;
+  if (flush) disposeSkinCache();
+  evictOldestSkins();
+}
 
 function evictOldestSkins() {
   while (cache.size > MAX_CACHED_SKINS) {
@@ -254,7 +269,7 @@ export function skinMaterialMaps(skinId) {
 
   // Roughness: the pattern's luminance jitter doubles as surface variation.
   const rc = document.createElement('canvas');
-  rc.width = rc.height = 256;
+  rc.width = rc.height = ROUGH_SIZE;
   const r2 = rc.getContext('2d');
   const base = Math.round(s.rough * 255);
   r2.fillStyle = `rgb(${base},${base},${base})`;

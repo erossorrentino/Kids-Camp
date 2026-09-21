@@ -46,8 +46,9 @@ function freshProfile() {
       skinId: DEFAULT_SKIN,
     })),
     settings: {
-      quality: 'high', sensitivity: 0.0022, invertY: false, volume: 0.6,
+      quality: 'high', qualityAuto: true, sensitivity: 0.0022, invertY: false, volume: 0.6,
       fov: 72, showFps: false, difficulty: 'regular', autoQuality: true,
+      touchControls: 'auto', touchSensitivity: 0.0052,
       colourMode: 'default', uiScale: 1, shake: 1, damageNumbers: true, nameplates: true,
     },
     stats: { bestKills: 0, bestDamage: 0, favouriteMech: null, mechUse: {} },

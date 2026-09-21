@@ -27,8 +27,15 @@
 
 *{box-sizing:border-box;margin:0;padding:0;}
 html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:var(--disp);}
-body{-webkit-font-smoothing:antialiased;user-select:none;touch-action:none;}
-canvas#viewport{position:fixed;inset:0;width:100vw;height:100vh;display:block;}
+/* `manipulation` rather than `none`: the viewport and the on-screen controls
+   claim their own gestures below, and everything else -- menus, modals,
+   panels -- has to stay scrollable on a touch screen. */
+body{-webkit-font-smoothing:antialiased;user-select:none;touch-action:manipulation;}
+/* The canvas paints the background itself. Until the first frame lands it is
+   transparent, and a transparent canvas shows whatever the page is sitting
+   on -- which, embedded in a light host page, is a white screen. */
+canvas#viewport{position:fixed;inset:0;width:100vw;height:100vh;display:block;
+  background:var(--bg);touch-action:none;}
 .hidden{display:none !important;}
 kbd{font-family:var(--mono);background:rgba(255,255,255,.1);border:1px solid var(--line);border-radius:3px;padding:1px 5px;font-size:.85em;}
 
@@ -188,7 +195,8 @@ kbd{font-family:var(--mono);background:rgba(255,255,255,.1);border:1px solid var
 #scoreboard h3{font-size:13px;letter-spacing:.24em;margin-bottom:10px;color:var(--ink-dim);}
 
 /* ---------------- Menus ---------------- */
-#ui-root{position:fixed;inset:0;z-index:20;display:none;overflow:auto;}
+#ui-root{position:fixed;inset:0;z-index:20;display:none;overflow:auto;
+  touch-action:pan-y;-webkit-overflow-scrolling:touch;}
 #ui-root.active{display:block;}
 .screen{min-height:100%;padding:26px 30px 40px;background:
   radial-gradient(ellipse 120% 80% at 50% -10%,rgba(73,214,255,.09),transparent 60%),
@@ -260,10 +268,18 @@ kbd{font-family:var(--mono);background:rgba(255,255,255,.1);border:1px solid var
 @media (max-width:1240px){
   .hangar-layout{grid-template-columns:232px minmax(200px,1fr) 262px;gap:12px;}
 }
+/* The middle column of the hangar is not a panel at all: it is a hole in the
+   layout that the 3D bay shows through. `menus._stageRect()` measures
+   `.stage-window` and the camera frames the mech into it. */
+.hangar-stage{display:flex;flex-direction:column;min-height:0;pointer-events:none;}
+.stage-window{flex:1;min-height:60vh;}
+.stage-hint{text-align:center;pointer-events:auto;padding:6px 0 2px;}
+.hangar-tabs{display:none;gap:6px;}
+
 .panel{background:var(--panel-solid);border:1px solid var(--line);border-radius:10px;padding:14px;}
 .panel h3{font-size:11px;letter-spacing:.26em;color:var(--ink-dim);margin-bottom:11px;
   border-bottom:1px solid var(--line);padding-bottom:8px;}
-.scroll{max-height:64vh;overflow-y:auto;padding-right:6px;}
+.scroll{max-height:64vh;overflow-y:auto;padding-right:6px;touch-action:pan-y;-webkit-overflow-scrolling:touch;}
 .scroll::-webkit-scrollbar{width:7px;}
 .scroll::-webkit-scrollbar-thumb{background:rgba(120,190,220,.24);border-radius:4px;}
 .scroll::-webkit-scrollbar-track{background:rgba(255,255,255,.03);}
@@ -300,7 +316,8 @@ kbd{font-family:var(--mono);background:rgba(255,255,255,.1);border:1px solid var
 .slot-card .sc-c{font-size:9px;letter-spacing:.2em;color:var(--ink-dim);margin-top:3px;}
 .slot-card .sc-empty{font-size:10px;letter-spacing:.22em;color:var(--ink-dim);}
 
-.modal-back{position:fixed;inset:0;background:rgba(2,4,7,.8);z-index:30;display:grid;place-items:center;backdrop-filter:blur(4px);}
+.modal-back{position:fixed;inset:0;background:rgba(2,4,7,.8);z-index:30;display:grid;place-items:center;backdrop-filter:blur(4px);
+  overflow:auto;touch-action:pan-y;-webkit-overflow-scrolling:touch;padding:14px;}
 .modal{width:min(980px,94vw);max-height:86vh;overflow:auto;background:var(--panel-solid);border:1px solid var(--line-strong);
   border-radius:12px;padding:20px;box-shadow:0 24px 80px rgba(0,0,0,.8);}
 .modal h3{font-size:14px;letter-spacing:.26em;margin-bottom:14px;}
@@ -343,12 +360,51 @@ kbd{font-family:var(--mono);background:rgba(255,255,255,.1);border:1px solid var
 .mono{font-family:var(--mono);}
 
 @media (max-width:880px){
-  .title-hero{align-items:center;text-align:center;padding-left:16px;max-width:none;}
+  /* The mech takes the top third of a phone screen and the menu sits under
+     it, so the scrim is light where the machine is and heavy behind text. */
+  .title-hero{align-items:center;text-align:center;padding-left:16px;max-width:none;
+    justify-content:flex-end;padding-bottom:9vh;}
+  .title-hero .tagline{white-space:normal;font-size:9px;letter-spacing:.14em;line-height:1.7;}
   .screen.see-through .title-hero::before{width:100vw;
-    background:linear-gradient(180deg,rgba(4,6,9,.9),rgba(4,6,9,.75));}
+    background:linear-gradient(180deg,rgba(4,6,9,.30) 0%,rgba(4,6,9,.34) 28%,
+                rgba(4,6,9,.80) 48%,rgba(4,6,9,.94) 100%);}
   .hangar-layout{grid-template-columns:1fr;}
   #radar{width:120px;height:120px;}
   #weapon-panel .wslot{min-width:206px;}
+
+  /* A phone cannot show three columns, and stacking them buries the mech
+     under the panels -- which is exactly what it looked like. Instead the
+     screen becomes a fixed frame: the bay keeps a band across the top and
+     one panel at a time scrolls underneath it. */
+  .screen{padding:12px 13px 14px;}
+  .screen-head{flex-wrap:wrap;gap:8px 12px;margin-bottom:12px;padding-bottom:10px;}
+  .screen-head .spacer{display:none;}
+  .brand{font-size:17px;letter-spacing:.24em;}
+  .wallet{font-size:11px;gap:10px;}
+  .loadout-strip{gap:6px;margin-bottom:10px;}
+  .slot-card{min-height:56px;padding:5px;}
+  .slot-card .sc-n{font-size:10.5px;}
+  .slot-card .sc-c{font-size:8px;letter-spacing:.12em;}
+
+  .screen.hangar-screen{height:100vh;height:100dvh;min-height:0;overflow:hidden;
+    display:flex;flex-direction:column;}
+  /* `align-items:start` sizes grid items to their content, which collapses
+     an empty stage to nothing. Here the rows are the layout. */
+  .hangar-layout.with-stage{flex:1;min-height:0;grid-template-columns:1fr;gap:8px;
+    align-items:stretch;grid-template-rows:auto minmax(122px,0.95fr) minmax(0,1.1fr);}
+  .hangar-layout.with-stage .hangar-tabs{display:flex;grid-row:1;}
+  .hangar-layout.with-stage .hangar-tabs .tab{flex:1;padding:7px 4px;font-size:10px;letter-spacing:.12em;}
+  .hangar-layout.with-stage > .hangar-stage{grid-row:2;}
+  .hangar-layout.with-stage .stage-window{min-height:0;}
+  .hangar-layout.with-stage .stage-hint{font-size:8.5px;}
+  .hangar-layout.with-stage > .panel{grid-row:3;min-height:0;overflow-y:auto;
+    touch-action:pan-y;-webkit-overflow-scrolling:touch;}
+  .hangar-layout.with-stage .scroll{max-height:none;}
+  .hangar-layout.tab-chassis > .col-loadout{display:none;}
+  .hangar-layout.tab-loadout > .col-chassis{display:none;}
+  /* 'VIEW MECH' gives the whole frame back to the bay. */
+  .hangar-layout.tab-view{grid-template-rows:auto 1fr 0;}
+  .hangar-layout.tab-view > .panel{display:none;}
 }
 @media (max-width:1100px){
   #radar{width:120px;height:120px;}
@@ -466,3 +522,108 @@ kbd{font-family:var(--mono);background:rgba(255,255,255,.1);border:1px solid var
   color:var(--ink);background:var(--panel);border:1px solid var(--line-strong);
   backdrop-filter:blur(8px);box-shadow:var(--shadow);animation:introin .4s ease-out;}
 #aim-mode b{display:block;font-size:10px;letter-spacing:.3em;color:var(--cyan);margin-bottom:6px;}
+
+
+/* ---------------- Boot failure ---------------- */
+/* Shown by the inline guard in index.html when the page cannot start: a
+   refused WebGL context, a module that never arrived, a render loop that
+   gave up. Anything is better than an empty frame. */
+#boot-error{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:20px;
+  background:linear-gradient(180deg,#05070a,#080d13);overflow:auto;touch-action:pan-y;}
+#boot-error.hidden{display:none !important;}
+#boot-error .be-card{max-width:520px;width:100%;background:var(--panel-solid);border:1px solid var(--line);
+  border-top:3px solid var(--red);border-radius:11px;padding:24px;text-align:center;box-shadow:var(--shadow);}
+#boot-error h2{font-size:15px;letter-spacing:.26em;color:var(--red);margin-bottom:12px;}
+#boot-error p{font-size:12.5px;line-height:1.7;color:var(--ink);}
+#boot-error .be-foot{margin-top:16px;font-size:10.5px;letter-spacing:.06em;color:var(--ink-dim);line-height:1.7;}
+#boot-error pre{margin-top:12px;padding:10px;border-radius:6px;background:rgba(0,0,0,.45);border:1px solid var(--line);
+  font-family:var(--mono);font-size:10px;line-height:1.55;color:var(--ink-dim);text-align:left;
+  white-space:pre-wrap;word-break:break-word;max-height:30vh;overflow:auto;}
+#boot-error pre.hidden{display:none;}
+
+/* ---------------- On-screen controls ---------------- */
+/* Drawn only on touch devices. The stick and the buttons claim their own
+   gestures; the bare viewport between them is the look area. */
+#touch-controls{position:fixed;inset:0;z-index:14;pointer-events:none;touch-action:none;
+  font-family:var(--disp);user-select:none;-webkit-user-select:none;}
+#touch-controls.hidden{display:none !important;}
+#tc-stick{position:absolute;pointer-events:auto;touch-action:none;
+  left:calc(14px + env(safe-area-inset-left,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));
+  width:138px;height:138px;border-radius:50%;
+  background:radial-gradient(circle at 50% 50%,rgba(73,214,255,.10),rgba(5,8,11,.5));
+  border:1px solid var(--line);box-shadow:0 6px 24px rgba(0,0,0,.5);}
+#tc-ring{position:absolute;inset:18px;border-radius:50%;border:1px dashed rgba(120,190,220,.28);}
+#tc-knob{position:absolute;left:50%;top:50%;width:58px;height:58px;border-radius:50%;
+  transform:translate(-50%,-50%);background:rgba(73,214,255,.24);border:1px solid var(--line-strong);
+  box-shadow:0 0 18px rgba(73,214,255,.3);}
+#tc-pad{position:absolute;pointer-events:none;display:flex;flex-direction:column;align-items:flex-end;gap:8px;
+  right:calc(12px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));}
+.tc-row{display:flex;gap:8px;pointer-events:none;}
+.tc-btn{pointer-events:auto;touch-action:none;font-family:var(--disp);font-size:10px;letter-spacing:.14em;
+  min-width:64px;height:42px;border-radius:9px;color:var(--ink);cursor:pointer;
+  background:rgba(10,16,22,.66);border:1px solid var(--line-strong);backdrop-filter:blur(5px);}
+.tc-btn.on{background:rgba(73,214,255,.34);border-color:var(--cyan);color:#fff;}
+.tc-big{align-self:flex-end;width:108px;height:108px;border-radius:50%;font-size:14px;letter-spacing:.2em;
+  background:rgba(255,77,94,.24);border-color:rgba(255,130,120,.62);}
+.tc-big.on{background:rgba(255,77,94,.55);border-color:#ff8a7a;}
+.tc-corner{position:absolute;min-width:56px;height:34px;font-size:9.5px;
+  left:calc(12px + env(safe-area-inset-left,0px));top:calc(12px + env(safe-area-inset-top,0px));}
+#tc-hint{position:absolute;left:50%;transform:translateX(-50%);bottom:4px;
+  font-size:8.5px;letter-spacing:.2em;color:var(--ink-dim);}
+
+#tc-hint{animation:tcHint .6s ease 9s forwards;}
+@keyframes tcHint{to{opacity:0;}}
+
+/* With the controls up the bottom corners belong to thumbs, so every
+   readout that lived down there moves to the top of the frame. */
+body.touch-ui #speedo{display:none;}
+body.touch-ui #status-panel{left:10px;bottom:auto;top:96px;transform-origin:top left;}
+body.touch-ui #weapon-panel{right:10px;bottom:auto;top:96px;transform-origin:top right;}
+body.touch-ui #comms{left:10px;bottom:auto;top:268px;}
+body.touch-ui #ability-panel{bottom:calc(160px + env(safe-area-inset-bottom,0px));}
+body.touch-ui #tutorial{top:auto;bottom:calc(178px + env(safe-area-inset-bottom,0px));
+  left:10px;width:min(330px,64vw);}
+
+/* A phone has no room for the desktop HUD at full size. */
+@media (max-width:900px){
+  /* The score and clock run left-to-right from beside the MENU button so
+     the radar can keep the top-right corner to itself. */
+  body.touch-ui #topbar{left:58px;top:5px;transform:scale(.66);transform-origin:top left;gap:10px;}
+  body.touch-ui #objectives{top:52px;transform:translateX(-50%) scale(.74);}
+  body.touch-ui #radar{width:88px;height:88px;right:8px;top:8px;}
+  body.touch-ui #status-panel{top:52px;left:6px;transform:scale(.6);}
+  body.touch-ui #weapon-panel{top:146px;right:6px;transform:scale(.62);}
+  body.touch-ui #weapon-panel .wslot{min-width:152px;}
+  body.touch-ui #killfeed{top:250px;right:6px;width:180px;transform:scale(.78);transform-origin:top right;}
+  body.touch-ui #comms{top:150px;width:196px;transform:scale(.8);transform-origin:top left;}
+  body.touch-ui #fps{top:120px;}
+  body.touch-ui #event-toast{top:19%;font-size:17px;}
+  body.touch-ui #intro-card{left:14px;right:14px;bottom:38%;max-width:none;}
+  body.touch-ui #intro-card .in-map{font-size:28px;}
+  body.touch-ui #intro-card .in-sub{font-size:11px;}
+  /* Above the stick, left of the action pad. */
+  body.touch-ui #ability-panel{left:8px;transform:scale(.68);transform-origin:bottom left;
+    bottom:calc(148px + env(safe-area-inset-bottom,0px));}
+  body.touch-ui #tutorial{bottom:calc(232px + env(safe-area-inset-bottom,0px));width:min(300px,74vw);}
+  body.touch-ui #respawn-overlay{padding:10px;}
+}
+@media (max-width:520px){
+  .tc-btn{min-width:56px;height:38px;font-size:9px;}
+  .tc-big{width:92px;height:92px;font-size:12px;}
+  #tc-stick{width:118px;height:118px;}
+  #tc-knob{width:50px;height:50px;}
+  .tc-corner{min-width:48px;height:28px;font-size:8.5px;}
+}
+
+
+/* Shown while the WebGL context is away and the game is waiting for it. */
+#gpu-notice{position:fixed;left:50%;top:44%;transform:translate(-50%,-50%);z-index:55;width:min(420px,88vw);
+  background:var(--panel-solid);border:1px solid var(--line-strong);border-left:3px solid var(--amber);
+  border-radius:9px;padding:16px 18px;font-size:11.5px;line-height:1.7;color:var(--ink-dim);
+  box-shadow:var(--shadow);text-align:left;}
+#gpu-notice b{display:block;font-size:12px;letter-spacing:.24em;color:var(--amber);margin-bottom:7px;}
+#gpu-notice.hidden{display:none !important;}
+
+/* Choosing the next mech beats holding the trigger. */
+body.respawning #touch-controls{opacity:.15;pointer-events:none;}
+body.respawning #tc-stick,body.respawning .tc-btn{pointer-events:none;}

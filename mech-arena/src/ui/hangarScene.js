@@ -30,6 +30,9 @@ export class HangarScene {
     // the screen without moving the camera off its turntable arc. The title
     // screen uses it to keep the mech clear of the menu column.
     this.lookShiftX = 0;
+    // The rectangle of the window the menu has left clear for the mech, in
+    // CSS pixels. Null means "the whole window".
+    this.stage = null;
     this.built = false;
     this.visible = false;
   }
@@ -201,7 +204,22 @@ export class HangarScene {
     this.zoom = damp(this.zoom, this.targetZoom, 8, dt);
     const h = this.frameHeight || 10;
     const cam = this.engine.camera;
-    const dist = (h * 2.4 + 8) / this.zoom;
+
+    /* Frame the mech into the rectangle the menu left clear for it, not into
+     * the middle of the window. On a wide screen that is the centre column;
+     * on a phone it is a band across the top with the panels below. Backing
+     * the camera off until the machine fits that rectangle -- and aiming at
+     * the rectangle's centre rather than the screen's -- is what keeps it
+     * visible at every width instead of hiding behind the panels. */
+    const vw = Math.max(1, innerWidth), vh = Math.max(1, innerHeight);
+    const st = this.stage || { x: 0, y: 0, w: vw, h: vh };
+    const tanY = Math.tan((cam.fov * Math.PI / 180) / 2);
+    const fracY = clamp(st.h / vh, 0.12, 1);
+    const fracX = clamp(st.w / vw, 0.12, 1);
+    const distY = (h * 1.12 * 0.5) / (tanY * fracY);
+    const distX = (h * 0.66 * 0.5) / (tanY * Math.max(0.35, cam.aspect) * fracX);
+    const dist = Math.max(distY, distX, h * 1.4 + 5) / this.zoom;
+
     const want = _v.set(
       Math.sin(-0.5) * dist * 0.55,
       this.focusY + h * 0.42,
@@ -210,30 +228,72 @@ export class HangarScene {
     cam.position.x = damp(cam.position.x, want.x, 6, dt);
     cam.position.y = damp(cam.position.y, want.y, 6, dt);
     cam.position.z = damp(cam.position.z, want.z, 6, dt);
-    cam.lookAt(this.lookShiftX, this.focusY + h * 0.06, 0);
+
+    const target = _t.set(this.lookShiftX, this.focusY + h * 0.06, 0);
+    // Where the stage sits in normalised device coordinates: +x right, +y up.
+    const cx = ((st.x + st.w * 0.5) / vw) * 2 - 1;
+    const cy = 1 - ((st.y + st.h * 0.5) / vh) * 2;
+    if (cx || cy) {
+      // Shifting the look target the other way moves the subject onto the
+      // stage without moving the camera off its turntable arc.
+      _fwd.copy(target).sub(cam.position);
+      const d = _fwd.length() || 1;
+      _fwd.multiplyScalar(1 / d);
+      _right.crossVectors(_fwd, _up).normalize();
+      const halfH = tanY * d;
+      target.addScaledVector(_right, -cx * halfH * cam.aspect)
+            .addScaledVector(_up, -cy * halfH);
+    }
+    cam.lookAt(target);
   }
 
   /** @param {number} x negative shifts the subject toward the right of frame. */
   setFraming(x) { this.lookShiftX = x; }
 
+  /**
+   * The clear rectangle the mech should be framed into.
+   * @param {?{x:number,y:number,w:number,h:number}} rect CSS pixels, or null
+   *        for the whole window.
+   */
+  setStage(rect) {
+    this.stage = (rect && rect.w > 8 && rect.h > 8) ? rect : null;
+  }
+
   /** Hook pointer drag from the menu layer so the mech can be spun by hand. */
   attachDrag(el) {
-    let last = null;
-    const down = (e) => { this.dragging = true; last = e.clientX; };
-    const move = (e) => {
-      if (!this.dragging || last == null) return;
-      this.userSpin += (e.clientX - last) * 0.011;
-      last = e.clientX;
-    };
-    const up = () => { this.dragging = false; last = null; };
-    el.addEventListener('pointerdown', down);
-    addEventListener('pointermove', move);
-    addEventListener('pointerup', up);
+    // The menu re-renders its surface on every change, so the window-level
+    // listeners are registered once and the per-element ones ride along.
+    if (!this._dragBound) {
+      this._dragBound = true;
+      this._dragLast = null;
+      addEventListener('pointermove', (e) => {
+        if (!this.dragging || this._dragLast == null) return;
+        this.userSpin += (e.clientX - this._dragLast) * 0.011;
+        this._dragLast = e.clientX;
+      });
+      addEventListener('pointerup', () => { this.dragging = false; this._dragLast = null; });
+      addEventListener('pointercancel', () => { this.dragging = false; this._dragLast = null; });
+    }
+    el.addEventListener('pointerdown', (e) => {
+      // On a touch screen a drag that starts on a panel is a scroll, not a
+      // turntable spin.
+      if (e.pointerType === 'touch' && e.target?.closest?.('.panel,.btn,.card,.tab,button,input,select'))
+        return;
+      this.dragging = true;
+      this._dragLast = e.clientX;
+    });
     el.addEventListener('wheel', (e) => {
       this.targetZoom = clamp(this.targetZoom * (e.deltaY > 0 ? 0.9 : 1.1), 0.6, 2.6);
       e.preventDefault();
     }, { passive: false });
   }
+
+  /** Pinch/zoom from the on-screen control, clamped to the framing limits. */
+  nudgeZoom(mul) { this.targetZoom = clamp(this.targetZoom * mul, 0.6, 2.6); }
 }
 
 const _v = new THREE.Vector3();
+const _t = new THREE.Vector3();
+const _fwd = new THREE.Vector3();
+const _right = new THREE.Vector3();
+const _up = new THREE.Vector3(0, 1, 0);

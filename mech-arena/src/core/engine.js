@@ -13,12 +13,49 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { damp, clamp } from './rng.js';
 
+/* `tex`, `sets`, `skin` and `skins` are the texture budget: how big the
+ * generated maps are and how many stay resident. They matter more than
+ * anything else on a phone, where running out of texture memory does not
+ * slow the game down -- it loses the WebGL context and the screen goes
+ * blank. */
 export const QUALITY = {
-  low:    { shadow:0,    pixelRatio:0.75, bloom:0.0,  aniso:1, shadowDist:0,   particles:0.4, fogQuality:0 },
-  medium: { shadow:1024, pixelRatio:1.0,  bloom:0.45, aniso:4, shadowDist:140, particles:0.7, fogQuality:1 },
-  high:   { shadow:2048, pixelRatio:1.0,  bloom:0.7,  aniso:8, shadowDist:220, particles:1.0, fogQuality:1 },
-  ultra:  { shadow:4096, pixelRatio:1.25, bloom:0.9,  aniso:16, shadowDist:320, particles:1.4, fogQuality:1 },
+  low:    { shadow:0,    pixelRatio:0.7,  bloom:0.0,  aniso:1, shadowDist:0,   particles:0.35, fogQuality:0,
+            tex:256, sets:8,  skin:256, skinRough:128, skins:12 },
+  medium: { shadow:1024, pixelRatio:1.0,  bloom:0.45, aniso:4, shadowDist:140, particles:0.7, fogQuality:1,
+            tex:384, sets:12, skin:384, skinRough:192, skins:20 },
+  high:   { shadow:2048, pixelRatio:1.0,  bloom:0.7,  aniso:8, shadowDist:220, particles:1.0, fogQuality:1,
+            tex:512, sets:16, skin:512, skinRough:256, skins:32 },
+  ultra:  { shadow:4096, pixelRatio:1.25, bloom:0.9,  aniso:16, shadowDist:320, particles:1.4, fogQuality:1,
+            tex:512, sets:20, skin:512, skinRough:256, skins:40 },
 };
+
+/**
+ * The preset to start on when the player has not chosen one. A phone or a
+ * cheap laptop cannot carry the desktop preset, and finding that out by
+ * losing the graphics context mid-match is the worst way to learn it.
+ */
+export function suggestQuality() {
+  let coarse = false, fine = true;
+  try {
+    coarse = matchMedia('(pointer: coarse)').matches;
+    fine = matchMedia('(pointer: fine)').matches;
+  } catch { /* older browsers: fall through to the other signals */ }
+  // Chrome caps deviceMemory at 8 and Safari does not report it at all, so
+  // it can only ever say "this machine is small", never "this one is big".
+  const mem = navigator.deviceMemory || 8;
+  const cores = navigator.hardwareConcurrency || 4;
+  const short = Math.min(screen?.width || innerWidth, screen?.height || innerHeight);
+  if ((coarse && !fine) || short <= 820) return 'low';   // phone, small tablet
+  if (mem <= 4 || cores <= 4) return 'low';              // cheap laptop, Chromebook
+  if (cores <= 8) return 'medium';
+  return 'high';
+}
+
+/** The highest preset worth letting the adaptive controller climb to. */
+export function qualityCeiling() {
+  const floor = suggestQuality();
+  return floor === 'low' ? 'medium' : 'ultra';
+}
 
 /* A light chromatic-aberration + scanline + damage-grade pass. Cheap, and it
  * does more for the "inside a cockpit" feeling than any amount of geometry. */
@@ -90,6 +127,26 @@ export class Engine {
 
     this.renderer = new THREE.WebGLRenderer({
       canvas, antialias: this.quality !== 'low', powerPreference:'high-performance', stencil:false,
+    });
+    // The post chain is the most driver-sensitive part of the renderer. If a
+    // pass ever throws, the game drops to a plain forward render rather than
+    // to a blank page -- see Game._onRenderError.
+    this.postEnabled = true;
+    this.contextLost = false;
+    /* A lost context stops painting, and the canvas turns transparent while
+     * it is gone -- which is why a blown texture budget reads as "the screen
+     * went white". Calling preventDefault asks the browser to give the
+     * context back; three re-uploads everything it needs on the next frame,
+     * so the game can carry on at a lighter preset rather than dying. */
+    canvas.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      this.contextLost = true;
+      this.onContextLost?.();
+    });
+    canvas.addEventListener('webglcontextrestored', () => {
+      this.contextLost = false;
+      this._onResize();
+      this.onContextRestored?.();
     });
     this.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, this.q.pixelRatio * 1.5));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -376,9 +433,14 @@ export class Engine {
     this.fill.position.copy(this.camera.position).addScaledVector(_camDir, -1).setY(this.camera.position.y + 12);
   }
 
+  /** Post-processing on or off. Off is the fallback path, not a quality tier. */
+  setPostEnabled(on) { this.postEnabled = !!on; }
+
   render() {
+    if (this.contextLost) return;
     this.renderer.info.reset();
-    this.composer.render();
+    if (this.postEnabled) this.composer.render();
+    else this.renderer.render(this.scene, this.camera);
     const info = this.renderer.info.render;
     this.stats.draw = info.calls;
     this.stats.tris = info.triangles;

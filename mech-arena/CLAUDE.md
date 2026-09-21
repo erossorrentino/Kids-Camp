@@ -15,6 +15,7 @@ python3 -m http.server 8000      # ES modules need an origin, not file://
 ./tools/check.sh                 # full ESM parse of every module
 node tools/validate.mjs          # data cross-references, no browser
 node tools/smoke.mjs             # boot, menus, matches, screenshots
+node tools/mobile.mjs            # phone/tablet layout + touch, on pixels
 node tools/sim.mjs               # headless combat on all 41 arenas
 node tools/circuit.mjs           # a tournament end to end
 node tools/leak.mjs              # resource leaks across ten matches
@@ -45,6 +46,32 @@ yours is elsewhere. Screenshots land in `$SMOKE_OUT` (default
   builds one per biome and `buildStudioEnvironment` covers the menus.
 - **CSS silently takes the last duplicate declaration.** The ability panel
   declared `position` twice and rendered in the wrong corner for days.
+- **Test the page the player actually loads.** The Artifact host wraps the
+  published fragment in its own document with a light background, so a
+  canvas that never paints reads as a white screen. `tools/mobile.mjs`
+  serves that exact skeleton and decodes the screenshot rather than
+  trusting the scene graph.
+- **A layout that works on a desktop can bury the game on a phone.** The
+  hangar's three columns collapsed into one below 880px and the panels
+  stacked over the bay, so the mech was off screen while every structural
+  check still passed. The camera now frames into a measured rectangle
+  (`menus._stageRect()` -> `hangarScene.setStage()`), which is why the
+  narrow layout has to reserve one.
+- **`align-items:start` collapses an empty grid item to nothing.** The
+  stage rectangle measured zero height until the narrow layout stretched
+  its rows.
+- **A white screen is usually a lost WebGL context.** The canvas is
+  transparent while the context is away, so the page behind it shows
+  through. `canvas#viewport` paints its own dark background, `Engine`
+  calls `preventDefault` on `webglcontextlost` so the browser gives it
+  back, and `Game._wireContextLoss` drops to the lightest preset and
+  carries on.
+- **On a phone the texture budget is the constraint, not the frame rate.**
+  Sixteen 512px surface sets plus thirty-two painted skins is most of a
+  phone's texture memory. `QUALITY` presets carry `tex`/`sets`/`skin`/
+  `skins`, `suggestQuality()` picks one from the device, and the budget is
+  applied between matches -- resizing throws the caches away, which must
+  not happen under a live match.
 
 ## Rules the code follows
 
@@ -53,6 +80,8 @@ yours is elsewhere. Screenshots land in `$SMOKE_OUT` (default
 - Bots and the player write the same intent fields and run the same physics,
   heat and weapon code. Difficulty buys reaction time and aim error, never
   damage or armour.
+- Keyboard, mouse steering and the on-screen controls all write the same
+  intent through `Input`; nothing downstream knows which one is in use.
 - Generated content is deterministic: arenas from a seed, skins from a hash.
 - Nothing allocates during a match. Particles, tracers, beams, decals and
   projectiles all come from preallocated pools.

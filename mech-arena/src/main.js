@@ -6,11 +6,13 @@
  * module that does one job.
  */
 import * as THREE from 'three';
-import { Engine, QUALITY } from './core/engine.js';
+import { Engine, QUALITY, suggestQuality, qualityCeiling } from './core/engine.js';
 import { Input } from './core/input.js';
 import { Audio } from './core/audio.js';
 import { FX } from './world/fx.js';
 import { Arena } from './world/arena.js';
+import { setSurfaceBudget } from './world/textures.js';
+import { setSkinBudget } from './world/skinTexture.js';
 import { Sky } from './world/sky.js';
 import { CockpitRig } from './world/cockpitRig.js';
 import { Match, setTeamPalette, TEAM_COLORS } from './game/match.js';
@@ -21,6 +23,7 @@ import { HangarScene } from './ui/hangarScene.js';
 import { Progression } from './ui/progression.js';
 import { Tutorial } from './ui/tutorial.js';
 import { Markers } from './ui/markers.js';
+import { TouchControls, isTouchDevice } from './ui/touch.js';
 import { MAPS, MAP_BY_ID, mapsForMode, BIOMES } from './data/maps.js';
 import { TOURNAMENTS } from './data/tournaments.js';
 import { clamp } from './core/rng.js';
@@ -34,12 +37,22 @@ class Game {
     this.progression = new Progression();
     const s = this.progression.settings;
 
-    this.engine = new Engine(this.canvas, s.quality);
+    // Until the player picks a preset themselves, the device picks it. A
+    // phone or a low-end Chromebook cannot carry the desktop texture budget,
+    // and the way it fails is the whole screen going blank mid-match.
+    if (s.qualityAuto !== false) {
+      const want = suggestQuality();
+      if (want !== s.quality) this.progression.setSetting('quality', want);
+    }
+    applyBudget(this.progression.settings.quality);
+
+    this.engine = new Engine(this.canvas, this.progression.settings.quality);
     this.engine.fovBase = s.fov;
     this.engine.fovTarget = s.fov;
 
     this.input = new Input(this.canvas);
     this.input.sensitivity = s.sensitivity;
+    this.input.touchSensitivity = s.touchSensitivity ?? this.input.touchSensitivity;
     this.input.invertY = s.invertY;
 
     this.audio = new Audio();
@@ -69,6 +82,24 @@ class Game {
 
     this.controller = new PlayerController(this.input, this.engine, null, this.audio);
 
+    // On a phone or a tablet the keyboard and the mouse are not there to be
+    // used. The on-screen controls write the same intent, so the simulation
+    // is unchanged -- see src/ui/touch.js.
+    this.touchMode = s.touchControls === 'on'
+      || (s.touchControls !== 'off' && isTouchDevice());
+    this.touch = new TouchControls({
+      input: this.input,
+      canvas: this.canvas,
+      onMenu: () => this.togglePause(),
+    });
+    if (this.touchMode) this.input.setTouchMode(true);
+    // A Chromebook or a Windows laptop with a touchscreen reports a fine
+    // pointer, so it does not look like a phone until somebody taps it.
+    addEventListener('touchstart', () => {
+      if (this.touchMode || this.progression.settings.touchControls === 'off') return;
+      this.setTouchMode(true);
+    }, { passive: true, once: false });
+
     this.state = 'menu';
     this.booted = false;
     this.match = null;
@@ -83,6 +114,10 @@ class Game {
     // Adaptive quality: a mech arena is unplayable below ~40fps, and the
     // right response to a slow machine is fewer shadows, not a slideshow.
     this.autoQuality = s.autoQuality !== false;
+    // A machine that had to start on the lightest preset should not be
+    // climbed back to the heaviest one just because a quiet minute went
+    // smoothly -- that is how a phone ends up losing its context again.
+    this.maxQuality = qualityCeiling();
     this._perfWindow = [];
     this._perfCooldown = 6;
 
@@ -94,6 +129,7 @@ class Game {
     this.markers.showPlates = s.nameplates !== false;
 
     this._wireGlobal();
+    this._wireContextLoss();
   }
 
   /* ---------------------------------------------------------------- */
@@ -160,13 +196,65 @@ class Game {
     document.documentElement.style.setProperty('--team-b', hex(p.b));
   }
 
+  /** Turn the on-screen controls on or off at runtime. */
+  setTouchMode(on) {
+    if (this.touchMode === on) return;
+    this.touchMode = on;
+    this.input.setTouchMode(on);
+    this.touch.setVisible(on && this.state === 'match');
+    if (on) this.input.releaseLock();
+  }
+
+  /**
+   * The graphics context can be taken away -- a phone reclaiming memory, a
+   * driver reset, a backgrounded tab. Three re-uploads what it needs when
+   * the context comes back, so the game pauses, drops to the lightest
+   * preset and carries on rather than leaving a blank page.
+   */
+  _wireContextLoss() {
+    const notice = document.getElementById('gpu-notice');
+    this.engine.onContextLost = () => {
+      this._contextLostAt = performance.now();
+      notice?.classList.remove('hidden');
+      clearTimeout(this._gpuTimer);
+      this._gpuTimer = setTimeout(() => {
+        if (!this.engine.contextLost) return;
+        window.__bootFail?.('The graphics context was lost and did not come back.',
+          'This usually means the device ran out of graphics memory.');
+      }, 9000);
+    };
+    this.engine.onContextRestored = () => {
+      clearTimeout(this._gpuTimer);
+      notice?.classList.add('hidden');
+      // Come back lighter, and stay there: whatever the budget was, this
+      // device could not hold it.
+      this.maxQuality = 'low';
+      if (this.progression.settings.quality !== 'low') {
+        this.progression.setSetting('quality', 'low');
+        this.applySetting('quality', 'low');
+        this.hud?.toast?.('GRAPHICS REDUCED', 'Recovered from a graphics reset');
+      }
+      applyBudget('low');
+      this.lastTime = performance.now();
+      this.accumulator = 0;
+    };
+  }
+
   applySetting(key, value) {
     switch (key) {
       case 'quality':
         this.engine.setQuality(value);
         this.fx.q = QUALITY[value].particles;
+        // Resizing the generated textures throws away everything cached, so
+        // it happens between matches -- or on the recovery path, where
+        // freeing that memory is the entire point.
+        if (this.state !== 'match') applyBudget(value);
         break;
       case 'sensitivity': this.input.sensitivity = value; break;
+      case 'touchSensitivity': this.input.touchSensitivity = value; break;
+      case 'touchControls':
+        this.setTouchMode(value === 'on' || (value !== 'off' && isTouchDevice()));
+        break;
       case 'invertY': this.input.invertY = value; break;
       case 'volume': this.audio.setVolume(value); break;
       case 'fov': this.engine.fovBase = value; this.engine.fovTarget = value; break;
@@ -201,6 +289,7 @@ class Game {
     setTimeout(() => loading.remove(), 600);
 
     this.booted = true;
+    window.__booted = true;
     this.menus.open('title');
     this.lastTime = performance.now();
     requestAnimationFrame(this.loop);
@@ -209,6 +298,8 @@ class Game {
   /* ---------------------------------------------------------------- */
   startMatch({ mode, mapId, difficulty, tournament = null }) {
     this.audio.resume();
+    // Size the generated textures for the preset before the arena builds any.
+    applyBudget(this.progression.settings.quality);
     this.menus.close();
     this.menus.suspended = true;
     this.hangarScene.leave();
@@ -259,6 +350,7 @@ class Game {
     this.intro = null;
     this.hud.show();
     this.markers.setVisible(true);
+    if (this.touchMode) this.touch.setVisible(true);
     this.hud.hideRespawn();
     // The intro card names the arena, so the centre-screen toast would just
     // be the same words twice.
@@ -302,6 +394,7 @@ class Game {
     this.hud.hideKillCam();
     this.cockpit.setVisible(false);
     this.markers.setVisible(false);
+    this.touch.setVisible(false);
     this.menus.suspended = false;
     this.input.releaseLock();
     this.hud.hide();
@@ -382,6 +475,7 @@ class Game {
 
   /* ---------------------------------------------------------------- */
   loop = () => {
+    if (this._renderDead) return;
     requestAnimationFrame(this.loop);
     const now = performance.now();
     let dt = (now - this.lastTime) / 1000;
@@ -402,9 +496,33 @@ class Game {
 
     this.engine.update(dt, this._grade());
     if (this._cockpitMech) this.cockpit.update(dt, this.engine.camera, this._cockpitMech);
-    this.engine.render();
+    try {
+      this.engine.render();
+    } catch (err) {
+      this._onRenderError(err);
+    }
     this.input.endFrame();
   };
+
+  /**
+   * A frame that throws must not leave an empty window. The post chain is
+   * the part most likely to fail on an unusual driver, so the first failure
+   * drops to a plain forward render; only if that fails too does the game
+   * give up, and then it says so.
+   */
+  _onRenderError(err) {
+    this._renderFails = (this._renderFails || 0) + 1;
+    console.error('render failed', err);
+    if (this._renderFails === 1 && this.engine.postEnabled) {
+      this.engine.setPostEnabled(false);
+      this.hud?.toast?.('EFFECTS OFF', 'Post-processing failed on this device');
+      return;
+    }
+    if (this._renderFails >= 4) {
+      this._renderDead = true;
+      window.__bootFail?.('The graphics pipeline stopped responding.', err);
+    }
+  }
 
   _updateMatch(dt) {
     const m = this.match;
@@ -488,9 +606,10 @@ class Game {
     const order = ['low', 'medium', 'high', 'ultra'];
     const i = order.indexOf(this.progression.settings.quality);
 
+    const ceiling = Math.min(order.indexOf(this.maxQuality || 'ultra'), order.length - 1);
     let next = null;
     if (p80 > 1 / 34 && i > 0) next = order[i - 1];
-    else if (p80 < 1 / 110 && i < order.length - 1) next = order[i + 1];
+    else if (p80 < 1 / 110 && i < ceiling) next = order[i + 1];
     if (!next) return;
 
     this.progression.setSetting('quality', next);
@@ -645,6 +764,13 @@ class Game {
 
 function frame() { return new Promise(r => requestAnimationFrame(() => setTimeout(r, 14))); }
 
+/** Push a quality preset's texture budget into the generators. */
+function applyBudget(quality) {
+  const q = QUALITY[quality] || QUALITY.high;
+  setSurfaceBudget({ size: q.tex, sets: q.sets });
+  setSkinBudget({ size: q.skin, rough: q.skinRough, skins: q.skins });
+}
+
 const _fwd = new THREE.Vector3();
 const _kcWant = new THREE.Vector3();
 const _kcDir = new THREE.Vector3();
@@ -656,8 +782,18 @@ const _introE = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
 
-const game = new Game();
-window.__game = game;      // handy for debugging from the console
-window.__MAP_IDS = MAPS.map(m => m.id);
-window.__TOURNAMENTS = TOURNAMENTS;
-game.boot();
+let game = null;
+try {
+  if (window.__hasWebGL === false) throw new Error('WebGL is unavailable in this browser.');
+  game = new Game();
+  window.__game = game;      // handy for debugging from the console
+  window.__MAP_IDS = MAPS.map(m => m.id);
+  window.__TOURNAMENTS = TOURNAMENTS;
+  game.boot().catch(err => {
+    console.error(err);
+    window.__bootFail?.('The arena failed while starting up.', err);
+  });
+} catch (err) {
+  console.error(err);
+  window.__bootFail?.('The arena could not start on this device.', err);
+}
