@@ -568,6 +568,8 @@ kbd{font-family:var(--mono);background:rgba(255,255,255,.1);border:1px solid var
 .tc-big.on{background:rgba(255,77,94,.55);border-color:#ff8a7a;}
 .tc-corner{position:absolute;min-width:56px;height:34px;font-size:9.5px;
   left:calc(12px + env(safe-area-inset-left,0px));top:calc(12px + env(safe-area-inset-top,0px));}
+/* Auto-fire is the arena convention: aim, and the guns do the shooting. */
+.tc-auto.on{background:rgba(93,242,160,.26);border-color:var(--green);color:#dfffee;}
 #tc-hint{position:absolute;left:50%;transform:translateX(-50%);bottom:4px;
   font-size:8.5px;letter-spacing:.2em;color:var(--ink-dim);}
 

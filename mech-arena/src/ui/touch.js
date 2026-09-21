@@ -36,10 +36,11 @@ export class TouchControls {
    * @param {HTMLCanvasElement} o.canvas
    * @param {function():void} [o.onMenu]
    */
-  constructor({ input, canvas, onMenu }) {
+  constructor({ input, canvas, onMenu, onAutoFire }) {
     this.input = input;
     this.canvas = canvas;
     this.onMenu = onMenu;
+    this.onAutoFire = onAutoFire;
     this.root = document.getElementById('touch-controls');
     this.visible = false;
     this.stickId = null;
@@ -110,6 +111,12 @@ export class TouchControls {
 
     const menu = this.root.querySelector('#tc-menu');
     menu?.addEventListener('pointerdown', (e) => { e.preventDefault(); this.onMenu?.(); });
+
+    this.autoBtn = this.root.querySelector('#tc-auto');
+    this.autoBtn?.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      this.onAutoFire?.(!this.autoBtn.classList.contains('on'));
+    });
   }
 
   _stickTo(px, py) {
@@ -151,6 +158,9 @@ export class TouchControls {
     this.canvas.addEventListener('pointercancel', end);
     this.canvas.addEventListener('lostpointercapture', end);
   }
+
+  /** Reflect whether the guns are firing themselves. */
+  setAutoFire(on) { this.autoBtn?.classList.toggle('on', !!on); }
 
   /** Show the controls and switch the input layer to touch aiming. */
   setVisible(on) {

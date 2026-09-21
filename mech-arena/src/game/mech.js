@@ -63,6 +63,10 @@ export class Mech {
 
     /* ---- intent ---- */
     this.moveX = 0; this.moveZ = 0;
+    // When true, moveX/moveZ are a world-space heading rather than a vector
+    // in the legs' own frame. The on-screen stick writes it that way so the
+    // machine goes where the stick points; bots use the legs' frame.
+    this.moveWorld = false;
     this.desiredYaw = 0;
     this.wantJump = false;
     this.wantBrake = false;
@@ -404,12 +408,25 @@ export class Mech {
     // Desired velocity in world space.
     let ax = 0, az = 0;
     if (!stunned) {
-      const s = Math.sin(this.yaw), c = Math.cos(this.yaw);
-      // Backpedalling and strafing are deliberately slower: mechs are not cars.
-      const fwd = this.moveZ >= 0 ? 1 : 0.58;
-      const strafeScale = 0.72;
-      const wx = (this.moveX * strafeScale * c + this.moveZ * fwd * s);
-      const wz = (-this.moveX * strafeScale * s + this.moveZ * fwd * c);
+      let wx, wz;
+      if (this.moveWorld) {
+        /* moveX/moveZ are already a world-space direction -- the stick is
+         * pointing where the machine should go and the legs are turning to
+         * face it, so there is nothing to rotate and no strafe penalty to
+         * apply. Until they have turned, walking sideways still costs
+         * something, which is where the mass comes from. */
+        wx = this.moveX; wz = this.moveZ;
+        const off = Math.abs(angleDelta(this.yaw, Math.atan2(wx, wz)));
+        const align = off > 2.2 ? 0.62 : off > 1.1 ? 0.82 : 1;
+        wx *= align; wz *= align;
+      } else {
+        const s = Math.sin(this.yaw), c = Math.cos(this.yaw);
+        // Backpedalling and strafing are deliberately slower: mechs are not cars.
+        const fwd = this.moveZ >= 0 ? 1 : 0.58;
+        const strafeScale = 0.72;
+        wx = (this.moveX * strafeScale * c + this.moveZ * fwd * s);
+        wz = (-this.moveX * strafeScale * s + this.moveZ * fwd * c);
+      }
       let target = this.maxSpeed * this.speedMul;
       if (this.destroyed.LL || this.destroyed.RL) target *= 0.55;   // limping
       if (this.wantBrake) target *= 0.35;

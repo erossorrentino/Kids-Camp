@@ -471,6 +471,31 @@ export class Menus {
           </div>
           <div class="tiny muted" style="line-height:1.6;margin-top:6px">A stick, a trigger and an action pad drawn over the view. AUTO turns them on
             for a touch screen and the first time you tap one — useful on a Chromebook, which has both.</div>
+
+          <div class="tiny muted" style="margin-top:12px">MOVEMENT</div>
+          <div class="tabs" data-setting="moveStyle">
+            ${[['auto', 'AUTO'], ['steer', 'STEER'], ['strafe', 'STRAFE']]
+              .map(([v, l]) => `<button class="tab${v === (s.moveStyle || 'auto') ? ' on' : ''}" data-set="${v}">${l}</button>`).join('')}
+          </div>
+          <div class="tiny muted" style="line-height:1.6;margin-top:6px">STEER is the arena convention: the stick points where the mech goes and the legs
+            turn to follow, so left is left whichever way the torso is aimed. STRAFE is the keyboard one — forward is where you look, A and D sidestep.
+            AUTO picks steering for a stick and strafing for a keyboard.</div>
+
+          <div class="tiny muted" style="margin-top:12px">AIM ASSIST</div>
+          <div class="tabs" data-setting="aimAssist">
+            ${[['auto', 'AUTO'], ['strong', 'STRONG'], ['light', 'LIGHT'], ['off', 'OFF']]
+              .map(([v, l]) => `<button class="tab${v === (s.aimAssist || 'auto') ? ' on' : ''}" data-set="${v}">${l}</button>`).join('')}
+          </div>
+          <div class="tiny muted" style="line-height:1.6;margin-top:6px">Bends the aim toward a hostile already near the crosshair, and leads its movement.
+            It will not find a target for you. AUTO means on for a thumb, off for a mouse.</div>
+
+          <div class="tiny muted" style="margin-top:12px">AUTO-FIRE</div>
+          <div class="tabs" data-setting="autoFire">
+            ${[['auto', 'AUTO'], ['on', 'ON'], ['off', 'OFF']]
+              .map(([v, l]) => `<button class="tab${v === (s.autoFire || 'auto') ? ' on' : ''}" data-set="${v}">${l}</button>`).join('')}
+          </div>
+          <div class="tiny muted" style="line-height:1.6;margin-top:6px">The guns fire themselves whenever the reticle is on a hostile — heat and ammunition
+            still apply, so it is not free. The AUTO button in a match toggles it too.</div>
           <div class="tiny muted" style="margin-top:8px">TOUCH LOOK SPEED — <b class="mono">${((s.touchSensitivity ?? 0.0052) * 1000).toFixed(1)}</b></div>
           <input type="range" min="15" max="120" value="${Math.round((s.touchSensitivity ?? 0.0052) * 10000)}" data-range="touchSensitivity" style="width:100%">
           <div class="tiny muted" style="margin-top:10px">MOUSE SENSITIVITY — <b class="mono">${(s.sensitivity * 1000).toFixed(1)}</b></div>

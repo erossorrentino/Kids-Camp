@@ -200,6 +200,12 @@ for (const prof of PROFILES) {
   if (prof.touch) {
     check('on-screen controls appear', tc.shown && tc.bodyClass, JSON.stringify(tc));
     check('aiming switches to drag', tc.aimMode === 'touch', tc.aimMode);
+    const handling = await page.evaluate(() => {
+      const c = window.__game.controller;
+      return { style:c.moveStyle, assist:c.aimAssist, auto:c.autoFire, group:c.fireGroup };
+    });
+    check('arena handling on a stick', handling.style === 'steer' && handling.assist > 0
+      && handling.auto === true && handling.group === 'all', JSON.stringify(handling));
 
     // Walk: press the stick and hold it forward.
     const stick = await page.locator('#tc-stick').boundingBox();
@@ -210,8 +216,10 @@ for (const prof of PROFILES) {
     });
     await page.touchscreen.tap(cx, cy);     // wakes audio + proves it is tappable
     const t = await page.context().newCDPSession(page);
+    // Deflect by the stick's own radius, so both screen sizes get a full push.
+    const throwPx = stick.width * 0.45;
     await t.send('Input.dispatchTouchEvent', { type:'touchStart', touchPoints:[{ x:cx, y:cy, id:1 }] });
-    await t.send('Input.dispatchTouchEvent', { type:'touchMove', touchPoints:[{ x:cx, y:cy - 48, id:1 }] });
+    await t.send('Input.dispatchTouchEvent', { type:'touchMove', touchPoints:[{ x:cx, y:cy - throwPx, id:1 }] });
     await page.waitForTimeout(1600);
     const moving = await page.evaluate(() => {
       const m = window.__game.match.player.mech;
@@ -220,6 +228,41 @@ for (const prof of PROFILES) {
     await t.send('Input.dispatchTouchEvent', { type:'touchEnd', touchPoints:[] });
     check('the stick walks the mech', moving.speed > 1.5,
       `speed ${moving.speed.toFixed(1)} stick ${JSON.stringify(moving.stick)}`);
+
+    // Push the stick left: the mech has to travel left across the screen,
+    // not sidestep while still facing forward. Let the previous run's
+    // momentum bleed off first, or it shows up as forward travel.
+    await page.waitForFunction(() => {
+      const m = window.__game.match.player.mech;
+      return Math.hypot(m.velocity.x, m.velocity.z) < 4;
+    }, null, { timeout: 6000 }).catch(() => {});
+    const from = await page.evaluate(() => {
+      const m = window.__game.match.player.mech;
+      return { x:m.position.x, z:m.position.z, yaw:m.aimYaw, style:window.__game.controller.moveStyle };
+    });
+    await t.send('Input.dispatchTouchEvent', { type:'touchStart', touchPoints:[{ x:cx, y:cy, id:4 }] });
+    await t.send('Input.dispatchTouchEvent', { type:'touchMove', touchPoints:[{ x:cx - throwPx, y:cy, id:4 }] });
+    await page.waitForTimeout(2000);
+    const to = await page.evaluate(() => {
+      const m = window.__game.match.player.mech;
+      return { x:m.position.x, z:m.position.z, yaw:m.yaw };
+    });
+    await t.send('Input.dispatchTouchEvent', { type:'touchEnd', touchPoints:[] });
+    // Camera-left in world space, from the heading the player had when they pushed.
+    const dx = to.x - from.x, dz = to.z - from.z;
+    const leftX = -Math.cos(from.yaw), leftZ = Math.sin(from.yaw);
+    const leftward = dx * leftX + dz * leftZ;
+    const forward = dx * Math.sin(from.yaw) + dz * Math.cos(from.yaw);
+    // How far it gets depends on what is in the way; the direction does not.
+    check('stick left sends the mech left', from.style === 'steer' && leftward > 1 && leftward > Math.abs(forward),
+      `left ${leftward.toFixed(1)}m forward ${forward.toFixed(1)}m style ${from.style}`);
+    // And the legs face the way it is travelling, which is what makes it read
+    // as walking left rather than crabbing sideways. Measured against the
+    // actual travel, since aim assist may have turned the torso meanwhile.
+    const facing = await page.evaluate(() => window.__game.match.player.mech.yaw);
+    const travel = Math.atan2(dx, dz);
+    const dAng = Math.abs(Math.atan2(Math.sin(facing - travel), Math.cos(facing - travel)));
+    check('and the legs turn to follow', dAng < 0.9, `${dAng.toFixed(2)} rad off travel`);
 
     // Look: drag across the middle of the viewport.
     const midX = prof.viewport.width / 2, midY = prof.viewport.height * 0.42;

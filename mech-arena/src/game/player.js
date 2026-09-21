@@ -35,6 +35,18 @@ export class PlayerController {
     this.smoothPitch = 0;
     this.fireGroup = 'single';   // single | alpha | beta | all
     this.scoreboardOpen = false;
+
+    /* ---- arena-shooter handling ----
+     * 'strafe' is the keyboard convention: W walks the way the torso faces
+     * and A/D sidestep. 'steer' is the stick convention every arena mech
+     * game uses: the stick points where the machine should go, in camera
+     * space, and the legs turn to face it -- push left, go left.
+     */
+    this.moveStyle = 'strafe';   // 'strafe' | 'steer'
+    this.aimAssist = 0;          // 0 = off, 1 = full pull toward the target
+    this.autoFire = false;       // fire whenever a hostile is under the reticle
+    this.assistTarget = null;
+    this.match = null;           // set at match start; used to find targets
     this.onEvent = null;
     this.enabled = true;
     this._inited = false;
@@ -63,14 +75,26 @@ export class PlayerController {
     /* ---- move ---- */
     if (this.enabled && live && !mech.shutdown) {
       const mv = inp.moveVector();
-      mech.moveX = mv.x;
-      mech.moveZ = mv.z;
-      // The legs follow the torso, but lag behind it: this is what makes a
-      // mech feel like a mech rather than a first-person shooter body.
-      const twist = angleDelta(mech.yaw, mech.aimYaw);
-      const deadzone = 0.42;
-      if (Math.abs(twist) > deadzone || Math.abs(mv.x) + Math.abs(mv.z) > 0.05) {
-        mech.desiredYaw = mech.aimYaw;
+      const mag = Math.hypot(mv.x, mv.z);
+      if (this.moveStyle === 'steer' && mag > 0.01) {
+        // Camera space -> world heading. Stick left is left on the screen,
+        // whichever way the torso happens to be pointing.
+        const heading = mech.aimYaw + Math.atan2(mv.x, mv.z);
+        mech.moveWorld = true;
+        mech.moveX = Math.sin(heading) * Math.min(1, mag);
+        mech.moveZ = Math.cos(heading) * Math.min(1, mag);
+        mech.desiredYaw = heading;
+      } else {
+        mech.moveWorld = false;
+        mech.moveX = mv.x;
+        mech.moveZ = mv.z;
+        // The legs follow the torso, but lag behind it: this is what makes a
+        // mech feel like a mech rather than a first-person shooter body.
+        const twist = angleDelta(mech.yaw, mech.aimYaw);
+        const deadzone = 0.42;
+        if (Math.abs(twist) > deadzone || mag > 0.05) {
+          mech.desiredYaw = mech.aimYaw;
+        }
       }
       mech.wantJump = inp.isDown('jump');
       mech.wantBrake = inp.isDown('brake');
@@ -78,6 +102,7 @@ export class PlayerController {
       if (inp.pressed('melee')) mech.wantMelee = true;
     } else {
       mech.moveX = mech.moveZ = 0;
+      mech.moveWorld = false;
       mech.wantJump = false;
       mech.wantBrake = inp.isDown('brake');   // still allowed: forces a restart
     }
@@ -110,9 +135,18 @@ export class PlayerController {
       }
     }
 
+    /* ---- aim assist ---- */
+    // A thumb cannot track a running mech the way a mouse can, so the aim
+    // is pulled toward whatever hostile is nearest the crosshair. It never
+    // aims for you -- past a few degrees off, the pull is nothing.
+    this.assistTarget = (this.aimAssist > 0 && live && !mech.shutdown)
+      ? this._pullToward(mech, dt) : null;
+
     /* ---- firing ---- */
     mech.firing.clear();
-    if (this.enabled && live && inp.mouse.left && !mech.shutdown) {
+    const trigger = inp.mouse.left
+      || (this.autoFire && !!this.assistTarget && this.assistTarget.onTarget);
+    if (this.enabled && live && trigger && !mech.shutdown) {
       if (this.fireGroup === 'single') mech.firing.add(mech.selected);
       else for (const i of mech.weaponGroups[this.fireGroup === 'all' ? 'all' : this.fireGroup]) mech.firing.add(i);
     }
@@ -133,6 +167,51 @@ export class PlayerController {
     this.scoreboardOpen = inp.isDown('scoreboard');
 
     this._updateCamera(mech, dt);
+  }
+
+  /**
+   * Bend the aim toward the best hostile near the crosshair.
+   * @returns {?{mech:object, onTarget:boolean, angle:number}}
+   */
+  _pullToward(mech, dt) {
+    const list = this.match?.aliveMechs?.();
+    if (!list || !list.length) return null;
+
+    const eye = mech.eyePosition(_a1);
+    const fwd = mech.aimForward(_a2);
+    let best = null, bestAngle = Infinity, bestDist = 0;
+    for (const o of list) {
+      if (o === mech || o.team === mech.team || !o.alive) continue;
+      const to = _a3.copy(o.position);
+      to.y += o.height * 0.55;
+      to.sub(eye);
+      const dist = to.length();
+      if (dist < 1 || dist > 520) continue;
+      to.multiplyScalar(1 / dist);
+      const angle = Math.acos(clamp(to.dot(fwd), -1, 1));
+      // Wider help up close, tighter at range: a cone, not a snap.
+      const cone = clamp(0.20 - dist * 0.00022, 0.055, 0.20);
+      if (angle > cone || angle >= bestAngle) continue;
+      if (this.world && !this.world.lineOfSight(eye, _a4.copy(o.position).setY(o.position.y + o.height * 0.55), o.radius * 0.9)) continue;
+      best = o; bestAngle = angle; bestDist = dist;
+    }
+    if (!best) return null;
+
+    // Aim at where it will be, not where it was.
+    const aimAt = _a3.copy(best.position);
+    aimAt.y += best.height * 0.55;
+    aimAt.addScaledVector(best.velocity, Math.min(0.5, bestDist / 900));
+    const to = aimAt.sub(eye);
+    const wantYaw = Math.atan2(to.x, to.z);
+    const wantPitch = Math.atan2(to.y, Math.hypot(to.x, to.z));
+
+    // The pull falls off with how far off you already are, so it steadies a
+    // near-miss and never drags the crosshair across the screen.
+    const softness = 1 - clamp(bestAngle / 0.20, 0, 1);
+    const k = clamp(this.aimAssist * softness * dt * 7, 0, 0.35);
+    mech.aimYaw += angleDelta(mech.aimYaw, wantYaw) * k;
+    mech.aimPitch = clamp(mech.aimPitch + (wantPitch - mech.aimPitch) * k, -0.72, 0.72);
+    return { mech: best, onTarget: bestAngle < 0.085, angle: bestAngle };
   }
 
   _updateCamera(mech, dt) {
@@ -229,3 +308,8 @@ const _v5 = new THREE.Vector3();
 const _v6 = new THREE.Vector3();
 const _v7 = new THREE.Vector3();
 const _v8 = new THREE.Vector3();
+
+const _a1 = new THREE.Vector3();
+const _a2 = new THREE.Vector3();
+const _a3 = new THREE.Vector3();
+const _a4 = new THREE.Vector3();

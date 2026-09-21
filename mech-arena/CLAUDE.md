@@ -82,6 +82,11 @@ yours is elsewhere. Screenshots land in `$SMOKE_OUT` (default
   damage or armour.
 - Keyboard, mouse steering and the on-screen controls all write the same
   intent through `Input`; nothing downstream knows which one is in use.
+- Handling that differs by device lives in `PlayerController`, not in the
+  mech: `moveStyle` ('strafe' in the legs' frame, 'steer' in camera space
+  with `mech.moveWorld`), `aimAssist` and `autoFire`. `Game._applyHandling`
+  resolves the three 'auto' settings from whether the stick is up. Bots are
+  untouched by all of it.
 - Generated content is deterministic: arenas from a seed, skins from a hash.
 - Nothing allocates during a match. Particles, tracers, beams, decals and
   projectiles all come from preallocated pools.

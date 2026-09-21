@@ -54,6 +54,7 @@ frame times stay poor, so it degrades rather than stutters.
 | Melee (punch / kick) | `R` |
 | Select weapon | `1`–`6`, or the mouse wheel |
 | Fire group Alpha / Beta / All | `Z` / `X` / `C` |
+| Auto-fire | the AUTO button, or Settings → Controls |
 | Cockpit ↔ chase view | `F` |
 | Brace, or force a hot restart during shutdown | `Shift` |
 | Scoreboard | `Tab` |
@@ -78,6 +79,27 @@ does not look like a phone until somebody taps the screen — the first touch
 turns the controls on. Settings → Controls has the switch if you would
 rather have them always on, always off, and a separate look speed for
 dragging.
+
+The stick **steers**, the way every arena mech game's stick does: it points
+where the machine should go in camera space and the legs turn to follow, so
+pushing left walks left across the screen whichever way the torso happens
+to be aimed. A keyboard keeps the simulation convention — forward is where
+you look, `A` and `D` sidestep — and Settings → Controls → MOVEMENT forces
+either one.
+
+Two more things come on with a stick, because a thumb cannot track a
+running mech the way a mouse can:
+
+- **Aim assist** bends the aim toward a hostile that is *already* near the
+  crosshair, and leads its movement. Past a few degrees off it does
+  nothing — it steadies a near miss, it does not find targets.
+- **Auto-fire** hands the trigger to the targeting computer: the guns fire
+  whenever the reticle is on a hostile. Heat and ammunition still apply, so
+  holding an alpha strike on a hot build still scrams your reactor. The
+  AUTO button toggles it mid-match.
+
+Both default to on for touch and off for a mouse, and both are three-way
+settings (`AUTO` / on / off).
 
 The hangar reshapes itself as well. Below 880px it becomes a fixed frame:
 the bay keeps a band across the top with the mech standing in it, and one

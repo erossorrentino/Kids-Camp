@@ -14,6 +14,7 @@ const STEPS = [
     id: 'move',
     title: 'WALK',
     body: 'W A S D to walk. Your legs turn to follow where the torso is looking, and they turn at the chassis\'s own rate — a heavy mech cannot pivot like a person.',
+    touchBody: 'The stick walks: push it where you want to go and the legs turn to follow, at the chassis\'s own rate — a heavy mech cannot pivot like a person.',
     goal: 'Cover 40 metres',
     init: (ctx) => ({ from: ctx.mech.position.clone() }),
     done: (ctx, st) => ctx.mech.position.distanceTo(st.from) > 40,
@@ -22,6 +23,7 @@ const STEPS = [
     id: 'look',
     title: 'TWIST THE TORSO',
     body: 'Move the mouse to aim. The torso swings independently of the hips, so you can walk one way and shoot another — that is how you retreat without giving up your guns.',
+    touchBody: 'Drag anywhere on the view to aim. The torso swings independently of the hips, so you can walk one way and shoot another — that is how you retreat without giving up your guns.',
     goal: 'Twist 60° off your heading',
     done: (ctx) => Math.abs(angle(ctx.mech.yaw, ctx.mech.aimYaw)) > 1.0,
   },
@@ -29,6 +31,7 @@ const STEPS = [
     id: 'fire',
     title: 'FIRE',
     body: 'Left mouse fires the selected weapon. 1–6 pick a weapon; Z, X and C fire your Alpha group, your Beta group, or everything at once.',
+    touchBody: 'FIRE shoots. ALL switches between one weapon and the whole loadout, and AUTO hands the trigger to the targeting computer — it fires whenever the reticle is on a hostile.',
     goal: 'Land 5 hits',
     init: () => ({ hits: 0 }),
     tick: (ctx, st, ev) => { if (ev?.type === 'hit') st.hits++; },
@@ -37,7 +40,8 @@ const STEPS = [
   {
     id: 'heat',
     title: 'WATCH THE HEAT',
-    body: 'Every shot adds heat. Cross the red line and your reactor scrams: no movement, no weapons, for three seconds. Hold SHIFT during a shutdown to force a restart.',
+    body: 'Every shot adds heat. Cross the red line and your reactor scrams: no movement, no weapons, for three seconds — a very long time in a five-minute match.',
+    touchBody: 'Every shot adds heat. Cross the red line and your reactor scrams: no movement, no weapons, for three seconds — a very long time in a five-minute match.',
     goal: 'Push heat past 60%',
     done: (ctx) => ctx.mech.heatFraction > 0.6,
   },
@@ -59,6 +63,7 @@ const STEPS = [
     id: 'ability',
     title: 'USE YOUR ABILITY',
     body: 'Q triggers your chassis special. Every mech has exactly one and it defines how it plays. An ability sitting on cooldown is doing nothing for you.',
+    touchBody: 'ABIL triggers your chassis special. Every mech has exactly one and it defines how it plays. An ability sitting on cooldown is doing nothing for you.',
     goal: 'Trigger your ability',
     init: () => ({ used: false }),
     tick: (ctx, st) => { if (ctx.mech.abilityActive || ctx.mech.abilityCd > 0) st.used = true; },
@@ -68,6 +73,7 @@ const STEPS = [
     id: 'jets',
     title: 'JUMP JETS',
     body: 'SPACE burns jump-jet fuel. Fuel regenerates on the ground, and a hard landing damages your legs — jets are for taking an angle, not for flying.',
+    touchBody: 'JETS burns jump-jet fuel. Fuel regenerates on the ground, and a hard landing damages your legs — jets are for taking an angle, not for flying.',
     goal: 'Leave the ground (skip if your chassis has no jets)',
     skipIf: (ctx) => ctx.mech.chassis.jets.thrust <= 0,
     done: (ctx) => !ctx.mech.grounded,
@@ -84,9 +90,11 @@ const STEPS = [
     id: 'cockpit',
     title: 'COCKPIT VIEW',
     body: 'F switches between the chase camera and the cockpit. The cockpit is harder to fly and much better for long-range gunnery. Right mouse zooms in either view.',
-    goal: 'Switch views',
+    touchBody: 'ZOOM magnifies the view, which is what wins a long-range exchange. LOCK cycles which hostile your missiles are hunting.',
+    goal: 'Switch views or zoom in',
     init: (ctx) => ({ start: ctx.controller.view }),
-    done: (ctx, st) => ctx.controller.view !== st.start,
+    // There is no cockpit key on a phone, so zooming counts as well.
+    done: (ctx, st) => ctx.controller.view !== st.start || ctx.controller.targetZoom > 1.5,
   },
   {
     id: 'done',
@@ -159,7 +167,9 @@ export class Tutorial {
     this.completing = 0;
     this.parts.step.textContent = `${this.index + 1}/${STEPS.length}`;
     this.parts.title.textContent = step.title;
-    this.parts.body.textContent = step.body;
+    // On a touch screen the lesson has to name the buttons that exist.
+    const touch = document.body.classList.contains('touch-ui');
+    this.parts.body.textContent = (touch && step.touchBody) ? step.touchBody : step.body;
     this.parts.goal.textContent = step.goal || '';
     this.parts.goal.parentElement.style.display = step.goal ? '' : 'none';
     this.el.classList.remove('tut-done');

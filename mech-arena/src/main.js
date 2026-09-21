@@ -91,6 +91,13 @@ class Game {
       input: this.input,
       canvas: this.canvas,
       onMenu: () => this.togglePause(),
+      onAutoFire: (on) => {
+        this.progression.setSetting('autoFire', on ? 'on' : 'off');
+        this._applyHandling();
+        this.audio.play('ui');
+        this.hud.toast(on ? 'AUTO-FIRE ON' : 'AUTO-FIRE OFF',
+          on ? 'The guns shoot whatever the reticle is on' : 'Hold FIRE to shoot');
+      },
     });
     if (this.touchMode) this.input.setTouchMode(true);
     // A Chromebook or a Windows laptop with a touchscreen reports a fine
@@ -130,6 +137,7 @@ class Game {
 
     this._wireGlobal();
     this._wireContextLoss();
+    this._applyHandling();
   }
 
   /* ---------------------------------------------------------------- */
@@ -203,6 +211,28 @@ class Game {
     this.input.setTouchMode(on);
     this.touch.setVisible(on && this.state === 'match');
     if (on) this.input.releaseLock();
+    this._applyHandling();
+  }
+
+  /**
+   * Movement style, aim assist and auto-fire. All three default to 'auto',
+   * which means the arena-shooter handling on a stick and the simulation
+   * handling on a mouse -- a thumb cannot track a running mech the way a
+   * mouse can, and a mouse does not want its aim nudged.
+   */
+  _applyHandling() {
+    const s = this.progression.settings;
+    const touch = this.touchMode;
+    const style = s.moveStyle || 'auto';
+    this.controller.moveStyle = style === 'auto' ? (touch ? 'steer' : 'strafe') : style;
+
+    const assist = s.aimAssist || 'auto';
+    this.controller.aimAssist = assist === 'auto' ? (touch ? 0.85 : 0)
+      : assist === 'strong' ? 1 : assist === 'light' ? 0.5 : 0;
+
+    const auto = s.autoFire || 'auto';
+    this.controller.autoFire = auto === 'auto' ? touch : auto === 'on';
+    this.touch.setAutoFire?.(this.controller.autoFire);
   }
 
   /**
@@ -254,6 +284,9 @@ class Game {
       case 'touchSensitivity': this.input.touchSensitivity = value; break;
       case 'touchControls':
         this.setTouchMode(value === 'on' || (value !== 'off' && isTouchDevice()));
+        break;
+      case 'moveStyle': case 'aimAssist': case 'autoFire':
+        this._applyHandling();
         break;
       case 'invertY': this.input.invertY = value; break;
       case 'volume': this.audio.setVolume(value); break;
@@ -341,6 +374,11 @@ class Game {
       quality: QUALITY[this.progression.settings.quality],
     });
     this.match.onEvent = (e) => this.onMatchEvent(e);
+    // Aim assist and auto-fire need to know who is on the field.
+    this.controller.match = this.match;
+    // One trigger for everything is the arena convention, and it is the only
+    // thing that makes sense with a thumb on a FIRE button.
+    if (this.touchMode) this.controller.fireGroup = 'all';
     this.match.onLightning = () => this.sky.strike();
 
     this.state = 'match';
@@ -407,6 +445,8 @@ class Game {
     this.audio.stopAllLoops();
     if (this.arena) { this.engine.scene.remove(this.arena.group); this.arena.dispose(); this.arena = null; }
     if (this.match) { this.match.dispose(); this.match = null; }
+    this.controller.match = null;
+    this.controller.assistTarget = null;
 
     this.menus.showResults(result, award, circuit);
   }

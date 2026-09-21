@@ -112,7 +112,7 @@ export class Markers {
     const cam = this.camera;
     cam.updateMatrixWorld();
 
-    this._updatePlates(match, playerMech);
+    this._updatePlates(match, playerMech, controller);
     this._updateWaypoints(match, playerMech);
     this._updateNumbers(dt);
     this._updateArrows(dt, playerMech);
@@ -128,7 +128,7 @@ export class Markers {
     };
   }
 
-  _updatePlates(match, me) {
+  _updatePlates(match, me, controller) {
     let i = 0;
     if (me && this.showPlates) {
       const now = match.time;
@@ -158,8 +158,11 @@ export class Markers {
         const rec = this.plates[i++];
         rec.el.style.display = '';
         rec.el.style.transform = `translate(-50%,-100%) translate(${p.x.toFixed(0)}px,${p.y.toFixed(0)}px)`;
+        // The machine the guns are actually favouring gets the marker, so
+        // there is never a question of what you are about to shoot.
+        const marked = o === me.lockedTarget || o === controller?.assistTarget?.mech;
         rec.el.className = 'plate ' + (hostile ? 'hostile' : 'ally')
-          + (o === me.lockedTarget ? ' locked' : '')
+          + (marked ? ' locked' : '')
           + (o.juggernaut ? ' jugg' : '');
         // Fade with distance so a busy skyline does not become a wall of text.
         rec.el.style.opacity = clamp(1.15 - d / (me.sensorRange * 1.4), 0.25, 1).toFixed(2);
