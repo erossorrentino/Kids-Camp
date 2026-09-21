@@ -36,3 +36,6 @@ crashlytics-build.properties
 
 # Packages generated lock file (keep manifest.json, ignore the lock that Unity regenerates)
 /Packages/packages-lock.json
+
+# Build output for the published Artifact page (regenerate with tools/build-artifact.mjs)
+dist-artifact/

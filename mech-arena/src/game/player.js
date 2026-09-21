@@ -50,10 +50,14 @@ export class PlayerController {
     }
 
     /* ---- look ---- */
-    if (inp.locked && this.enabled) {
-      const sens = 1 / Math.max(0.4, this.zoom);
-      mech.aimYaw -= inp.mouse.dx * sens;
-      mech.aimPitch = clamp(mech.aimPitch - inp.mouse.dy * sens, -0.72, 0.72);
+    // One call covers both pointer lock and the steering fallback; it
+    // returns radians either way.
+    if (this.enabled) {
+      const aim = inp.aimDelta(dt, this.zoom);
+      if (aim.x || aim.y) {
+        mech.aimYaw -= aim.x;
+        mech.aimPitch = clamp(mech.aimPitch - aim.y, -0.72, 0.72);
+      }
     }
 
     /* ---- move ---- */

@@ -98,15 +98,28 @@ class Game {
 
   /* ---------------------------------------------------------------- */
   _wireGlobal() {
+    const hint = document.getElementById('pointer-hint');
     this.input.onLockChange = (locked) => {
-      const hint = document.getElementById('pointer-hint');
-      if (this.state === 'match') hint.classList.toggle('hidden', locked);
+      if (this.state === 'match' && this.input.aimMode === 'lock') hint.classList.toggle('hidden', locked);
       else hint.classList.add('hidden');
+    };
+    // If pointer lock is refused -- an embedded frame without permission,
+    // say -- say so once and explain the controls that do work.
+    this.input.onAimModeChange = (mode) => {
+      hint.classList.add('hidden');
+      if (mode !== 'steer') return;
+      this.hud.toast('MOUSE STEERING', 'Move toward an edge to turn · click to fire');
+      const notice = document.getElementById('aim-mode');
+      if (!notice) return;
+      notice.classList.remove('hidden');
+      setTimeout(() => notice.classList.add('hidden'), 11000);
     };
 
     this.canvas.addEventListener('click', () => {
       this.audio.resume();
-      if (this.state === 'match' && !this._pendingRespawn) this.input.requestLock();
+      if (this.state === 'match' && !this._pendingRespawn && this.input.aimMode === 'lock') {
+        this.input.requestLock();
+      }
     });
 
     addEventListener('keydown', (e) => {

@@ -28,6 +28,22 @@ export class Input {
     this.sensitivity = 0.0022;
     this.invertY = false;
     this.enabled = true;
+
+    /* ---- aiming mode ----
+     * Pointer lock is the good way to aim, but it is not always available:
+     * an embedded frame without `allow="pointer-lock"` refuses it, and so do
+     * some browsers after a user has dismissed the prompt. Rather than
+     * leaving the player with no way to turn, we fall back to steering --
+     * the further the cursor sits from the centre of the viewport, the
+     * faster the torso swings that way, with a dead zone in the middle.
+     */
+    this.aimMode = 'lock';          // 'lock' | 'steer'
+    this.lockDenied = false;
+    this.cursor = { x: 0, y: 0, inside: false };
+    this.steerSpeed = 2.6;          // radians per second at full deflection
+    this.steerDeadzone = 0.08;
+    this.onAimModeChange = null;
+
     this._bind();
   }
 
@@ -42,7 +58,9 @@ export class Input {
     addEventListener('blur', () => { this.down.clear(); this.mouse.left = this.mouse.right = false; });
 
     this.canvas.addEventListener('mousedown', (e) => {
-      if (!this.locked) return;
+      // In steering mode there is no lock to gate on -- a click on the
+      // viewport is a trigger pull.
+      if (!this.locked && this.aimMode !== 'steer') return;
       if (e.button === 0) { this.mouse.left = true; this.mouseEdges.left = true; }
       if (e.button === 2) { this.mouse.right = true; this.mouseEdges.right = true; }
       if (e.button === 1) this.mouse.middle = true;
@@ -54,10 +72,17 @@ export class Input {
     });
     this.canvas.addEventListener('contextmenu', (e) => e.preventDefault());
     addEventListener('mousemove', (e) => {
+      // Always track the cursor: steering mode needs it, and it costs nothing.
+      const r = this.canvas.getBoundingClientRect();
+      this.cursor.x = (e.clientX - r.left) / r.width * 2 - 1;
+      this.cursor.y = (e.clientY - r.top) / r.height * 2 - 1;
+      this.cursor.inside = e.clientX >= r.left && e.clientX <= r.right
+        && e.clientY >= r.top && e.clientY <= r.bottom;
       if (!this.locked) return;
-      this.mouse.dx += e.movementX * this.sensitivity;
-      this.mouse.dy += e.movementY * this.sensitivity * (this.invertY ? -1 : 1);
+      this.mouse.dx += e.movementX;
+      this.mouse.dy += e.movementY;
     });
+    this.canvas.addEventListener('mouseleave', () => { this.cursor.inside = false; });
     addEventListener('wheel', (e) => { if (this.locked) this.mouse.wheel += Math.sign(e.deltaY); }, { passive:true });
 
     document.addEventListener('pointerlockchange', () => {
@@ -67,7 +92,30 @@ export class Input {
   }
 
   requestLock() {
-    if (!this.locked) this.canvas.requestPointerLock?.();
+    if (this.locked || this.aimMode === 'steer') return;
+    let p;
+    try { p = this.canvas.requestPointerLock?.(); } catch { this._denyLock(); return; }
+    // Chrome returns a promise; a frame without pointer-lock permission
+    // rejects it rather than throwing.
+    if (p && typeof p.catch === 'function') p.catch(() => this._denyLock());
+    // Some browsers neither throw nor reject -- they simply never lock.
+    clearTimeout(this._lockProbe);
+    this._lockProbe = setTimeout(() => { if (!this.locked) this._denyLock(); }, 900);
+  }
+
+  _denyLock() {
+    if (this.aimMode === 'steer') return;
+    this.lockDenied = true;
+    this.aimMode = 'steer';
+    this.onAimModeChange?.('steer');
+  }
+
+  /** Let the player choose steering even where pointer lock works. */
+  setAimMode(mode) {
+    if (mode === this.aimMode) return;
+    this.aimMode = mode;
+    if (mode === 'steer') this.releaseLock();
+    this.onAimModeChange?.(mode);
   }
   releaseLock() { if (this.locked) document.exitPointerLock?.(); }
 
@@ -87,6 +135,39 @@ export class Input {
     if (!codes) return false;
     for (const c of codes) if (this.edges.has(c)) return true;
     return false;
+  }
+
+  /**
+   * Aim change for this frame, in radians.
+   *
+   * Pointer lock gives raw pixel deltas, which scale by sensitivity. Steering
+   * gives a rate from how far the cursor sits off centre, which scales by
+   * time. Returning radians from one place keeps the caller from having to
+   * know which mode is active.
+   *
+   * @param {number} dt seconds
+   * @param {number} zoom current magnification; aiming slows as you zoom in
+   */
+  aimDelta(dt, zoom = 1) {
+    const scale = 1 / Math.max(0.4, zoom);
+    if (this.aimMode === 'lock') {
+      if (!this.locked || !this.enabled) return ZERO_AIM;
+      _aim.x = this.mouse.dx * this.sensitivity * scale;
+      _aim.y = this.mouse.dy * this.sensitivity * scale * (this.invertY ? -1 : 1);
+      return _aim;
+    }
+    if (!this.enabled || !this.cursor.inside) return ZERO_AIM;
+    const dz = this.steerDeadzone;
+    const ramp = (v) => {
+      const a = Math.abs(v);
+      if (a < dz) return 0;
+      // Squared past the dead zone: precise near the middle, fast at the edge.
+      const t = (a - dz) / (1 - dz);
+      return Math.sign(v) * t * t;
+    };
+    _aim.x = ramp(this.cursor.x) * this.steerSpeed * scale * dt;
+    _aim.y = ramp(this.cursor.y) * this.steerSpeed * 0.7 * scale * dt * (this.invertY ? -1 : 1);
+    return _aim;
   }
 
   /** Movement vector in local space: x = strafe, z = forward. */
@@ -109,3 +190,6 @@ export class Input {
 
   rebind(action, code) { this.binds[action] = [code]; }
 }
+
+const ZERO_AIM = { x: 0, y: 0 };
+const _aim = { x: 0, y: 0 };
