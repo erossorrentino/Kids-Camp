@@ -1143,8 +1143,15 @@ export class Mech {
     if (this.jetting) this.fx.thrusterTrail(this, dt);
   }
 
+  /**
+   * Release this mech's GPU resources. Match teardown calls this for live
+   * mechs; a destroyed mech's model is handed to the wreck list instead and
+   * freed when the wreck is recycled.
+   */
   dispose(scene) {
-    scene.remove(this.root);
+    if (scene) scene.remove(this.root);
+    this.root.traverse(o => { if (o.isMesh) o.geometry?.dispose?.(); });
+    for (const mat of Object.values(this.model.materials)) mat?.dispose?.();
   }
 }
 

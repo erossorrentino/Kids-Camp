@@ -13,7 +13,22 @@
 import * as THREE from 'three';
 import { makeRng } from '../core/rng.js';
 
+/**
+ * Surface sets are per arena, and each one is three 512px canvases. Two
+ * arenas' worth is all that is ever live at once, so cap the cache well
+ * above that and evict the oldest rather than growing for a whole session.
+ */
+const MAX_CACHED_SURFACES = 16;
 const cache = new Map();
+
+function evictOldestSurfaces() {
+  while (cache.size > MAX_CACHED_SURFACES) {
+    const oldest = cache.keys().next().value;
+    const s = cache.get(oldest);
+    cache.delete(oldest);
+    s.map.dispose(); s.normalMap.dispose(); s.roughnessMap.dispose();
+  }
+}
 
 function canvas(size) {
   const c = document.createElement('canvas');
@@ -253,7 +268,12 @@ const RECIPES = { ground: groundMaps, concrete: concreteMaps, metal: metalMaps }
  */
 export function surface(kind, colorHex, { seed = 1, repeat = 4, style = null, normalStrength = 2.0 } = {}) {
   const key = `${kind}|${colorHex}|${seed}|${repeat}|${style}`;
-  if (cache.has(key)) return cache.get(key);
+  if (cache.has(key)) {
+    const hit = cache.get(key);
+    cache.delete(key);
+    cache.set(key, hit);   // keep recently used sets alive
+    return hit;
+  }
   const { albedo, height } = (RECIPES[kind] || concreteMaps)(colorHex, { style, seed });
   const normal = normalFromHeight(height, normalStrength);
   const out = {
@@ -262,6 +282,7 @@ export function surface(kind, colorHex, { seed = 1, repeat = 4, style = null, no
     roughnessMap: tex(height, repeat),
   };
   cache.set(key, out);
+  evictOldestSurfaces();
   return out;
 }
 

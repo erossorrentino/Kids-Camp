@@ -11,7 +11,25 @@ import { makeRng } from '../core/rng.js';
 import { SKIN_BY_ID, DEFAULT_SKIN } from '../data/skins.js';
 
 const SIZE = 512;
+
+/**
+ * Painted skins are cached by id, but there are 2,496 of them and bots roll
+ * random ones every match, so an unbounded cache grows for as long as a
+ * session lasts. A small insertion-ordered cache with the oldest entries
+ * evicted keeps a match's worth resident and bounds the total.
+ */
+const MAX_CACHED_SKINS = 32;
 const cache = new Map();
+
+function evictOldestSkins() {
+  while (cache.size > MAX_CACHED_SKINS) {
+    const oldest = cache.keys().next().value;
+    const entry = cache.get(oldest);
+    cache.delete(oldest);
+    entry.map.dispose();
+    entry.roughMap.dispose();
+  }
+}
 
 function hexToRgb(h) {
   const n = parseInt(h.slice(1), 16);
@@ -201,7 +219,13 @@ const PAINT = {
 /** Build (and cache) the albedo + roughness maps for a skin id. */
 export function skinMaterialMaps(skinId) {
   const id = SKIN_BY_ID[skinId] ? skinId : DEFAULT_SKIN;
-  if (cache.has(id)) return cache.get(id);
+  if (cache.has(id)) {
+    // Refresh insertion order so a skin in active use is not evicted.
+    const hit = cache.get(id);
+    cache.delete(id);
+    cache.set(id, hit);
+    return hit;
+  }
   const s = SKIN_BY_ID[id];
   const rng = makeRng(hashStr(id));
 
@@ -245,6 +269,7 @@ export function skinMaterialMaps(skinId) {
 
   const out = { map, roughMap, skin: s };
   cache.set(id, out);
+  evictOldestSkins();
   return out;
 }
 

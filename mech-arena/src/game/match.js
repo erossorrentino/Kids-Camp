@@ -897,7 +897,10 @@ export class Match {
     this.pickups = null;
     for (const w of this.wrecks) this._removeWreck(w);
     this.wrecks.length = 0;
-    for (const m of this.mechs) { this.scene.remove(m.root); }
+    // Live mechs own geometry and materials that nothing else references.
+    // Removing them from the scene is not enough: without disposing, every
+    // match leaks a full roster's worth of GPU buffers.
+    for (const m of this.mechs) m.dispose(this.scene);
     this.mechs.length = 0;
     this.brains.clear();
     this.combat.reset();

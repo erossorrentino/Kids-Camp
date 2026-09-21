@@ -222,6 +222,8 @@ tools/
                     and drives a death through the kill cam to respawn
   sim.mjs           headless combat simulation across every arena
   circuit.mjs       plays a tournament end to end and checks the bookkeeping
+  leak.mjs          starts and tears down ten matches, watching the
+                    renderer's own geometry and texture counters
 ```
 
 ### Design rules the code follows
@@ -273,6 +275,7 @@ node tools/validate.mjs             # data integrity, no browser needed
 node tools/smoke.mjs                # boot, walk menus, play, screenshot
 node tools/sim.mjs                  # simulate combat on all 41 arenas
 node tools/circuit.mjs              # play a tournament end to end
+node tools/leak.mjs                 # resource leaks across ten matches
 SIM_SECONDS=180 node tools/sim.mjs  # longer runs
 node tools/sim.mjs refinery,mesa    # specific arenas
 ```
