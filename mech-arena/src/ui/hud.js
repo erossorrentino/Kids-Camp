@@ -233,12 +233,16 @@ export class HUD {
       this._weaponRows = m.weapons.map((w, i) => {
         const row = document.createElement('div');
         row.className = 'wslot' + (w ? '' : ' empty');
+        // The key hint rides on the chip, the way an arena HUD labels its
+        // buttons rather than making you remember them.
         row.innerHTML = `<span class="idx">${i + 1}</span>`
           + `<span class="grp"></span>`
           + `<span class="wname">${w ? escape(w.def.name) : '— empty —'}</span>`
+          + `<span class="wkey"></span>`
           + `<span class="wammo"></span><i class="cool"></i>`;
         this.el.weapons.appendChild(row);
-        return { root: row, ammo: row.querySelector('.wammo'), cool: row.querySelector('.cool'), grp: row.querySelector('.grp') };
+        return { root: row, ammo: row.querySelector('.wammo'), cool: row.querySelector('.cool'),
+                 grp: row.querySelector('.grp'), key: row.querySelector('.wkey') };
       });
     }
     const group = controller?.fireGroup || 'single';
@@ -249,6 +253,10 @@ export class HUD {
       r.root.classList.toggle('selected', !!selected);
       r.root.classList.toggle('destroyed', w.destroyed);
       r.grp.textContent = w.group_key === 'alpha' ? 'A' : 'B';
+      if (r.key) {
+        const touch = document.body.classList.contains('touch-ui');
+        r.key.textContent = touch ? (selected ? 'FIRE' : '') : (selected ? 'LMB' : String(i + 1));
+      }
 
       let txt, cls = 'wammo';
       if (w.destroyed) { txt = 'WRECKED'; cls += ' out'; }
@@ -268,7 +276,7 @@ export class HUD {
         : w.def.mode === 'charge' ? w.charge
         : 1 - clamp(w.cooldown / (60 / Math.max(1, w.def.rpm)), 0, 1);
       r.cool.style.width = `${clamp(cd, 0, 1) * 100}%`;
-      r.cool.style.background = w.def.mode === 'charge' && w.charge > 0 ? '#ffb454' : '#49d6ff';
+      r.cool.style.background = w.def.mode === 'charge' && w.charge > 0 ? '#ffc247' : '#3fd2ff';
     });
   }
 
@@ -282,11 +290,13 @@ export class HUD {
     const pct = m.abilityActive
       ? (a.duration > 0 ? m.abilityTime / a.duration : 1)
       : 1 - m.abilityCd / (a.cooldown * m.cooldownMul);
-    this.el.abilityCd.style.width = `${clamp(pct, 0, 1) * 100}%`;
-    this.el.abilityCd.style.background = m.abilityActive ? '#ffb454' : ready ? '#5df2a0' : '#b47cff';
+    // The dial sweeps: --cd is how much of the ring is still filled.
+    this.el.abilityCd.style.setProperty('--cd', (1 - clamp(pct, 0, 1)).toFixed(3));
+    this.el.abilityCd.style.setProperty('color', m.abilityActive ? '#ffc247' : ready ? '#4ce07a' : '#b47cff');
+    const touch = document.body.classList.contains('touch-ui');
     this.el.abilityKey.textContent = m.abilityActive
       ? (a.duration > 0 ? m.abilityTime.toFixed(1) + 's' : 'ACTIVE')
-      : ready ? 'READY — Q' : Math.ceil(m.abilityCd) + 's';
+      : ready ? (touch ? 'READY' : 'READY — Q') : Math.ceil(m.abilityCd) + 's';
   }
 
   _updateReticle(match, m, controller) {

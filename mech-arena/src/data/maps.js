@@ -17,27 +17,30 @@
  *   dunes     rolling terrain with sparse hard cover, long sightlines
  */
 
+/* Daylight biomes are properly daylit: a bright sky, a high ambient floor
+ * and colour in the haze. The four marked `night` keep their mood -- an
+ * arena set that is all one weather is a duller game than one that is not. */
 export const BIOMES = {
-  industrial: { sky:0x2a3340, fogCol:0x3a4654, fog:[80, 620], sun:0xffe8cc, sunI:2.0, amb:0x44566b, ambI:0.9,
-                ground:0x3c4148, accent:0xff8a3d, hazeCol:0x55708c, label:'INDUSTRIAL' },
+  industrial: { sky:0x5b8fc8, fogCol:0x7ba2c6, fog:[110, 760], sun:0xfff0dc, sunI:2.5, amb:0x8aacca, ambI:1.2,
+                ground:0x6b7280, accent:0xff8a3d, hazeCol:0x9cbcd8, label:'INDUSTRIAL' },
   desert:     { sky:0xd9b98a, fogCol:0xd8c49a, fog:[140, 900], sun:0xfff0d0, sunI:3.1, amb:0xc8a878, ambI:1.1,
                 ground:0xb89a6c, accent:0xffcf66, hazeCol:0xe8d4a8, label:'DESERT' },
-  arctic:     { sky:0xa8c4dc, fogCol:0xc8dae8, fog:[90, 700], sun:0xeef6ff, sunI:1.7, amb:0x8ea8c0, ambI:0.85,
-                ground:0xb4c6d4, accent:0x7cd8ff, hazeCol:0xd2e2ee, label:'ARCTIC' },
+  arctic:     { sky:0xbcd8ee, fogCol:0xc4dcec, fog:[110, 780], sun:0xf6fbff, sunI:2.2, amb:0xa6c2d8, ambI:1.1,
+                ground:0xc6d6e2, accent:0x7cd8ff, hazeCol:0xdcebf5, label:'ARCTIC' },
   volcanic:   { sky:0x2a1210, fogCol:0x5a2418, fog:[60, 520], sun:0xff9a55, sunI:1.7, amb:0x8e3a24, ambI:1.25,
                 ground:0x2e2422, accent:0xff4a1f, hazeCol:0x8e3a20, label:'VOLCANIC', night:true },
-  jungle:     { sky:0x4a6b52, fogCol:0x5f7d63, fog:[45, 400], sun:0xe8ffd0, sunI:1.9, amb:0x4a6b4a, ambI:1.1,
-                ground:0x3a4a32, accent:0x7cff9a, hazeCol:0x6b8e70, label:'JUNGLE' },
+  jungle:     { sky:0x74b0dc, fogCol:0x86b4bc, fog:[60, 520], sun:0xf4ffe0, sunI:2.4, amb:0x86b08a, ambI:1.3,
+                ground:0x4e6644, accent:0x7cff9a, hazeCol:0x94bc9c, label:'JUNGLE' },
   orbital:    { sky:0x05070f, fogCol:0x0a1020, fog:[200, 1400], sun:0xffffff, sunI:3.4, amb:0x24304e, ambI:0.9,
                 ground:0x2a3038, accent:0x49d6ff, hazeCol:0x162238, label:'ORBITAL', night:true },
   citynight:  { sky:0x0c1018, fogCol:0x141c28, fog:[60, 520], sun:0x9fb4d8, sunI:0.9, amb:0x3a4a62, ambI:1.5,
                 ground:0x23282e, accent:0xff4de0, hazeCol:0x2a3852, label:'NIGHT CITY', night:true },
-  wasteland:  { sky:0x8a7a68, fogCol:0x9a8a74, fog:[70, 620], sun:0xffe0b0, sunI:2.2, amb:0x8a7a64, ambI:1.0,
-                ground:0x6b5f4e, accent:0xffa04e, hazeCol:0xa89478, label:'WASTELAND' },
+  wasteland:  { sky:0xb0a88c, fogCol:0xbcaf92, fog:[95, 760], sun:0xfff0cc, sunI:2.6, amb:0xa89a80, ambI:1.15,
+                ground:0x8a7c66, accent:0xffa04e, hazeCol:0xc4b498, label:'WASTELAND' },
   underwater: { sky:0x0a2a3a, fogCol:0x0f3a4e, fog:[35, 330], sun:0x9fe8ff, sunI:1.5, amb:0x2a5e74, ambI:1.4,
                 ground:0x2a4a52, accent:0x5ce8ff, hazeCol:0x1a5a70, label:'ABYSSAL', night:true },
-  storm:      { sky:0x30363f, fogCol:0x3a424c, fog:[40, 360], sun:0xc8d4e4, sunI:1.2, amb:0x38424e, ambI:1.1,
-                ground:0x3e4450, accent:0xa8c8ff, hazeCol:0x49535f, label:'STORM' },
+  storm:      { sky:0x4a5766, fogCol:0x596675, fog:[55, 440], sun:0xd8e4f2, sunI:1.6, amb:0x56657a, ambI:1.3,
+                ground:0x525a68, accent:0xa8c8ff, hazeCol:0x6b788a, label:'STORM' },
 };
 
 /**

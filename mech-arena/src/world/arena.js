@@ -83,7 +83,9 @@ export class Arena {
       || 'rock';
 
     const g = surface('ground', b.ground, { seed, repeat: 26, style: groundStyle, normalStrength: 2.6 });
-    const c = surface('concrete', mixHex(b.ground, 0xffffff, 0.26), { seed: seed + 11, repeat: 1 });
+    // Daylight arenas are built out of light concrete, not the same mud the
+    // floor is made of: it is what lets the painted crates read against it.
+    const c = surface('concrete', mixHex(b.ground, 0xffffff, b.night ? 0.26 : 0.42), { seed: seed + 11, repeat: 1 });
     const m = surface('metal', mixHex(b.ground, 0x8899aa, 0.55), { seed: seed + 23, repeat: 1 });
     const dk = surface('metal', mixHex(b.ground, 0x000000, 0.6), { seed: seed + 37, repeat: 1 });
 
@@ -98,7 +100,21 @@ export class Arena {
     };
     this.mat.window = new THREE.MeshBasicMaterial({ color: mixHex(b.accent, 0xffe6b0, 0.55), fog: true });
     this.mat.windowWarm = new THREE.MeshBasicMaterial({ color: 0xffc98a, fog: true });
-    this._buckets = { concrete: [], metal: [], dark: [], accent: [], hazard: [], glass: [], window: [], windowWarm: [] };
+
+    /* Painted cargo. An arena built entirely out of one hue reads as a grey
+     * box however well lit it is; a few saturated containers give the eye
+     * something to range against and are most of why the reference art for
+     * this genre looks the way it does. They share the concrete maps, so
+     * they cost three materials and no extra texture memory. */
+    const livery = b.night
+      ? [0x9e3b2e, 0x2f6f8e, 0x8a7a2e]
+      : [0xd9452f, 0x2f8fbf, 0xe0a52a];
+    this.mat.liveryA = new THREE.MeshStandardMaterial({ ...c, color: livery[0], roughness: 0.85, metalness: 0.1, envMapIntensity: 0.7 });
+    this.mat.liveryB = new THREE.MeshStandardMaterial({ ...c, color: livery[1], roughness: 0.85, metalness: 0.1, envMapIntensity: 0.7 });
+    this.mat.liveryC = new THREE.MeshStandardMaterial({ ...c, color: livery[2], roughness: 0.85, metalness: 0.1, envMapIntensity: 0.7 });
+
+    this._buckets = { concrete: [], metal: [], dark: [], accent: [], hazard: [], glass: [], window: [], windowWarm: [],
+                      liveryA: [], liveryB: [], liveryC: [] };
   }
 
   _emit(bucket, geo, pos, rot, scale) {
@@ -192,7 +208,16 @@ export class Arena {
       kind, meta,
     );
     this.colliders.push(c);
-    this._emit(bucket, boxGeo(w, h, d), [cx, cy, cz]);
+    // Crate-sized concrete gets painted. Deterministic from the position, so
+    // the same arena always comes out the same colours.
+    let paint = bucket;
+    if (bucket === 'concrete' || (bucket === 'metal' && Math.max(w, h, d) <= 15)) {
+      const hash = Math.abs(Math.round(cx * 7.13 + cy * 3.31 + cz * 11.7)) % 100;
+      if (hash < 14) paint = 'liveryA';
+      else if (hash < 26) paint = 'liveryB';
+      else if (hash < 36) paint = 'liveryC';
+    }
+    this._emit(paint, boxGeo(w, h, d), [cx, cy, cz]);
     return c;
   }
 

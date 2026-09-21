@@ -124,8 +124,8 @@ export class Menus {
       <div class="title-menu">
         ${p.matches === 0
           ? `<button class="btn primary lg" data-action="training">TRAINING RANGE</button>
-             <button class="btn" data-go="deploy">DEPLOY</button>`
-          : `<button class="btn primary lg" data-go="deploy">DEPLOY</button>
+             <button class="btn battle" data-go="deploy">BATTLE</button>`
+          : `<button class="btn battle lg" data-go="deploy">BATTLE</button>
              <button class="btn" data-action="training">TRAINING RANGE</button>`}
         <button class="btn" data-go="circuit">CIRCUIT${p.tournaments?.run ? ' <span style="color:var(--amber)">● IN PROGRESS</span>' : ''}</button>
         <button class="btn" data-go="hangar">HANGAR</button>
@@ -246,7 +246,7 @@ export class Menus {
         </div>
       </div>
       <div class="row" style="margin-top:16px;justify-content:center">
-        <button class="btn primary lg" data-go="deploy">DEPLOY</button>
+        <button class="btn battle lg" data-go="deploy">BATTLE</button>
       </div>
     </div>`;
   }
@@ -439,7 +439,7 @@ export class Menus {
             return `<div class="kv"><span>${esc(c?.classLabel || '')}</span><b>${esc(c?.name || '—')}</b></div>`;
           }).join('')}
           ${lance.length < mode.hangarSize ? `<div class="tiny muted" style="margin-top:8px">${mode.hangarSize - lance.length} bay(s) empty — fill them in the hangar.</div>` : ''}
-          <button class="btn primary lg" style="width:100%;margin-top:18px" data-action="launch">LAUNCH</button>
+          <button class="btn battle lg" style="width:100%;margin-top:18px" data-action="launch">BATTLE</button>
           <button class="btn ghost" style="width:100%;margin-top:6px" data-go="hangar">EDIT LANCE</button>
         </div>
       </div>
@@ -586,7 +586,7 @@ export class Menus {
           <div class="row" style="margin-top:18px">
             ${circuit && !circuit.finished
               ? '<button class="btn primary" data-action="runRound">NEXT ROUND</button>'
-              : '<button class="btn primary" data-action="launch">REDEPLOY</button>'}
+              : '<button class="btn battle" data-action="launch">REDEPLOY</button>'}
             ${circuit ? '<button class="btn" data-go="circuit">CIRCUIT</button>' : ''}
             <button class="btn" data-go="hangar">HANGAR</button>
             <button class="btn ghost" data-go="title">MENU</button>
@@ -720,14 +720,28 @@ export class Menus {
       this.hangarScene.highlightHardpoint(null);
       return;
     }
-    const build = this.progression.hangar[this.slot] || this.progression.hangar.find(Boolean);
+    const lance = this.progression.hangar.filter(Boolean);
+    const build = this.progression.hangar[this.slot] || lance[0];
     if (!build) { this.hangarScene.clearMech(); return; }
     const chassis = MECH_BY_ID[build.chassisId];
-    const key = build.chassisId + '|' + build.skinId + '|' + (build.loadout || []).join(',');
-    if (key !== this._previewKey) {
+
+    // The whole lance stands in the bay. Rebuild only when the machines
+    // themselves change -- selecting a different one just re-lights it.
+    const index = Math.max(0, lance.indexOf(build));
+    const key = lance.map(b => `${b.chassisId}|${b.skinId}|${(b.loadout || []).join(',')}`).join(';');
+    if (key !== this._previewKey || index !== this._previewIndex) {
       this._previewKey = key;
-      this.hangarScene.setMech(chassis, build.skinId, build.loadout);
+      this._previewIndex = index;
+      this.hangarScene.setLance(
+        lance.map(b => ({ chassis: MECH_BY_ID[b.chassisId], skinId: b.skinId, loadout: b.loadout })),
+        index,
+      );
     }
+    // A row needs room. On a phone the bay shows the one you are working on.
+    this.hangarScene.setLineUp(innerWidth > 880 || this.screen === 'title');
+    // The title screen has nothing in the way, so it gets the squad shot;
+    // the hangar puts the machine you are fitting in the clear middle.
+    this.hangarScene.setFocus(this.screen === 'hangar' && innerWidth > 880 ? 'selected' : 'row');
     if (this.screen === 'hangar') this.hangarScene.highlightHardpoint(this.hardpoint, chassis);
     else this.hangarScene.highlightHardpoint(null);
     // Frame the mech into whatever rectangle this screen leaves clear. When

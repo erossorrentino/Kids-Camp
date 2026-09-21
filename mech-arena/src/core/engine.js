@@ -70,6 +70,11 @@ const CockpitShader = {
     uHeat: { value: 0 },
     uGrain: { value: 0.018 },
     uEmp: { value: 0 },
+    // Arena grade: the reference for this game is a bright, saturated
+    // arena, not a grey simulator. Done in the post pass so every biome
+    // and every menu gets it for one multiply.
+    uSaturation: { value: 1.24 },
+    uContrast: { value: 1.11 },
   },
   vertexShader: /* glsl */`
     varying vec2 vUv;
@@ -77,6 +82,7 @@ const CockpitShader = {
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
     uniform float uAberration, uVignette, uScan, uTime, uDamage, uHeat, uGrain, uEmp;
+    uniform float uSaturation, uContrast;
     varying vec2 vUv;
 
     float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -109,6 +115,11 @@ const CockpitShader = {
       // Scanlines + grain.
       col *= 1.0 - uScan * (0.5 + 0.5 * sin(uv.y * 1400.0));
       col += (hash(uv * 1024.0 + fract(uTime)) - 0.5) * uGrain;
+
+      // Arena grade.
+      float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
+      col = mix(vec3(l), col, uSaturation);
+      col = clamp((col - 0.5) * uContrast + 0.5, 0.0, 1.0);
 
       // Vignette, deepened and reddened by structural damage.
       float vig = smoothstep(0.86, 0.22, r2 * uVignette * 2.0);
@@ -151,7 +162,7 @@ export class Engine {
     this.renderer.setPixelRatio(Math.min(devicePixelRatio || 1, this.q.pixelRatio * 1.5));
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.18;
+    this.renderer.toneMappingExposure = 1.2;
     this.renderer.shadowMap.enabled = this.q.shadow > 0;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     // Post-processing renders several passes; letting three reset its counters
@@ -258,9 +269,13 @@ export class Engine {
    */
   applyBiome(b, opts = {}) {
     this.scene.background = new THREE.Color(b.sky);
-    this.scene.fog = new THREE.Fog(b.fogCol, b.fog[0] * (opts.fogScale || 1), b.fog[1] * (opts.fogScale || 1));
+    // Daylight arenas keep their distance: haze that closes in reads as
+    // gloom, and these are meant to be bright places to fight in.
+    const fogPush = b.night ? 1 : 1.6;
+    this.scene.fog = new THREE.Fog(b.fogCol,
+      b.fog[0] * (opts.fogScale || 1) * fogPush, b.fog[1] * (opts.fogScale || 1) * fogPush);
     this.sun.color.setHex(b.sun);
-    this.sun.intensity = b.sunI;
+    this.sun.intensity = b.sunI * (b.night ? 1 : 1.1);
     this.hemi.color.setHex(b.amb);
     this.hemi.groundColor.setHex(b.ground);
     this.hemi.intensity = b.ambI;
@@ -275,13 +290,13 @@ export class Engine {
     this.ambient.color.setHex(b.amb).lerp(_white, interior ? 0.4 : b.night ? 0.42 : 0.2);
     // Dark biomes need a higher flat floor or the mechs -- which are the
     // thing the player actually has to read -- become pure silhouettes.
-    this.ambient.intensity = interior ? 1.5 : b.night ? 1.25 : 0.42 + b.ambI * 0.22;
+    this.ambient.intensity = interior ? 1.5 : b.night ? 1.3 : 0.42 + b.ambI * 0.18;
     this.hemi.intensity = b.ambI * (interior ? 1.7 : 1);
     this.fill.color.setHex(b.hazeCol).lerp(_white, b.night ? 0.62 : 0.35);
-    this.fill.intensity = interior ? 0.9 : b.night ? 1.25 : 0.55;
+    this.fill.intensity = interior ? 0.95 : b.night ? 1.3 : 0.62;
 
     this.buildEnvironment(b);
-    this.scene.environmentIntensity = interior ? 0.55 : 1.0;
+    this.scene.environmentIntensity = interior ? 0.6 : b.night ? 1.0 : 1.05;
   }
 
   /**

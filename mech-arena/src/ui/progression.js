@@ -15,6 +15,9 @@ import { makeRng } from '../core/rng.js';
 
 const KEY = 'ironvanguard.profile.v1';
 
+/** One scheme per starting machine: cyan, gold, crimson. */
+const STARTER_PAINT = ['azure.stripe.gloss', 'amber.chevron.gloss', 'crimson.stripe.gloss'];
+
 /** XP needed to reach each rank; index is rank-1. */
 const RANK_CURVE = Array.from({ length: 50 }, (_, i) => Math.round(900 * Math.pow(i + 1, 1.42)));
 
@@ -37,13 +40,16 @@ function freshProfile() {
     ownedWeapons: WEAPONS.filter(w => w.cost === 0).map(w => w.id),
     ownedPilots: PILOTS.filter(p => p.cost === 0).map(p => p.id),
     ownedImplants: [],
-    ownedSkins: starterSkins(),
+    // A squad that all looks the same is a squad you cannot read at a
+    // glance. The first three machines come painted, and those three
+    // schemes are yours from the start.
+    ownedSkins: [...new Set([...starterSkins(), ...STARTER_PAINT])],
     pilotId: PILOTS[0].id,
     implants: [null, null, null],
     hangar: starterMechs.map((id, i) => ({
       chassisId: id,
       loadout: autoLoadout(MECH_BY_ID[id], rng, { maxTier: 1 }),
-      skinId: DEFAULT_SKIN,
+      skinId: STARTER_PAINT[i] || DEFAULT_SKIN,
     })),
     settings: {
       quality: 'high', qualityAuto: true, sensitivity: 0.0022, invertY: false, volume: 0.6,

@@ -169,7 +169,9 @@ export class Markers {
         rec.name.textContent = o.name;
         rec.bar.style.transform = `scaleX(${o.healthFraction.toFixed(3)})`;
         rec.bar.className = o.healthFraction < 0.3 ? 'crit' : o.healthFraction < 0.6 ? 'low' : '';
-        rec.sub.textContent = `${o.chassis.name} · ${Math.round(d)}m`;
+        // Range is what a pilot reads mid-fight; the chassis name is on the
+        // scoreboard if they want it.
+        rec.sub.textContent = `${Math.round(d)}m`;
       }
     }
     for (; i < this.plates.length; i++) this.plates[i].el.style.display = 'none';
