@@ -142,6 +142,12 @@ export class Mech {
     this.damageDealt = 0; this.damageTaken = 0; this.healingDone = 0;
     this.captureTime = 0;
     this.assistCredit = new Map();
+    // Gunnery record. Counted per projectile or per hitscan ray, so a
+    // shotgun pellet and a missile each count once; a hit is a shot that
+    // damaged an enemy, whether directly or through splash.
+    this.shotsFired = 0;
+    this.shotsHit = 0;
+    this.damageByWeapon = new Map();
 
     /* ---- animation ---- */
     this.gait = 0;
@@ -245,6 +251,14 @@ export class Mech {
   }
   get healthFraction() { return clamp((this.totalArmour + this.totalStructure) / this.maxTotal, 0, 1); }
   get heatFraction() { return clamp(this.heat / this.heatCapacity, 0, 1); }
+  get accuracy() { return this.shotsFired > 0 ? this.shotsHit / this.shotsFired : 0; }
+
+  /** The weapon this pilot actually did the work with. */
+  bestWeapon() {
+    let best = null, most = 0;
+    for (const [id, dmg] of this.damageByWeapon) if (dmg > most) { most = dmg; best = id; }
+    return best ? { id: best, damage: most } : null;
+  }
 
   eyePosition(out = new THREE.Vector3()) {
     return out.set(this.position.x, this.position.y + this.height * 0.82, this.position.z);
@@ -989,11 +1003,10 @@ export class Mech {
     const amp = clamp(speedFrac, 0, 1);
     const airborne = !this.grounded;
 
-    const legPhase = [this.gait, this.gait + Math.PI];
-    const legs = [rig.legL, rig.legR];
-    for (let i = 0; i < 2; i++) {
+    const legs = rig.legParts;
+    for (let i = 0; i < legs.length; i++) {
       const leg = legs[i];
-      const ph = legPhase[i];
+      const ph = this.gait + leg.phase;
       const swing = Math.sin(ph);
       const lift = Math.max(0, Math.sin(ph + Math.PI / 2));
       const dir = leg.reverse ? -1 : 1;
@@ -1008,7 +1021,9 @@ export class Mech {
         leg.knee.rotation.x = dir * (0.18 + lift * 0.75) * amp + (leg.reverse ? -0.45 : 0.12);
         leg.ankle.rotation.x = -leg.thigh.rotation.x - leg.knee.rotation.x * dir * 0.6;
         // Footfall: dust and a thump when a foot passes the bottom of its arc.
-        const contact = swing < -0.92;
+        // Only the first pair reports footfalls: four feet would quadruple
+        // the dust and the audio for no extra information.
+        const contact = swing < -0.92 && i < 2;
         if (contact && this._stepFlag !== i + 1 && amp > 0.15) {
           this._stepFlag = i + 1;
           const fp = _v3.copy(this.position);

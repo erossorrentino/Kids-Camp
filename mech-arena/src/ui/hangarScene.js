@@ -26,6 +26,10 @@ export class HangarScene {
     this.zoom = 1;
     this.targetZoom = 1;
     this.focusY = 0.5;
+    // Lateral framing: shifting the look target moves the subject across
+    // the screen without moving the camera off its turntable arc. The title
+    // screen uses it to keep the mech clear of the menu column.
+    this.lookShiftX = 0;
     this.built = false;
     this.visible = false;
   }
@@ -90,7 +94,10 @@ export class HangarScene {
     g.add(door);
 
     // Lighting rig: a warm key, a cool fill, and two rim lights.
-    this.key = new THREE.SpotLight(0xffe6c8, 340, 90, 0.7, 0.45, 1.6);
+    // Physically-based falloff: illuminance is intensity / distance^2, so a
+    // key light twenty-five metres away needs to be in the thousands, not
+    // the hundreds.
+    this.key = new THREE.SpotLight(0xffe6c8, 12000, 120, 0.72, 0.5, 2);
     this.key.position.set(14, 30, 20);
     this.key.target.position.set(0, 6, 0);
     this.key.castShadow = true;
@@ -98,18 +105,18 @@ export class HangarScene {
     this.key.shadow.bias = -0.0012;
     g.add(this.key, this.key.target);
 
-    this.fill = new THREE.PointLight(0x4fa8ff, 160, 90, 2);
+    this.fill = new THREE.PointLight(0x4fa8ff, 4200, 110, 2);
     this.fill.position.set(-18, 14, 14);
     g.add(this.fill);
 
-    this.rimA = new THREE.PointLight(0x49d6ff, 120, 70, 2);
+    this.rimA = new THREE.PointLight(0x49d6ff, 3000, 90, 2);
     this.rimA.position.set(-14, 9, -16);
     g.add(this.rimA);
-    this.rimB = new THREE.PointLight(0xff8a3d, 90, 70, 2);
+    this.rimB = new THREE.PointLight(0xff8a3d, 2200, 90, 2);
     this.rimB.position.set(16, 7, -14);
     g.add(this.rimB);
 
-    this.ambient = new THREE.HemisphereLight(0x3a4a5a, 0x0a0c10, 0.6);
+    this.ambient = new THREE.HemisphereLight(0x5e7386, 0x14181e, 1.1);
     g.add(this.ambient);
   }
 
@@ -117,10 +124,14 @@ export class HangarScene {
     this.build();
     if (!this.visible) { this.scene.add(this.group); this.visible = true; }
     this.scene.background = new THREE.Color(0x05070a);
-    this.scene.fog = new THREE.Fog(0x05070a, 40, 150);
-    this.engine.sun.intensity = 0.25;
-    this.engine.hemi.intensity = 0.35;
-    this.engine.rim.intensity = 0.2;
+    this.scene.fog = new THREE.Fog(0x05070a, 55, 190);
+    this.engine.buildStudioEnvironment();
+    this.engine.sun.intensity = 0.35;
+    this.engine.hemi.intensity = 0.4;
+    this.engine.rim.intensity = 0.25;
+    this.engine.ambient.intensity = 0.55;
+    this.engine.ambient.color.setHex(0x8fa6bb);
+    this.engine.fill.intensity = 0.35;
     this.engine.fovTarget = 40;
   }
 
@@ -199,8 +210,11 @@ export class HangarScene {
     cam.position.x = damp(cam.position.x, want.x, 6, dt);
     cam.position.y = damp(cam.position.y, want.y, 6, dt);
     cam.position.z = damp(cam.position.z, want.z, 6, dt);
-    cam.lookAt(0, this.focusY + h * 0.06, 0);
+    cam.lookAt(this.lookShiftX, this.focusY + h * 0.06, 0);
   }
+
+  /** @param {number} x negative shifts the subject toward the right of frame. */
+  setFraming(x) { this.lookShiftX = x; }
 
   /** Hook pointer drag from the menu layer so the mech can be spun by hand. */
   attachDrag(el) {

@@ -21,6 +21,9 @@ import { TOURNAMENTS, resolveRoundMap } from '../data/tournaments.js';
 import { RANK_TITLES } from './progression.js';
 import { clamp } from '../core/rng.js';
 
+/** Screens rendered over the live 3D hangar bay. */
+const SEE_THROUGH = new Set(['title', 'hangar', 'deploy']);
+
 const esc = (s) => String(s).replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const fmt = (n) => Math.round(n).toLocaleString('en-US');
 
@@ -81,6 +84,8 @@ export class Menus {
       default: html = this.renderTitle();
     }
     this.root.innerHTML = html;
+    const surface = this.root.querySelector('.screen');
+    if (surface) surface.classList.toggle('see-through', SEE_THROUGH.has(this.screen));
     this._wire();
     this._syncPreview();
   }
@@ -483,6 +488,7 @@ export class Menus {
           <div class="kv"><span>WINS</span><b>${this.progression.data.wins}</b></div>
           <div class="kv"><span>KILLS</span><b>${fmt(this.progression.data.kills)}</b></div>
           <div class="kv"><span>DAMAGE</span><b>${fmt(this.progression.data.damage)}</b></div>
+          <div class="kv"><span>LIFETIME ACCURACY</span><b>${this.progression.data.shotsFired ? Math.round(this.progression.lifetimeAccuracy * 100) + '%' : '—'}</b></div>
           <div class="kv"><span>BEST GAME</span><b>${this.progression.data.stats.bestKills} kills</b></div>
           <button class="btn danger" style="width:100%;margin-top:14px" data-action="resetProfile">RESET PROFILE</button>
         </div>
@@ -505,20 +511,21 @@ export class Menus {
       <div class="grid" style="grid-template-columns:1.6fr 1fr;align-items:start">
         <div class="panel"><h3>SCOREBOARD</h3>
           <table style="width:100%;border-collapse:collapse;font-size:12.5px">
-            <thead><tr><th style="text-align:left;padding:5px 8px;font-size:9.5px;letter-spacing:.2em;color:var(--ink-dim)">PILOT</th>
-            <th style="padding:5px 8px;font-size:9.5px;color:var(--ink-dim)">K</th><th style="padding:5px 8px;font-size:9.5px;color:var(--ink-dim)">D</th>
-            <th style="padding:5px 8px;font-size:9.5px;color:var(--ink-dim)">A</th><th style="padding:5px 8px;font-size:9.5px;color:var(--ink-dim)">DMG</th>
-            <th style="padding:5px 8px;font-size:9.5px;color:var(--ink-dim)">SCORE</th></tr></thead>
+            <thead><tr>${['PILOT', 'K', 'D', 'A', 'DMG', 'ACC', 'SCORE'].map((h, i) =>
+              `<th style="text-align:${i ? 'center' : 'left'};padding:5px 8px;font-size:9.5px;letter-spacing:.2em;color:var(--ink-dim)">${h}</th>`).join('')}</tr></thead>
             <tbody>${result.players.map(p => `<tr style="${p.isPlayer ? 'background:rgba(73,214,255,.12)' : ''}">
               <td style="padding:5px 8px;border-left:2px solid ${p.team === 'a' ? 'var(--team-a)' : p.team === 'b' ? 'var(--team-b)' : 'transparent'}">${esc(p.name)}</td>
               <td style="padding:5px 8px;text-align:center">${p.kills}</td>
               <td style="padding:5px 8px;text-align:center">${p.deaths}</td>
               <td style="padding:5px 8px;text-align:center">${p.assists}</td>
               <td style="padding:5px 8px;text-align:center">${fmt(p.damage)}</td>
+              <td style="padding:5px 8px;text-align:center" class="muted">${p.shotsFired ? Math.round(p.accuracy * 100) + '%' : '—'}</td>
               <td style="padding:5px 8px;text-align:center">${fmt(p.score)}</td></tr>`).join('')}</tbody>
           </table>
         </div>
-        <div class="panel"><h3>REWARDS</h3>
+        <div class="panel">
+          ${this._gunneryPanel(result)}
+          <h3>REWARDS</h3>
           <div class="kv"><span>CREDITS</span><b style="color:var(--amber)">+${fmt(award?.credits || 0)}</b></div>
           <div class="kv"><span>EXPERIENCE</span><b style="color:var(--cyan)">+${fmt(award?.xp || 0)}</b></div>
           ${circuit ? this._circuitPanel(circuit) : ''}
@@ -598,6 +605,21 @@ export class Menus {
     </div>`;
   }
 
+  /** Your own gunnery for the match: shots, accuracy, and what did the work. */
+  _gunneryPanel(result) {
+    const me = result.players.find(p => p.isPlayer);
+    if (!me || !me.shotsFired) return '';
+    const w = me.bestWeapon ? WEAPON_BY_ID[me.bestWeapon.id] : null;
+    return `<h3>YOUR GUNNERY</h3>
+      <div class="kv"><span>SHOTS FIRED</span><b>${fmt(me.shotsFired)}</b></div>
+      <div class="kv"><span>SHOTS ON TARGET</span><b>${fmt(me.shotsHit)}</b></div>
+      <div class="kv"><span>ACCURACY</span><b style="color:${me.accuracy > 0.45 ? 'var(--green)' : me.accuracy > 0.25 ? 'var(--amber)' : 'var(--red)'}">${Math.round(me.accuracy * 100)}%</b></div>
+      <div class="kv"><span>DAMAGE PER SHOT</span><b>${(me.damage / me.shotsFired).toFixed(1)}</b></div>
+      ${w ? `<div class="kv"><span>TOP WEAPON</span><b>${esc(w.name)}</b></div>
+             <div class="kv"><span>ITS SHARE</span><b>${Math.round(me.bestWeapon.damage / Math.max(1, me.damage) * 100)}% of ${fmt(me.damage)}</b></div>` : ''}
+      <div style="height:14px"></div>`;
+  }
+
   /** The circuit block on the results screen: advance, win, or bust. */
   _circuitPanel(c) {
     if (!c.finished) {
@@ -657,6 +679,8 @@ export class Menus {
     }
     if (this.screen === 'hangar') this.hangarScene.highlightHardpoint(this.hardpoint, chassis);
     else this.hangarScene.highlightHardpoint(null);
+    // The title menu occupies the left column, so push the mech right.
+    this.hangarScene.setFraming(this.screen === 'title' ? -11 : 0);
     const surface = this.root.querySelector('.screen');
     if (surface) this.hangarScene.attachDrag(surface);
   }

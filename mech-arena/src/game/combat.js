@@ -165,6 +165,11 @@ export class Combat {
     const dmgScale = mech.damageMul * mech.damageBase * chargeLevel;
 
     for (let i = 0; i < pellets; i++) {
+      // Gunnery is counted in discrete shots. A sustained beam ticks twenty
+      // times a second and a flamer more than that, so including them would
+      // bury every other weapon's contribution and make the percentage
+      // meaningless. Support beams are not gunnery at all.
+      if (countsAsGunnery(d)) mech.shotsFired++;
       const dir = applySpread(baseDir, spread);
       if (d.mode === 'beam' || d.vel === 0) {
         this._hitscan(mech, inst, muzzlePos, dir, dmgScale);
@@ -229,6 +234,7 @@ export class Combat {
         shred: flags.includes('shred'), overpen: flags.includes('overpen'),
       });
       if (flags.includes('emp')) hitMech.heat += d.dmg * 0.55 * (1 - hitMech.empResist);
+      if (hitMech.team !== mech.team && countsAsGunnery(d)) mech.shotsHit++;
       this.fx.sparks(hitPoint, dir.clone().negate(), 6, d.tracer);
       this.audio.impact(hitPoint, 'metal');
     } else if (wall) {
@@ -464,6 +470,9 @@ export class Combat {
   _detonate(p, point, hitMech, collider = null, normal = null) {
     const d = p.def;
     const flags = d.flags || [];
+    // One projectile counts as at most one hit, however many mechs its
+    // splash reaches.
+    const before = p.owner ? p.owner.shotsHit : 0;
     if (hitMech) {
       const dist = p.spawnPos ? p.spawnPos.distanceTo(point) : 0;
       const dmg = damageAtRange(d, dist) / d.dmg * p.damage;
@@ -475,12 +484,14 @@ export class Combat {
         stagger: flags.includes('stagger') ? 0.35 : 0,
       });
       if (flags.includes('emp')) hitMech.heat += d.dmg * 0.6 * (1 - hitMech.empResist);
+      if (p.owner && hitMech.team !== p.owner.team) p.owner.shotsHit++;
       this.fx.sparks(point, p.vel.clone().normalize().negate(), 8, d.tracer);
       this.audio.impact(point, 'metal');
     }
 
     if (d.splash) {
-      this._splashDamage(point, d.splash.r, d.splash.dmg * (p.damage / d.dmg), p.owner, d);
+      const splashHit = this._splashDamage(point, d.splash.r, d.splash.dmg * (p.damage / d.dmg), p.owner, d);
+      if (splashHit && p.owner && p.owner.shotsHit === before) p.owner.shotsHit++;
       this.fx.explosion(point, clamp(d.splash.r / 5, 0.4, 2.4), d.tracer);
       this.audio.explosion(point, clamp(d.splash.r / 6, 0.4, 2));
     } else if (!hitMech) {
@@ -506,7 +517,9 @@ export class Combat {
     this._free(p);
   }
 
+  /** @returns {boolean} whether any enemy actually took splash damage. */
   _splashDamage(center, radius, damage, owner, def) {
+    let hitAnyone = false;
     for (const m of this.match.aliveMechs()) {
       const d = m.position.clone().setY(m.position.y + m.height * 0.45).distanceTo(center);
       if (d > radius + m.radius) continue;
@@ -519,13 +532,15 @@ export class Combat {
         continue;
       }
       if (m.team === owner?.team && this.match.friendlyFire === false) continue;
-      this.match.applyDamage(m, owner, damage * f, {
+      const dealt = this.match.applyDamage(m, owner, damage * f, {
         location: 'CT', weapon: def, from: center, splash: true, type: 'explosive',
       });
+      if (dealt > 0) hitAnyone = true;
     }
     // Destructible scenery takes splash too.
     const cols = this.world.queryBox(center.x - radius, center.z - radius, center.x + radius, center.z + radius, []);
     for (const c of cols) if (c.destructible) this._damageCollider(c, damage * 0.6, center);
+    return hitAnyone;
   }
 
   _damageCollider(c, dmg, point) {
@@ -676,6 +691,14 @@ export class Combat {
 }
 
 /* ---------------- helpers ---------------- */
+
+/** Discrete-fire, damage-dealing weapons are the ones accuracy is about. */
+function countsAsGunnery(def) {
+  if ((def.flags || []).includes('heal')) return false;
+  if ((def.flags || []).includes('tag')) return false;
+  return def.mode !== 'beam' && def.mode !== 'stream' && def.mode !== 'passive';
+}
+
 function applySpread(dir, spreadDeg) {
   if (spreadDeg <= 0.0001) return dir.clone();
   const rad = spreadDeg * Math.PI / 180;

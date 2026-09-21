@@ -281,6 +281,49 @@ export class Engine {
     sun.geometry.dispose(); sun.material.dispose();
   }
 
+  /**
+   * A neutral studio environment for the hangar. Without any environment at
+   * all a metallic material has nothing to reflect and renders black, which
+   * is exactly what the menu bay looked like.
+   */
+  buildStudioEnvironment() {
+    const envScene = new THREE.Scene();
+    const shell = new THREE.Mesh(
+      new THREE.SphereGeometry(60, 20, 14),
+      new THREE.ShaderMaterial({
+        side: THREE.BackSide,
+        vertexShader: `varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+        fragmentShader: `
+          varying vec3 vP;
+          void main(){
+            float h = normalize(vP).y;
+            vec3 top = vec3(0.30, 0.38, 0.48);
+            vec3 mid = vec3(0.12, 0.15, 0.19);
+            vec3 low = vec3(0.03, 0.035, 0.045);
+            vec3 c = h > 0.0 ? mix(mid, top, pow(clamp(h,0.0,1.0), 0.6))
+                             : mix(mid, low, pow(clamp(-h,0.0,1.0), 0.5));
+            gl_FragColor = vec4(c, 1.0);
+          }`,
+      }),
+    );
+    envScene.add(shell);
+    // Two soft box lights, as a product shot would have.
+    for (const [x, y, z, i] of [[26, 30, 22, 9], [-30, 18, -14, 3.5]]) {
+      const panel = new THREE.Mesh(
+        new THREE.PlaneGeometry(26, 26),
+        new THREE.MeshBasicMaterial({ color: new THREE.Color(0xffffff).multiplyScalar(i), side: THREE.DoubleSide }),
+      );
+      panel.position.set(x, y, z);
+      panel.lookAt(0, 0, 0);
+      envScene.add(panel);
+    }
+    if (this.envTarget) this.envTarget.dispose();
+    this.envTarget = this.pmrem.fromScene(envScene, 0.06);
+    this.scene.environment = this.envTarget.texture;
+    this.scene.environmentIntensity = 1.0;
+    envScene.traverse(o => { if (o.isMesh) { o.geometry.dispose(); o.material.dispose(); } });
+  }
+
   _onResize() {
     const w = innerWidth, h = innerHeight;
     this.renderer.setSize(w, h, false);

@@ -67,6 +67,7 @@ export class Match {
     this.score = { a: 0, b: 0 };
     this.ffaScores = new Map();
     this.events = [];                // killfeed entries
+    this.comms = [];                 // squad chatter
     this.mechs = [];
     this.brains = new Map();
     this.players = [];               // roster entries (a pilot + their hangar)
@@ -139,6 +140,7 @@ export class Match {
           alive: false,
           respawnIn: 0,
           score: 0, kills: 0, deaths: 0, assists: 0, damage: 0, healing: 0,
+          shotsFired: 0, shotsHit: 0, weaponDamage: {},
           mech: null,
           juggernaut: false,
           passive: !!m.passiveEnemies && team === 'b',
@@ -352,6 +354,12 @@ export class Match {
 
     if (attacker && attacker !== target && attacker.team !== target.team) {
       attacker.damageDealt += dealt;
+      if (opts.weapon?.id) {
+        attacker.damageByWeapon.set(opts.weapon.id, (attacker.damageByWeapon.get(opts.weapon.id) || 0) + dealt);
+        if (attacker.entry) {
+          attacker.entry.weaponDamage[opts.weapon.id] = (attacker.entry.weaponDamage[opts.weapon.id] || 0) + dealt;
+        }
+      }
       if (attacker.entry) attacker.entry.damage += dealt;
       if (attacker.isPlayer) this.onEvent?.({ type: 'hit', amount: dealt, target, killing: !target.alive });
     }
@@ -420,6 +428,8 @@ export class Match {
     entry.alive = false;
     entry.deaths++;
     mech.deaths++;
+    entry.shotsFired += mech.shotsFired;
+    entry.shotsHit += mech.shotsHit;
 
     const value = mech.juggernaut ? 2 : 1;
 
@@ -488,8 +498,10 @@ export class Match {
 
     // Collapse: drop to the knees, slump the torso, splay the arms.
     const rig = mech.rig;
-    rig.legL.thigh.rotation.x = 0.9; rig.legL.knee.rotation.x = -1.5;
-    rig.legR.thigh.rotation.x = 0.5; rig.legR.knee.rotation.x = -1.1;
+    for (const leg of rig.legParts) {
+      leg.thigh.rotation.x = this.rng.range(0.4, 1.0);
+      leg.knee.rotation.x = this.rng.range(-1.6, -0.9);
+    }
     rig.torsoPitch.rotation.x = 0.55;
     rig.torsoYaw.rotation.y = this.rng.range(-0.6, 0.6);
     rig.armL.upper.rotation.x = this.rng.range(-0.4, 1.4);
@@ -559,6 +571,30 @@ export class Match {
   scoreFor(team) {
     if (team === 'a' || team === 'b') return this.score[team];
     return this.ffaScores.get(team) || 0;
+  }
+
+  /**
+   * Squad chatter. Bots announce things a human teammate would: contact,
+   * a zone falling, being overwhelmed. It is flavour, but it is also the
+   * only way a solo player hears what the rest of their lance is doing.
+   *
+   * Rate-limited per speaker and globally so a firefight does not turn
+   * into a wall of text.
+   */
+  say(mech, kind, text) {
+    if (!mech || mech.team !== this.player?.team) return;
+    const now = this.time;
+    if (now - (this._lastComms || -99) < 2.2) return;
+    if (now - (mech._lastSaid || -99) < 9) return;
+    if (this._recentComms?.[kind] > now - 14) return;
+    this._lastComms = now;
+    mech._lastSaid = now;
+    this._recentComms = this._recentComms || {};
+    this._recentComms[kind] = now;
+    const line = { name: mech.name, text, t: now };
+    this.comms.push(line);
+    if (this.comms.length > 12) this.comms.shift();
+    this.onEvent?.({ type: 'comms', line });
   }
 
   _pushEvent(e) {
@@ -774,13 +810,16 @@ export class Match {
             z.progress = 0.02;
             this.onEvent?.({ type: 'capture', zone: z, team: holder });
             this.audio.play('callout');
+            const nearby = this.aliveMechs().find(mm => mm.team === holder && mm.position.distanceTo(z.pos) < z.radius);
+            this.say(nearby, 'capture',
+              holder === this.player?.team ? `${z.name} is ours.` : `We lost ${z.name}.`);
           }
         }
       } else if (!z.contested) {
         z.progress = Math.max(0, z.progress - 0.08 * dt);
       }
 
-      if (tick && z.owner && !z.contested) this._addScore(z.owner, obj === 'king' ? 5 : 3);
+      if (tick && z.owner && !z.contested) this._addScore(z.owner, obj === 'king' ? 5 : 2);
 
       const col = z.contested ? 0xffd24e
                 : z.owner === 'a' ? TEAM_COLORS.a
@@ -827,6 +866,11 @@ export class Match {
 
   _end(winner, reason) {
     this.state = 'over';
+    for (const p of this.players) {
+      if (!p.mech) continue;
+      p.shotsFired += p.mech.shotsFired;
+      p.shotsHit += p.mech.shotsHit;
+    }
     this.result = {
       winner, reason,
       playerWon: winner === this.player?.team,
@@ -836,6 +880,9 @@ export class Match {
         name: p.name, team: p.team, kills: p.kills, deaths: p.deaths,
         assists: p.assists, damage: Math.round(p.damage), healing: Math.round(p.healing),
         score: p.score, isPlayer: p.isPlayer,
+        shotsFired: p.shotsFired, shotsHit: p.shotsHit,
+        accuracy: p.shotsFired > 0 ? p.shotsHit / p.shotsFired : 0,
+        bestWeapon: bestOf(p.weaponDamage),
       })).sort((x, y) => y.score - x.score),
     };
     this.audio.play(this.result.playerWon ? 'victory' : this.result.draw ? 'callout' : 'defeat');
@@ -910,6 +957,13 @@ export function autoLoadout(chassis, rng = Math.random, opts = {}) {
 }
 
 function sizeRank(s) { return { S: 0, M: 1, L: 2, XL: 3 }[s] ?? 0; }
+
+/** The id with the most damage in a {weaponId: damage} bag. */
+function bestOf(bag) {
+  let best = null, most = 0;
+  for (const [id, v] of Object.entries(bag || {})) if (v > most) { most = v; best = id; }
+  return best ? { id: best, damage: Math.round(most) } : null;
+}
 
 const _v1 = new THREE.Vector3();
 const _v2 = new THREE.Vector3();

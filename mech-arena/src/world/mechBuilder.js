@@ -438,23 +438,58 @@ export function buildMech(chassis, skinId, teamColor = null) {
   /* ---- legs ---- */
   const legs = new THREE.Group();
   root.add(legs);
+  const quad = b.legs === 'quad';
 
-  const pelvis = mesh(mergeParts([
-    { geo: box(S.w * 1.0, S.h * 0.3, S.d * 0.9), pos: [0, 0, 0] },
-    { geo: plate(S.w * 0.8, S.h * 0.22, S.d * 0.6, 1.3), pos: [0, -S.h * 0.2, 0] },
-  ]), mats.hull);
+  const pelvis = mesh(mergeParts(quad
+    ? [
+      // A quad's body is a long chassis slung between four hips rather than
+      // a pelvis under a torso.
+      { geo: box(S.w * 1.25, S.h * 0.34, S.d * 2.0), pos: [0, 0, 0] },
+      { geo: plate(S.w * 1.0, S.h * 0.24, S.d * 1.6, 1.25), pos: [0, -S.h * 0.22, 0] },
+    ]
+    : [
+      { geo: box(S.w * 1.0, S.h * 0.3, S.d * 0.9), pos: [0, 0, 0] },
+      { geo: plate(S.w * 0.8, S.h * 0.22, S.d * 0.6, 1.3), pos: [0, -S.h * 0.2, 0] },
+    ]), mats.hull);
   pelvis.position.y = S.legLen;
   legs.add(pelvis);
 
-  const legL = buildLeg(b.legs, S, mats, -1, rng);
-  const legR = buildLeg(b.legs, S, mats, 1, rng);
-  legL.group.position.set(-S.w * 0.36, S.legLen, 0);
-  legR.group.position.set(S.w * 0.36, S.legLen, 0);
-  legs.add(legL.group, legR.group);
+  // Bipeds swing their legs in antiphase; quads use a diagonal trot, so the
+  // front-left and rear-right feet move together.
+  const legType = quad ? 'digitigrade' : b.legs;
+  const layout = quad
+    ? [
+      { sx: -1, sz: 1, phase: 0 },          // front left
+      { sx: 1, sz: 1, phase: Math.PI },     // front right
+      { sx: -1, sz: -1, phase: Math.PI },   // rear left
+      { sx: 1, sz: -1, phase: 0 },          // rear right
+    ]
+    : [
+      { sx: -1, sz: 0, phase: 0 },
+      { sx: 1, sz: 0, phase: Math.PI },
+    ];
+
+  const legParts = layout.map(spec => {
+    const leg = buildLeg(legType, S, mats, spec.sx, rng);
+    leg.group.position.set(
+      spec.sx * S.w * (quad ? 0.52 : 0.36),
+      S.legLen,
+      spec.sz * S.d * 0.78,
+    );
+    // Rear legs of a quad face slightly outward, which reads as a stance.
+    if (quad) leg.group.rotation.y = spec.sx * (spec.sz > 0 ? 0.12 : -0.12);
+    leg.phase = spec.phase;
+    legs.add(leg.group);
+    return leg;
+  });
+
+  const legL = legParts[0];
+  const legR = legParts[1];
 
   /* ---- torso ---- */
   const torsoYaw = new THREE.Group();
-  torsoYaw.position.y = S.legLen + S.h * 0.28;
+  // A quad carries its turret low and forward over the front hips.
+  torsoYaw.position.set(0, S.legLen + S.h * (quad ? 0.20 : 0.28), quad ? S.d * 0.45 : 0);
   root.add(torsoYaw);
 
   const torsoPitch = new THREE.Group();
@@ -537,8 +572,8 @@ export function buildMech(chassis, skinId, teamColor = null) {
     HD: collectHull(cockpit),
     LA: collectHull(armL.group),
     RA: collectHull(armR.group),
-    LL: collectHull(legL.group),
-    RL: collectHull(legR.group),
+    LL: legParts.filter((_, i) => i % 2 === 0).flatMap(l => collectHull(l.group)),
+    RL: legParts.filter((_, i) => i % 2 === 1).flatMap(l => collectHull(l.group)),
   };
 
   root.userData.height = H;
@@ -546,7 +581,8 @@ export function buildMech(chassis, skinId, teamColor = null) {
   return {
     root, materials: mats, mounts, jets, height: H, scaleRef: S,
     rig: {
-      legs, pelvis, legL, legR, torsoYaw, torsoPitch, cockpit,
+      legs, pelvis, legL, legR, legParts, quad,
+      torsoYaw, torsoPitch, cockpit,
       shoulderL, shoulderR, armL, armR, sideTorso, torsoMesh, sectionMeshes,
     },
   };

@@ -10,10 +10,15 @@ this repository; the whole thing is about 11,000 lines of JavaScript and a
 vendored copy of Three.js.
 
 ```
-34 chassis   ·  302 weapons  ·  22 abilities  ·  2,496 paint schemes
+37 chassis   ·  302 weapons  ·  22 abilities  ·  2,496 paint schemes
 41 arenas    ·  10 biomes    ·  8 game modes  ·  12 pilots, 20 implants
 5 tournament circuits with locked lances, purses and trophies
 ```
+
+Chassis come on two legs, bird legs, six-point spider legs — and four,
+which changes how a machine reads and how it plays: a quadruped cannot
+punch or jump, but nothing knocks it down and it is the steadiest gun
+mount in the game.
 
 ---
 
@@ -103,7 +108,15 @@ dashboard with live structure, heat and jet strips, and side consoles that
 sway as the mech walks. It is harder to fly and much better for gunnery.
 
 Destroyed mechs leave **wrecks** on the field, burning for a while and then
-going cold — the map tells you where the fighting has been.
+going cold — the map tells you where the fighting has been. Your lance
+talks: bots call contacts, announce a zone falling, and say when they are
+breaking off, which is the only way a solo pilot hears what the rest of
+the team is doing.
+
+After the match you get your **gunnery record**: shots fired, shots on
+target, accuracy, damage per shot and which weapon actually did the work.
+Continuous-fire weapons are excluded from the count, because a beam that
+ticks twenty times a second would bury everything else.
 
 ---
 

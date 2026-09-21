@@ -50,7 +50,7 @@ export const COLOURWAYS = [
 export const PATTERNS = [
   { id:'solid',    name:'Solid',        tier:1 },
   { id:'panel',    name:'Panelled',     tier:1 },
-  { id:'stripe',   name:'Lance Stripe', tier:1 },
+  { id:'stripe',   name:'Racing Stripe', tier:1 },
   { id:'splinter', name:'Splinter',     tier:2 },
   { id:'hexcam',   name:'Hex Camo',     tier:2 },
   { id:'digital',  name:'Digital Camo', tier:2 },

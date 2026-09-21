@@ -248,6 +248,28 @@ const RAW = [
     build:{ legs:'humanoid', torso:'boxy', cockpit:'head', shoulders:'spiked', arms:'hybrid', height:12.0, width:1.46, accents:3 },
     tier:5, cost:33000, blurb:'Ninety tons with jump jets. The landing is a weapon -- ask anyone who has been underneath one.' },
 
+  /* ===================== QUADRUPEDS ===================== */
+  { id:'scorpion', name:'SCORPION', cls:'medium', tons:55, armour:2680, spread:'legger',
+    speed:88, accel:26, turn:96, torsoTurn:186, heatCap:72, sinks:10.5,
+    jets:{ thrust:0, fuel:0, regen:0 }, ability:'braced',
+    hardpoints:[...hp('RT','L'), ...hp('LT','M'), ...hp('CT','M'), ...hp('HD','S')],
+    build:{ legs:'quad', torso:'wide', cockpit:'sensor', shoulders:'slim', arms:'gun', height:8.2, width:1.18, accents:3 },
+    tier:2, cost:9600, blurb:'A four-legged weapons platform. It cannot punch and it cannot jump, but it is the most stable gun mount in the game and it does not fall over.' },
+
+  { id:'goliath', name:'GOLIATH', cls:'heavy', tons:80, armour:3600, spread:'legger',
+    speed:74, accel:20, turn:80, torsoTurn:150, heatCap:88, sinks:12.5,
+    jets:{ thrust:0, fuel:0, regen:0 }, ability:'stomp',
+    hardpoints:[...hp('RT','XL'), ...hp('LT','L'), ...hp('CT','M'), ...hp('RA','M')],
+    build:{ legs:'quad', torso:'boxy', cockpit:'visor', shoulders:'boxlauncher', arms:'gun', height:9.4, width:1.42, accents:3 },
+    tier:4, cost:22400, blurb:'Eighty tons on four legs. Losing a leg barely slows it, and nothing its size holds a firing line so well.' },
+
+  { id:'arachne', name:'ARACHNE', cls:'assault', tons:90, armour:4300, spread:'legger',
+    speed:62, accel:14, turn:66, torsoTurn:120, heatCap:106, sinks:15,
+    jets:{ thrust:0, fuel:0, regen:0 }, ability:'shieldwall',
+    hardpoints:[...hp('LT','XL'), ...hp('RT','XL'), ...hp('CT','L'), ...hp('LA','M'), ...hp('RA','M')],
+    build:{ legs:'quad', torso:'wide', cockpit:'dome', shoulders:'spiked', arms:'gun', height:10.2, width:1.52, accents:5 },
+    tier:5, cost:35000, blurb:'A siege spider. Five hardpoints on a platform that cannot be knocked down, walking slowly toward wherever you were standing.' },
+
   /* ============================ SUPPORT ============================ */
   { id:'medic', name:'CADUCEUS', cls:'support', tons:55, armour:2700, spread:'balanced',
     speed:82, accel:21, turn:100, torsoTurn:154, heatCap:78, sinks:12,

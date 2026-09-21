@@ -70,6 +70,25 @@ await page.screenshot({ path: join(OUT, '01-title.png') });
 await step('hangar', async () => {
   await page.evaluate(() => window.__game.menus.open('hangar'));
   await page.waitForTimeout(1600);
+  // The bay is the mech preview. It was invisible for a long time because
+  // the menu's own background was 97% opaque over it, which no amount of
+  // checking the scene graph would have revealed.
+  const ok = await page.evaluate(() => {
+    const g = window.__game, hs = g.hangarScene;
+    const screen = document.querySelector('#ui-root .screen');
+    const bg = screen ? getComputedStyle(screen).backgroundImage : '';
+    // Pull the largest alpha out of the background gradient stops.
+    const alphas = [...bg.matchAll(/rgba?\([^)]*?,\s*([0-9.]+)\s*\)/g)].map(m => parseFloat(m[1]));
+    return {
+      hasModel: !!hs.model,
+      inScene: !!hs.model?.root.parent,
+      seeThrough: !!screen?.classList.contains('see-through'),
+      maxAlpha: alphas.length ? Math.max(...alphas) : 1,
+    };
+  });
+  if (!ok.hasModel || !ok.inScene) throw new Error('hangar has no mech on the turntable');
+  if (!ok.seeThrough) throw new Error('hangar screen is not marked see-through');
+  if (ok.maxAlpha > 0.95) throw new Error(`hangar background is opaque (alpha ${ok.maxAlpha}) and hides the bay`);
 });
 await page.screenshot({ path: join(OUT, '02-hangar.png') });
 
@@ -256,6 +275,28 @@ await step('long sim (60s of match time)', async () => {
     return { count: m.wrecks.length, inScene: m.wrecks.filter(w => !!w.root.parent).length, cap: m.maxWrecks };
   });
   console.log('    wrecks', JSON.stringify(wrecks));
+  const gun = await page.evaluate(() => {
+    const m = window.__game.match;
+    m._end('a', 'TEST');
+    const rows = m.result.players.filter(p => p.shotsFired > 0);
+    return {
+      shooters: rows.length,
+      worst: Math.min(...rows.map(r => r.accuracy)),
+      best: Math.max(...rows.map(r => r.accuracy)),
+      anyOverOne: rows.some(r => r.shotsHit > r.shotsFired),
+      weapons: rows.filter(r => r.bestWeapon).length,
+    };
+  });
+  console.log('    gunnery', JSON.stringify(gun));
+  const comms = await page.evaluate(() => {
+    const m = window.__game.match;
+    return { lines: m.comms.length, sample: m.comms.slice(-2).map(c => `${c.name}: ${c.text}`) };
+  });
+  console.log('    comms', JSON.stringify(comms));
+  if (!gun.shooters) throw new Error('nobody fired a shot in a minute of combat');
+  if (gun.anyOverOne) throw new Error('a pilot hit more times than they fired');
+  if (gun.best > 1 || gun.worst < 0) throw new Error('accuracy outside 0..1');
+  if (!gun.weapons) throw new Error('no top weapon recorded for any shooter');
   if (st.kills > 0 && wrecks.count === 0) throw new Error('kills happened but no wrecks were left');
   if (wrecks.count !== wrecks.inScene) throw new Error('a wreck was detached from the scene but still tracked');
   if (wrecks.count > wrecks.cap) throw new Error('wreck cap exceeded');

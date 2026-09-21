@@ -32,7 +32,7 @@ function freshProfile() {
     name: 'PILOT',
     credits: 6000,
     xp: 0,
-    matches: 0, wins: 0, kills: 0, deaths: 0, damage: 0,
+    matches: 0, wins: 0, kills: 0, deaths: 0, damage: 0, shotsFired: 0, shotsHit: 0,
     ownedMechs: [...starterMechs],
     ownedWeapons: WEAPONS.filter(w => w.cost === 0).map(w => w.id),
     ownedPilots: PILOTS.filter(p => p.cost === 0).map(p => p.id),
@@ -172,6 +172,8 @@ export class Progression {
     this.data.kills += me.kills;
     this.data.deaths += me.deaths;
     this.data.damage += me.damage;
+    this.data.shotsFired += me.shotsFired || 0;
+    this.data.shotsHit += me.shotsHit || 0;
     this.data.stats.bestKills = Math.max(this.data.stats.bestKills, me.kills);
     this.data.stats.bestDamage = Math.max(this.data.stats.bestDamage, Math.round(me.damage));
     this.save();
@@ -216,6 +218,10 @@ export class Progression {
       implants: this.data.implants.filter(Boolean),
       pilotName: this.data.name,
     };
+  }
+
+  get lifetimeAccuracy() {
+    return this.data.shotsFired > 0 ? this.data.shotsHit / this.data.shotsFired : 0;
   }
 
   setSetting(k, v) { this.data.settings[k] = v; this.save(); }

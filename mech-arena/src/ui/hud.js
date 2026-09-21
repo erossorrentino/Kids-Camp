@@ -91,6 +91,7 @@ export class HUD {
     this._updateObjectives(match);
     this._updateFeed(match);
     this._updateToast(dt);
+    this._updateComms(dt);
     this._updateFps();
 
     if (!mech || !mech.alive) {
@@ -446,6 +447,39 @@ export class HUD {
       case 'pickup':
         this.toast(e.pad.type.label, e.pad.type.desc);
         break;
+      case 'comms':
+        this._pushComms(e.line);
+        break;
+    }
+  }
+
+  /** Squad chatter, stacked above the status panel and aged out. */
+  _pushComms(line) {
+    if (!this._commsEl) {
+      const el = document.createElement('div');
+      el.id = 'comms';
+      this.root.appendChild(el);
+      this._commsEl = el;
+      this._commsRows = [];
+    }
+    const row = document.createElement('div');
+    row.className = 'comms-row';
+    row.innerHTML = `<b>${escape(line.name)}</b><span>${escape(line.text)}</span>`;
+    this._commsEl.appendChild(row);
+    this._commsRows.push({ el: row, life: 7 });
+    while (this._commsRows.length > 4) {
+      const old = this._commsRows.shift();
+      old.el.remove();
+    }
+  }
+
+  _updateComms(dt) {
+    if (!this._commsRows?.length) return;
+    for (let i = this._commsRows.length - 1; i >= 0; i--) {
+      const r = this._commsRows[i];
+      r.life -= dt;
+      if (r.life < 1.2) r.el.style.opacity = Math.max(0, r.life / 1.2).toFixed(2);
+      if (r.life <= 0) { r.el.remove(); this._commsRows.splice(i, 1); }
     }
   }
 

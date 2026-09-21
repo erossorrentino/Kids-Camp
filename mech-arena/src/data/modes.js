@@ -27,13 +27,16 @@ export const MODES = {
   },
   control: {
     id:'control', name:'CONTROL POINT CLASH', short:'CONTROL',
-    teams:2, perTeam:5, duration:360, scoreLimit:1000,
+    // Three points per zone per second would end a six-minute mode in under
+    // two if one team snowballed. At two, holding all three still wins in
+    // four minutes and a contested match runs to the horn.
+    teams:2, perTeam:5, duration:360, scoreLimit:1500,
     objective:'points', respawn:true, hangarSize:5, zones:3,
     desc:'Three zones. Holding them ticks up your score. Contesting one stops the enemy cold.',
   },
   king: {
     id:'king', name:'HARDPOINT', short:'KING',
-    teams:2, perTeam:5, duration:300, scoreLimit:600,
+    teams:2, perTeam:5, duration:300, scoreLimit:900,
     objective:'king', respawn:true, hangarSize:5, zones:1, rotateEvery:60,
     desc:'One live zone that relocates every sixty seconds. Hold it, then be ready to move.',
   },

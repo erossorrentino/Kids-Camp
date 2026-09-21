@@ -188,10 +188,36 @@ export class BotBrain {
     if (this.state === 'retreat' && hp < 0.5 && heat > 0.45 && this.stateTime < 4) next = 'retreat';
 
     if (next !== this.state) {
+      this._announce(this.state, next);
       this.state = next;
       this.stateTime = 0;
       this.waypoint = null;
       this.repathTimer = 0;
+    }
+  }
+
+  /** A line of chatter when the situation changes enough to be worth one. */
+  _announce(from, to) {
+    const m = this.mech;
+    const t = this.target;
+    if (to === 'engage' && from !== 'hunt' && t) {
+      const cls = t.chassis.classLabel.toLowerCase();
+      this.match.say(m, 'contact',
+        this.rng.chance(0.5)
+          ? `Contact — ${cls}, ${Math.round(m.position.distanceTo(t.position))} metres.`
+          : `Engaging a ${cls}. ${t.name}.`);
+    } else if (to === 'retreat') {
+      this.match.say(m, 'retreat',
+        m.heatFraction > 0.85 ? 'Cooking off — breaking contact.'
+          : m.shutdown ? 'Reactor scrammed, I am a sitting target.'
+          : `I am down to ${Math.round(m.healthFraction * 100)} percent. Falling back.`);
+    } else if (to === 'resupply') {
+      this.match.say(m, 'resupply',
+        this._lowOnAmmo() ? 'Running dry. Hitting a pad.' : 'Pulling out for a patch-up.');
+    } else if (to === 'flank' && t) {
+      this.match.say(m, 'flank', `Going around on ${t.name}. Hold their attention.`);
+    } else if (to === 'support' && this.supportTarget) {
+      this.match.say(m, 'support', `Coming to you, ${this.supportTarget.name}.`);
     }
   }
 
