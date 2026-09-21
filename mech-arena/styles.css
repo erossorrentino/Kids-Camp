@@ -451,7 +451,8 @@ kbd{font-family:var(--mono);background:rgba(255,255,255,.1);border:1px solid var
 @keyframes introin{from{opacity:0;transform:translateX(-26px);}}
 
 /* ---------------- Squad comms ---------------- */
-#comms{position:absolute;left:18px;bottom:128px;width:340px;display:flex;flex-direction:column;gap:4px;}
+/* Stacks above the status panel, which is ~110px tall at bottom:18px. */
+#comms{position:absolute;left:18px;bottom:148px;width:340px;display:flex;flex-direction:column;gap:4px;}
 .comms-row{font-size:11.5px;line-height:1.45;padding:5px 9px;border-radius:5px;
   background:var(--panel);border:1px solid var(--line);border-left:2px solid var(--team-a);
   backdrop-filter:blur(6px);transition:opacity .3s;animation:commsin .22s ease-out;}
