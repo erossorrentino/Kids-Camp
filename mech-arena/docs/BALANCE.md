@@ -120,6 +120,27 @@ out-flown. `Match` reads the best rarity in the player's lance and caps bot
 weapons there, shifted by difficulty (recruit −1, regular 0, veteran and
 elite +1, ace +2), never below Rare so every hardpoint can still be filled.
 
+## Stick steering
+
+The stick means "go that way", in screen space, for every chassis. Weight
+decides how fast a machine gets going, not which way it goes. Two things
+used to break that on a heavy:
+
+- Velocity was damped per axis, so a machine told to go right carried its
+  forward speed for the best part of a second — an Atlas was still 22°
+  off half a second after the stick moved. Now the velocity is split: the
+  part along the new heading accelerates at the chassis's own rate, and
+  the sideways slide bleeds off at 14/s. Reversing brakes 2.2× harder than
+  it accelerates, so pulling back stops and turns rather than arcing.
+- The legs turned at the chassis's own rate — 62°/s for an Atlas, three
+  seconds to face a stick pulled back — so it visibly walked one way while
+  facing another. Under stick steering the legs turn at 2.5× their rate
+  and never slower than 260°/s.
+
+Measured half a second after swinging the stick at full speed, travel is
+within 4° and the body within 0° on a Wasp and an Atlas alike; it was 31°
+and 124° on the Atlas. `tools/handling.mjs` fails on the old code.
+
 ## Bot difficulty
 
 Difficulty never touches damage, armour or speed. The five tiers vary:

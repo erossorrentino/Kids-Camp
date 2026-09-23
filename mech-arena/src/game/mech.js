@@ -28,6 +28,11 @@ const OVERHEAT_WARN = 0.78;
 
 let nextId = 1;
 
+/** Minimum leg turn rate under stick steering, rad/s (about 260 deg/s). */
+const STEER_TURN = 4.5;
+/** How fast sideways slide dies under stick steering, 1/s. */
+const SLIDE_BLEED = 14;
+
 export class Mech {
   /**
    * @param {object} opts { chassis, loadout, skinId, pilotId, implants, team, name, isPlayer }
@@ -398,7 +403,12 @@ export class Mech {
 
     // Facing.
     if (!stunned) {
-      const turn = this.turnRate * this.turnMul * dt;
+      let turn = this.turnRate * this.turnMul * dt;
+      // Stick steering: the body has to follow the stick briskly or a heavy
+      // machine visibly walks one way while facing another -- an Atlas at
+      // its own 62 deg/s took three seconds to face a stick pulled back.
+      // At least 260 deg/s, and a light still turns faster than that.
+      if (this.moveWorld) turn = Math.max(turn * 2.5, STEER_TURN * this.turnMul * dt);
       this.yaw = approachAngle(this.yaw, this.desiredYaw, turn);
     }
     // Torso tracks the aim independently, clamped to a realistic arc.
@@ -417,7 +427,7 @@ export class Mech {
          * something, which is where the mass comes from. */
         wx = this.moveX; wz = this.moveZ;
         const off = Math.abs(angleDelta(this.yaw, Math.atan2(wx, wz)));
-        const align = off > 2.2 ? 0.62 : off > 1.1 ? 0.82 : 1;
+        const align = off > 2.2 ? 0.8 : off > 1.1 ? 0.9 : 1;
         wx *= align; wz *= align;
       } else {
         const s = Math.sin(this.yaw), c = Math.cos(this.yaw);
@@ -435,8 +445,26 @@ export class Mech {
 
     const control = this.grounded ? 1 : this.airControl;
     const accel = this.accel * this.speedMul * control;
-    this.velocity.x = damp(this.velocity.x, ax, accel * 0.42, dt);
-    this.velocity.z = damp(this.velocity.z, az, accel * 0.42, dt);
+    const want = Math.hypot(ax, az);
+    if (this.moveWorld && want > 0.01) {
+      /* Stick steering. Damping x and z separately drags the old heading
+       * along for the best part of a second on a heavy, so a machine told
+       * to go right kept drifting forward. Split the velocity instead: the
+       * part along the new heading accelerates at the chassis's own rate --
+       * weight still decides how fast it gets going -- and the sideways
+       * slide is bled off fast, so the direction answers the stick almost
+       * at once. Reversing brakes harder than it accelerates. */
+      const ux = ax / want, uz = az / want;
+      const par = this.velocity.x * ux + this.velocity.z * uz;
+      const sx = this.velocity.x - par * ux, sz = this.velocity.z - par * uz;
+      const keep = Math.exp(-SLIDE_BLEED * control * dt);
+      const along = damp(par, want, accel * 0.42 * (par < 0 ? 2.2 : 1), dt);
+      this.velocity.x = ux * along + sx * keep;
+      this.velocity.z = uz * along + sz * keep;
+    } else {
+      this.velocity.x = damp(this.velocity.x, ax, accel * 0.42, dt);
+      this.velocity.z = damp(this.velocity.z, az, accel * 0.42, dt);
+    }
 
     // Jump jets.
     const canJet = this.jets.thrust > 0 && !stunned;

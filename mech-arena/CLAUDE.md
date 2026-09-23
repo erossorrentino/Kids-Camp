@@ -16,6 +16,7 @@ python3 -m http.server 8000      # ES modules need an origin, not file://
 node tools/validate.mjs          # data cross-references, no browser
 node tools/smoke.mjs             # boot, menus, matches, screenshots
 node tools/mobile.mjs            # phone/tablet layout + touch, on pixels
+node tools/handling.mjs          # the stick: 8 directions, turns at speed
 node tools/sim.mjs               # headless combat on all 41 arenas
 node tools/circuit.mjs           # a tournament end to end
 node tools/leak.mjs              # resource leaks across ten matches
@@ -90,7 +91,11 @@ yours is elsewhere. Screenshots land in `$SMOKE_OUT` (default
   intent through `Input`; nothing downstream knows which one is in use.
 - Handling that differs by device lives in `PlayerController`, not in the
   mech: `moveStyle` ('strafe' in the legs' frame, 'steer' in camera space
-  with `mech.moveWorld`), `aimAssist` and `autoFire`. `Game._applyHandling`
+  with `mech.moveWorld`), `aimAssist` and `autoFire`. Under `moveWorld` the
+  mech splits its velocity into along-heading (chassis acceleration: weight
+  sets how fast it gets going) and sideways slide (bled off fast), and the
+  legs turn at no less than `STEER_TURN`; weight decides speed, never which
+  way it goes. `tools/handling.mjs` holds a light and an assault to that. `Game._applyHandling`
   resolves the three 'auto' settings from whether the stick is up. Bots are
   untouched by all of it.
 - Rarer is better and rarer costs more, strictly. Prices come from rarity
