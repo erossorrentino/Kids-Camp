@@ -679,3 +679,42 @@ body.touch-ui #tutorial{top:auto;bottom:calc(178px + env(safe-area-inset-bottom,
 /* Choosing the next mech beats holding the trigger. */
 body.respawning #touch-controls{opacity:.15;pointer-events:none;}
 body.respawning #tc-stick,body.respawning .tc-btn{pointer-events:none;}
+
+
+/* ---------------- Team roster pips ---------------- */
+.roster{display:flex;gap:4px;align-items:center;padding:0 2px;}
+.roster .pip{width:17px;height:21px;display:block;opacity:.32;
+  clip-path:polygon(50% 0,100% 22%,100% 70%,50% 100%,0 70%,0 22%);
+  background:linear-gradient(180deg,#e8f6ff,#8fb2d2);transition:opacity .2s;}
+.roster.team-a .pip.up{opacity:1;background:linear-gradient(180deg,#9ce8ff,#1f8fd0);}
+.roster.team-b .pip.up{opacity:1;background:linear-gradient(180deg,#ffb4a4,#d8392b);}
+.roster .pip.me{box-shadow:0 0 0 2px #fff inset;outline:2px solid rgba(255,255,255,.9);outline-offset:1px;}
+.roster .pip.out{opacity:.15;background:#333;}
+
+/* ---------------- Integrity strip ---------------- */
+#hp-strip{position:absolute;left:50%;bottom:10px;transform:translateX(-50%);display:flex;align-items:center;gap:9px;
+  padding:6px 12px 6px 8px;border-radius:12px;min-width:340px;transition:opacity .2s;
+  background:linear-gradient(180deg,rgba(18,56,98,.9),rgba(6,22,42,.9));border:1px solid var(--line);
+  box-shadow:inset 0 1px 0 rgba(150,215,255,.22),var(--shadow);}
+#hp-strip .hp-icon{width:22px;height:22px;border-radius:6px;background:linear-gradient(180deg,#3fd2ff,#1274b6);
+  clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);}
+.hp-track{position:relative;flex:1;height:14px;border-radius:4px;overflow:hidden;background:rgba(0,0,0,.5);
+  border:1px solid rgba(0,0,0,.6);}
+.hp-track i,.hp-track b{position:absolute;inset:0;transform-origin:left;display:block;}
+.hp-track b{background:rgba(255,230,160,.75);z-index:1;}
+.hp-track i{background:linear-gradient(180deg,#8cff9e,#27b44a);z-index:2;transition:transform .08s;}
+.hp-track i.low{background:linear-gradient(180deg,#ffd46a,#e39a16);}
+.hp-track i.crit{background:linear-gradient(180deg,#ff8a7a,#d8262b);animation:blink .5s steps(2) infinite;}
+/* Segment ticks: ten cells, like the reference strip. */
+.hp-track .hp-ticks{position:absolute;inset:0;z-index:3;pointer-events:none;
+  background:repeating-linear-gradient(90deg,transparent 0 calc(10% - 2px),rgba(4,14,26,.85) calc(10% - 2px) 10%);}
+.hp-num{font-family:var(--mono);font-size:15px;min-width:52px;text-align:right;color:#fff;text-shadow:0 1px 4px #000;}
+/* The ability dial sits above the strip now, not on it, and the speed
+   readout moves up beside the dial. */
+#ability-panel{bottom:58px;}
+#speedo{bottom:74px;transform:translateX(-168px);}
+body.touch-ui #hp-strip{min-width:0;width:min(300px,56vw);bottom:calc(6px + env(safe-area-inset-bottom,0px));}
+@media (max-width:900px){
+  #hp-strip{transform:translateX(-50%) scale(.82);transform-origin:bottom center;}
+  .roster .pip{width:12px;height:15px;}
+}

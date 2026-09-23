@@ -64,12 +64,22 @@
 
   <!-- Top bar: score + timer -->
   <div id="topbar">
+    <div class="roster team-a" id="roster-a"></div>
     <div class="score team-a"><span id="score-a">0</span></div>
     <div id="clock">
       <div id="timer">5:00</div>
       <div id="mode-label">TEAM DEATHMATCH</div>
     </div>
     <div class="score team-b"><span id="score-b">0</span></div>
+    <div class="roster team-b" id="roster-b"></div>
+  </div>
+
+  <!-- Bottom centre: your machine's integrity as one segmented bar with a
+       number on it, the way an arena HUD shows it. -->
+  <div id="hp-strip">
+    <div class="hp-icon"></div>
+    <div class="hp-track"><i id="hp-fill"></i><b id="hp-ghost"></b><span class="hp-ticks"></span></div>
+    <div class="hp-num" id="hp-num">0</div>
   </div>
 
   <div id="objectives"></div>

@@ -223,8 +223,11 @@ class Game {
   _applyHandling() {
     const s = this.progression.settings;
     const touch = this.touchMode;
+    // Steering is the default everywhere now, keyboard included: left means
+    // the machine goes left, which is what an arena game means by left. The
+    // simulation convention is still one setting away.
     const style = s.moveStyle || 'auto';
-    this.controller.moveStyle = style === 'auto' ? (touch ? 'steer' : 'strafe') : style;
+    this.controller.moveStyle = style === 'auto' ? 'steer' : style;
 
     const assist = s.aimAssist || 'auto';
     this.controller.aimAssist = assist === 'auto' ? (touch ? 0.85 : 0)

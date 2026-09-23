@@ -264,6 +264,27 @@ for (const prof of PROFILES) {
     const dAng = Math.abs(Math.atan2(Math.sin(facing - travel), Math.cos(facing - travel)));
     check('and the legs turn to follow', dAng < 0.9, `${dAng.toFixed(2)} rad off travel`);
 
+    // And the other way, so a sign error cannot pass by being symmetrical.
+    await page.waitForFunction(() => {
+      const m = window.__game.match.player.mech;
+      return Math.hypot(m.velocity.x, m.velocity.z) < 4;
+    }, null, { timeout: 6000 }).catch(() => {});
+    const rFrom = await page.evaluate(() => {
+      const m = window.__game.match.player.mech;
+      return { x: m.position.x, z: m.position.z, yaw: m.aimYaw };
+    });
+    await t.send('Input.dispatchTouchEvent', { type:'touchStart', touchPoints:[{ x:cx, y:cy, id:5 }] });
+    await t.send('Input.dispatchTouchEvent', { type:'touchMove', touchPoints:[{ x:cx + throwPx, y:cy, id:5 }] });
+    await page.waitForTimeout(2000);
+    const rTo = await page.evaluate(() => {
+      const m = window.__game.match.player.mech;
+      return { x: m.position.x, z: m.position.z };
+    });
+    await t.send('Input.dispatchTouchEvent', { type:'touchEnd', touchPoints:[] });
+    const rdx = rTo.x - rFrom.x, rdz = rTo.z - rFrom.z;
+    const rightward = rdx * Math.cos(rFrom.yaw) - rdz * Math.sin(rFrom.yaw);
+    check('stick right sends the mech right', rightward > 1, `right ${rightward.toFixed(1)}m`);
+
     // Look: drag across the middle of the viewport.
     const midX = prof.viewport.width / 2, midY = prof.viewport.height * 0.42;
     await t.send('Input.dispatchTouchEvent', { type:'touchStart', touchPoints:[{ x:midX, y:midY, id:2 }] });
@@ -304,6 +325,36 @@ for (const prof of PROFILES) {
     await shot(page, `m-${prof.name}-04-match`);
   } else {
     check('no on-screen controls on a desktop', !tc.shown);
+
+    /* Arrow keys, which is how a Chromebook gets played. Measured on the
+     * velocity rather than on where it ends up: a wall can stop a mech
+     * walking left, and that would not mean the key was wrong. */
+    const heldVelocity = async (key) => {
+      await page.keyboard.down(key);
+      await page.waitForTimeout(1400);
+      const v = await page.evaluate(() => {
+        const m = window.__game.match.player.mech;
+        return { vx: m.velocity.x, vz: m.velocity.z, yaw: m.aimYaw,
+                 world: m.moveWorld, style: window.__game.controller.moveStyle };
+      });
+      await page.keyboard.up(key);
+      await page.waitForTimeout(700);
+      return v;
+    };
+
+    const L = await heldVelocity('ArrowLeft');
+    const lLeft = L.vx * -Math.cos(L.yaw) + L.vz * Math.sin(L.yaw);
+    const lFwd = L.vx * Math.sin(L.yaw) + L.vz * Math.cos(L.yaw);
+    check('the left arrow drives the mech left', L.style === 'steer' && L.world && lLeft > 2 && lLeft > Math.abs(lFwd),
+      `left ${lLeft.toFixed(1)} forward ${lFwd.toFixed(1)} m/s`);
+
+    const R = await heldVelocity('ArrowRight');
+    const rRight = R.vx * Math.cos(R.yaw) - R.vz * Math.sin(R.yaw);
+    check('the right arrow drives it right', rRight > 2, `right ${rRight.toFixed(1)} m/s`);
+
+    const F = await heldVelocity('ArrowUp');
+    const fFwd = F.vx * Math.sin(F.yaw) + F.vz * Math.cos(F.yaw);
+    check('the up arrow drives it forward', fFwd > 2, `forward ${fFwd.toFixed(1)} m/s`);
     await shot(page, `m-${prof.name}-04-match`);
   }
 

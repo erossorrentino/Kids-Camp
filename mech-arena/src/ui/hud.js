@@ -51,7 +51,11 @@ export class HUD {
       respawn: $('respawn-overlay'), respawnKiller: $('respawn-killer'), respawnChoices: $('respawn-choices'),
       scoreboard: $('scoreboard'),
       fps: $('fps'),
+      rosterA: $('roster-a'), rosterB: $('roster-b'),
+      hpFill: $('hp-fill'), hpGhost: $('hp-ghost'), hpNum: $('hp-num'), hpStrip: $('hp-strip'),
     };
+    this._hpGhost = 1;
+    this._rosterKey = '';
     this.ctx2d = this.el.radarCanvas.getContext('2d');
     this._weaponRows = [];
     this._feedRows = [];
@@ -88,6 +92,8 @@ export class HUD {
   /* ================================================================ */
   update(match, mech, controller, dt) {
     this._updateTop(match);
+    this._updateRoster(match);
+    this._updateHpStrip(mech, dt);
     this._updateObjectives(match);
     this._updateFeed(match);
     this._updateToast(dt);
@@ -145,6 +151,43 @@ export class HUD {
     this.el.modeLabel.textContent = match.state === 'countdown'
       ? `DROPPING IN ${Math.ceil(match.countdown)}`
       : match.mode.name;
+  }
+
+  /**
+   * One pip per pilot on each side of the score: lit while their machine is
+   * standing, dark while they are down, crossed out once out of lives.
+   * The whole state of the fight in one glance, which is why every arena
+   * HUD puts it there.
+   */
+  _updateRoster(match) {
+    if (!this.el.rosterA) return;
+    const teamGame = match.mode.teams <= 2;
+    this.el.rosterA.style.display = teamGame ? '' : 'none';
+    this.el.rosterB.style.display = teamGame ? '' : 'none';
+    if (!teamGame) return;
+    let key = '';
+    for (const p of match.players) key += p.team + (p.alive ? 1 : 0) + (p.eliminated ? 'x' : '') + (p.isPlayer ? 'p' : '');
+    if (key === this._rosterKey) return;
+    this._rosterKey = key;
+    const pips = (team) => match.players.filter(p => p.team === team).map(p =>
+      `<i class="pip${p.alive ? ' up' : ''}${p.eliminated ? ' out' : ''}${p.isPlayer ? ' me' : ''}" title="${escape(p.name)}"></i>`).join('');
+    this.el.rosterA.innerHTML = pips('a');
+    this.el.rosterB.innerHTML = pips('b');
+  }
+
+  /** Integrity strip: fill, a trailing "ghost" that shows the last hit, a number. */
+  _updateHpStrip(m, dt) {
+    if (!this.el.hpStrip) return;
+    if (!m || !m.alive) { this.el.hpStrip.style.opacity = '0'; this._hpGhost = 1; return; }
+    this.el.hpStrip.style.opacity = '1';
+    const f = m.healthFraction;
+    // The ghost lags, so a hit shows as a bite out of the bar before it closes.
+    this._hpGhost = Math.max(f, this._hpGhost - dt * 0.45);
+    this.el.hpFill.style.transform = `scaleX(${f.toFixed(4)})`;
+    this.el.hpGhost.style.transform = `scaleX(${this._hpGhost.toFixed(4)})`;
+    this.el.hpFill.className = f < 0.25 ? 'crit' : f < 0.5 ? 'low' : '';
+    const pts = (m.totalArmour + m.totalStructure) * 10;
+    this.el.hpNum.textContent = pts >= 10000 ? (pts / 1000).toFixed(1) + 'k' : Math.round(pts).toString();
   }
 
   _updateObjectives(match) {

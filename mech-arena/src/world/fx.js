@@ -367,15 +367,35 @@ export class FX {
     }
   }
 
+  /**
+   * Jump-jet exhaust: a hot core that cools from white through amber, and
+   * slower grey smoke that billows and hangs. The flame itself is geometry
+   * on the mech (see mechBuilder); this is what it leaves behind.
+   */
   thrusterTrail(mech, dt, intensity = 1) {
     const n = Math.ceil(24 * dt * intensity * this.q);
+    const alt = mech.position.y - (mech.world?.heightAt?.(mech.position.x, mech.position.z) ?? mech.position.y - 99);
     for (const port of mech.model.jets) {
       port.getWorldPosition(_v);
       for (let i = 0; i < n; i++) {
         this.particle(_v.x, _v.y, _v.z,
-          rng.range(-2, 2), rng.range(-16, -8) * intensity, rng.range(-2, 2),
-          { life: rng.range(0.15, 0.4), size: rng.range(0.5, 1.1), size1: 0.1, color: 0xbfe6ff, color1: 0xff9a44, drag: 3, grav: 0 });
+          rng.range(-2, 2), rng.range(-18, -9) * intensity, rng.range(-2, 2),
+          { life: rng.range(0.14, 0.34), size: rng.range(0.6, 1.2), size1: 0.1, color: 0xf2f8ff, color1: 0xff8a2d, drag: 3, grav: 0 });
       }
+      // Smoke: fewer, bigger, slower, and it rises once it has lost its push.
+      if (rng() < dt * 16 * this.q) {
+        this.particle(_v.x, _v.y - 0.8, _v.z,
+          rng.range(-1.6, 1.6) - mech.velocity.x * 0.2, rng.range(-7, -3), rng.range(-1.6, 1.6) - mech.velocity.z * 0.2,
+          { life: rng.range(0.7, 1.3), size: 1.0, size1: 3.6, color: 0x7a808a, color1: 0x2c3036, drag: 1.4, grav: -2 });
+      }
+    }
+    // Low over the ground the blast kicks up a ring of dust.
+    if (alt < 7 && rng() < dt * 22 * this.q) {
+      const a = rng() * Math.PI * 2;
+      const gy = mech.position.y - alt + 0.3;
+      this.particle(mech.position.x + Math.cos(a) * 1.5, gy, mech.position.z + Math.sin(a) * 1.5,
+        Math.cos(a) * rng.range(8, 14), rng.range(0.5, 2), Math.sin(a) * rng.range(8, 14),
+        { life: rng.range(0.5, 0.9), size: 1.2, size1: 3.2, color: 0x9a8f80, color1: 0x4a4540, drag: 2.4, grav: 0 });
     }
   }
 

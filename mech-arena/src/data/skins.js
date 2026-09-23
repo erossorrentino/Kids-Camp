@@ -65,8 +65,8 @@ export const PATTERNS = [
 
 export const FINISHES = [
   { id:'matte',      name:'Matte',      metal:0.55, rough:0.78, tier:1 },
-  { id:'satin',      name:'Satin',      metal:0.70, rough:0.52, tier:1 },
-  { id:'gloss',      name:'Gloss',      metal:0.80, rough:0.26, tier:2 },
+  { id:'satin',      name:'Satin',      metal:0.62, rough:0.55, tier:1 },
+  { id:'gloss',      name:'Gloss',      metal:0.72, rough:0.36, tier:2 },
   { id:'chrome',     name:'Chrome',     metal:1.00, rough:0.08, tier:4 },
   { id:'iridescent', name:'Iridescent', metal:0.95, rough:0.18, tier:5, irid:true },
   { id:'battleworn', name:'Battleworn', metal:0.60, rough:0.88, tier:2, wear:0.55 },

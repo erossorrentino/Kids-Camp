@@ -40,6 +40,44 @@ function cyl(rt, rb, h, seg = 12) {
   return geoCache.get(k);
 }
 
+/**
+ * A chamfered slab: an eight-sided prism scaled to w x h x d. Cut corners
+ * catch a highlight along every edge, which is most of the difference
+ * between a box and a piece of armour.
+ */
+function chamfer(w, h, d, cut = 0.22) {
+  const k = `ch${w}_${h}_${d}_${cut}`;
+  if (geoCache.has(k)) return geoCache.get(k);
+  const g = new THREE.CylinderGeometry(0.5, 0.5, 1, 8, 1);
+  g.rotateY(Math.PI / 8);            // flats face front and side, not corners
+  // An octagon inscribed in a unit circle is narrower than the box it stands
+  // in, so scale it back out and then pull the chamfer in by `cut`.
+  const k8 = 1 / Math.cos(Math.PI / 8);
+  g.scale(w * 0.5 * k8 * (1 - cut * 0.10), h, d * 0.5 * k8 * (1 - cut * 0.10));
+  g.computeVertexNormals();
+  geoCache.set(k, g);
+  return g;
+}
+
+/**
+ * A rocket plume: an open cone whose vertex colours run from `hot` at the
+ * base, through `cool`, to black at the tip. Drawn additively, so the black
+ * end simply disappears.
+ */
+function plumeGeometry(radius, len, hot, cool) {
+  const geo = new THREE.ConeGeometry(radius, len, 16, 6, true);
+  const pos = geo.attributes.position;
+  const col = new Float32Array(pos.count * 3);
+  const a = new THREE.Color(hot), b = new THREE.Color(cool), c = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const t = (pos.getY(i) + len / 2) / len;            // 0 at the base, 1 at the apex
+    c.copy(a).lerp(b, Math.min(1, t * 1.6)).multiplyScalar(Math.pow(1 - t, 1.6));
+    col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return geo;
+}
+
 /** A tapered plate: the basic armour panel shape used all over the mech. */
 function plate(w, h, d, taper = 0.75) {
   const g = new THREE.BoxGeometry(w, h, d, 1, 1, 1);
@@ -111,9 +149,9 @@ function buildTorso(style, S, rng) {
       parts.push({ geo: box(w * 0.95, h * 0.24, d * 0.86), pos: [0, h * 0.30, 0] });
       break;
     case 'boxy':
-      parts.push({ geo: box(w, h, d), pos: [0, 0, 0] });
+      parts.push({ geo: chamfer(w, h, d), pos: [0, 0, 0] });
       parts.push({ geo: box(w * 1.06, h * 0.2, d * 1.04), pos: [0, h * 0.36, 0] });
-      parts.push({ geo: box(w * 0.7, h * 0.34, d * 0.4), pos: [0, -h * 0.1, d * 0.52] });
+      parts.push({ geo: chamfer(w * 0.7, h * 0.34, d * 0.4, 0.3), pos: [0, -h * 0.1, d * 0.52] });
       break;
     case 'round':
       parts.push({ geo: cyl(w * 0.52, w * 0.46, h, 14), pos: [0, 0, 0] });
@@ -132,11 +170,17 @@ function buildTorso(style, S, rng) {
       break;
     case 'wide':
     default:
-      parts.push({ geo: box(w * 1.2, h * 0.86, d), pos: [0, 0, 0] });
+      parts.push({ geo: chamfer(w * 1.2, h * 0.86, d), pos: [0, 0, 0] });
       parts.push({ geo: box(w * 1.3, h * 0.24, d * 1.05), pos: [0, h * 0.34, 0] });
       parts.push({ geo: plate(w * 0.9, h * 0.34, d * 0.5, 1.4), pos: [0, -h * 0.42, d * 0.2] });
       break;
   }
+  /* Shared over every style: a raised chest brow above the glow strip, a
+   * collar that carries the shoulders, and a spine down the back. They are
+   * what make the torso read as built rather than extruded. */
+  parts.push({ geo: chamfer(w * 0.78, h * 0.17, d * 0.34, 0.34), pos: [0, h * 0.16, d * 0.46] });
+  parts.push({ geo: chamfer(w * 1.18, h * 0.13, d * 0.62, 0.3), pos: [0, h * 0.42, -d * 0.04] });
+  parts.push({ geo: chamfer(w * 0.3, h * 0.72, d * 0.3, 0.3), pos: [0, -h * 0.02, -d * 0.52] });
   parts.push(...greebleParts(w, h, d, rng, 14));
   return mergeParts(parts);
 }
@@ -149,9 +193,12 @@ function buildCockpit(style, S, mats, rng) {
   switch (style) {
     case 'visor': {
       g.add(mesh(box(s * 1.5, s * 0.7, s * 1.1), mats.dark));
-      const vis = mesh(box(s * 1.36, s * 0.26, s * 0.16), mats.glass);
-      vis.position.set(0, s * 0.06, s * 0.58);
+      // A lit visor, not a dark window: it is what makes a head read as a
+      // cockpit with somebody in it at fifty metres.
+      const vis = mesh(box(s * 1.36, s * 0.26, s * 0.16), mats.accent, false);
+      vis.position.set(0, s * 0.06, s * 0.6);
       g.add(vis);
+      g.add(mesh(box(s * 1.56, s * 0.16, s * 0.3), mats.trim)).position.set(0, s * 0.34, s * 0.5);
       break;
     }
     case 'dome': {
@@ -162,7 +209,7 @@ function buildCockpit(style, S, mats, rng) {
       break;
     }
     case 'sensor': {
-      g.add(mesh(box(s * 1.2, s * 0.8, s * 1.0), mats.dark));
+      g.add(mesh(chamfer(s * 1.25, s * 0.85, s * 1.05, 0.3), mats.dark));
       for (let i = -1; i <= 1; i += 2) {
         const eye = mesh(cyl(s * 0.16, s * 0.16, s * 0.2, 10), mats.accent);
         eye.rotation.x = Math.PI / 2;
@@ -176,14 +223,19 @@ function buildCockpit(style, S, mats, rng) {
       break;
     }
     case 'skull': {
-      g.add(mesh(plate(s * 1.5, s * 1.1, s * 1.2, 1.25), mats.dark));
+      // A brow that overhangs the eyes, not a wedge that flares away from
+      // them: the overhang is what makes a head look like a face.
+      g.add(mesh(plate(s * 1.25, s * 1.0, s * 1.1, 0.82), mats.dark));
+      const brow = mesh(plate(s * 1.45, s * 0.26, s * 1.15, 0.86), mats.trim);
+      brow.position.set(0, s * 0.42, s * 0.04);
+      g.add(brow);
       for (let i = -1; i <= 1; i += 2) {
-        const eye = mesh(box(s * 0.34, s * 0.3, s * 0.12), mats.accent);
-        eye.position.set(i * s * 0.36, s * 0.16, s * 0.6);
+        const eye = mesh(box(s * 0.32, s * 0.24, s * 0.1), mats.accent, false);
+        eye.position.set(i * s * 0.28, s * 0.1, s * 0.56);
         g.add(eye);
       }
-      const jaw = mesh(box(s * 1.0, s * 0.3, s * 0.7), mats.trim);
-      jaw.position.set(0, -s * 0.48, s * 0.18);
+      const jaw = mesh(chamfer(s * 0.9, s * 0.34, s * 0.8, 0.3), mats.dark);
+      jaw.position.set(0, -s * 0.44, s * 0.14);
       g.add(jaw);
       break;
     }
@@ -191,13 +243,21 @@ function buildCockpit(style, S, mats, rng) {
       return g;
     case 'head':
     default: {
-      g.add(mesh(box(s * 1.2, s * 1.0, s * 1.05), mats.dark));
-      const vis = mesh(box(s * 1.0, s * 0.3, s * 0.14), mats.glass);
-      vis.position.set(0, s * 0.14, s * 0.56);
+      g.add(mesh(chamfer(s * 1.25, s * 1.0, s * 1.1, 0.3), mats.dark));
+      const vis = mesh(box(s * 1.0, s * 0.3, s * 0.14), mats.accent, false);
+      vis.position.set(0, s * 0.14, s * 0.58);
       g.add(vis);
+      const brow = mesh(plate(s * 1.3, s * 0.22, s * 0.9, 0.8), mats.trim);
+      brow.position.set(0, s * 0.46, s * 0.06);
+      g.add(brow);
       const fin = mesh(box(s * 0.12, s * 0.5, s * 0.7), mats.trim);
       fin.position.set(0, s * 0.68, -s * 0.1);
       g.add(fin);
+      // Whip antenna: a small thing that reads as a machine with a radio.
+      const ant = mesh(cyl(s * 0.03, s * 0.04, s * 1.1, 6), mats.trim);
+      ant.position.set(s * 0.42, s * 0.86, -s * 0.2);
+      ant.rotation.z = -0.18;
+      g.add(ant);
       break;
     }
   }
@@ -211,11 +271,14 @@ function buildShoulder(style, S, mats, side, rng) {
   const w = S.w * 0.46, h = S.h * 0.34, d = S.d * 0.62;
   switch (style) {
     case 'pauldron': {
+      // Flared outward and down: the wide shoulder line is the single most
+      // recognisable thing about a heavy mech's silhouette.
       const parts = [
-        { geo: plate(w * 1.35, h * 1.2, d * 1.2, 0.72), pos: [0, h * 0.1, 0] },
-        { geo: box(w * 0.5, h * 0.4, d * 0.5), pos: [side * w * 0.5, -h * 0.3, 0] },
+        { geo: plate(w * 1.7, h * 1.45, d * 1.35, 0.66), pos: [side * w * 0.16, h * 0.12, 0], rot: [0, 0, -side * 0.18] },
+        { geo: chamfer(w * 1.2, h * 0.34, d * 1.15, 0.3), pos: [side * w * 0.22, h * 0.72, 0], rot: [0, 0, -side * 0.18] },
+        { geo: box(w * 0.5, h * 0.44, d * 0.5), pos: [side * w * 0.52, -h * 0.34, 0] },
       ];
-      g.add(mesh(mergeParts(parts), mats.hull));
+      g.add(mesh(mergeParts(parts), mats.hull2));
       break;
     }
     case 'boxlauncher': {
@@ -229,16 +292,19 @@ function buildShoulder(style, S, mats, side, rng) {
       break;
     }
     case 'spiked': {
-      const parts = [{ geo: plate(w * 1.25, h * 1.1, d * 1.1, 0.8), pos: [0, 0, 0] }];
+      const parts = [{ geo: plate(w * 1.45, h * 1.25, d * 1.2, 0.76), pos: [side * w * 0.12, 0, 0], rot: [0, 0, -side * 0.16] }];
       for (let i = 0; i < 3; i++) {
-        parts.push({ geo: cyl(0.02, w * 0.16, h * 0.9, 6), pos: [side * w * 0.45, h * 0.4, (i - 1) * d * 0.35], rot: [0, 0, -side * 0.5] });
+        parts.push({ geo: cyl(0.02, w * 0.16, h * 0.9, 6), pos: [side * w * 0.55, h * 0.42, (i - 1) * d * 0.35], rot: [0, 0, -side * 0.55] });
       }
-      g.add(mesh(mergeParts(parts), mats.hull));
+      g.add(mesh(mergeParts(parts), mats.hull2));
       break;
     }
     case 'slim':
     default:
-      g.add(mesh(plate(w * 0.9, h * 0.95, d * 0.9, 0.85), mats.hull));
+      g.add(mesh(mergeParts([
+        { geo: plate(w * 1.15, h * 1.15, d * 1.0, 0.8), pos: [side * w * 0.1, 0, 0], rot: [0, 0, -side * 0.14] },
+        { geo: chamfer(w * 0.8, h * 0.26, d * 0.9, 0.3), pos: [side * w * 0.12, h * 0.58, 0] },
+      ]), mats.hull2));
       break;
   }
   return g;
@@ -272,17 +338,19 @@ function buildArm(style, S, mats, side, rng) {
       { geo: box(r * 1.8, r * 1.6, r * 1.5), pos: [0, -lowerLen - r * 0.7, 0] },
       { geo: box(r * 0.5, r * 1.3, r * 0.5), pos: [r * 0.7, -lowerLen - r * 1.3, r * 0.3] },
       { geo: box(r * 0.5, r * 1.3, r * 0.5), pos: [-r * 0.7, -lowerLen - r * 1.3, r * 0.3] },
-    ]), mats.hull));
+    ]), mats.hull2));
   } else if (style === 'hybrid') {
     lower.add(mesh(mergeParts([
       { geo: box(r * 1.9, lowerLen, r * 1.9), pos: [0, -lowerLen / 2, 0] },
       { geo: plate(r * 2.6, lowerLen * 0.8, r * 0.7, 1.2), pos: [side * r * 1.2, -lowerLen * 0.45, 0] },
-    ]), mats.hull));
+    ]), mats.hull2));
   } else {
     lower.add(mesh(mergeParts([
-      { geo: box(r * 2.0, lowerLen, r * 2.0), pos: [0, -lowerLen / 2, 0] },
-      { geo: box(r * 2.3, r * 1.1, r * 2.3), pos: [0, -lowerLen * 0.86, 0] },
-    ]), mats.hull));
+      { geo: chamfer(r * 2.2, lowerLen, r * 2.2, 0.24), pos: [0, -lowerLen / 2, 0] },
+      { geo: chamfer(r * 2.5, r * 1.2, r * 2.5, 0.3), pos: [0, -lowerLen * 0.86, 0] },
+      // A shroud over the outside of the forearm, where the gun hangs.
+      { geo: plate(r * 0.8, lowerLen * 0.7, r * 2.4, 1.15), pos: [side * r * 1.25, -lowerLen * 0.42, 0] },
+    ]), mats.hull2));
   }
 
   const mount = new THREE.Object3D();
@@ -309,7 +377,9 @@ function buildLeg(type, S, mats, side, rng) {
   hip.add(thigh);
   thigh.add(mesh(mergeParts([
     { geo: cyl(r * 0.95, r * 0.8, thighLen, 10), pos: [0, -thighLen / 2, 0] },
-    { geo: plate(r * 2.2, thighLen * 0.8, r * 1.5, 0.9), pos: [0, -thighLen * 0.42, 0] },
+    { geo: chamfer(r * 2.5, thighLen * 0.82, r * 1.8, 0.26), pos: [0, -thighLen * 0.42, 0] },
+    // A hip skirt over the joint, which is what stops a leg reading as a pipe.
+    { geo: plate(r * 2.0, thighLen * 0.34, r * 1.9, 1.2), pos: [0, -thighLen * 0.08, 0] },
     ...greebleParts(r * 2, thighLen, r * 2, rng, 4).map(p => ({ ...p, pos: [p.pos[0], p.pos[1] - thighLen / 2, p.pos[2]] })),
   ]), mats.hull));
 
@@ -324,8 +394,10 @@ function buildLeg(type, S, mats, side, rng) {
   knee.add(shin);
   shin.add(mesh(mergeParts([
     { geo: cyl(r * 0.78, r * 0.62, shinLen, 10), pos: [0, -shinLen / 2, 0] },
-    { geo: box(r * 1.5, shinLen * 0.55, r * 1.3), pos: [0, -shinLen * 0.4, -r * 0.2] },
-  ]), mats.hull));
+    { geo: chamfer(r * 2.0, shinLen * 0.62, r * 1.7, 0.26), pos: [0, -shinLen * 0.4, -r * 0.1] },
+    // Shin guard: a flared plate down the front of the calf.
+    { geo: plate(r * 1.8, shinLen * 0.7, r * 0.7, 1.25), pos: [0, -shinLen * 0.46, r * 0.8] },
+  ]), mats.hull2));
 
   const ankle = new THREE.Group();
   ankle.position.y = -shinLen;
@@ -346,8 +418,11 @@ function buildLeg(type, S, mats, side, rng) {
     ]), mats.dark));
   } else {
     foot.add(mesh(mergeParts([
-      { geo: box(r * 1.8, r * 0.6, r * 3.2), pos: [0, -r * 0.25, r * 0.5] },
-      { geo: plate(r * 1.9, r * 0.8, r * 1.2, 0.8), pos: [0, r * 0.2, -r * 0.8] },
+      { geo: chamfer(r * 2.4, r * 0.7, r * 3.8, 0.24), pos: [0, -r * 0.25, r * 0.55] },
+      { geo: plate(r * 2.2, r * 0.9, r * 1.3, 0.8), pos: [0, r * 0.22, -r * 0.85] },
+      // Toe plates: a wide, planted foot carries the tonnage.
+      { geo: box(r * 0.7, r * 0.42, r * 1.0), pos: [-r * 0.7, -r * 0.3, r * 1.9] },
+      { geo: box(r * 0.7, r * 0.42, r * 1.0), pos: [r * 0.7, -r * 0.3, r * 1.9] },
     ]), mats.dark));
   }
 
@@ -499,6 +574,26 @@ export function buildMech(chassis, skinId, teamColor = null) {
   torsoPitch.add(torsoMesh);
   addAccents(torsoPitch, S, mats, b.accents, rng);
 
+  /* A lit chest strip and a reactor pack on the back with glowing ports.
+   * These two are what read as "powered" at any range and in any paint,
+   * and they give the silhouette something behind the shoulders. */
+  const chestGlow = mesh(box(S.w * 0.52, S.h * 0.075, 0.06), mats.accent, false);
+  chestGlow.position.set(0, S.h * 0.03, S.d * 0.64);
+  torsoPitch.add(chestGlow);
+
+  const pack = mesh(mergeParts([
+    { geo: chamfer(S.w * 1.05, S.h * 0.46, S.d * 0.44, 0.28), pos: [0, S.h * 0.08, -S.d * 0.64] },
+    { geo: cyl(S.w * 0.17, S.w * 0.21, S.h * 0.22, 10), pos: [-S.w * 0.36, -S.h * 0.14, -S.d * 0.7], rot: [0.32, 0, 0] },
+    { geo: cyl(S.w * 0.17, S.w * 0.21, S.h * 0.22, 10), pos: [S.w * 0.36, -S.h * 0.14, -S.d * 0.7], rot: [0.32, 0, 0] },
+  ]), mats.hull);
+  torsoPitch.add(pack);
+
+  const ports = mesh(mergeParts([
+    { geo: cyl(S.w * 0.125, S.w * 0.125, 0.06, 10), pos: [-S.w * 0.36, -S.h * 0.25, -S.d * 0.76], rot: [Math.PI / 2 + 0.32, 0, 0] },
+    { geo: cyl(S.w * 0.125, S.w * 0.125, 0.06, 10), pos: [S.w * 0.36, -S.h * 0.25, -S.d * 0.76], rot: [Math.PI / 2 + 0.32, 0, 0] },
+  ]), mats.accent, false);
+  torsoPitch.add(ports);
+
   // Side torso blisters double as the LT/RT hardpoint anchors.
   const sideTorso = {};
   for (const [key, sx] of [['LT', -1], ['RT', 1]]) {
@@ -542,19 +637,89 @@ export function buildMech(chassis, skinId, teamColor = null) {
     RS: mkMount(shoulderR, 0, S.h * 0.18, S.d * 0.3),
   };
 
-  /* ---- jump jet nozzles ---- */
+  /* ---- jump-jet pack ----
+   * Two engine pods either side of the reactor pack, each a painted housing
+   * over a collar, a bell nozzle with vanes round its lip, a throat that
+   * glows while the engine is lit, and a flame that grows out of the bell
+   * when it fires. The flame is two nested cones, additive and unshadowed:
+   * a white-hot core inside a blue-to-amber sheath, which is what a real
+   * rocket plume looks like and what reads as thrust at a glance. */
   const jets = [];
+  let jetFx = null;
   if (chassis.jets.thrust > 0) {
+    const r = S.w * 0.125;
+    mats.jetBell = mats.dark.clone();
+    mats.jetBell.side = THREE.DoubleSide;
+    mats.jetCore = new THREE.MeshStandardMaterial({
+      color: 0x0a0f18, emissive: new THREE.Color(0xffa24a), emissiveIntensity: 0.5, roughness: 0.4, metalness: 0.2,
+    });
+    // Vertex colours carry the fade: bright at the nozzle, black at the tip.
+    // With additive blending black is invisible, so the plume tapers into
+    // nothing instead of ending in a hard-edged cone.
+    mats.jetFlame = new THREE.MeshBasicMaterial({
+      vertexColors: true, transparent: true, opacity: 0, blending: THREE.AdditiveBlending,
+      depthWrite: false, side: THREE.DoubleSide, fog: false,
+    });
+    mats.jetFlameCore = mats.jetFlame.clone();
+    const flames = [];
+    const bellLen = r * 1.4;
+    const exitY = -r * 1.0 - bellLen;
+
     for (const sx of [-1, 1]) {
-      const n = mesh(cyl(S.w * 0.16, S.w * 0.22, S.h * 0.26, 10), mats.dark);
-      n.position.set(sx * S.w * 0.5, -S.h * 0.3, -S.d * 0.62);
-      n.rotation.x = -0.35;
-      torsoPitch.add(n);
+      const pod = new THREE.Group();
+      pod.position.set(sx * S.w * 0.52, -S.h * 0.16, -S.d * 0.8);
+      pod.rotation.x = 0.32;               // exhaust angled down and back
+      pod.rotation.z = sx * 0.06;
+      torsoPitch.add(pod);
+
+      pod.add(mesh(mergeParts([
+        { geo: chamfer(r * 2.2, r * 2.2, r * 2.0, 0.3), pos: [0, r * 0.4, 0] },
+        { geo: plate(r * 1.9, r * 0.55, r * 1.8, 0.78), pos: [0, r * 1.75, 0] },  // intake cowl
+      ]), mats.hull2));
+      pod.add(mesh(mergeParts([
+        // Collar and a bracket bolting the pod to the pack.
+        { geo: cyl(r * 0.95, r * 1.0, r * 0.3, 16), pos: [0, -r * 0.9, 0] },
+        { geo: box(r * 0.5, r * 1.6, r * 0.8), pos: [-sx * r * 1.2, r * 0.7, r * 0.3] },
+        // Heat vanes round the lip of the bell.
+        ...[0, 1, 2, 3].map(i => {
+          const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
+          return { geo: box(r * 0.08, r * 0.7, r * 0.5), pos: [Math.cos(a) * r * 1.12, exitY + r * 0.35, Math.sin(a) * r * 1.12], rot: [0, -a, 0] };
+        }),
+      ]), mats.trim));
+
+      // Bell nozzle: open-ended, flaring toward the exit.
+      const bell = new THREE.Mesh(new THREE.CylinderGeometry(r * 0.72, r * 1.12, bellLen, 18, 1, true), mats.jetBell);
+      bell.position.y = -r * 1.0 - bellLen / 2;
+      bell.castShadow = true;
+      pod.add(bell);
+      // Throat: the glowing disc up inside the bell.
+      const throat = new THREE.Mesh(new THREE.CircleGeometry(r * 0.7, 16), mats.jetCore);
+      throat.rotation.x = Math.PI / 2;
+      throat.position.y = -r * 1.05;
+      pod.add(throat);
+
+      // Flames hang from a pivot at the exit so scaling grows them outward.
+      const pivot = new THREE.Object3D();
+      pivot.position.y = exitY;
+      pod.add(pivot);
+      const sheathLen = r * 7.5, coreLen = r * 3.8;
+      const sheath = new THREE.Mesh(plumeGeometry(r * 1.0, sheathLen, 0x3f9dff, 0xff8a2d), mats.jetFlame);
+      sheath.rotation.x = Math.PI;
+      sheath.position.y = -sheathLen / 2;
+      const core = new THREE.Mesh(plumeGeometry(r * 0.55, coreLen, 0xfff6e0, 0xffb060), mats.jetFlameCore);
+      core.rotation.x = Math.PI;
+      core.position.y = -coreLen / 2;
+      for (const f of [sheath, core]) { f.castShadow = false; f.receiveShadow = false; f.renderOrder = 5; pivot.add(f); }
+      pivot.visible = false;
+      flames.push(pivot);
+
+      // Particle port just past the exit.
       const port = new THREE.Object3D();
-      port.position.set(sx * S.w * 0.5, -S.h * 0.42, -S.d * 0.72);
-      torsoPitch.add(port);
+      port.position.y = exitY - r * 0.3;
+      pod.add(port);
       jets.push(port);
     }
+    jetFx = { flames, level: 0 };
   }
 
   // Section -> the meshes that should change material as it takes damage.
@@ -562,11 +727,11 @@ export function buildMech(chassis, skinId, teamColor = null) {
   // glass and glow strips keep their look.
   const collectHull = (root) => {
     const out = [];
-    root.traverse(o => { if (o.isMesh && o.material === mats.hull) out.push(o); });
+    root.traverse(o => { if (o.isMesh && (o.material === mats.hull || o.material === mats.hull2)) out.push(o); });
     return out;
   };
   const sectionMeshes = {
-    CT: [torsoMesh],
+    CT: [torsoMesh, pack],
     LT: [sideTorso.LT],
     RT: [sideTorso.RT],
     HD: collectHull(cockpit),
@@ -579,7 +744,7 @@ export function buildMech(chassis, skinId, teamColor = null) {
   root.userData.height = H;
 
   return {
-    root, materials: mats, mounts, jets, height: H, scaleRef: S,
+    root, materials: mats, mounts, jets, jetFx, height: H, scaleRef: S,
     rig: {
       legs, pelvis, legL, legR, legParts, quad,
       torsoYaw, torsoPitch, cockpit,

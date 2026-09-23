@@ -133,7 +133,7 @@ export class HangarScene {
     // Physically-based falloff: illuminance is intensity / distance^2, so a
     // key light twenty-five metres away needs to be in the thousands, not
     // the hundreds.
-    this.key = new THREE.SpotLight(0xffe6c8, 12000, 120, 0.72, 0.5, 2);
+    this.key = new THREE.SpotLight(0xfff4e4, 11500, 130, 0.8, 0.55, 2);
     this.key.position.set(14, 30, 20);
     this.key.target.position.set(0, 6, 0);
     this.key.castShadow = true;
@@ -141,18 +141,18 @@ export class HangarScene {
     this.key.shadow.bias = -0.0012;
     g.add(this.key, this.key.target);
 
-    this.fill = new THREE.PointLight(0x6cc0ff, 7200, 120, 2);
+    this.fill = new THREE.PointLight(0x9fd0f0, 4200, 120, 2);
     this.fill.position.set(-18, 14, 14);
     g.add(this.fill);
 
-    this.rimA = new THREE.PointLight(0x3fd2ff, 5200, 100, 2);
+    this.rimA = new THREE.PointLight(0x5cd8ff, 3000, 100, 2);
     this.rimA.position.set(-14, 9, -16);
     g.add(this.rimA);
     this.rimB = new THREE.PointLight(0xffb454, 3600, 95, 2);
     this.rimB.position.set(16, 7, -14);
     g.add(this.rimB);
 
-    this.ambient = new THREE.HemisphereLight(0x8fc4e8, 0x1b3350, 1.7);
+    this.ambient = new THREE.HemisphereLight(0xb4cad8, 0x2a3f56, 1.15);
     g.add(this.ambient);
   }
 
@@ -386,16 +386,18 @@ export class HangarScene {
     const distX = (subject * 0.5) / (tanY * Math.max(0.35, cam.aspect) * fracX);
     const dist = Math.max(distY, distX, h * 1.4 + 5) / this.zoom;
 
+    // Chest height, looking very slightly up: a machine photographed from
+    // above looks like a model on a table, and from below like a threat.
     const want = _v.set(
       Math.sin(-0.5) * dist * 0.55,
-      this.focusY + h * 0.42,
+      this.focusY + h * 0.14,
       Math.cos(-0.5) * dist,
     );
     cam.position.x = damp(cam.position.x, want.x, 6, dt);
     cam.position.y = damp(cam.position.y, want.y, 6, dt);
     cam.position.z = damp(cam.position.z, want.z, 6, dt);
 
-    const target = _t.set(this.lookShiftX, this.focusY + h * 0.06, 0);
+    const target = _t.set(this.lookShiftX, this.focusY + h * 0.12, 0);
     // Where the stage sits in normalised device coordinates: +x right, +y up.
     const cx = ((st.x + st.w * 0.5) / vw) * 2 - 1;
     const cy = 1 - ((st.y + st.h * 0.5) / vh) * 2;

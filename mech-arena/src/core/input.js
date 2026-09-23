@@ -7,7 +7,10 @@
  */
 
 export const DEFAULT_BINDS = {
-  forward:['KeyW'], back:['KeyS'], left:['KeyA'], right:['KeyD'],
+  // Arrows sit beside WASD, not instead of it: a laptop or a Chromebook is
+  // often played with one hand on the arrow cluster.
+  forward:['KeyW', 'ArrowUp'], back:['KeyS', 'ArrowDown'],
+  left:['KeyA', 'ArrowLeft'], right:['KeyD', 'ArrowRight'],
   jump:['Space'], ability:['KeyQ'], brake:['ShiftLeft','ShiftRight'],
   weapon1:['Digit1'], weapon2:['Digit2'], weapon3:['Digit3'],
   weapon4:['Digit4'], weapon5:['Digit5'], weapon6:['Digit6'],
@@ -62,6 +65,12 @@ export class Input {
   _bind() {
     addEventListener('keydown', (e) => {
       if (e.code === 'Tab') e.preventDefault();
+      // Arrows scroll the page and space presses whatever has focus. Both
+      // are the player trying to drive -- unless they are actually on a
+      // control, in which case the browser's behaviour is the right one.
+      const tag = document.activeElement?.tagName;
+      if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'BUTTON'
+          && (e.code.startsWith('Arrow') || e.code === 'Space')) e.preventDefault();
       if (this.down.has(e.code)) return;
       this.down.add(e.code);
       this.edges.add(e.code);

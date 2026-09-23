@@ -498,6 +498,10 @@ export class Match {
   _leaveWreck(mech) {
     const root = mech.root;
     root.visible = true;
+    // A wreck is not updated any more, so put its engines out now.
+    const jf = mech.model?.jetFx;
+    if (jf) { for (const f of jf.flames) f.visible = false; jf.level = 0; }
+    if (mech.model?.materials?.jetCore) mech.model.materials.jetCore.emissiveIntensity = 0;
 
     // Collapse: drop to the knees, slump the torso, splay the arms.
     const rig = mech.rig;

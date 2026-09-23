@@ -60,31 +60,32 @@ const PAINT = {
   solid() {},
 
   panel(c, s, rng) {
-    // Plated panel lines: the base look for almost every mech.
-    c.strokeStyle = 'rgba(0,0,0,0.30)';
-    c.lineWidth = 2;
-    for (let i = 0; i < 26; i++) {
-      const y = rng() * SIZE;
+    /* Plated panel lines. A loose grid reads as panels; the forty random
+     * full-length lines this used to draw read as tartan once the texture
+     * was box-mapped across a whole machine. */
+    const px = SIZE / 512;
+    c.strokeStyle = 'rgba(0,0,0,0.24)';
+    c.lineWidth = Math.max(1, 2 * px);
+    const step = SIZE / 6;
+    for (let i = 1; i < 6; i++) {
+      const y = i * step + (rng() - 0.5) * step * 0.3;
       c.beginPath(); c.moveTo(0, y); c.lineTo(SIZE, y); c.stroke();
-    }
-    for (let i = 0; i < 18; i++) {
-      const x = rng() * SIZE;
+      const x = i * step + (rng() - 0.5) * step * 0.3;
       c.beginPath(); c.moveTo(x, 0); c.lineTo(x, SIZE); c.stroke();
     }
-    c.fillStyle = 'rgba(255,255,255,0.05)';
-    for (let i = 0; i < 40; i++) {
-      const x = rng() * SIZE, y = rng() * SIZE;
-      c.fillRect(x, y, rng() * 40 + 8, 2);
+    // A few short seams catch the light and stop the grid looking printed.
+    c.fillStyle = 'rgba(255,255,255,0.06)';
+    for (let i = 0; i < 14; i++) {
+      c.fillRect(rng() * SIZE, rng() * SIZE, rng() * SIZE * 0.14 + SIZE * 0.03, Math.max(1, 1.5 * px));
     }
   },
 
   stripe(c, s, rng) {
     PAINT.panel(c, s, rng);
+    // One band, not two: a racing stripe, not a flag.
     c.fillStyle = s.trim;
-    const w = SIZE * 0.10;
-    c.fillRect(SIZE * 0.42, 0, w, SIZE);
-    c.fillStyle = s.secondary;
-    c.fillRect(SIZE * 0.42 + w, 0, w * 0.35, SIZE);
+    const w = SIZE * 0.06;
+    c.fillRect(SIZE * 0.46, 0, w, SIZE);
   },
 
   splinter(c, s, rng) {
@@ -295,6 +296,13 @@ export function skinMaterials(skinId, teamColor = null) {
     map, roughnessMap: roughMap, metalness: skin.metal, roughness: 1.0,
     envMapIntensity: skin.irid ? 1.9 : 1.15,
   });
+  /* Second armour tone. A machine painted one flat colour reads as a toy;
+   * the reference silhouettes all carry a darker secondary on the
+   * shoulders, forearms and shins. It shares the painted map, so the
+   * whole two-tone costs one cloned material and no texture memory. */
+  const hull2 = hull.clone();
+  hull2.color = new THREE.Color(skin.secondary).lerp(new THREE.Color(0xffffff), 0.16);
+
   const dark = new THREE.MeshStandardMaterial({
     color: new THREE.Color(skin.secondary).multiplyScalar(0.7),
     metalness: Math.min(1, skin.metal + 0.15), roughness: Math.max(0.12, skin.rough * 0.8),
@@ -327,7 +335,7 @@ export function skinMaterials(skinId, teamColor = null) {
   hullCritical.emissive = new THREE.Color(0xff4a1f);
   hullCritical.emissiveIntensity = 0.55;
 
-  return { hull, hullDamaged, hullCritical, dark, trim, accent, glass, skin };
+  return { hull, hull2, hullDamaged, hullCritical, dark, trim, accent, glass, skin };
 }
 
 export function hashStr(s) {

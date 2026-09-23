@@ -479,7 +479,7 @@ export class Menus {
           </div>
           <div class="tiny muted" style="line-height:1.6;margin-top:6px">STEER is the arena convention: the stick points where the mech goes and the legs
             turn to follow, so left is left whichever way the torso is aimed. STRAFE is the keyboard one — forward is where you look, A and D sidestep.
-            AUTO picks steering for a stick and strafing for a keyboard.</div>
+            AUTO is steering, on a stick and on a keyboard alike.</div>
 
           <div class="tiny muted" style="margin-top:12px">AIM ASSIST</div>
           <div class="tabs" data-setting="aimAssist">
@@ -502,7 +502,7 @@ export class Menus {
           <input type="range" min="5" max="60" value="${Math.round(s.sensitivity * 10000)}" data-range="sensitivity" style="width:100%">
           <div class="tabs" data-setting="invertY">${[false, true].map(v => `<button class="tab${v === s.invertY ? ' on' : ''}" data-set="${v}">INVERT Y ${v ? 'ON' : 'OFF'}</button>`).join('')}</div>
           <h3 style="margin-top:16px">BINDINGS</h3>
-          <div class="kv"><span>MOVE</span><b>W A S D</b></div>
+          <div class="kv"><span>MOVE</span><b>W A S D / ARROWS</b></div>
           <div class="kv"><span>AIM / FIRE</span><b>MOUSE</b></div>
           <div class="kv"><span>ZOOM</span><b>RMB / V</b></div>
           <div class="kv"><span>JUMP JETS</span><b>SPACE</b></div>

@@ -228,7 +228,7 @@ export class Mech {
         ammo: w.ammo < 0 ? -1 : Math.round(w.ammo * (1 + (this.mods.ammo || 0))),
         mag: w.mag < 0 ? -1 : w.mag,
         cooldown: 0, reloading: 0, charge: 0, spin: 0,
-        heatBuild: 0, beamTime: 0, jammed: 0,
+        heatBuild: 0, beamTime: 0, jammed: 0, recoil: 0,
         group_key: i < 2 ? 'alpha' : 'beta',
         destroyed: false,
       };
@@ -546,6 +546,11 @@ export class Mech {
     for (const w of this.weapons) {
       if (!w || w.destroyed) continue;
       const d = w.def;
+      // Recoil: the gun slams back along its own axis and recovers.
+      if (w.recoil > 0) {
+        w.recoil = Math.max(0, w.recoil - dt * 9);
+        w.group.position.z = -w.recoil * (w.group.userData.kick || 0);
+      }
       if (w.jammed > 0) { w.jammed -= dt; continue; }
       if (w.reloading > 0) {
         w.reloading -= dt;
@@ -598,6 +603,7 @@ export class Mech {
 
   _fire(w, ctx, chargeLevel = 1) {
     const d = w.def;
+    w.recoil = Math.min(1, (w.recoil || 0) * 0.4 + chargeLevel);
     const rpm = d.rpm * this.fireRateMul * this.rateBase;
     w.cooldown = 60 / Math.max(1, rpm);
     if (w.mag > 0) w.mag--;
@@ -1158,6 +1164,32 @@ export class Mech {
     }
 
     if (this.jetting) this.fx.thrusterTrail(this, dt);
+    this._updateJetFlames(dt);
+  }
+
+  /**
+   * The plume: lights fast, dies a little slower, and never holds still.
+   * The throat keeps a dull glow at idle so the engines read as live.
+   */
+  _updateJetFlames(dt) {
+    const jf = this.model.jetFx;
+    if (!jf) return;
+    const on = this.jetting && this.alive;
+    jf.level = damp(jf.level, on ? 1 : 0, on ? 20 : 8, dt);
+    const lit = jf.level > 0.02;
+    const mats = this.model.materials;
+    for (let i = 0; i < jf.flames.length; i++) {
+      const p = jf.flames[i];
+      p.visible = lit;
+      if (!lit) continue;
+      const flick = 0.82 + Math.random() * 0.36;
+      p.scale.set(0.9 + Math.random() * 0.2, jf.level * flick, 0.9 + Math.random() * 0.2);
+    }
+    if (mats.jetFlame) {
+      mats.jetFlame.opacity = 0.9 * jf.level;
+      mats.jetFlameCore.opacity = jf.level;
+      mats.jetCore.emissiveIntensity = this.shutdown ? 0.05 : 0.5 + jf.level * 6;
+    }
   }
 
   /**
