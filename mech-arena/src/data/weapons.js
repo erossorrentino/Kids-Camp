@@ -255,6 +255,32 @@ export const WEAPONS = (() => {
     if (w.heal) w.heal = Math.round(w.heal * k * 10) / 10;
     if (w.shieldGive) w.shieldGive = Math.round(w.shieldGive * k);
   });
+  /* Damage floor: no gun deals 50 damage a second or less. The weakest are
+   * lifted along a straight line that meets the untouched guns at 80 DPS,
+   * so the order is kept -- a Small Laser still trails a Medium Laser, a
+   * refit still beats its base -- and everything from 80 up is left alone.
+   * Tools that are not guns (repair, shield projector, target designator)
+   * are exempt: their job is not damage. Slow single-shot guns are then
+   * nudged so one hit also reads above 50. */
+  const FLOOR = 55, PIVOT = 80, HIT_FLOOR = 52;
+  for (const w of list) {
+    const f = w.flags || [];
+    if (!(w.dmg > 0) || f.includes('heal') || f.includes('tag')) continue;
+    let k = 1;
+    const d = dps(w);
+    if (d < PIVOT) k = (FLOOR + d * (PIVOT - FLOOR) / PIVOT) / d;
+    const target = d * k;                         // the damage a second it should end on
+    if (w.rpm <= 120 && (w.pellets || 1) === 1 && w.dmg * k < HIT_FLOOR) {
+      // Bigger hits, fired a little slower: the per-second figure stays on
+      // the line, so a Small Laser does not catch up with a Medium Laser.
+      k = HIT_FLOOR / w.dmg;
+      w.rpm = Math.round(target * 60 / HIT_FLOOR * 100) / 100;
+    }
+    if (k === 1) continue;
+    w.dmg = Math.round(w.dmg * k * 100) / 100;
+    if (w.splash) w.splash.dmg = Math.round(w.splash.dmg * k * 10) / 10;
+  }
+
   // Prices follow rarity strictly: see data/rarity.js.
   bandPrices(list, 'weaponBand');
   return list;

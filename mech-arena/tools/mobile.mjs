@@ -72,6 +72,13 @@ const shot = async (page, name) => {
   return decodePNG(buf);
 };
 
+/** Wait until `seconds` of match time have passed, however slow the frames. */
+async function simWait(page, seconds, wallLimitMs = 45000) {
+  const t0 = await page.evaluate(() => window.__game.match?.time ?? 0);
+  await page.waitForFunction(({ t0, seconds }) => (window.__game.match?.time ?? 0) - t0 >= seconds,
+    { t0, seconds }, { timeout: wallLimitMs, polling: 100 }).catch(() => {});
+}
+
 const PROFILES = [
   { name:'phone',   viewport:{ width:390,  height:780  }, touch:true,  scale:2 },
   { name:'tablet',  viewport:{ width:820,  height:1180 }, touch:true,  scale:2 },
@@ -242,12 +249,13 @@ for (const prof of PROFILES) {
     });
     await t.send('Input.dispatchTouchEvent', { type:'touchStart', touchPoints:[{ x:cx, y:cy, id:4 }] });
     await t.send('Input.dispatchTouchEvent', { type:'touchMove', touchPoints:[{ x:cx - throwPx, y:cy, id:4 }] });
-    await page.waitForTimeout(2000);
+    // Wait on game time, not wall time: under a software renderer a frame
+    // can take a second, and two seconds of wall clock is a sliver of play.
+    await simWait(page, 2.0);
     const to = await page.evaluate(() => {
       const m = window.__game.match.player.mech;
       return { x:m.position.x, z:m.position.z, yaw:m.yaw };
     });
-    await t.send('Input.dispatchTouchEvent', { type:'touchEnd', touchPoints:[] });
     // Camera-left in world space, from the heading the player had when they pushed.
     const dx = to.x - from.x, dz = to.z - from.z;
     const leftX = -Math.cos(from.yaw), leftZ = Math.sin(from.yaw);
@@ -256,13 +264,19 @@ for (const prof of PROFILES) {
     // How far it gets depends on what is in the way; the direction does not.
     check('stick left sends the mech left', from.style === 'steer' && leftward > 1 && leftward > Math.abs(forward),
       `left ${leftward.toFixed(1)}m forward ${forward.toFixed(1)}m style ${from.style}`);
-    // And the legs face the way it is travelling, which is what makes it read
-    // as walking left rather than crabbing sideways. Measured against the
-    // actual travel, since aim assist may have turned the torso meanwhile.
-    const facing = await page.evaluate(() => window.__game.match.player.mech.yaw);
-    const travel = Math.atan2(dx, dz);
-    const dAng = Math.abs(Math.atan2(Math.sin(facing - travel), Math.cos(facing - travel)));
-    check('and the legs turn to follow', dAng < 0.9, `${dAng.toFixed(2)} rad off travel`);
+    /* And the legs turn to face the way the stick points, which is what
+     * makes it read as walking left rather than crabbing sideways. Measured
+     * against the heading the stick asked for (desiredYaw) rather than the
+     * net travel: a spawn next to a wall turns the travel into a slide and
+     * says nothing about the legs, and aim assist can swing the torso. The
+     * sample is taken while the stick is still held. */
+    const legs = await page.evaluate(() => {
+      const m = window.__game.match.player.mech;
+      return { yaw: m.yaw, want: m.desiredYaw, world: m.moveWorld };
+    });
+    const dAng = Math.abs(Math.atan2(Math.sin(legs.yaw - legs.want), Math.cos(legs.yaw - legs.want)));
+    check('and the legs turn to follow', legs.world && dAng < 0.35, `${dAng.toFixed(2)} rad off the stick heading`);
+    await t.send('Input.dispatchTouchEvent', { type:'touchEnd', touchPoints:[] });
 
     // And the other way, so a sign error cannot pass by being symmetrical.
     await page.waitForFunction(() => {
@@ -275,7 +289,7 @@ for (const prof of PROFILES) {
     });
     await t.send('Input.dispatchTouchEvent', { type:'touchStart', touchPoints:[{ x:cx, y:cy, id:5 }] });
     await t.send('Input.dispatchTouchEvent', { type:'touchMove', touchPoints:[{ x:cx + throwPx, y:cy, id:5 }] });
-    await page.waitForTimeout(2000);
+    await simWait(page, 2.0);
     const rTo = await page.evaluate(() => {
       const m = window.__game.match.player.mech;
       return { x: m.position.x, z: m.position.z };

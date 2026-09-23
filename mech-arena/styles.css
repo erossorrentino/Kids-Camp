@@ -737,3 +737,6 @@ body.touch-ui #hp-strip{min-width:0;width:min(300px,56vw);bottom:calc(6px + env(
 .hardpoint-row[data-rarity] .hp-w{color:var(--r-color);}
 .hp-stars{font-size:9px;color:var(--r-color);letter-spacing:0;}
 .wslot .wname{color:var(--r-color,var(--ink));}
+/* A climbing total pulses each time it grows. */
+.dmgnum.bump{animation:dmgBump .14s ease-out;}
+@keyframes dmgBump{from{filter:brightness(1.8);font-size:18px;}}

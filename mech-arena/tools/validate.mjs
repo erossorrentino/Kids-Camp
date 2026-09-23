@@ -170,6 +170,14 @@ for (const [base, fam] of families) {
   }
 }
 
+// Every gun deals more than 50 damage a second. Repair, shield and target
+// designator tools are exempt; their job is not damage.
+for (const w of WEAPONS) {
+  const f = w.flags || [];
+  if (f.includes('heal') || f.includes('tag')) continue;
+  check(dps(w) > 50, `${w.name}: only ${dps(w).toFixed(1)} damage a second`);
+}
+
 /* ---- report ---- */
 if (problems.length) {
   console.error(`${problems.length} problem(s) in ${checks} checks:\n`);

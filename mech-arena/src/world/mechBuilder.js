@@ -577,9 +577,6 @@ export function buildMech(chassis, skinId, teamColor = null) {
   /* A lit chest strip and a reactor pack on the back with glowing ports.
    * These two are what read as "powered" at any range and in any paint,
    * and they give the silhouette something behind the shoulders. */
-  const chestGlow = mesh(box(S.w * 0.52, S.h * 0.075, 0.06), mats.accent, false);
-  chestGlow.position.set(0, S.h * 0.03, S.d * 0.64);
-  torsoPitch.add(chestGlow);
 
   const pack = mesh(mergeParts([
     { geo: chamfer(S.w * 1.05, S.h * 0.46, S.d * 0.44, 0.28), pos: [0, S.h * 0.08, -S.d * 0.64] },
@@ -588,11 +585,13 @@ export function buildMech(chassis, skinId, teamColor = null) {
   ]), mats.hull);
   torsoPitch.add(pack);
 
-  const ports = mesh(mergeParts([
+  // Chest strip and reactor ports share the accent material: one draw.
+  const glows = mesh(mergeParts([
+    { geo: box(S.w * 0.52, S.h * 0.075, 0.06), pos: [0, S.h * 0.03, S.d * 0.64] },
     { geo: cyl(S.w * 0.125, S.w * 0.125, 0.06, 10), pos: [-S.w * 0.36, -S.h * 0.25, -S.d * 0.76], rot: [Math.PI / 2 + 0.32, 0, 0] },
     { geo: cyl(S.w * 0.125, S.w * 0.125, 0.06, 10), pos: [S.w * 0.36, -S.h * 0.25, -S.d * 0.76], rot: [Math.PI / 2 + 0.32, 0, 0] },
   ]), mats.accent, false);
-  torsoPitch.add(ports);
+  torsoPitch.add(glows);
 
   // Side torso blisters double as the LT/RT hardpoint anchors.
   const sideTorso = {};
@@ -662,6 +661,7 @@ export function buildMech(chassis, skinId, teamColor = null) {
     });
     mats.jetFlameCore = mats.jetFlame.clone();
     const flames = [];
+    const pods = [];
     const bellLen = r * 1.4;
     const exitY = -r * 1.0 - bellLen;
 
@@ -671,6 +671,7 @@ export function buildMech(chassis, skinId, teamColor = null) {
       pod.rotation.x = 0.32;               // exhaust angled down and back
       pod.rotation.z = sx * 0.06;
       torsoPitch.add(pod);
+      pods.push(pod);
 
       pod.add(mesh(mergeParts([
         { geo: chamfer(r * 2.2, r * 2.2, r * 2.0, 0.3), pos: [0, r * 0.4, 0] },
@@ -718,6 +719,34 @@ export function buildMech(chassis, skinId, teamColor = null) {
       port.position.y = exitY - r * 0.3;
       pod.add(port);
       jets.push(port);
+    }
+    /* The pods never move on their own, so their housings, collars, bells
+     * and throats are baked into torsoPitch space and merged across both
+     * pods: four draws for the pair instead of eight. Only the flame pivots
+     * stay separate, because they scale -- and they are hidden, and cost
+     * nothing, unless the jets are lit. */
+    torsoPitch.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(torsoPitch.matrixWorld).invert();
+    const byMat = new Map();
+    for (const pod of pods) {
+      const statics = [];
+      pod.traverse(o => { if (o.isMesh && !flames.some(f => f === o.parent)) statics.push(o); });
+      for (const o of statics) {
+        const geo = o.geometry.clone();
+        geo.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld));
+        if (!byMat.has(o.material)) byMat.set(o.material, []);
+        byMat.get(o.material).push(geo);
+        o.parent.remove(o);
+      }
+    }
+    for (const [mat, geos] of byMat) {
+      const merged = geos.length > 1 ? BGU.mergeGeometries(geos, false) : geos[0];
+      if (geos.length > 1) geos.forEach(g => g.dispose());
+      if (!merged) continue;
+      const m = new THREE.Mesh(merged, mat);
+      m.castShadow = mat !== mats.jetCore;
+      m.receiveShadow = true;
+      torsoPitch.add(m);
     }
     jetFx = { flames, level: 0 };
   }

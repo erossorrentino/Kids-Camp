@@ -178,8 +178,7 @@ export function buildWeaponModel(w, mats, scaleRef) {
     // Top bracket + scope.
     add(box(S * 0.12, S * 0.18, S * 0.3), M.dark, [0, S * 0.5, S * 0.2]);
     add(cyl(S * 0.1, S * 0.1, S * 0.7, 10), M.dark, [0, S * 0.64, S * 0.25], Z);
-    const scopeLens = addLive(cyl(S * 0.08, S * 0.08, S * 0.02, 10), M.glow, [0, S * 0.64, S * 0.61], Z);
-    scopeLens.castShadow = false;
+    add(cyl(S * 0.08, S * 0.08, S * 0.02, 10), M.glow, [0, S * 0.64, S * 0.61], Z);          // scope lens
     // Muzzle cap tying the rails together.
     add(chamfer(bore * 5.2, S * 0.46, S * 0.16), M.dark, [0, 0, len]);
     mount(-S * 0.1);
@@ -193,18 +192,31 @@ export function buildWeaponModel(w, mats, scaleRef) {
     receiver(S * 0.78, S * 0.72, S * 0.8, -S * 0.3);
     add(cyl(S * 0.36, S * 0.36, S * 0.42, 14), M.dark, [0, 0, -S * 0.02], Z);      // motor
     add(torus(S * 0.36, S * 0.04, 16), M.trim, [0, 0, S * 0.18]);
+    // The cluster spins as one piece, so it is built as one piece: two
+    // merged meshes (barrels, collars) rather than ten separate draws.
     const cluster = new THREE.Group();
+    const barrels = [], collars = [];
+    const place = (geo, pos, rot, out) => {
+      const part = geo.clone();
+      part.applyMatrix4(new THREE.Matrix4().compose(new THREE.Vector3(...pos),
+        new THREE.Quaternion().setFromEuler(new THREE.Euler(...rot)), new THREE.Vector3(1, 1, 1)));
+      out.push(part);
+    };
     const n = 6;
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2;
-      addLive(cyl(bore * 0.42, bore * 0.42, len, 8), M.trim,
-        [Math.cos(a) * bore * 1.05, Math.sin(a) * bore * 1.05, len / 2], Z, cluster);
+      place(cyl(bore * 0.42, bore * 0.42, len, 8), [Math.cos(a) * bore * 1.05, Math.sin(a) * bore * 1.05, len / 2], Z, barrels);
     }
     // Collars clamp the barrels at the breech, the middle and the muzzle.
-    for (const t of [0.12, 0.55, 0.94]) {
-      addLive(cyl(bore * 1.75, bore * 1.75, S * 0.08, 14), M.dark, [0, 0, len * t], Z, cluster);
+    for (const t of [0.12, 0.55, 0.94]) place(cyl(bore * 1.75, bore * 1.75, S * 0.08, 14), [0, 0, len * t], Z, collars);
+    place(cyl(bore * 0.35, bore * 0.35, len, 8), [0, 0, len / 2], Z, collars);
+    for (const [list, mat] of [[barrels, M.trim], [collars, M.dark]]) {
+      const merged = BGU.mergeGeometries(list, false);
+      list.forEach(p => p.dispose());
+      const mesh = new THREE.Mesh(merged, mat);
+      mesh.castShadow = true;
+      cluster.add(mesh);
     }
-    addLive(cyl(bore * 0.35, bore * 0.35, len, 8), M.dark, [0, 0, len / 2], Z, cluster);
     group.add(cluster);
     group.userData.spinner = cluster;
     // Drum magazine: the unmistakable "this thing eats ammunition" shape.
@@ -347,7 +359,7 @@ export function buildWeaponModel(w, mats, scaleRef) {
       [twin ? -bore * 1.35 : 0, 0, len + S * 0.04], Z);
     lens.castShadow = false;
     group.userData.lens = lens;
-    if (twin) addLive(cyl(bore * 0.66, bore * 0.66, S * 0.04, 14), M.glow, [bore * 1.35, 0, len + S * 0.04], Z).castShadow = false;
+    if (twin) add(cyl(bore * 0.66, bore * 0.66, S * 0.04, 14), M.glow, [bore * 1.35, 0, len + S * 0.04], Z);
     mount(-S * 0.15);
     muzzle.position.set(0, 0, len + S * 0.1);
 
@@ -377,7 +389,7 @@ export function buildWeaponModel(w, mats, scaleRef) {
     // Armour cheeks and a sighting sensor.
     for (let i = -1; i <= 1; i += 2) add(chamfer(S * 0.12, ph * 1.08, pd * 1.02), M.paint2, [i * (pw * 0.5 + S * 0.05), 0, 0]);
     add(box(S * 0.2, S * 0.14, S * 0.2), M.dark, [pw * 0.3, ph * 0.5 + S * 0.08, pd * 0.3]);
-    addLive(cyl(S * 0.05, S * 0.05, S * 0.02, 8), M.glow, [pw * 0.3, ph * 0.5 + S * 0.08, pd * 0.41], Z).castShadow = false;
+    add(cyl(S * 0.05, S * 0.05, S * 0.02, 8), M.glow, [pw * 0.3, ph * 0.5 + S * 0.08, pd * 0.41], Z);
     if (arcing) {
       // Indirect launchers tilt up and carry a hinged cover: reads at a glance.
       add(box(pw * 1.02, S * 0.05, pd * 0.5), M.paint2, [0, ph * 0.5 + S * 0.14, pd * 0.16], [-0.5, 0, 0]);

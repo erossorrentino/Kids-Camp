@@ -57,6 +57,12 @@ yours is elsewhere. Screenshots land in `$SMOKE_OUT` (default
   check still passed. The camera now frames into a measured rectangle
   (`menus._stageRect()` -> `hangarScene.setStage()`), which is why the
   narrow layout has to reserve one.
+- **Browser tests must wait on game time, not wall time.** Under the
+  software renderer a frame can take a second or more, and `MAX_FRAME`
+  caps each one at 50ms of simulation, so "hold the stick for two seconds"
+  can be a twentieth of a second of play. `mobile.mjs` has `simWait()`,
+  which polls `match.time`; a leg-steering check failed on exactly this
+  while the steering itself was correct.
 - **`align-items:start` collapses an empty grid item to nothing.** The
   stage rectangle measured zero height until the narrow layout stretched
   its rows.

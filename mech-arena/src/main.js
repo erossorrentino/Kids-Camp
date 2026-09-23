@@ -135,6 +135,7 @@ class Game {
     this.markers.showNumbers = s.damageNumbers !== false;
     this.markers.showPlates = s.nameplates !== false;
 
+    this._dmgAcc = new Map();       // target mech -> the number climbing over it
     this._wireGlobal();
     this._wireContextLoss();
     this._applyHandling();
@@ -448,6 +449,7 @@ class Game {
     this.audio.stopAllLoops();
     if (this.arena) { this.engine.scene.remove(this.arena.group); this.arena.dispose(); this.arena = null; }
     if (this.match) { this.match.dispose(); this.match = null; }
+    this._dmgAcc.clear();
     this.controller.match = null;
     this.controller.assistTarget = null;
 
@@ -760,11 +762,25 @@ class Game {
   _markerFeedback(e) {
     const me = this.match?.player?.mech;
     if (e.type === 'hit' && e.target) {
+      // Hits on the same machine inside a third of a second add up into one
+      // number that climbs; a sustained burst starts a fresh one every
+      // second and a half so the total stays readable.
+      const now = performance.now();
+      const acc = this._dmgAcc.get(e.target);
+      if (!e.killing && acc && now - acc.last < 330 && now - acc.start < 1500) {
+        acc.total += e.amount;
+        acc.last = now;
+        if (this.markers.bump(acc.rec, acc.total, acc.total >= 150 ? 'crit' : 'hit')) return;
+      }
       const p = e.target.position.clone();
       p.y += e.target.height * (0.45 + Math.random() * 0.3);
       p.x += (Math.random() - 0.5) * 2;
       p.z += (Math.random() - 0.5) * 2;
-      this.markers.damage(p, e.amount, e.killing ? 'kill' : e.amount >= 70 ? 'crit' : 'hit');
+      const rec = this.markers.damage(p, e.amount, e.killing ? 'kill' : e.amount >= 150 ? 'crit' : 'hit');
+      if (e.killing) { this._dmgAcc.delete(e.target); return; }
+      const slot = acc || {};
+      slot.rec = rec; slot.total = e.amount; slot.start = now; slot.last = now;
+      this._dmgAcc.set(e.target, slot);
     } else if (e.type === 'taken' && me) {
       const from = e.from || e.attacker?.position;
       const angle = from

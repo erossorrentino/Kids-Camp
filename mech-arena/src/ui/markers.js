@@ -85,9 +85,23 @@ export class Markers {
     rec.max = rec.life;
     rec.pos.copy(pos);
     rec.drift.set((Math.random() - 0.5) * 3, 6 + Math.random() * 3, (Math.random() - 0.5) * 3);
-    rec.el.textContent = kind === 'kill' ? 'DESTROYED' : Math.round(amount);
+    rec.el.textContent = kind === 'kill' ? 'DESTROYED' : fmtDamage(amount);
     rec.el.className = 'dmgnum ' + kind;
     rec.el.style.display = '';
+    return rec;
+  }
+
+  /**
+   * Add to a number that is already on screen. A burst from a machine gun or
+   * a missile volley reads as one total that climbs, not a dozen small
+   * numbers stacked on top of each other.
+   */
+  bump(rec, total, kind = 'hit') {
+    if (!rec || rec.life <= 0) return false;
+    rec.el.textContent = fmtDamage(total);
+    rec.el.className = 'dmgnum ' + kind + ' bump';
+    rec.life = Math.max(rec.life, rec.max * 0.9);
+    return true;
   }
 
   /** Flash a ring segment pointing at where a hit came from. */
@@ -254,3 +268,8 @@ function shortest(from, to) {
 
 const _a = new THREE.Vector3();
 const _b = new THREE.Vector3();
+
+/** 940 -> "940", 2930 -> "2.9k": how an arena HUD writes big hits. */
+function fmtDamage(n) {
+  return n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(Math.round(n));
+}

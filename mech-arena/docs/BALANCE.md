@@ -73,6 +73,22 @@ too long: a medium took the best part of half a minute of focused fire to
 drop. Over the same 82 simulated seconds on the same five arenas, the sim
 went from 44–46 kills to 65. It is symmetrical — bots carry the same guns.
 
+### Damage floor
+
+No gun deals 50 damage a second or less. The weakest are lifted along a
+straight line that meets the untouched guns at 80 DPS — a Small Laser goes
+from 32 to 65, a Medium Laser from 47 to 70, anything already at 80 or
+more is left alone — so the order is kept: a smaller gun still trails a
+bigger one and a refit still beats its base. Slow single-shot guns get
+bigger hits fired a little slower, so a single hit also reads above 50
+without the Small Laser catching the Medium. Repair, shield projector and
+target designator are exempt; their job is not damage. `validate.mjs`
+fails if any gun drops to 50.
+
+The numbers that pop over a target merge: hits on the same machine inside
+a third of a second add into one total that climbs, written `2.9k` past a
+thousand. A machine-gun burst reads as one number, not a dozen sixes.
+
 ## Rarity
 
 Five grades: Common, Rare, Epic, Legendary, Mythic (`src/data/rarity.js`).
