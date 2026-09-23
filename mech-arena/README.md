@@ -182,6 +182,13 @@ ticks twenty times a second would bury everything else.
 
 ---
 
+**Rarity.** Every gun and every chassis is Common, Rare, Epic, Legendary or
+Mythic — grey, blue, purple, gold, red, with one to five stars. Rarer is
+better and rarer costs more, without exceptions: every Rare costs more than
+every Common, and a rarer gun hits harder than the same gun a grade down.
+Bots carry guns of about your own grade, so buying better kit makes you
+stronger rather than making the enemy stronger with you.
+
 ## Game modes
 
 | Mode | Shape | Notes |

@@ -64,6 +64,46 @@ list deliberately spans everything from Salt Flat (no cover, 680m across)
 to Undercity (tunnels, 440m across): a loadout should be a choice you can
 get wrong.
 
+## Damage scale
+
+Every damage figure in the weapon catalogue is multiplied by
+`DAMAGE_SCALE = 1.5` (`src/data/weapons.js`), splash and healing included,
+so the numbers the hangar shows are the numbers in the fight. Fights were
+too long: a medium took the best part of half a minute of focused fire to
+drop. Over the same 82 simulated seconds on the same five arenas, the sim
+went from 44–46 kills to 65. It is symmetrical — bots carry the same guns.
+
+## Rarity
+
+Five grades: Common, Rare, Epic, Legendary, Mythic (`src/data/rarity.js`).
+The rule the player can rely on is **rarer is better, and rarer costs
+more**, and `tools/validate.mjs` enforces both halves.
+
+- **Weapons** are ranked by value — the hand-set price already encodes
+  archetype and refit — and cut into a pyramid: about 30 % Common, 28 %
+  Rare, 22 % Epic, 13 % Legendary, 7 % Mythic. Tier alone would have put
+  half the catalogue at the top grade. Each grade adds damage on top of the
+  global scale: ×1.00, ×1.07, ×1.15, ×1.24, ×1.34.
+- **Chassis** take their grade straight from their tier. They are already
+  graded — a Mythic assault carries four times a Common light's armour — so
+  for them rarity is a label and a price band, not an extra multiplier.
+- **Prices** are laid out in bands per grade, so every Rare is dearer than
+  every Common, every Epic dearer than every Rare, and so on; within a band
+  the bigger, stronger item is dearer. Weapons run 100 CR to 60,000 CR,
+  chassis up to 60,000. The old catalogue topped out at 237,600 CR for one
+  gun, which at 1–2k CR a match was not a goal, it was a wall.
+- The validator checks the strict price ordering across grades, and that
+  within one weapon family the straight refits (Standard, Mk II, Mk III,
+  Prime) never lose damage per second as they climb.
+
+### Bots and rarity
+
+A rarer gun hits harder, so bots cannot simply roll from the whole shop: a
+new pilot's Common lance would be outgunned by the catalogue, not
+out-flown. `Match` reads the best rarity in the player's lance and caps bot
+weapons there, shifted by difficulty (recruit −1, regular 0, veteran and
+elite +1, ace +2), never below Rare so every hardpoint can still be filled.
+
 ## Bot difficulty
 
 Difficulty never touches damage, armour or speed. The five tiers vary:

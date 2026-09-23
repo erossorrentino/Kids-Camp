@@ -37,6 +37,17 @@
  *   silent      no tracer, no audible report beyond 60m
  */
 
+import { rarityForTier, bandPrices } from './rarity.js';
+
+/**
+ * Global damage scale. Fights were long: a medium took the best part of
+ * half a minute of focused fire to drop. Everything that hurts -- direct
+ * damage, splash, and the healing that has to keep up with it -- is scaled
+ * here, so the numbers in the hangar are the numbers in the fight. It is
+ * symmetrical: bots shoot with the same guns.
+ */
+export const DAMAGE_SCALE = 1.5;
+
 /** @typedef {'ballistic'|'energy'|'missile'|'support'} WeaponClass */
 
 const CLASS_COLOR = {
@@ -218,9 +229,34 @@ export const WEAPONS = (() => {
       w.pellets = w.pellets || 1;
       w.splash = base.splash ? { ...base.splash } : null;
       w.max = w.max || Math.round(w.opt * 1.5);
+
       list.push(w);
     }
   }
+
+  /* Rarity. Tier on its own piles half the catalogue into the top grade
+   * (a tier-3 archetype plus a Prime refit caps out at 5), and a Mythic that
+   * half the guns share is not rare. So weapons are ranked by value -- the
+   * hand-set price already encodes archetype and refit -- and cut into a
+   * real pyramid: most guns Common, a handful Mythic. The starter kit is
+   * Common by definition. */
+  const CUTS = [0.30, 0.58, 0.80, 0.93, 1.0];         // cumulative share per rarity
+  const ranked = [...list].sort((a, b) => (a.cost - b.cost) || (dps(a) - dps(b)));
+  ranked.forEach((w, i) => {
+    const f = (i + 0.5) / ranked.length;
+    const tier = w.cost === 0 ? 1 : CUTS.findIndex(c => f <= c) + 1;
+    const r = rarityForTier(tier);
+    w.rarity = r.id;
+    w.rarityTier = r.tier;
+    // A rarer gun hits harder, on top of the global scale.
+    const k = DAMAGE_SCALE * r.power;
+    if (w.dmg) w.dmg = Math.round(w.dmg * k * 100) / 100;
+    if (w.splash) w.splash.dmg = Math.round(w.splash.dmg * k * 10) / 10;
+    if (w.heal) w.heal = Math.round(w.heal * k * 10) / 10;
+    if (w.shieldGive) w.shieldGive = Math.round(w.shieldGive * k);
+  });
+  // Prices follow rarity strictly: see data/rarity.js.
+  bandPrices(list, 'weaponBand');
   return list;
 })();
 

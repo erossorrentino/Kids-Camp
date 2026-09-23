@@ -7,6 +7,7 @@
  * The expensive parts (killfeed rows, weapon slots, respawn cards) are
  * only rebuilt when their underlying data actually changes.
  */
+import { RARITY_BY_ID } from '../data/rarity.js';
 import * as THREE from 'three';
 import { LOCATIONS, LOCATION_NAMES, MECH_BY_ID } from '../data/mechs.js';
 import { SKIN_BY_ID, DEFAULT_SKIN } from '../data/skins.js';
@@ -276,6 +277,8 @@ export class HUD {
       this._weaponRows = m.weapons.map((w, i) => {
         const row = document.createElement('div');
         row.className = 'wslot' + (w ? '' : ' empty');
+        // The name carries the gun's rarity colour, as it does in the hangar.
+        if (w) row.style.setProperty('--r-color', RARITY_BY_ID[w.def.rarity]?.color || '#eaf4ff');
         // The key hint rides on the chip, the way an arena HUD labels its
         // buttons rather than making you remember them.
         row.innerHTML = `<span class="idx">${i + 1}</span>`

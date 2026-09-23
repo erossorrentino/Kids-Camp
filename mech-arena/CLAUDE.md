@@ -87,6 +87,10 @@ yours is elsewhere. Screenshots land in `$SMOKE_OUT` (default
   with `mech.moveWorld`), `aimAssist` and `autoFire`. `Game._applyHandling`
   resolves the three 'auto' settings from whether the stick is up. Bots are
   untouched by all of it.
+- Rarer is better and rarer costs more, strictly. Prices come from rarity
+  bands (`data/rarity.js`), not from hand-typed numbers, and
+  `validate.mjs` fails the build if a lower grade ever costs more than a
+  higher one. Bot weapon rarity is capped to the player's lance.
 - Generated content is deterministic: arenas from a seed, skins from a hash.
 - Nothing allocates during a match. Particles, tracers, beams, decals and
   projectiles all come from preallocated pools.

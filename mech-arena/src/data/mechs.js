@@ -13,6 +13,8 @@
  */
 
 /** Hardpoint locations, in the order the HUD lists them. */
+import { rarityForTier, bandPrices } from './rarity.js';
+
 export const LOCATIONS = ['HD', 'CT', 'LT', 'RT', 'LA', 'RA', 'LL', 'RL'];
 export const LOCATION_NAMES = {
   HD: 'Cockpit', CT: 'Centre Torso', LT: 'Left Torso', RT: 'Right Torso',
@@ -336,6 +338,10 @@ function expand(m) {
 }
 
 export const MECHS = RAW.map(expand);
+// Rarity is read off the tier; prices are laid out in rarity bands so a
+// rarer chassis is always the dearer one. See data/rarity.js.
+for (const m of MECHS) m.rarity = rarityForTier(m.tier).id;
+bandPrices(MECHS, 'mechBand');
 export const MECH_BY_ID = Object.fromEntries(MECHS.map(m => [m.id, m]));
 
 export function mechsOfClass(cls) { return MECHS.filter(m => m.cls === cls); }

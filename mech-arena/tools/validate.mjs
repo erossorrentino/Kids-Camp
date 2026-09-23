@@ -14,6 +14,7 @@ import { SKINS, SKIN_BY_ID, DEFAULT_SKIN, starterSkins } from '../src/data/skins
 import { MAPS, MAP_BY_ID, BIOMES, mapsForMode } from '../src/data/maps.js';
 import { MODES, MODE_LIST } from '../src/data/modes.js';
 import { TOURNAMENTS } from '../src/data/tournaments.js';
+import { RARITIES, RARITY_BY_ID } from '../src/data/rarity.js';
 
 const problems = [];
 const fail = (msg) => problems.push(msg);
@@ -129,6 +130,44 @@ for (const t of TOURNAMENTS) {
   }
   if (t.reward.kind === 'skin') check(!!SKIN_BY_ID[t.reward.id], `tournament ${t.id}: unknown skin reward ${t.reward.id}`);
   if (t.reward.kind === 'mech') check(!!MECH_BY_ID[t.reward.id], `tournament ${t.id}: unknown mech reward ${t.reward.id}`);
+}
+
+/* ---- rarity ----
+ * The promise to the player is "rarer is better and rarer costs more".
+ * Costs more is checked strictly: every priced item of a rarity is dearer
+ * than every priced item of any lower rarity. Better is checked within a
+ * family: the same archetype at a higher rarity never does less damage
+ * per second. */
+for (const [label, items] of [['weapon', WEAPONS], ['chassis', MECHS]]) {
+  for (const it of items) check(!!RARITY_BY_ID[it.rarity], `${label} ${it.id}: no rarity`);
+  for (let i = 0; i < RARITIES.length - 1; i++) {
+    const lo = items.filter(x => x.rarity === RARITIES[i].id && x.cost > 0);
+    const hi = items.filter(x => x.rarity === RARITIES[i + 1].id && x.cost > 0);
+    if (!lo.length || !hi.length) continue;
+    const maxLo = Math.max(...lo.map(x => x.cost)), minHi = Math.min(...hi.map(x => x.cost));
+    check(maxLo < minHi, `${label}: a ${RARITIES[i].name} costs ${maxLo}, more than a ${RARITIES[i + 1].name} at ${minHi}`);
+  }
+}
+const tierOf = (w) => RARITY_BY_ID[w.rarity].tier;
+const counts = RARITIES.map(r => WEAPONS.filter(w => w.rarity === r.id).length);
+check(counts[0] > counts[4], `weapon rarities are not a pyramid: ${counts.join('/')}`);
+const families = new Map();
+for (const w of WEAPONS) {
+  if (!families.has(w.baseId)) families.set(w.baseId, []);
+  families.get(w.baseId).push(w);
+}
+for (const [base, fam] of families) {
+  // Compare the straight refits only; Lightweight/Extended/Compact trade
+  // damage for mass or reach on purpose.
+  const line = fam.filter(w => ['Standard', 'Mk II', 'Mk III', 'Prime'].includes(w.variant))
+    .sort((a, b) => tierOf(a) - tierOf(b) || a.cost - b.cost);
+  for (let i = 1; i < line.length; i++) {
+    if (tierOf(line[i]) > tierOf(line[i - 1])) {
+      check(dps(line[i]) >= dps(line[i - 1]) - 1e-6,
+        `${base}: ${line[i].name} (${line[i].rarity}) does less than ${line[i - 1].name} (${line[i - 1].rarity})`);
+    }
+    check(line[i].cost >= line[i - 1].cost, `${base}: ${line[i].name} is cheaper than ${line[i - 1].name}`);
+  }
 }
 
 /* ---- report ---- */

@@ -55,6 +55,18 @@ export class Match {
     this.audio = audio;
     this.mode = getMode(mode);
     this.difficulty = difficulty || 'regular';
+    /* Bots carry guns of about the player's own rarity. A rarer gun hits
+     * harder, and a new pilot with a Common lance against bots carrying
+     * Mythics would be outgunned by the shop, not out-flown. Difficulty
+     * shifts the cap; it never lifts bots clear of the pool entirely. */
+    const lance = (hangar?.mechs || []).filter(Boolean);
+    let best = 1;
+    for (const b of lance) for (const id of (b.loadout || [])) {
+      const w = id && WEAPON_BY_ID[id];
+      if (w) best = Math.max(best, w.rarityTier || 1);
+    }
+    const lift = { recruit: -1, regular: 0, veteran: 1, elite: 1, ace: 2 }[this.difficulty] ?? 0;
+    this.botRarityCap = Math.max(2, Math.min(5, best + lift));
     this.progression = progression;
     this.quality = quality;
     this.rng = makeRng((world.def.seed ^ 0x9e37) >>> 0);
@@ -173,7 +185,7 @@ export class Match {
       const chassis = this.rng.pick(pool);
       out.push({
         chassisId: chassis.id,
-        loadout: autoLoadout(chassis, this.rng),
+        loadout: autoLoadout(chassis, this.rng, { maxRarity: this.botRarityCap }),
         skinId: skinForSeed(chassis.id.length * 977 + i * 31 + this.rng.int(0, 9999)),
       });
     }
@@ -939,6 +951,7 @@ export function autoLoadout(chassis, rng = Math.random, opts = {}) {
     const candidates = WEAPONS.filter(w =>
       fitsHardpoint(w, h.size) &&
       w.tier <= maxTier &&
+      (opts.maxRarity == null || (w.rarityTier || 1) <= opts.maxRarity) &&
       w.tons <= remaining &&
       !(w.flags || []).includes('heal') &&
       w.opt >= bracket[0] * 0.6 && w.opt <= bracket[1]);

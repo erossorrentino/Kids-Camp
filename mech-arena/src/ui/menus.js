@@ -19,6 +19,7 @@ import { DIFFICULTIES } from '../game/ai.js';
 import { autoLoadout } from '../game/match.js';
 import { TOURNAMENTS, resolveRoundMap } from '../data/tournaments.js';
 import { RANK_TITLES } from './progression.js';
+import { RARITY_BY_ID } from '../data/rarity.js';
 import { clamp } from '../core/rng.js';
 
 /** Screens rendered over the live 3D hangar bay. */
@@ -152,7 +153,7 @@ export class Menus {
       const b = builds[i];
       const c = b ? MECH_BY_ID[b.chassisId] : null;
       if (!c) return `<div class="slot-card${i === this.slot ? ' on' : ''}" data-slot="${i}"><span class="sc-empty">+ ADD MECH</span></div>`;
-      return `<div class="slot-card filled${i === this.slot ? ' on' : ''}" data-slot="${i}">
+      return `<div class="slot-card filled${i === this.slot ? ' on' : ''}" data-slot="${i}" data-rarity style="${rarityVars(c)}">
         <div class="sc-n">${esc(c.name)}</div>
         <div class="sc-c">${c.classLabel} · ${c.tons}t</div>
       </div>`;
@@ -175,9 +176,10 @@ export class Menus {
     const hardpoints = chassis.hardpoints.map((hp, i) => {
       const id = build.loadout?.[i];
       const w = id ? WEAPON_BY_ID[id] : null;
-      return `<div class="hardpoint-row${i === this.hardpoint ? ' on' : ''}" data-hp="${i}">
+      return `<div class="hardpoint-row${i === this.hardpoint ? ' on' : ''}" data-hp="${i}"${w ? ` data-rarity style="${rarityVars(w)}"` : ''}>
         <span class="hp-loc">${hp.loc}</span>
         <span class="hp-w ${w ? '' : 'none'}">${w ? esc(w.name) : 'empty'}</span>
+        ${w ? `<span class="hp-stars">${'★'.repeat(RARITY_BY_ID[w.rarity]?.stars || 1)}</span>` : ''}
         <span class="hp-size">${hp.size}</span>
       </div>`;
     }).join('');
@@ -199,6 +201,7 @@ export class Menus {
         <div class="panel col-chassis">
           <h3>CHASSIS</h3>
           <h4 style="font-size:17px;letter-spacing:.1em">${esc(chassis.name)}</h4>
+          <div style="margin:2px 0 6px">${rarityBadge(chassis)}</div>
           <div class="sub" style="margin-bottom:8px">
             <span class="pill ${chassis.cls}">${chassis.classLabel}</span>
             <span class="muted"> ${chassis.tons} TONS</span>
@@ -271,8 +274,8 @@ export class Menus {
         `<button class="tab${this.weaponFilter === f ? ' on' : ''}" data-filter="${f}">${f.toUpperCase()}</button>`).join('');
       const list = WEAPONS
         .filter(w => this.weaponFilter === 'all' || w.cls === this.weaponFilter)
-        .sort((a, b) => a.tier - b.tier || a.tons - b.tons)
-        .slice(0, 260);
+        .sort((a, b) => (a.rarityTier - b.rarityTier) || a.cost - b.cost)
+        .slice(0, 302);
       body = `<div class="tabs">${filters}</div>
         <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(258px,1fr))">
           ${list.map(w => this.weaponCard(w)).join('')}
@@ -293,8 +296,9 @@ export class Menus {
   mechCard(m) {
     const owned = this.progression.owns('mech', m.id);
     const locked = !this.progression.tierUnlocked(m.tier);
-    return `<div class="card clickable ${owned ? '' : 'locked'}" data-buy="mech:${m.id}">
+    return `<div class="card clickable ${owned ? '' : 'locked'}" data-buy="mech:${m.id}" data-rarity style="${rarityVars(m)}">
       ${owned ? '' : `<span class="lock">${locked ? '🔒' : '🛒'}</span>`}
+      ${rarityBadge(m)}
       <h4>${esc(m.name)}</h4>
       <div class="sub"><span class="pill ${m.cls}">${m.classLabel}</span> ${m.tons}t · ${m.hardpoints.length} HP</div>
       <p class="muted tiny" style="margin:8px 0;line-height:1.5;min-height:46px">${esc(m.blurb)}</p>
@@ -306,8 +310,9 @@ export class Menus {
   weaponCard(w) {
     const owned = this.progression.owns('weapon', w.id);
     const locked = !this.progression.tierUnlocked(w.tier);
-    return `<div class="card clickable ${owned ? '' : 'locked'}" data-buy="weapon:${w.id}">
+    return `<div class="card clickable ${owned ? '' : 'locked'}" data-buy="weapon:${w.id}" data-rarity style="${rarityVars(w)}">
       ${owned ? '' : `<span class="lock">${locked ? '🔒' : '🛒'}</span>`}
+      ${rarityBadge(w)}
       <h4>${esc(w.name)}</h4>
       <div class="sub">${w.cls.toUpperCase()} · ${w.size} · ${w.tons}t</div>
       <p class="muted tiny" style="margin:6px 0;line-height:1.45;min-height:40px">${esc(w.blurb)}</p>
@@ -1066,11 +1071,13 @@ export class Menus {
 
     const fits = weaponsForSize(hp.size);
     const ownedList = fits.filter(w => p.owns('weapon', w.id)).sort((a, b2) => b2.tons - a.tons);
-    const shopList = fits.filter(w => !p.owns('weapon', w.id)).sort((a, b2) => a.tier - b2.tier || a.cost - b2.cost).slice(0, 140);
+    const shopList = fits.filter(w => !p.owns('weapon', w.id))
+      .sort((a, b2) => (a.rarityTier - b2.rarityTier) || a.cost - b2.cost).slice(0, 160);
 
     const card = (w) => {
       const over = w.tons > budget;
-      return `<div class="card clickable ${p.owns('weapon', w.id) ? '' : 'locked'}" data-pick="${w.id}" style="${over ? 'opacity:.45' : ''}">
+      return `<div class="card clickable ${p.owns('weapon', w.id) ? '' : 'locked'}" data-pick="${w.id}" data-rarity style="${rarityVars(w)};${over ? 'opacity:.45' : ''}">
+        ${rarityBadge(w)}
         <h4 style="font-size:12.5px">${esc(w.name)}</h4>
         <div class="sub">${w.cls.toUpperCase()} · ${w.size} · <b style="color:${over ? 'var(--red)' : 'var(--ink)'}">${w.tons}t</b></div>
         <p class="muted tiny" style="margin:6px 0;line-height:1.45;min-height:38px">${esc(w.blurb)}</p>
@@ -1126,6 +1133,18 @@ export class Menus {
 }
 
 /* ---------------- small render helpers ---------------- */
+/** CSS custom properties that colour a card or chip by rarity. */
+function rarityVars(item) {
+  const r = RARITY_BY_ID[item?.rarity] || RARITY_BY_ID.common;
+  return `--r-color:${r.color};--r-glow:${r.glow}`;
+}
+
+/** A rarity chip: stars and the name, in the rarity's colour. */
+function rarityBadge(item) {
+  const r = RARITY_BY_ID[item?.rarity] || RARITY_BY_ID.common;
+  return `<span class="rarity" style="${rarityVars(item)}"><i>${'★'.repeat(r.stars)}</i>${r.name.toUpperCase()}</span>`;
+}
+
 function statLine(label, value, max) {
   const pct = clamp(value / max, 0, 1) * 100;
   return `<div class="statline"><span style="width:56px">${label}</span>
