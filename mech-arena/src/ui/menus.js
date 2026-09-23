@@ -21,6 +21,7 @@ import { TOURNAMENTS, resolveRoundMap } from '../data/tournaments.js';
 import { RANK_TITLES } from './progression.js';
 import { RARITY_BY_ID } from '../data/rarity.js';
 import { clamp } from '../core/rng.js';
+import { BUILD } from '../build.js';
 
 /** Screens rendered over the live 3D hangar bay. */
 const SEE_THROUGH = new Set(['title', 'hangar', 'deploy']);
@@ -136,7 +137,7 @@ export class Menus {
         <button class="btn ghost" data-go="settings">SETTINGS</button>
       </div>
       <div class="title-foot">
-        ${p.matches} MATCHES · ${p.wins} WINS · ${fmt(p.kills)} KILLS · RANK ${this.progression.rank} ${esc(this.progression.rankTitle)}
+        ${p.matches} MATCHES · ${p.wins} WINS · ${fmt(p.kills)} KILLS · RANK ${this.progression.rank} ${esc(this.progression.rankTitle)} · BUILD ${esc(BUILD)}
       </div>
     </div>`;
   }

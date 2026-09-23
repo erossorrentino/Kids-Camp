@@ -113,6 +113,8 @@ for (const prof of PROFILES) {
     if (r.status() === 404 && !/favicon/.test(r.url())) errors.push('404 ' + r.url());
   });
   const ignorable = (e) => /Failed to load resource/.test(e) && !errors.some(x => x.startsWith('404 '));
+  const moduleUrls = [];
+  page.on('request', (r) => { if (/\/src\/.*\.js/.test(r.url())) moduleUrls.push(r.url()); });
 
   await page.goto(`http://127.0.0.1:${PORT}/index.html`, { waitUntil: 'load' });
   let booted = true;
@@ -126,6 +128,15 @@ for (const prof of PROFILES) {
     const b = document.getElementById('boot-error');
     return !!b && !b.classList.contains('hidden');
   })));
+
+  // An update only reaches a player whose browser fetches the new files:
+  // every game module must load at a content-hashed URL, and the title
+  // screen must say which build it is.
+  const stale = moduleUrls.filter(u => !/\?v=[0-9a-f]{10}$/.test(u));
+  check('every game module loads at a versioned URL', moduleUrls.length > 20 && !stale.length,
+    `${moduleUrls.length} modules${stale.length ? ', unversioned: ' + stale.slice(0, 3).join(' ') : ''}`);
+  const foot = await page.evaluate(() => document.querySelector('.title-foot')?.textContent || '');
+  check('the title screen shows the build number', /BUILD \d+/.test(foot), foot.trim().replace(/\s+/g, ' '));
 
   const picked = await page.evaluate(() => window.__game.progression.settings.quality);
   check('the device picks a preset it can carry', prof.touch ? picked === 'low' : !!picked, picked);

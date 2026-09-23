@@ -70,6 +70,12 @@ yours is elsewhere. Screenshots land in `$SMOKE_OUT` (default
   while every test passed, because the tests used the same wrong idea of
   right. `handling.mjs` and `mobile.mjs` read the camera's quaternion and
   where the mech lands on screen.
+- **A published fix is not a fix the player has.** Modules are published
+  at the same path every version, so a browser can keep running an old
+  copy. `build-artifact.mjs` maps each module to `path?v=<content hash>`
+  in the import map (relative imports are matched by resolved URL, so the
+  whole graph is caught) and stamps `src/build.js`; the title screen shows
+  `BUILD n`. `mobile.mjs` fails if any module loads unversioned.
 - **`align-items:start` collapses an empty grid item to nothing.** The
   stage rectangle measured zero height until the narrow layout stretched
   its rows.
