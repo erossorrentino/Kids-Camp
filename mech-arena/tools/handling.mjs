@@ -69,19 +69,51 @@ for (const chassis of ['wasp', 'atlas']) {
     const t0 = await page.evaluate(() => window.__game.match.time);
     await page.waitForFunction(({ t0, s }) => window.__game.match.time - t0 >= s, { t0, s }, { timeout: 90000, polling: 30 });
   };
-  /** Travel and body error against the stick, in degrees, in camera space. */
+  /* Travel and body error against the stick, in degrees, in SCREEN space.
+   * Left and right are taken from the camera's own orientation, never from
+   * the game's idea of which way is right: this test used to share the
+   * game's convention, and passed for weeks while stick-left walked the
+   * mech right across the screen. */
   const errors = (x, z) => page.evaluate(({ x, z }) => {
-    const m = window.__game.match.player.mech, a = m.aimYaw;
+    const g = window.__game, m = g.match.player.mech, cam = g.engine.camera;
+    const V = cam.position.constructor;
+    const R = new V(1, 0, 0).applyQuaternion(cam.quaternion).setY(0).normalize();
+    const F = new V(0, 0, -1).applyQuaternion(cam.quaternion).setY(0).normalize();
     const d = (p, q) => Math.atan2(Math.sin(p - q), Math.cos(p - q));
+    const onScreen = (wx, wz) => Math.atan2(wx * R.x + wz * R.z, wx * F.x + wz * F.z);
+    const want = Math.atan2(x, z);
     const vx = m.velocity.x, vz = m.velocity.z;
-    const cx = vx * Math.cos(a) - vz * Math.sin(a), cz = vx * Math.sin(a) + vz * Math.cos(a);
     return {
-      move: Math.abs(d(Math.atan2(cx, cz), Math.atan2(x, z))) * 57.3,
-      body: Math.abs(d(m.yaw, a + Math.atan2(x, z))) * 57.3,
+      move: Math.abs(d(onScreen(vx, vz), want)) * 57.3,
+      body: Math.abs(d(onScreen(Math.sin(m.yaw), Math.cos(m.yaw)), want)) * 57.3,
       speed: Math.hypot(vx, vz),
     };
   }, { x, z });
+
+  /** Where the mech is on the screen, in pixels: the ground truth. */
+  const screenX = () => page.evaluate(() => {
+    const g = window.__game, m = g.match.player.mech;
+    const p = m.position.clone(); p.y += m.height * 0.5; p.project(g.engine.camera);
+    return (p.x * 0.5 + 0.5) * innerWidth;
+  });
   const stick = (x, z) => page.evaluate(({ x, z }) => window.__game.input.setTouchMove(x, z), { x, z });
+
+  // The plainest possible check: stick left, the mech moves left in the
+  // picture; stick right, it moves right. Both handling styles, because
+  // they reach the legs by different roads.
+  for (const style of ['strafe', 'steer']) {
+    await page.evaluate((s) => { window.__game.controller.moveStyle = s; }, style);
+    for (const [name, x, sign] of [['left', -1, -1], ['right', 1, 1]]) {
+      await stick(0, 0);
+      await simWait(0.6);
+      const x0 = await screenX();
+      await stick(x, 0);
+      await simWait(0.8);
+      const x1 = await screenX();
+      check(`${style}: stick ${name} moves the mech ${name} on screen`, Math.sign(x1 - x0) === sign && Math.abs(x1 - x0) > 5,
+        `${x0.toFixed(0)}px -> ${x1.toFixed(0)}px`);
+    }
+  }
 
   // Eight directions from a standstill.
   const DIRS = [['up', 0, 1], ['up-right', 0.707, 0.707], ['right', 1, 0], ['down-right', 0.707, -0.707],

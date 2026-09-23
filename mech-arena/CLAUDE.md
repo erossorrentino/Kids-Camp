@@ -64,6 +64,12 @@ yours is elsewhere. Screenshots land in `$SMOKE_OUT` (default
   can be a twentieth of a second of play. `mobile.mjs` has `simWait()`,
   which polls `match.time`; a leg-steering check failed on exactly this
   while the steering itself was correct.
+- **Take left and right from the camera, not from the game.** Yaw grows
+  toward screen-left here, the legs' `+moveX` is screen-left, and
+  `camSide`'s "right" vector is too. Stick steering was mirrored for weeks
+  while every test passed, because the tests used the same wrong idea of
+  right. `handling.mjs` and `mobile.mjs` read the camera's quaternion and
+  where the mech lands on screen.
 - **`align-items:start` collapses an empty grid item to nothing.** The
   stage rectangle measured zero height until the narrow layout stretched
   its rows.

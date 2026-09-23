@@ -72,6 +72,16 @@ const shot = async (page, name) => {
   return decodePNG(buf);
 };
 
+/** The camera's own right and forward, flattened onto the ground. */
+function camBasis(page) {
+  return page.evaluate(() => {
+    const cam = window.__game.engine.camera, V = cam.position.constructor;
+    const R = new V(1, 0, 0).applyQuaternion(cam.quaternion).setY(0).normalize();
+    const F = new V(0, 0, -1).applyQuaternion(cam.quaternion).setY(0).normalize();
+    return { rx: R.x, rz: R.z, fx: F.x, fz: F.z };
+  });
+}
+
 /** Wait until `seconds` of match time have passed, however slow the frames. */
 async function simWait(page, seconds, wallLimitMs = 45000) {
   const t0 = await page.evaluate(() => window.__game.match?.time ?? 0);
@@ -256,11 +266,12 @@ for (const prof of PROFILES) {
       const m = window.__game.match.player.mech;
       return { x:m.position.x, z:m.position.z, yaw:m.yaw };
     });
-    // Camera-left in world space, from the heading the player had when they pushed.
+    // Screen-left in world space, straight from the camera's orientation --
+    // never from the game's own idea of which way is right (see handling.mjs).
     const dx = to.x - from.x, dz = to.z - from.z;
-    const leftX = -Math.cos(from.yaw), leftZ = Math.sin(from.yaw);
-    const leftward = dx * leftX + dz * leftZ;
-    const forward = dx * Math.sin(from.yaw) + dz * Math.cos(from.yaw);
+    const basis = await camBasis(page);
+    const leftward = -(dx * basis.rx + dz * basis.rz);
+    const forward = dx * basis.fx + dz * basis.fz;
     // How far it gets depends on what is in the way; the direction does not.
     check('stick left sends the mech left', from.style === 'steer' && leftward > 1 && leftward > Math.abs(forward),
       `left ${leftward.toFixed(1)}m forward ${forward.toFixed(1)}m style ${from.style}`);
@@ -296,7 +307,8 @@ for (const prof of PROFILES) {
     });
     await t.send('Input.dispatchTouchEvent', { type:'touchEnd', touchPoints:[] });
     const rdx = rTo.x - rFrom.x, rdz = rTo.z - rFrom.z;
-    const rightward = rdx * Math.cos(rFrom.yaw) - rdz * Math.sin(rFrom.yaw);
+    const rb = await camBasis(page);
+    const rightward = rdx * rb.rx + rdz * rb.rz;
     check('stick right sends the mech right', rightward > 1, `right ${rightward.toFixed(1)}m`);
 
     // Look: drag across the middle of the viewport.
@@ -348,26 +360,27 @@ for (const prof of PROFILES) {
       await page.waitForTimeout(1400);
       const v = await page.evaluate(() => {
         const m = window.__game.match.player.mech;
-        return { vx: m.velocity.x, vz: m.velocity.z, yaw: m.aimYaw,
+        return { vx: m.velocity.x, vz: m.velocity.z,
                  world: m.moveWorld, style: window.__game.controller.moveStyle };
       });
+      Object.assign(v, await camBasis(page));
       await page.keyboard.up(key);
       await page.waitForTimeout(700);
       return v;
     };
 
     const L = await heldVelocity('ArrowLeft');
-    const lLeft = L.vx * -Math.cos(L.yaw) + L.vz * Math.sin(L.yaw);
-    const lFwd = L.vx * Math.sin(L.yaw) + L.vz * Math.cos(L.yaw);
+    const lLeft = -(L.vx * L.rx + L.vz * L.rz);
+    const lFwd = L.vx * L.fx + L.vz * L.fz;
     check('the left arrow drives the mech left', L.style === 'steer' && L.world && lLeft > 2 && lLeft > Math.abs(lFwd),
       `left ${lLeft.toFixed(1)} forward ${lFwd.toFixed(1)} m/s`);
 
     const R = await heldVelocity('ArrowRight');
-    const rRight = R.vx * Math.cos(R.yaw) - R.vz * Math.sin(R.yaw);
+    const rRight = R.vx * R.rx + R.vz * R.rz;
     check('the right arrow drives it right', rRight > 2, `right ${rRight.toFixed(1)} m/s`);
 
     const F = await heldVelocity('ArrowUp');
-    const fFwd = F.vx * Math.sin(F.yaw) + F.vz * Math.cos(F.yaw);
+    const fFwd = F.vx * F.fx + F.vz * F.fz;
     check('the up arrow drives it forward', fFwd > 2, `forward ${fFwd.toFixed(1)} m/s`);
     await shot(page, `m-${prof.name}-04-match`);
   }

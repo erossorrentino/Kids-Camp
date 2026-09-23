@@ -78,15 +78,19 @@ export class PlayerController {
       const mag = Math.hypot(mv.x, mv.z);
       if (this.moveStyle === 'steer' && mag > 0.01) {
         // Camera space -> world heading. Stick left is left on the screen,
-        // whichever way the torso happens to be pointing.
-        const heading = mech.aimYaw + Math.atan2(mv.x, mv.z);
+        // whichever way the torso happens to be pointing. Yaw grows toward
+        // screen-left (forward is (sin, cos)), so a stick to the right
+        // subtracts from it.
+        const heading = mech.aimYaw - Math.atan2(mv.x, mv.z);
         mech.moveWorld = true;
         mech.moveX = Math.sin(heading) * Math.min(1, mag);
         mech.moveZ = Math.cos(heading) * Math.min(1, mag);
         mech.desiredYaw = heading;
       } else {
         mech.moveWorld = false;
-        mech.moveX = mv.x;
+        // The legs' +moveX is screen-left (the bots are written to that),
+        // so the stick's x flips on the way in.
+        mech.moveX = -mv.x;
         mech.moveZ = mv.z;
         // The legs follow the torso, but lag behind it: this is what makes a
         // mech feel like a mech rather than a first-person shooter body.

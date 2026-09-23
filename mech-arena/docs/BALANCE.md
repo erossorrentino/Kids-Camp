@@ -141,6 +141,14 @@ Measured half a second after swinging the stick at full speed, travel is
 within 4° and the body within 0° on a Wasp and an Atlas alike; it was 31°
 and 124° on the Atlas. `tools/handling.mjs` fails on the old code.
 
+Left and right were mirrored on screen for a long time, in both handling
+styles: stick left walked the mech right. The game's yaw grows toward
+screen-left (forward is `(sin, cos)`, and the camera's right is
+`(−cos, sin)`), and both the controller and the tests assumed the
+opposite, so every check agreed with a bug. The tests now take left and
+right from the camera's quaternion and from where the mech lands in the
+projected picture, never from the game's own convention.
+
 ## Bot difficulty
 
 Difficulty never touches damage, armour or speed. The five tiers vary:
