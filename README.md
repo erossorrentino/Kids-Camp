@@ -6,6 +6,11 @@ project with working, data-driven systems rather than hand-placed content,
 so the requested scale (1,000+ vehicles, 800+ weapons, 2,000+ heists) is
 achieved by generation, not by faking numbers.
 
+> **Also in this repo:** [`castle-squad/`](castle-squad/) is a separate
+> browser game, a kid-friendly merge tower defense (fighters on grass
+> tiles defending a castle from zombies). Open `castle-squad/index.html`
+> in any browser to play. See its own README for details.
+
 ## House rule: heists are planning-based
 
 Every heist requires prep before you run it, not just a getaway car and a
