@@ -104,7 +104,7 @@ export class Menus {
     const xp = this.progression.xpIntoRank;
     return `<div class="screen-head">
       <div>
-        <div class="brand">IRON <span>VANGUARD</span></div>
+        <div class="brand">TITAN <span>CLASH</span></div>
         <div class="crumbs">${esc(crumb)}</div>
       </div>
       <div class="spacer"></div>
@@ -121,7 +121,7 @@ export class Menus {
   renderTitle() {
     const p = this.progression.data;
     return `<div class="screen title-hero">
-      <div class="logo">IRON<br><span>VANGUARD</span></div>
+      <div class="logo">TITAN<br><span>CLASH</span></div>
       <div class="tagline">HEAVY METAL COMBAT · ${MECHS.length} CHASSIS · ${WEAPONS.length} WEAPONS · ${MAPS.length} ARENAS</div>
       <div class="title-menu">
         ${p.matches === 0

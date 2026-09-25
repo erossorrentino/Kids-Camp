@@ -1,4 +1,4 @@
-# IRON VANGUARD
+# TITAN CLASH
 
 A 3D mech battle arena that runs in a browser. No engine to install, no
 build step, no art pipeline — open `index.html` and you are piloting a

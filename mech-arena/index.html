@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Mech Arena — Iron Vanguard</title>
+<title>Titan Clash</title>
 <meta name="description" content="A 3D mech battle arena: pilot heavy war machines, build loadouts, and fight five-minute matches." />
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text y='26' font-size='26'>&#129302;</text></svg>" />
 <link rel="stylesheet" href="./styles.css" />
@@ -130,7 +130,7 @@
 
 <div id="loading">
   <div class="load-inner">
-    <div class="load-logo">IRON<span>VANGUARD</span></div>
+    <div class="load-logo">TITAN <span>CLASH</span></div>
     <div class="load-bar"><i id="load-fill"></i></div>
     <div id="load-text">Spinning up reactors…</div>
   </div>
@@ -209,7 +209,7 @@
   var safe = document.getElementById('be-safe');
   if (safe) safe.addEventListener('click', function () {
     try {
-      var KEY = 'ironvanguard.profile.v1';
+      var KEY = 'ironvanguard.profile.v1';   // the game's old name: keeps saves
       var p = JSON.parse(localStorage.getItem(KEY) || '{}');
       p.settings = p.settings || {};
       p.settings.quality = 'low';

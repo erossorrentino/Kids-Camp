@@ -32,7 +32,7 @@ body = body.replace(/<link rel="stylesheet"[^>]*>\s*/i, '');
 const importMap = /<script type="importmap">([\s\S]*?)<\/script>/i.exec(html);
 if (!importMap) throw new Error('index.html has no import map');
 
-const title = (/<title>([^<]*)<\/title>/i.exec(html) || [, 'Iron Vanguard'])[1]
+const title = (/<title>([^<]*)<\/title>/i.exec(html) || [, 'Titan Clash'])[1]
   // The gallery wants a name, not a name plus a category.
   .replace(/^.*—\s*/, '')
   .trim();

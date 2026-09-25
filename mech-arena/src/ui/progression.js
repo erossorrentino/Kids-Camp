@@ -13,6 +13,8 @@ import { TOURNAMENT_BY_ID } from '../data/tournaments.js';
 import { autoLoadout } from '../game/match.js';
 import { makeRng } from '../core/rng.js';
 
+// Named for the game's first title. Renaming the key would wipe every
+// player's credits, mechs and rank, so it stays.
 const KEY = 'ironvanguard.profile.v1';
 
 /** One scheme per starting machine: cyan, gold, crimson. */

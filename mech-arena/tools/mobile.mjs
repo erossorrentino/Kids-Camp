@@ -138,6 +138,18 @@ for (const prof of PROFILES) {
   const foot = await page.evaluate(() => document.querySelector('.title-foot')?.textContent || '');
   check('the title screen shows the build number', /BUILD \d+/.test(foot), foot.trim().replace(/\s+/g, ' '));
 
+  // The stats line at the foot of the title used to sit on the SETTINGS
+  // button on a phone.
+  const footHits = await page.evaluate(() => {
+    const f = document.querySelector('.title-foot')?.getBoundingClientRect();
+    if (!f) return ['no footer'];
+    return [...document.querySelectorAll('.title-menu .btn')].filter((b) => {
+      const r = b.getBoundingClientRect();
+      return r.left < f.right && r.right > f.left && r.top < f.bottom && r.bottom > f.top;
+    }).map(b => b.textContent.trim());
+  });
+  check('the title footer covers no button', !footHits.length, footHits.join(', '));
+
   const picked = await page.evaluate(() => window.__game.progression.settings.quality);
   check('the device picks a preset it can carry', prof.touch ? picked === 'low' : !!picked, picked);
 

@@ -1,4 +1,4 @@
-# Working on Iron Vanguard
+# Working on Titan Clash
 
 A browser 3D mech arena in `mech-arena/`. No build step, no engine install,
 no art assets — Three.js r180 is vendored and everything else is generated

@@ -1,5 +1,5 @@
 /**
- * IRON VANGUARD — entry point
+ * TITAN CLASH — entry point
  * ------------------------------------------------------------------
  * Owns the application state machine (menu <-> match), the fixed-step
  * simulation loop and the wiring between systems. Everything else is a
