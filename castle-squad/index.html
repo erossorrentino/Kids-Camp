@@ -77,7 +77,13 @@ button{font-family:inherit;color:inherit;font-size:inherit}
     repeating-linear-gradient(135deg,rgba(255,255,255,.035) 0 22px,transparent 22px 44px),
     linear-gradient(#4b5ad9,#2d3194 68%,#231e70);
 }
-.topbar{height:76px;flex:none;display:flex;align-items:center;gap:26px;padding:0 16px}
+.topbar{height:76px;flex:none;display:flex;align-items:center;gap:22px;padding:0 16px}
+.tools{display:flex;gap:8px}
+.tools .icon-btn{width:46px;height:46px;position:relative}
+.tools .icon-btn svg{width:28px;height:28px}
+.tools .icon-btn span[data-icon]{display:grid}
+.tools .dot{position:absolute;top:-8px;right:-8px;width:20px;height:20px;border-radius:50%;border:2px solid var(--out);background:#ff4f4f;animation:bob .7s ease-in-out infinite alternate}
+@keyframes bob{to{transform:translateY(-3px)}}
 .spacer{flex:1}
 .pill{
   position:relative;height:40px;min-width:128px;border-radius:20px;padding:0 16px 0 40px;
@@ -219,6 +225,61 @@ button{font-family:inherit;color:inherit;font-size:inherit}
 .reward .ico{width:22px;height:22px}
 .task.finished{opacity:.65}
 
+/* heroes, castle upgrades, daily rewards, zombie book, victory chest */
+.hero-row{align-self:stretch;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.hero-card{
+  --c:#5b8fc4;position:relative;cursor:pointer;padding:6px 4px 8px;border-radius:14px;border:3px solid var(--out);background:var(--c);
+  box-shadow:inset 0 -6px 0 rgba(0,0,0,.22),inset 0 3px 0 rgba(255,255,255,.3),0 4px 0 rgba(0,0,0,.35);
+  display:flex;flex-direction:column;align-items:center;gap:4px;font-size:14px;line-height:1.05;
+}
+.hero-card canvas{display:block}
+.hero-card.off canvas{filter:grayscale(.85) brightness(.7)}
+.hero-card.on{box-shadow:0 0 0 4px #ffe14d,inset 0 -6px 0 rgba(0,0,0,.22),0 4px 0 rgba(0,0,0,.35)}
+.hero-card .hn{min-height:2.1em;display:grid;place-items:center;text-align:center}
+.hero-card .tag{font-size:13px;background:rgba(29,26,61,.85);border-radius:10px;padding:2px 8px;display:flex;gap:3px;align-items:center}
+.hero-card .tag .ico{width:15px;height:15px}
+.seg{align-self:stretch;display:flex;gap:8px}
+.seg .btn{flex:1;font-size:20px;padding:9px 6px;border-radius:14px}
+.seg .btn.off{filter:saturate(.3) brightness(.75)}
+.upgs{align-self:stretch;display:flex;flex-direction:column;gap:12px}
+.task.upg{grid-template-columns:54px minmax(0,1fr) 106px}
+.upg .u-lv{font-size:15px;color:#9a6a3a}
+.upg .u-desc{font-size:14px;line-height:1.2;color:#6a4a2a}
+.pips{display:flex;gap:3px}
+.pips i{flex:1;height:10px;border-radius:5px;background:rgba(74,51,32,.2);border:2px solid var(--out)}
+.pips i.on{background:linear-gradient(#9af586,#3fb44a)}
+.daily{align-self:stretch;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.day{position:relative;border:3px solid var(--out);border-radius:14px;padding:6px 4px 8px;background:linear-gradient(var(--paper),var(--paper-d));color:var(--paper-ink);display:flex;flex-direction:column;align-items:center;gap:4px;font-size:15px;box-shadow:0 3px 0 rgba(0,0,0,.3)}
+.day .dp{display:flex;flex-wrap:wrap;gap:2px 6px;justify-content:center;align-items:center}
+.day .dp .ico{width:28px;height:28px}
+.day b{font-weight:400;font-size:15px}
+.day.big{grid-column:span 2;background:linear-gradient(#e7c6ff,#b98ef0)}
+.day.today{background:linear-gradient(#fff3a8,#ffcf2e);box-shadow:0 0 0 4px #fff,0 3px 0 rgba(0,0,0,.3);animation:bob .6s ease-in-out infinite alternate}
+.day.got{filter:grayscale(.6);opacity:.7}
+.day .dchk{position:absolute;top:-8px;right:-8px;width:26px;height:26px}
+.book{align-self:stretch;display:flex;flex-direction:column;gap:8px;text-align:left}
+.zrow{display:grid;grid-template-columns:72px minmax(0,1fr);gap:10px;align-items:center;padding:6px 10px 6px 6px;border:3px solid var(--out);border-radius:14px;background:linear-gradient(var(--paper),var(--paper-d));color:var(--paper-ink)}
+.zrow canvas{display:block;border-radius:10px;background:linear-gradient(#bfe8a0,#86c96a);border:2px solid rgba(43,34,56,.4)}
+.zrow.boss canvas{background:linear-gradient(#ffc2b0,#e8837a)}
+.zrow.unknown canvas{filter:brightness(0) opacity(.45)}
+.zrow .zi{display:flex;flex-direction:column;gap:3px;min-width:0}
+.zrow .zn{font-size:19px;line-height:1.05}
+.zrow .zb{font-size:12px;padding:1px 6px;border-radius:7px;background:#e8443d;color:#fff;vertical-align:middle}
+.zrow .zd{font-size:14px;line-height:1.2;color:#6a4a2a}
+.zrow .zs{display:flex;flex-wrap:wrap;gap:4px 10px;font-size:13px;color:#4a3320;align-items:center}
+.zrow .zs span{display:flex;gap:2px;align-items:center}
+.zrow .zs .zl{font-weight:400;margin-right:3px}
+.zrow .zs i{width:8px;height:8px;border-radius:50%;border:1.5px solid var(--out);background:rgba(74,51,32,.15)}
+.zrow .zs i.on{background:#ff5a4f}
+.zrow .zs .ico{width:15px;height:15px}
+.zrow .zw{font-size:12px;color:#9a6a3a}
+.chest-btn{background:none;border:0;padding:0;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;min-height:150px;justify-content:center}
+.chest-btn:not(.opened) canvas{animation:wobble 1.4s ease-in-out infinite}
+.chest-btn .card{width:88px}
+.chest-btn .prize .ico{width:78px;height:78px}
+.prize-t{font-size:26px;color:#ffe14d}
+@keyframes wobble{0%,60%,100%{transform:rotate(0)}70%{transform:rotate(-7deg) scale(1.04)}80%{transform:rotate(7deg) scale(1.04)}90%{transform:rotate(-3deg)}}
+
 /* overlays */
 .overlay{position:absolute;inset:0;z-index:10;background:rgba(14,10,40,.66);display:flex;align-items:center;justify-content:center;padding:28px 22px}
 .panel{
@@ -257,6 +318,7 @@ button{font-family:inherit;color:inherit;font-size:inherit}
 
 @media (prefers-reduced-motion: reduce){
   .btn,.tab{transition:none}
+  .tools .dot,.day.today,.chest-btn:not(.opened) canvas{animation:none}
 }
 </style>
 </head>
@@ -267,7 +329,11 @@ button{font-family:inherit;color:inherit;font-size:inherit}
 
   <div id="menu">
     <div class="topbar">
-      <button id="btnSettings" class="icon-btn" aria-label="Settings" data-icon="gear"></button>
+      <div class="tools">
+        <button id="btnSettings" class="icon-btn" aria-label="Settings" data-icon="gear"></button>
+        <button id="btnBook" class="icon-btn" aria-label="Zombie Book" data-icon="book"></button>
+        <button id="btnDaily" class="icon-btn" aria-label="Daily rewards"><span data-icon="calendar"></span><span class="dot" id="dailyDot" hidden></span></button>
+      </div>
       <div class="spacer"></div>
       <div class="pill" title="Gems"><span class="ico" data-icon="gem"></span><span id="gemCount">0</span></div>
       <div class="pill" title="Gold"><span class="ico" data-icon="coin"></span><span id="goldCount">0</span></div>
@@ -275,7 +341,9 @@ button{font-family:inherit;color:inherit;font-size:inherit}
 
     <div id="pages">
       <section id="page-shop" class="page" hidden>
-        <div class="ribbon">Fighter Shop <span class="found">Win stages for gold</span></div>
+        <div class="ribbon"><span id="shopTitle">Fighter Shop</span> <span class="found">Win stages for gold</span></div>
+        <div class="seg" id="shopSeg"><button class="btn blue" data-v="f">Fighters</button><button class="btn blue" data-v="u">Castle upgrades</button></div>
+        <div id="upgList" class="upgs" hidden></div>
         <div class="chips" id="shopChips"></div>
         <div class="note-box o" id="shopNote"></div>
         <div id="shopGrid" class="grid"></div>
@@ -289,6 +357,8 @@ button{font-family:inherit;color:inherit;font-size:inherit}
           <div id="armyDeck" class="deck"></div>
           <div class="hint o">These 5 fighters come into battle. Tap one to level it up or swap it out.</div>
         </div>
+        <div class="ribbon">Heroes <span class="found">Tap to pick your hero</span></div>
+        <div id="heroRow" class="hero-row"></div>
         <div class="ribbon">Collection <span class="found" id="foundCount"></span></div>
         <div class="chips" id="armyChips"></div>
         <div id="collection" class="grid"></div>
@@ -517,16 +587,21 @@ const charCode = (ch) => '#' + String(ch.id).padStart(4, '0');
 // ---------- zombies ----------
 // h = art height (px at scale 1), size = draw scale
 const ENEMIES = {
-  zombie:   { hp: 36,   spd: 40, coin: 6,   dmg: 1,  size: 0.9,  h: 52, art: 'zombie',   pal: 'zombie' },
-  runner:   { hp: 24,   spd: 66, coin: 6,   dmg: 1,  size: 0.85, h: 52, art: 'zombie',   pal: 'runner' },
-  skeleton: { hp: 50,   spd: 44, coin: 8,   dmg: 1,  size: 0.9,  h: 54, art: 'skeleton' },
-  cone:     { hp: 115,  spd: 32, coin: 14,  dmg: 2,  size: 0.9,  h: 72, art: 'cone',     pal: 'cone' },
-  big:      { hp: 280,  spd: 26, coin: 24,  dmg: 3,  size: 1.35, h: 52, art: 'zombie',   pal: 'big', angry: true },
-  spore:    { hp: 14,   spd: 48, coin: 2,   dmg: 1,  size: 0.7,  h: 42, art: 'spore' },
-  mushking: { hp: 750,  spd: 18, coin: 120, dmg: 8,  size: 1.25, h: 82, art: 'mushking', boss: true, name: 'Mushroom King' },
-  magician: { hp: 1000, spd: 20, coin: 180, dmg: 8,  size: 1.3,  h: 76, art: 'magician', boss: true, name: 'Zombie Magician' },
-  gorilla:  { hp: 1500, spd: 17, coin: 260, dmg: 12, size: 1.2,  h: 92, art: 'gorilla',  boss: true, name: 'Gorilla King' },
-  dragon:   { hp: 1400, spd: 19, coin: 300, dmg: 14, size: 1.2,  h: 88, art: 'dragon',   boss: true, name: 'Zombie Dragon' },
+  zombie:    { hp: 36,   spd: 40, coin: 6,   dmg: 1,  size: 0.9,  h: 52, art: 'zombie',   pal: 'zombie', name: 'Zombie', desc: 'Slow, hungry and everywhere.' },
+  runner:    { hp: 24,   spd: 66, coin: 6,   dmg: 1,  size: 0.85, h: 52, art: 'zombie',   pal: 'runner', name: 'Runner', desc: 'Very fast. Wears a sweatband to look cool.' },
+  skeleton:  { hp: 50,   spd: 44, coin: 8,   dmg: 1,  size: 0.9,  h: 54, art: 'skeleton', name: 'Skeleton', desc: 'Bony and a bit tougher than a zombie.' },
+  cone:      { hp: 115,  spd: 32, coin: 14,  dmg: 2,  size: 0.9,  h: 72, art: 'cone',     pal: 'cone', name: 'Cone Head', desc: 'A traffic cone makes it extra tough.' },
+  big:       { hp: 280,  spd: 26, coin: 24,  dmg: 3,  size: 1.35, h: 52, art: 'zombie',   pal: 'big', angry: true, name: 'Big Brain', desc: 'Huge, slow and very tough. Hits the castle for 3.' },
+  shield:    { hp: 90,   spd: 30, coin: 12,  dmg: 2,  size: 0.95, h: 70, art: 'shield',   pal: 'shield', armor: 0.4, from: 3, name: 'Knight Zombie', desc: 'Its shield blocks 40% of all damage.' },
+  slime:     { hp: 60,   spd: 36, coin: 8,   dmg: 1,  size: 1.0,  h: 40, art: 'slime',    splits: true, from: 5, name: 'Slime', desc: 'Pops into two little slimes.' },
+  minislime: { hp: 20,   spd: 52, coin: 3,   dmg: 1,  size: 0.6,  h: 40, art: 'slime',    from: 5, name: 'Mini Slime', desc: 'Small, fast and wobbly.' },
+  nurse:     { hp: 70,   spd: 34, coin: 12,  dmg: 1,  size: 0.9,  h: 62, art: 'nurse',    pal: 'nurse', heals: true, from: 8, name: 'Nurse Zombie', desc: 'Heals the zombies around it. Take it out first!' },
+  goblin:    { hp: 160,  spd: 82, coin: 150, gems: 5, dmg: 0, size: 0.85, h: 58, art: 'goblin', thief: true, name: 'Treasure Goblin', desc: 'Runs off with gold and never hurts the castle. Catch it for coins and gems!' },
+  spore:     { hp: 14,   spd: 48, coin: 2,   dmg: 1,  size: 0.7,  h: 42, art: 'spore', name: 'Spore', desc: 'Tiny mushrooms made by the Mushroom King.' },
+  mushking:  { hp: 750,  spd: 18, coin: 120, dmg: 8,  size: 1.25, h: 82, art: 'mushking', boss: true, name: 'Mushroom King', desc: 'Boss. Keeps spawning little mushroom zombies.' },
+  magician:  { hp: 1000, spd: 20, coin: 180, dmg: 8,  size: 1.3,  h: 76, art: 'magician', boss: true, name: 'Zombie Magician', desc: 'Boss. Puts up a magic shield that blocks every hit.' },
+  gorilla:   { hp: 1500, spd: 17, coin: 260, dmg: 12, size: 1.2,  h: 92, art: 'gorilla',  boss: true, name: 'Gorilla King', desc: 'Boss. Roars and stuns two of your fighters.' },
+  dragon:    { hp: 1400, spd: 19, coin: 300, dmg: 14, size: 1.2,  h: 88, art: 'dragon',   boss: true, name: 'Zombie Dragon', desc: 'Boss. Heals itself, so hit it hard and fast!' },
 };
 const BOSS_ORDER = ['mushking', 'magician', 'gorilla', 'dragon'];
 const BOSS_HP = [700, 950, 1250, 1500];      // boss health by slot (waves 5, 10, 15, 20), whoever the boss is
@@ -545,6 +620,31 @@ function stageInfo(s) {
   return { num: s, world: wi + 1, theme: w.theme, worldName: w.name + ['', ' II', ' III'][lap] };
 }
 const CASTLE_HP = 20;
+// Heroes: the portrait in the top-right corner. Each one has its own power.
+const HEROES = [
+  { id: 'captain', name: 'Captain Bolt', power: 'Thunder Storm', short: 'Thunder', gems: 0, charge: 28, bg: '#6fa8dc',
+    desc: 'Zaps the 7 zombies closest to the castle and stuns them.' },
+  { id: 'frost', name: 'Frost Queen', power: 'Blizzard', short: 'Blizzard', gems: 300, charge: 34, bg: '#9fdcff',
+    desc: 'Freezes every zombie on the road for 3 seconds, then slows them down.' },
+  { id: 'doctor', name: 'Doctor Patch', power: 'Castle Repair', short: 'Repair', gems: 500, charge: 40, bg: '#8fe6a0',
+    desc: 'Fixes 5 castle hearts and puts a bubble on the gate for 6 seconds.' },
+  { id: 'king', name: 'Battle King', power: 'Battle Cry', short: 'Rally', gems: 800, charge: 36, bg: '#ffd27a',
+    desc: 'All your fighters attack twice as fast for 8 seconds.' },
+];
+const heroById = (id) => HEROES.find((h) => h.id === id) || HEROES[0];
+// Castle upgrades bought with gold in the Shop. They last forever.
+const UPGRADES = [
+  { id: 'walls', name: 'Castle Walls', icon: 'castle', max: 10, cost: (lv) => Math.round((400 * Math.pow(1.8, lv)) / 10) * 10,
+    desc: (lv) => `+2 castle hearts per level. The castle has ${CASTLE_HP + 2 * lv} hearts.` },
+  { id: 'mine', name: 'Deep Mine', icon: 'pick', max: 4, cost: (lv) => [1500, 5000, 15000, 40000][lv],
+    desc: (lv) => `The gold mine starts at Lv.${1 + lv} in every battle.` },
+  { id: 'chest', name: 'War Chest', icon: 'coin', max: 10, cost: (lv) => Math.round((300 * Math.pow(1.7, lv)) / 10) * 10,
+    desc: (lv) => (lv ? `Start every battle with ${50 * lv} extra coins. Each level adds 50.` : 'Each level gives you 50 extra coins at the start of every battle.') },
+  { id: 'train', name: 'Hero Training', icon: 'bolt', max: 5, cost: (lv) => Math.round((800 * Math.pow(2, lv)) / 10) * 10,
+    desc: (lv) => (lv ? `Your hero's power charges ${8 * lv}% faster. Each level adds 8%.` : "Each level makes your hero's power charge 8% faster.") },
+];
+// Daily login rewards, one per day, going round in a 7-day circle
+const DAILY = [{ gold: 200 }, { gems: 60 }, { gold: 500 }, { gems: 120 }, { summon: 1 }, { gold: 1500 }, { gems: 300, summon: 1 }];
 const START_COINS = 200;
 const MINE_PERIOD = 8;
 const MINE_MAX = 5;
@@ -568,6 +668,7 @@ const TASKS = [
   { stat: 'owned',    icon: 'army',   text: (n) => `Collect ${pl(n, 'fighter', 'fighters')}`,     goals: [8, 15, 30, 60, 120, 250, 500, 750, 1000], gems: [40, 60, 90, 130, 180, 250, 350, 500, 1000] },
   { stat: 'summons',  icon: 'orb',    text: (n) => `Summon ${pl(n, 'time', 'times')}`,            goals: [1, 10, 50, 150, 400, 1000], gems: [40, 80, 120, 180, 250, 400] },
   { stat: 'upgrades', icon: 'up',     text: (n) => `Level up fighters ${pl(n, 'time', 'times')}`, goals: [1, 10, 50, 200, 600, 1500], gems: [40, 70, 110, 160, 240, 350] },
+  { stat: 'goblins',  icon: 'coin',   text: (n) => `Catch ${pl(n, 'treasure goblin', 'treasure goblins')}`, goals: [1, 5, 15, 40, 100], gems: [60, 90, 130, 180, 250] },
 ];
 
 // ---------- save data (kept in this browser only) ----------
@@ -587,8 +688,9 @@ function defaultSave() {
   return {
     v: 3, gems: 200, gold: 100, owned: { 1: 1, 2: 1, 3: 1, 4: 1, 5: 1 }, squad: [1, 2, 3, 4, 5],
     cleared: 0, stars: {}, stage: 1,
-    stats: { kills: 0, merges: 0, bosses: 0, waves: 0, wins: 0, summons: 0, upgrades: 0 },
+    stats: { kills: 0, merges: 0, bosses: 0, waves: 0, wins: 0, summons: 0, upgrades: 0, goblins: 0 },
     tiers: {}, pity10: 0, pity50: 0, sfx: true, music: true, tutorialDone: false,
+    heroes: { captain: true }, hero: 'captain', upg: { walls: 0, mine: 0, chest: 0, train: 0 }, daily: { last: '', day: 0 },
   };
 }
 function fixSquad(s) {
@@ -618,6 +720,10 @@ function loadSave() {
   if (s && s.v === 3) {
     const out = Object.assign(d, s);
     out.stats = Object.assign(defaultSave().stats, s.stats || {});
+    out.heroes = Object.assign({ captain: true }, s.heroes || {});
+    if (!out.heroes[out.hero]) out.hero = 'captain';
+    out.upg = Object.assign(defaultSave().upg, s.upg || {});
+    out.daily = Object.assign(defaultSave().daily, s.daily || {});
     out.owned = {};
     Object.keys(s.owned || {}).forEach((k) => { if (CH[k]) out.owned[k] = clamp(s.owned[k] | 0, 1, MAX_LV); });
     if (!Object.keys(out.owned).length) out.owned = defaultSave().owned;
@@ -1295,6 +1401,8 @@ const ZPAL = {
   runner: { skin: '#a9d98e', skinD: '#8cc472', shirt: '#3f84dc', band: true },
   cone:   { skin: '#9fd183', skinD: '#86bd6a', shirt: '#ffd84a', vest: true },
   big:    { skin: '#86c26c', skinD: '#6fae56', shirt: '#7d4bc2' },
+  shield: { skin: '#94c47c', skinD: '#7bab63', shirt: '#8a5a3c' },
+  nurse:  { skin: '#a6d68c', skinD: '#8cc472', shirt: '#f4f6ff' },
 };
 const FROZEN = { skin: '#b4e6ff', skinD: '#92d2f5' };
 ART.zombie = (c, t, P, e) => {
@@ -1524,6 +1632,107 @@ ART.dragon = (c, t) => {
   sbox(c, 8, -31, 17, 8, 4, k('#78b85a'), 2.5);
 };
 
+// ---------- new zombies ----------
+ART.shield = (c, t, P, e) => {
+  ART.zombie(c, t, P, e);
+  const helm = new Path2D();
+  helm.moveTo(-15, -40); helm.lineTo(-15, -50); helm.quadraticCurveTo(-15, -62, 0, -62); helm.quadraticCurveTo(15, -62, 15, -50); helm.lineTo(15, -40); helm.closePath();
+  spath(c, helm, k('#a9b0c2'), -15, -62, 30, 22, 2.5);
+  box(c, -15, -49, 30, 4, 1, k('#7d8499'), 0);
+  box(c, 3, -47, 3, 8, 1, OUT, 0);
+  shape(c, [0, -62, -3, -70, 3, -70], k('#e53935'), 1.8);
+  c.save(); c.translate(16, -18);
+  sdot(c, 0, 0, 13, k('#9a6634'), 2.8);
+  c.beginPath(); c.arc(0, 0, 10, 0, TAU); c.lineWidth = 2.5; c.strokeStyle = k('#c9cfe0'); c.stroke();
+  dot(c, 0, 0, 3.5, k('#c9cfe0'), 1.5);
+  line(c, -6, -6, -2, -2, 'rgba(255,255,255,.35)', 1.5);
+  c.restore();
+};
+ART.nurse = (c, t, P, e) => {
+  ART.zombie(c, t, P, e);
+  box(c, -3, -21, 6, 6, 1, k('#e53935'), 0); box(c, -1, -23, 2, 10, 0, k('#e53935'), 0);
+  const cap = new Path2D();
+  cap.moveTo(-12, -51); cap.lineTo(-10, -61); cap.lineTo(10, -61); cap.lineTo(12, -51); cap.closePath();
+  spath(c, cap, k('#f4f6ff'), -12, -61, 24, 10, 2.2);
+  box(c, -2.5, -60, 5, 8, 0.5, k('#e53935'), 0); box(c, -4.5, -57.5, 9, 3, 0.5, k('#e53935'), 0);
+  c.save(); c.translate(-14, -16); c.rotate(-0.3);
+  sbox(c, -3, -10, 6, 12, 2, k('#9fe6ff'), 1.8); box(c, -1, -14, 2, 5, 0.5, k('#c9cfe0'), 1);
+  c.restore();
+};
+ART.slime = (c, t) => {
+  const sq = 1 + Math.sin(t * 10) * 0.06;
+  c.save(); c.scale(1 / sq, sq);
+  const body = new Path2D();
+  body.moveTo(-18, 0); body.quadraticCurveTo(-20, -30, 0, -34); body.quadraticCurveTo(20, -30, 18, 0); body.closePath();
+  spath(c, body, k('#6fd35f'), -20, -34, 38, 34, 2.8);
+  c.globalAlpha = 0.5; dot(c, -8, -22, 4, '#dcffd0', 0); dot(c, 6, -10, 2.5, '#dcffd0', 0); c.globalAlpha = 1;
+  dot(c, -3, -19, 4.5, k('#fff'), 2); dot(c, 8, -19, 4, k('#fff'), 2);
+  dot(c, -2, -18.5, 1.9, OUT, 0); dot(c, 9, -18.5, 1.7, OUT, 0);
+  c.beginPath(); c.arc(3, -11, 4, 0.2, Math.PI - 0.2); c.strokeStyle = OUT; c.lineWidth = 2; c.stroke();
+  c.restore();
+};
+ART.goblin = (c, t) => {
+  legs(c, t, k('#5a4a3a'), true);
+  const bag = new Path2D();
+  bag.moveTo(-26, -8); bag.quadraticCurveTo(-34, -40, -14, -46); bag.quadraticCurveTo(0, -40, -6, -8); bag.closePath();
+  spath(c, bag, k('#c9a36b'), -34, -46, 28, 38, 2.5);
+  line(c, -22, -40, -10, -43, OUT, 2);
+  drawCoin(c, -18, -30, 5); drawCoin(c, -12, -22, 4.5);
+  sbox(c, -11, -25, 22, 18, 5, k('#7d4bc2'));
+  sbox(c, -14, -50, 28, 26, 9, k('#8fd05a'));
+  shape(c, [-14, -42, -24, -50, -13, -35], k('#8fd05a'), 2.2); shape(c, [14, -42, 24, -50, 13, -35], k('#8fd05a'), 2.2);
+  dot(c, -3, -39, 3.8, k('#fff6a0'), 1.8); dot(c, 7, -39, 3.8, k('#fff6a0'), 1.8);
+  dot(c, -2, -39, 1.6, OUT, 0); dot(c, 8, -39, 1.6, OUT, 0);
+  c.beginPath(); c.arc(2, -32, 5, 0.1, Math.PI - 0.1); c.fillStyle = '#3a2438'; c.fill();
+  box(c, -1, -32, 2.5, 2.5, 0.5, '#fff', 0); box(c, 3.5, -32, 2.5, 2.5, 0.5, '#fff', 0);
+  box(c, -9, -54, 18, 6, 3, k('#e53935'), 2);
+  sbox(c, 4, -21, 16, 6, 3, k('#8fd05a'), 2.2);
+};
+
+// ---------- hero portraits ----------
+function artFrost(c) {
+  sbox(c, -16, -26, 32, 24, 7, '#6fb3ea');
+  box(c, -16, -26, 32, 5, 2, '#e6f4ff', 0);
+  const hair = new Path2D();
+  hair.moveTo(-19, -18); hair.quadraticCurveTo(-24, -58, 0, -60); hair.quadraticCurveTo(24, -58, 19, -18); hair.closePath();
+  spath(c, hair, '#e6f4ff', -24, -60, 48, 42, 2.5);
+  sbox(c, -14, -52, 28, 28, 9, '#f7d6c4');
+  eyes(c, -41, false);
+  c.beginPath(); c.arc(1, -32, 3.5, 0.3, Math.PI - 0.3); c.strokeStyle = OUT; c.lineWidth = 2; c.stroke();
+  shape(c, [-12, -52, -10, -64, -5, -56, 0, -68, 5, -56, 10, -64, 12, -52], '#9fe6ff', 2);
+  dot(c, 0, -60, 2.2, '#ffffff', 0);
+}
+function artDoctor(c) {
+  sbox(c, -16, -26, 32, 24, 7, '#f4f6ff');
+  shape(c, [-5, -26, 5, -26, 0, -16], '#3f6fd8', 0);
+  c.beginPath(); c.moveTo(-8, -26); c.quadraticCurveTo(-10, -14, 0, -12); c.quadraticCurveTo(8, -14, 7, -22);
+  c.strokeStyle = '#3a3a48'; c.lineWidth = 2; c.stroke(); dot(c, 0, -12, 2.5, '#c9cfe0', 1.2);
+  sbox(c, -16, -55, 32, 31, 9, '#f0c09a');
+  shape(c, [-17, -46, -19, -58, -8, -62, 8, -62, 19, -58, 17, -46, 10, -53, -10, -53], '#8a5a3c');
+  box(c, -17, -53, 34, 4, 1.5, '#3a3a48', 0);
+  sdot(c, 0, -56, 6, '#dfe6f5', 2); dot(c, 0, -56, 2.4, '#8fd3ff', 0);
+  eyes(c, -43, false);
+  c.beginPath(); c.arc(1, -33, 4, 0.2, Math.PI - 0.2); c.strokeStyle = OUT; c.lineWidth = 2; c.stroke();
+}
+function artKing(c) {
+  const cape = new Path2D(); cape.moveTo(-18, -26); cape.lineTo(18, -26); cape.lineTo(22, -2); cape.lineTo(-22, -2); cape.closePath();
+  spath(c, cape, '#e53935', -22, -26, 44, 24, 2.5);
+  box(c, -18, -27, 36, 5, 2, '#f4f6ff', 2);
+  sbox(c, -16, -55, 32, 31, 9, '#f4c9a0');
+  const beard = new Path2D(); beard.moveTo(-15, -38); beard.quadraticCurveTo(-12, -18, 0, -16); beard.quadraticCurveTo(12, -18, 15, -38); beard.closePath();
+  spath(c, beard, '#b06a30', -15, -38, 30, 22, 2.2);
+  eyes(c, -46, true);
+  box(c, -5, -36, 10, 3, 1.5, '#8a4a20', 0);
+  shape(c, [-16, -54, -16, -66, -9, -60, 0, -70, 9, -60, 16, -66, 16, -54], '#ffd23d', 2.2);
+  dot(c, 0, -62, 2.4, '#e53935', 1.2);
+}
+function artHero(c, id) {
+  if (id === 'frost') artFrost(c);
+  else if (id === 'doctor') artDoctor(c);
+  else if (id === 'king') artKing(c);
+  else artCaptain(c);
+}
+
 // extra scenery for the new worlds
 Object.assign(DECO, {
   sign(c) {
@@ -1737,17 +1946,20 @@ function buildBg(theme, K) {
 let B = null;
 // A fighter on the board is { type: character id, rank: merge level L.1-L.7, ... }
 function newBattle(stage) {
-  const lv = {}, deck = save.squad.slice();
+  const lv = {}, deck = save.squad.slice(), U = save.upg || {}, H = heroById(save.hero);
   deck.forEach((id) => (lv[id] = save.owned[id] || 1));
   const cheapest = Math.min(...deck.map((id) => CH[id].price));
+  const castleMax = CASTLE_HP + 2 * (U.walls || 0);
   return {
     stage, theme: stageInfo(stage).theme, wave: 0, state: 'ready', breakT: 0,
-    coins: Math.max(START_COINS, cheapest * 2), castleHP: CASTLE_HP,
+    coins: Math.max(START_COINS, cheapest * 2) + 50 * (U.chest || 0), castleHP: castleMax, castleMax,
+    rage: 0, gate: 0, freeze: 0, gemsBonus: 0,
     enemies: [], projs: [], fx: [], parts: [], floaters: [], coinFly: [], bolts: [], puddles: [],
-    queue: [], spawnT: 0, mine: { lv: 1, t: 0 }, hero: { charge: 0.4 },
+    queue: [], spawnT: 0, mine: { lv: Math.min(MINE_MAX, 1 + (U.mine || 0)), t: 0 },
+    hero: { charge: 0.4, id: H.id, time: H.charge * (1 - 0.08 * (U.train || 0)) },
     speed: 1, paused: false, over: false, time: 0, shake: 0, flash: 0, castleHit: 0,
     drag: null, selected: -1, nope: -1, nopeT: 0, banner: null, bossRef: null,
-    stats: { kills: 0, merges: 0, bosses: 0, waves: 0 }, deck, lv,
+    stats: { kills: 0, merges: 0, bosses: 0, waves: 0, goblins: 0 }, deck, lv,
     tut: save.tutorialDone ? null : { merged: false },
     slots: SLOT_DEFS.map((s) => Object.assign({}, s, { unit: null })),
   };
@@ -1764,12 +1976,16 @@ function makeWave(w, stage) {
   if (w >= 3) pool.push(['skeleton', 3 + w * 0.5 + late * 2]);
   if (w >= 4) pool.push(['cone', 1 + w * 0.4 + late * 2]);
   if (w >= 7) pool.push(['big', 0.4 + w * 0.16 + late * 1.5]);
+  if (stage >= 3 && w >= 5) pool.push(['shield', 1 + w * 0.2]);
+  if (stage >= 5 && w >= 4) pool.push(['slime', 1 + w * 0.15]);
+  if (stage >= 8 && w >= 6) pool.push(['nurse', 0.6 + w * 0.08]);
   const tot = pool.reduce((s, p) => s + p[1], 0);
   for (let i = 0; i < n; i++) {
     let r = Math.random() * tot, type = 'zombie';
     for (const [t, wt] of pool) { r -= wt; if (r <= 0) { type = t; break; } }
     q.push({ type, delay: i % 4 === 3 ? gap * 1.8 : gap * rand(0.7, 1.1) });
   }
+  if (!boss && w >= 3 && Math.random() < 0.12) q.splice(randi(0, q.length - 1), 0, { type: 'goblin', delay: gap });
   if (boss) q.push({ type: bossFor(stage, w), delay: 2.2 });
   return q;
 }
@@ -1855,7 +2071,7 @@ function update(dt) {
         sfx('coin');
       }
       if (b.hero.charge < 1) {
-        b.hero.charge = Math.min(1, b.hero.charge + dt / HERO_CHARGE);
+        b.hero.charge = Math.min(1, b.hero.charge + dt / b.hero.time);
         if (b.hero.charge >= 1) sfx('ready');
       }
     }
@@ -1864,6 +2080,9 @@ function update(dt) {
       for (const e of b.enemies) if (!e.dead && Math.hypot(e.x - pd.x, e.y - pd.y) < pd.r) hurt(e, pd.dps * dt, true);
     }
     b.puddles = b.puddles.filter((pd) => pd.t < pd.T);
+    if (b.rage > 0) b.rage -= dt;
+    if (b.gate > 0) b.gate -= dt;
+    if (b.freeze > 0) b.freeze -= dt;
     updateEnemies(dt);
     updateUnits(dt);
     updateProjs(dt);
@@ -1901,11 +2120,35 @@ function updateEnemies(dt) {
     e.t += dt * (sp > 0 ? sp / 40 : 0.15);
     e.d += sp * dt;
     if (e.def.boss) bossAbility(e, dt);
-    if (e.d >= PATH_LEN) { e.dead = true; hitCastle(e); if (b.over) return; continue; }
+    if (e.def.heals) nurseHeal(e, dt);
+    if (e.d >= PATH_LEN) {
+      if (e.def.thief) { e.dead = true; floater(CASTLE.x + 50, CASTLE.y - 90, 'The goblin got away!', '#ffe14d', 17, 1.4); continue; }
+      if (b.gate > 0) {
+        e.d = Math.max(0, PATH_LEN - (e.def.boss ? 60 : 150));
+        e.stunT = Math.max(e.stunT, 0.8);
+        placeEnemy(e);
+        burst(CASTLE.x + 70, CASTLE.y - 20, 8, ['#7df09a', '#c8ffd6', '#ffffff'], 140, 0.5, 4);
+        sfx('shield');
+        continue;
+      }
+      e.dead = true; hitCastle(e); if (b.over) return; continue;
+    }
     placeEnemy(e);
   }
 }
 
+function nurseHeal(e, dt) {
+  const b = B;
+  e.healT = (e.healT === undefined ? 3 : e.healT) - dt;
+  if (e.healT > 0 || e.stunT > 0) return;
+  e.healT = 3;
+  b.fx.push({ k: 'healRing', x: e.x, y: e.y + 8, t: 0, T: 0.6 });
+  for (const o of b.enemies) {
+    if (o === e || o.dead || o.def.boss || o.hp >= o.maxHp || Math.hypot(o.x - e.x, o.y - e.y) > 90) continue;
+    o.hp = Math.min(o.maxHp, o.hp + o.maxHp * 0.08);
+    b.fx.push({ k: 'heal', x: o.x, y: bodyY(o), t: 0, T: 0.8 });
+  }
+}
 function hitCastle(e) {
   const b = B;
   b.castleHP = Math.max(0, b.castleHP - e.def.dmg);
@@ -1924,6 +2167,7 @@ function hurt(e, dmg, quiet) {
     if (!quiet && Math.random() < 0.25) floater(e.x, bodyY(e) - 40, 'BLOCK', '#d8b8ff', 14, 0.5);
     return;
   }
+  if (e.def.armor) dmg *= 1 - e.def.armor;
   e.hp -= dmg;
   if (!quiet) e.flash = 0.06;
   if (e.hp <= 0) killEnemy(e);
@@ -1948,6 +2192,14 @@ function killEnemy(e) {
     b.fx.push({ k: 'boom', x: e.x, y: cy, r: 90, t: 0, T: 0.6 });
     b.banner = { text: 'BOSS DEFEATED!', sub: '+' + coins + ' coins', t: 0, T: 2.2, col: '#ffe14d' };
     sfx('boom');
+  }
+  if (e.def.splits) for (let i = 0; i < 2; i++) spawnEnemy('minislime', Math.max(0, e.d - 6 - i * 16));
+  if (e.def.thief) {
+    b.stats.goblins++;
+    b.gemsBonus += e.def.gems;
+    b.banner = { text: 'GOBLIN CAUGHT!', sub: `+${coins} coins and +${e.def.gems} gems`, t: 0, T: 2, col: '#ffe14d' };
+    burst(e.x, cy, 24, ['#ffd23d', '#fff3b0', '#c35cf2'], 220, 0.7, 4.5);
+    sfx('reveal');
   }
 }
 
@@ -2031,11 +2283,11 @@ function updateUnits(dt) {
         u.face = tg.x < s.x ? -1 : 1;
         u.atk = 0.5;
         u.tick -= dt;
-        if (u.tick <= 0) { u.tick += 0.1; hurt(tg, st.dps * 0.1, true); sfx('beam'); }
+        if (u.tick <= 0) { u.tick += 0.1; hurt(tg, st.dps * 0.1 * (b.rage > 0 ? 2 : 1), true); sfx('beam'); }
       }
       return;
     }
-    u.cd -= dt;
+    u.cd -= dt * (b.rage > 0 ? 2 : 1);
     if (u.cd > 0) return;
     const tg = d.shot === 'snipe' ? findToughest(s.x, s.y, st.range) : findTarget(s.x, s.y, st.range);
     if (!tg) { u.cd = 0; return; }
@@ -2218,20 +2470,46 @@ function explode(x, y, r, dmg) {
   sfx('boom');
 }
 
-// ---------- hero: Captain Bolt's Thunder Storm ----------
+// ---------- heroes and their powers ----------
 function castHero() {
   const b = B;
   if (b.over) return;
+  const H = heroById(b.hero.id);
   if (b.hero.charge < 1) { floater(HUD.hero.x - 24, HUD.hero.y + 74, 'Charging...', '#fff', 15, 0.8); sfx('nope'); return; }
-  const list = b.enemies.filter((e) => !e.dead).sort((a, z) => z.d - a.d).slice(0, 7);
-  if (!list.length) { floater(HUD.hero.x - 50, HUD.hero.y + 74, 'No zombies yet!', '#fff', 15, 0.9); return; }
+  const live = b.enemies.filter((e) => !e.dead);
+  if (H.id !== 'doctor' && !live.length) { floater(HUD.hero.x - 50, HUD.hero.y + 74, 'No zombies yet!', '#fff', 15, 0.9); return; }
   b.hero.charge = 0;
-  const dmg = 90 * hpMul(b.stage, Math.max(1, b.wave));
-  list.forEach((e, i) => b.bolts.push({ e, dmg, t: i * 0.08 }));
-  b.flash = REDUCED ? 0.15 : 0.35;
-  b.shake = Math.max(b.shake, 6);
-  b.banner = { text: 'THUNDER STORM!', sub: '', t: 0, T: 1.4, col: '#8fe8ff' };
-  sfx('thunder');
+  const hpNow = hpMul(b.stage, Math.max(1, b.wave));
+  if (H.id === 'frost') {
+    live.forEach((e) => { e.stunT = Math.max(e.stunT, 3); e.slowF = Math.max(e.slowT > 0 ? e.slowF : 0, 0.5); e.slowT = Math.max(e.slowT, 6); hurt(e, 40 * hpNow, true); });
+    b.freeze = 3;
+    for (let i = 0; i < 60; i++) part(rand(0, W), rand(100, 780), rand(-30, 30), rand(20, 80), 1.6, rand(2, 4), pick(['#ffffff', '#dff6ff', '#bff4ff']), 30);
+    b.flash = REDUCED ? 0.1 : 0.25;
+    b.banner = { text: 'BLIZZARD!', sub: 'Every zombie is frozen!', t: 0, T: 1.6, col: '#bff4ff' };
+    sfx('ice'); sfx('thunder');
+  } else if (H.id === 'doctor') {
+    const heal = Math.min(5, b.castleMax - b.castleHP);
+    b.castleHP += heal;
+    b.gate = 6;
+    floater(CASTLE.x + 40, CASTLE.y - 96, heal ? `+${heal} hearts` : 'Gate bubble!', '#7df09a', 22, 1.3);
+    burst(CASTLE.x, CASTLE.y - 20, 26, ['#7df09a', '#ff6a8a', '#ffffff'], 200, 0.8, 4.5);
+    b.banner = { text: 'CASTLE REPAIR!', sub: 'The gate is protected', t: 0, T: 1.6, col: '#7df09a' };
+    sfx('upgrade');
+  } else if (H.id === 'king') {
+    b.rage = 8;
+    b.shake = Math.max(b.shake, 5);
+    b.slots.forEach((s) => { if (s.unit) burst(s.x, s.y, 6, ['#ffb13b', '#ffe066', '#ff6a2b'], 120, 0.5, 3.5); });
+    b.banner = { text: 'BATTLE CRY!', sub: 'Fighters attack twice as fast', t: 0, T: 1.6, col: '#ffd23d' };
+    sfx('boss'); sfx('merge');
+  } else {
+    const list = live.sort((a, z) => z.d - a.d).slice(0, 7);
+    const dmg = 90 * hpNow;
+    list.forEach((e, i) => b.bolts.push({ e, dmg, t: i * 0.08 }));
+    b.flash = REDUCED ? 0.15 : 0.35;
+    b.shake = Math.max(b.shake, 6);
+    b.banner = { text: 'THUNDER STORM!', sub: '', t: 0, T: 1.4, col: '#8fe8ff' };
+    sfx('thunder');
+  }
 }
 function heroStrike(e, dmg) {
   const b = B;
@@ -2342,12 +2620,12 @@ function endBattle(win) {
   const firstWin = win && st > save.cleared;
   let gold = win ? winGold(st) : Math.round((winGold(st) * 0.3 * waves) / MAX_WAVE);
   if (win && !firstWin) gold = Math.round(gold * 0.5);            // replays pay half
-  const gems = 15 * b.stats.bosses + 2 * waves + (win ? 20 : 0) + (firstWin ? 60 : 0);
-  const ratio = b.castleHP / CASTLE_HP;
+  const gems = 15 * b.stats.bosses + 2 * waves + (win ? 20 : 0) + (firstWin ? 60 : 0) + b.gemsBonus;
+  const ratio = b.castleHP / b.castleMax;
   const stars = win ? (ratio >= 0.8 ? 3 : ratio >= 0.4 ? 2 : 1) : 0;
   save.gold += gold;
   save.gems += gems;
-  ['kills', 'merges', 'bosses', 'waves'].forEach((key) => (save.stats[key] += b.stats[key]));
+  ['kills', 'merges', 'bosses', 'waves', 'goblins'].forEach((key) => (save.stats[key] = (save.stats[key] || 0) + b.stats[key]));
   if (win) {
     save.stats.wins++;
     if (firstWin) { save.cleared = st; save.stage = Math.min(MAX_STAGE, st + 1); }
@@ -2355,7 +2633,7 @@ function endBattle(win) {
   }
   if (b.stats.merges > 0) save.tutorialDone = true;
   persist();
-  b.result = { win, waves, gold, gems, stars, firstWin, stage: st };
+  b.result = { win, waves, gold, gems, stars, firstWin, stage: st, goblins: b.stats.goblins };
   b.banner = { text: win ? 'VICTORY!' : 'OH NO!', sub: win ? 'The castle is safe!' : 'The zombies got in!', t: 0, T: 3, col: win ? '#ffe14d' : '#ff6a5a' };
   sfx(win ? 'win' : 'lose');
   setTimeout(() => { if (B === b) showResult(b.result); }, 1500);
@@ -2564,6 +2842,10 @@ function drawUnit(c, u, x, y) {
   const p = 0.55 + 0.45 * ease(u.pop === undefined ? 1 : u.pop);
   c.save(); c.translate(x, y); c.scale(p, p);
   if (u.rank >= 5) { c.globalAlpha = 0.35 + 0.2 * Math.sin(t * 4); dot(c, 0, 0, 40, RANK_COL[u.rank - 1], 0); c.globalAlpha = 1; }
+  if (B && B.rage > 0 && !live) {
+    c.globalAlpha = Math.min(1, B.rage / 0.5) * (0.45 + 0.2 * Math.sin(t * 12));
+    dot(c, 0, 0, 44, '#ff6a2e', 0); c.globalAlpha = 1;
+  }
   if (live) drawUnitTile(c, u.rank, ch.r, stun);
   else blit(c, sprite(`t${u.rank}:${ch.r}:${stun ? 1 : 0}`, 90, 90, 45, 46, (g) => drawUnitTile(g, u.rank, ch.r, stun)));
   c.save();
@@ -2579,6 +2861,14 @@ function drawUnit(c, u, x, y) {
   else blit(c, sprite(`rb${u.rank}`, 46, 30, 42, 44, (g) => drawRankBadge(g, u.rank)));
   if (stun) {
     for (let i = 0; i < 3; i++) { const a = t * 5 + (i * TAU) / 3; star(c, Math.cos(a) * 16, -46 + Math.sin(a) * 5, 5, 2.2, 5, a, '#ffe066', 1.5); }
+  }
+  if (B && B.rage > 0 && !live) {
+    for (let i = 0; i < 2; i++) {
+      const q = ((t * 1.6 + i * 0.5 + (u.ph || 0)) % 1), fx = (i ? 18 : -20) + Math.sin(t * 9 + i) * 3;
+      c.globalAlpha = 1 - q;
+      shape(c, [fx - 4, -10 - q * 40, fx, -20 - q * 40, fx + 4, -10 - q * 40], '#ffb13b', 0);
+    }
+    c.globalAlpha = 1;
   }
   c.restore();
 }
@@ -2641,7 +2931,14 @@ function drawEnemy(c, e) {
     c.fillStyle = 'rgba(180,120,255,.22)'; c.fill();
     c.lineWidth = 3; c.strokeStyle = `rgba(215,175,255,${0.7 + 0.3 * Math.sin(B.time * 12)})`; c.stroke();
   }
-  if (e.stunT > 0) {
+  if (B.freeze > 0 && e.stunT > 0) {
+    const bw = (d.boss ? 60 : 30) * s, bh = d.h * s + 6;
+    c.globalAlpha = Math.min(1, B.freeze / 0.4) * 0.8;
+    box(c, e.x - bw, fy - bh, bw * 2, bh + 4, 8, 'rgba(170,225,255,.45)', 2.5);
+    line(c, e.x - bw + 6, fy - bh + 8, e.x - bw + 14, fy - bh + 22, 'rgba(255,255,255,.8)', 3);
+    line(c, e.x + bw - 10, fy - 14, e.x + bw - 5, fy - 24, 'rgba(255,255,255,.6)', 2);
+    c.globalAlpha = 1;
+  } else if (e.stunT > 0) {
     for (let i = 0; i < 3; i++) { const a = B.time * 6 + (i * TAU) / 3; star(c, e.x + Math.cos(a) * 14 * s, top - 4 + Math.sin(a) * 4, 4.5, 2, 5, a, '#ffe066', 1.5); }
   }
   if (e.hp < e.maxHp && !d.boss) {
@@ -2731,10 +3028,22 @@ function drawCastle(c, b) {
     c.beginPath(); c.ellipse(x, -1, 2.2 * fl, 4 * fl, 0, 0, TAU); c.fillStyle = '#ffe066'; c.fill();
   });
   c.restore();
+  if (b.gate > 0) {
+    const a = Math.min(1, b.gate / 0.6);
+    c.globalAlpha = a;
+    c.beginPath(); c.ellipse(CASTLE.x, CASTLE.y - 40, 108, 118, 0, 0, TAU);
+    c.fillStyle = 'rgba(120,240,160,.24)'; c.fill();
+    c.lineWidth = 6; c.strokeStyle = `rgba(140,255,170,${0.6 + 0.3 * Math.sin(b.time * 8)})`; c.stroke();
+    for (let i = 0; i < 6; i++) {
+      const an = b.time * 1.2 + (i * TAU) / 6;
+      star(c, CASTLE.x + Math.cos(an) * 108, CASTLE.y - 40 + Math.sin(an) * 118, 5, 2, 4, an, '#dcffd0', 0);
+    }
+    c.globalAlpha = 1;
+  }
   const w = 100, x = CASTLE.x - w / 2 + 6, y = CASTLE.y - 138;
   box(c, x, y, w, 14, 7, OUT, 0);
-  rr(c, x + 2, y + 2, (w - 4) * (b.castleHP / CASTLE_HP), 10, 5);
-  c.fillStyle = b.castleHP / CASTLE_HP > 0.35 ? '#5fd35b' : '#ff4f4f'; c.fill();
+  rr(c, x + 2, y + 2, (w - 4) * (b.castleHP / b.castleMax), 10, 5);
+  c.fillStyle = b.castleHP / b.castleMax > 0.35 ? '#5fd35b' : '#ff4f4f'; c.fill();
   drawHeart(c, x - 4, y + 7, 0.95);
 }
 
@@ -2853,6 +3162,15 @@ function drawFx(c, f) {
     const pts = [[f.x + 12, 92], [f.x, f.y]];
     zigzag(c, pts, '#8fe8ff', 10, 12); zigzag(c, pts, '#ffffff', 4, 12);
     dot(c, f.x, f.y, 26 * (1 - q) + 6, 'rgba(191,244,255,.6)', 0);
+  } else if (f.k === 'healRing') {
+    c.beginPath(); c.arc(f.x, f.y, 90 * ease(q), 0, TAU);
+    c.fillStyle = 'rgba(120,240,140,.12)'; c.fill();
+    c.lineWidth = 5 * (1 - q) + 1; c.strokeStyle = '#7df09a'; c.stroke();
+  } else if (f.k === 'heal') {
+    const y = f.y - 26 * ease(q), s = 1 - q * 0.3;
+    box(c, f.x - 3 * s, y - 8 * s, 6 * s, 16 * s, 1.5, '#5fe07a', 1.5);
+    box(c, f.x - 8 * s, y - 3 * s, 16 * s, 6 * s, 1.5, '#5fe07a', 1.5);
+    box(c, f.x - 1.5 * s, y - 6.5 * s, 3 * s, 13 * s, 1, '#dcffd0', 0);
   }
   c.globalAlpha = 1;
 }
@@ -2871,9 +3189,9 @@ function drawHUD(c, b) {
   text(c, `Wave ${Math.max(1, b.wave)}/${MAX_WAVE}`, R.x + 108, R.y + 33, 20, '#fff', { max: 116 });
   R = HUD.hp;
   box(c, R.x, R.y, R.w, R.h, 10, panel, 3);
-  rr(c, R.x + 30, R.y + 6, (R.w - 38) * (b.castleHP / CASTLE_HP), R.h - 12, 5); c.fillStyle = '#ff5a6a'; c.fill();
+  rr(c, R.x + 30, R.y + 6, (R.w - 38) * (b.castleHP / b.castleMax), R.h - 12, 5); c.fillStyle = '#ff5a6a'; c.fill();
   drawHeart(c, R.x + 16, R.y + 13, 0.95);
-  text(c, `${b.castleHP}/${CASTLE_HP}`, R.x + 30 + (R.w - 38) / 2, R.y + 13.5, 15, '#fff', { stroke: 3, shadow: false });
+  text(c, `${b.castleHP}/${b.castleMax}`, R.x + 30 + (R.w - 38) / 2, R.y + 13.5, 15, '#fff', { stroke: 3, shadow: false });
   R = HUD.coins;
   box(c, R.x, R.y, R.w, R.h, 21, panel, 3);
   drawCoin(c, R.x + 6, R.y + R.h / 2, 21);
@@ -2894,16 +3212,17 @@ function drawHUD(c, b) {
   c.beginPath(); c.arc(h.x, h.y, h.r - 3, -Math.PI / 2, -Math.PI / 2 + TAU * ch);
   c.strokeStyle = ready ? '#ffe14d' : '#ffa726'; c.lineWidth = 7; c.lineCap = 'round'; c.stroke();
   c.save(); c.translate(h.x, h.y);
-  blit(c, sprite(`hero${ready ? 1 : 0}`, 64, 64, 32, 32, (g) => {
+  const HH = heroById(b.hero.id);
+  blit(c, sprite(`hero${HH.id}${ready ? 1 : 0}`, 64, 64, 32, 32, (g) => {
     g.beginPath(); g.arc(0, 0, h.r - 8, 0, TAU); g.clip();
-    g.fillStyle = ready ? '#a6e6ff' : '#6fa8dc'; g.fill();
+    g.fillStyle = ready ? shade(HH.bg, 0.3) : HH.bg; g.fill();
     g.fillStyle = 'rgba(255,255,255,.25)'; g.beginPath(); g.arc(-8, -10, 18, 0, TAU); g.fill();
-    g.translate(0, 36); g.scale(0.95, 0.95); artCaptain(g);
+    g.translate(0, 36); g.scale(0.95, 0.95); artHero(g, HH.id);
   }));
   c.restore();
   c.beginPath(); c.arc(h.x, h.y, h.r - 8, 0, TAU); c.lineWidth = 2.5; c.strokeStyle = OUT; c.stroke();
   box(c, h.x - 36, h.y + 30, 72, 22, 11, ready ? '#ffcf2e' : panel, 2.5);
-  text(c, ready ? 'TAP!' : 'Thunder', h.x, h.y + 41.5, ready ? 17 : 13, '#fff', { stroke: 3, shadow: false });
+  text(c, ready ? 'TAP!' : HH.short, h.x, h.y + 41.5, ready ? 17 : 13, '#fff', { stroke: 3, shadow: false });
   // boss health
   const e = b.bossRef;
   if (e && !e.dead) {
@@ -3127,13 +3446,26 @@ const ICONS = {
   skull: `<svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="14" rx="6" fill="#fff" ${STROKE}/><rect x="8" y="15" width="8" height="6" rx="2" fill="#fff" ${STROKE}/><circle cx="9" cy="10" r="2.5" fill="#2b2238"/><circle cx="15" cy="10" r="2.5" fill="#2b2238"/></svg>`,
   trophy: `<svg viewBox="0 0 24 24"><path d="M7 3h10v5a5 5 0 0 1-10 0z" fill="#ffc83d" ${STROKE}/><path d="M7 5H4a3 3 0 0 0 3 4M17 5h3a3 3 0 0 1-3 4" fill="none" stroke="#2b2238" stroke-width="2"/><rect x="10.5" y="12.5" width="3" height="4" fill="#e59a17" ${STROKE}/><rect x="7" y="16.5" width="10" height="4" rx="1.5" fill="#8a5a33" ${STROKE}/></svg>`,
 };
+ICONS.book = `<svg viewBox="0 0 24 24"><path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5z" fill="#6fcf5a" ${STROKE}/><path d="M4 21.5A2.5 2.5 0 0 1 6.5 19H20v3H6.5A2.5 2.5 0 0 1 4 21.5z" fill="#fff6dc" ${STROKE}/><circle cx="10.5" cy="9.5" r="2" fill="#fff" stroke="#2b2238" stroke-width="1.3"/><circle cx="15.5" cy="9.5" r="1.7" fill="#fff" stroke="#2b2238" stroke-width="1.3"/><circle cx="10.9" cy="9.7" r=".8" fill="#2b2238"/><circle cx="15.8" cy="9.7" r=".7" fill="#2b2238"/><path d="M10 14h6" stroke="#2b2238" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+ICONS.calendar = `<svg viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="17" rx="3" fill="#fff6dc" ${STROKE}/><path d="M3 10V7.5a3 3 0 0 1 3-3h12a3 3 0 0 1 3 3V10z" fill="#ff5a4f" ${STROKE}/><rect x="6.8" y="2" width="2.8" height="5" rx="1.4" fill="#c9cfe0" stroke="#2b2238" stroke-width="1.3"/><rect x="14.4" y="2" width="2.8" height="5" rx="1.4" fill="#c9cfe0" stroke="#2b2238" stroke-width="1.3"/><path d="M12 11.6l1.4 2.7 2.9.4-2.1 2 .5 2.9-2.7-1.4-2.7 1.4.5-2.9-2.1-2 2.9-.4z" fill="#ffd23d" stroke="#2b2238" stroke-width="1.1" stroke-linejoin="round"/></svg>`;
+ICONS.castle = `<svg viewBox="0 0 24 24"><path d="M12 9V2.5" stroke="#2b2238" stroke-width="1.8"/><path d="M12 2.6h5.5L16 4.6l1.5 2H12z" fill="#ff5a4f" stroke="#2b2238" stroke-width="1.3" stroke-linejoin="round"/><path d="M2.5 22V9h3.5v2.5h2.5V9h7v2.5h2.5V9h3.5v13z" fill="#c7ccd9" ${STROKE}/><path d="M9.5 22v-4.5a2.5 2.5 0 0 1 5 0V22z" fill="#8a5a33" ${STROKE}/></svg>`;
+ICONS.pick = `<svg viewBox="0 0 24 24"><circle cx="17.5" cy="17.5" r="4" fill="#ffc83d" ${STROKE}/><path d="M4.5 20.5L15 9" stroke="#2b2238" stroke-width="5" stroke-linecap="round"/><path d="M4.5 20.5L15 9" stroke="#b07440" stroke-width="2.4" stroke-linecap="round"/><path d="M7 4.5Q16.5 1.5 21 13Q16 7.5 7 4.5z" fill="#c9cfe0" ${STROKE}/></svg>`;
+ICONS.bolt = `<svg viewBox="0 0 24 24"><path d="M14 1.5L4.5 13.5h6L9 22.5l10-12.5h-6z" fill="#ffd23d" ${STROKE}/><path d="M12.5 5l-4 5" stroke="#fff6c0" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+ICONS.heart = `<svg viewBox="0 0 24 24"><path d="M12 21C5 16 2 12.5 2 8.5A5 5 0 0 1 12 6a5 5 0 0 1 10 2.5c0 4-3 7.5-10 12.5z" fill="#ff5a6a" ${STROKE}/></svg>`;
 ICONS.shop = `<svg viewBox="0 0 24 24"><path d="M4 9h16l-1.5 12h-13z" fill="#ffc83d" ${STROKE}/><path d="M8 9V7a4 4 0 0 1 8 0v2" fill="none" stroke="#2b2238" stroke-width="2.2"/><circle cx="12" cy="15" r="2.6" fill="#fff" ${STROKE}/></svg>`;
 const TIPS = [
   'Gold sword tiles make a fighter 50% stronger.',
   'Merge two matching fighters to make one super fighter.',
   'Upgrade the gold mine early for lots of coins later.',
   'Ice Wizards slow zombies so your team gets more hits.',
-  'Save the Thunder Storm for bosses!',
+  'Save your hero power for bosses!',
+  'Knight Zombies block 40% of damage. Strong hits work best!',
+  'Nurse Zombies heal their friends. Take them out first!',
+  'Catch the Treasure Goblin before it runs away for gold and gems!',
+  'Unlock new heroes in Army with gems. Each has a different power.',
+  'Castle upgrades in the Shop help you in every stage.',
+  'Come back every day for a daily reward!',
+  'Open the Zombie Book to learn what each zombie does.',
   'The Zombie Dragon heals itself. Hit it hard and fast!',
   'Snipers always shoot the toughest zombie, great against bosses.',
   'Cannoneers knock zombies back down the road.',
@@ -3171,6 +3503,7 @@ function renderTop() {
   const n = TASKS.filter((t) => { const s = taskState(t); return !s.done && s.ready; }).length;
   $('taskBadge').hidden = n === 0;
   $('taskBadge').textContent = n;
+  $('dailyDot').hidden = !dailyReady();
 }
 function showPage(name) {
   curPage = name;
@@ -3491,10 +3824,22 @@ function renderArmy() {
   if (!list.length) col.innerHTML = '<p class="note o" style="grid-column:1/-1">No fighters of this rarity yet. Visit the Shop or try a Summon!</p>';
   pager($('armyPager'), armyPage, pages, (p) => { armyPage = p; renderArmy(); });
   $('foundCount').textContent = `Found: ${ids.length}/${TOTAL_CHARS}`;
+  renderHeroes();
 }
 
 // ---- Shop page ----
+let shopMode = 'f';
 function renderShop() {
+  $('shopSeg').querySelectorAll('button').forEach((b) => {
+    b.classList.toggle('off', b.dataset.v !== shopMode);
+    b.setAttribute('aria-pressed', String(b.dataset.v === shopMode));
+    b.onclick = () => { if (shopMode !== b.dataset.v) { sfx('click'); shopMode = b.dataset.v; renderShop(); } };
+  });
+  const up = shopMode === 'u';
+  ['shopChips', 'shopNote', 'shopGrid', 'shopPager'].forEach((id) => ($(id).hidden = up));
+  $('upgList').hidden = !up;
+  $('shopTitle').textContent = up ? 'Castle Upgrades' : 'Fighter Shop';
+  if (up) { renderUpgrades(); return; }
   chipRow($('shopChips'), RARITIES.map((R, i) => ({ label: R.name, value: i, col: R.col, r: i })),
     shopR, (v) => { shopR = v; shopPage = 0; renderShop(); });
   const R = RARITIES[shopR], list = CH_BY_R[shopR];
@@ -3715,6 +4060,236 @@ function claimTask(t) {
   renderPage('tasks');
 }
 
+// ---- heroes (Army page) ----
+function heroPortrait(id, size) {
+  const H = heroById(id), cv = document.createElement('canvas');
+  cv.style.width = cv.style.height = size + 'px';
+  const c = setupCanvas(cv, size, size), s = size / 64;
+  c.translate(size / 2, size / 2); c.scale(s, s);
+  c.beginPath(); c.arc(0, 0, 30, 0, TAU); c.fillStyle = H.bg; c.fill();
+  c.save(); c.clip();
+  c.fillStyle = 'rgba(255,255,255,.25)'; c.beginPath(); c.arc(-8, -10, 18, 0, TAU); c.fill();
+  c.translate(0, 35); c.scale(0.87, 0.87); artHero(c, id);
+  c.restore();
+  c.beginPath(); c.arc(0, 0, 30, 0, TAU); c.lineWidth = 3; c.strokeStyle = OUT; c.stroke();
+  return cv;
+}
+function renderHeroes() {
+  const row = $('heroRow');
+  row.innerHTML = '';
+  HEROES.forEach((H) => {
+    const own = !!save.heroes[H.id], on = save.hero === H.id;
+    const el = document.createElement('button');
+    el.className = 'hero-card o' + (on ? ' on' : '') + (own ? '' : ' off');
+    el.style.setProperty('--c', shade(H.bg, -0.18));
+    el.setAttribute('aria-label', `${H.name}, ${H.power}${on ? ', in battle' : own ? '' : ', costs ' + H.gems + ' gems'}`);
+    el.appendChild(heroPortrait(H.id, 70));
+    el.insertAdjacentHTML('beforeend', `<div class="hn">${H.power}</div>
+      <div class="tag">${on ? icon('check') + 'Using' : own ? 'Pick' : icon('gem') + H.gems}</div>`);
+    el.onclick = () => openHero(H);
+    row.appendChild(el);
+  });
+}
+function openHero(H) {
+  sfx('click');
+  const own = !!save.heroes[H.id], on = save.hero === H.id;
+  const body = $('modalBody');
+  body.innerHTML = `<button class="x-btn" aria-label="Close">${ICONS.x}</button>
+    <h2 class="o" style="font-size:36px;padding:0 36px">${H.name}</h2>`;
+  const big = document.createElement('div');
+  big.className = 'unit-hero';
+  big.style.setProperty('--c', shade(H.bg, -0.18));
+  big.appendChild(heroPortrait(H.id, 136));
+  body.appendChild(big);
+  const secs = Math.round(H.charge * (1 - 0.08 * (save.upg.train || 0)));
+  body.insertAdjacentHTML('beforeend', `<div class="stat-grid o">
+      <div class="stat" style="grid-column:1/-1"><small>Hero power</small>${H.power}</div>
+      <div class="stat" style="grid-column:1/-1;font-size:17px;line-height:1.25;text-align:left"><small>What it does</small>${H.desc}</div>
+      <div class="stat"><small>Charge time</small>${secs} sec</div>
+      <div class="stat"><small>Status</small>${on ? 'In battle' : own ? 'Ready' : 'Locked'}</div>
+    </div>`);
+  if (on) {
+    body.insertAdjacentHTML('beforeend', `<p class="o" style="display:flex;gap:8px;align-items:center">${icon('check')} Your hero in battle</p>`);
+  } else if (own) {
+    body.insertAdjacentHTML('beforeend', '<button class="btn green" id="hPick">Use in battle</button>');
+    $('hPick').onclick = () => {
+      save.hero = H.id; persist(); sfx('coin'); closeModal(); renderPage('army');
+      toast(`${H.name} will lead your battles!`);
+    };
+  } else {
+    body.insertAdjacentHTML('beforeend', `<button class="btn purple" id="hBuy">Unlock ${icon('gem')} ${H.gems}</button>
+      <p class="o" style="font-size:15px;color:#d9ddff">Get gems from stages, tasks, treasure goblins and daily rewards.</p>`);
+    const b = $('hBuy');
+    b.disabled = save.gems < H.gems;
+    b.onclick = () => {
+      if (save.gems < H.gems || save.heroes[H.id]) return;
+      save.gems -= H.gems; save.heroes[H.id] = true; save.hero = H.id;
+      persist(); sfx('win'); closeModal(); renderPage('army');
+      toast(`${H.name} unlocked!`);
+    };
+  }
+  body.querySelector('.x-btn').onclick = closeModal;
+  openModal(true);
+}
+
+// ---- castle upgrades (Shop page) ----
+function renderUpgrades() {
+  const list = $('upgList');
+  list.innerHTML = '';
+  UPGRADES.forEach((u) => {
+    const lv = save.upg[u.id] || 0, max = lv >= u.max, cost = max ? 0 : u.cost(lv), ok = save.gold >= cost;
+    const el = document.createElement('div');
+    el.className = 'task upg' + (max ? ' finished' : '');
+    el.innerHTML = `
+      <div class="t-ico">${ICONS[u.icon]}</div>
+      <div class="t-body"><div class="t-name">${u.name} <span class="u-lv">Lv.${lv}/${u.max}</span></div>
+        <div class="u-desc">${u.desc(lv)}</div>
+        <div class="pips">${Array.from({ length: u.max }, (_, i) => `<i${i < lv ? ' class="on"' : ''}></i>`).join('')}</div></div>
+      <div class="t-side">${max ? `<div class="reward">${icon('check')}Max</div>`
+        : `<div class="reward">${icon('coin')}${goldText(cost)}</div>
+        <button class="btn small ${ok ? 'green' : 'blue'}"${ok ? '' : ' disabled'} aria-label="Upgrade ${u.name}">Upgrade</button>`}</div>`;
+    const btn = el.querySelector('button');
+    if (btn) btn.onclick = () => buyUpgrade(u);
+    list.appendChild(el);
+  });
+  list.insertAdjacentHTML('beforeend', '<p class="note o" style="align-self:center">Castle upgrades last forever and help in every stage.</p>');
+}
+function buyUpgrade(u) {
+  const lv = save.upg[u.id] || 0;
+  if (lv >= u.max) return;
+  const cost = u.cost(lv);
+  if (save.gold < cost) { sfx('nope'); toast('Not enough gold. Win stages to earn more!'); return; }
+  save.gold -= cost;
+  save.upg[u.id] = lv + 1;
+  persist();
+  sfx('coin');
+  toast(`${u.name} is now Lv.${lv + 1}!`);
+  renderPage('shop');
+}
+
+// ---- daily rewards ----
+const todayKey = () => { const d = new Date(); return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`; };
+const dailyReady = () => save.daily.last !== todayKey();
+function dailyParts(r) {
+  const out = [];
+  if (r.gold) out.push(`${icon('coin')}<b>${goldText(r.gold)}</b>`);
+  if (r.gems) out.push(`${icon('gem')}<b>${r.gems}</b>`);
+  if (r.summon) out.push(`${icon('orb')}<b>Summon</b>`);
+  return out.join('');
+}
+function openDaily() {
+  const ready = dailyReady(), day = save.daily.day;
+  const ref = ready ? day : Math.max(0, day - 1), base = Math.floor(ref / 7) * 7;
+  const body = $('modalBody');
+  body.innerHTML = `<button class="x-btn" aria-label="Close">${ICONS.x}</button>
+    <h2 class="o" style="font-size:38px;padding:0 36px">Daily Rewards</h2>
+    <p class="o" style="font-size:17px;color:#d9ddff">A new present every day. Day 7 is the best one!</p>
+    <div class="daily">${DAILY.map((r, i) => {
+      const got = base + i < day, today = ready && base + i === day;
+      return `<div class="day${got ? ' got' : ''}${today ? ' today' : ''}${i === 6 ? ' big' : ''}">
+        <span>Day ${i + 1}</span><div class="dp">${dailyParts(r)}</div>${got ? icon('check', 'dchk') : ''}</div>`;
+    }).join('')}</div>
+    <button class="btn green" id="dClaim"${ready ? '' : ' disabled'}>${ready ? 'Claim!' : 'Come back tomorrow!'}</button>`;
+  body.querySelector('.x-btn').onclick = closeModal;
+  $('dClaim').onclick = claimDaily;
+  openModal(true);
+}
+function claimDaily() {
+  if (!dailyReady()) return;
+  const r = DAILY[save.daily.day % DAILY.length], n = (save.daily.day % DAILY.length) + 1;
+  save.daily.last = todayKey();
+  save.daily.day++;
+  if (r.gold) save.gold += r.gold;
+  if (r.gems) save.gems += r.gems;
+  const pulls = [];
+  for (let i = 0; i < (r.summon || 0); i++) pulls.push(summonOne());
+  persist();
+  renderPage(curPage);
+  sfx('coin');
+  const got = [r.gold ? `+${goldText(r.gold)} gold` : '', r.gems ? `+${r.gems} gems` : ''].filter(Boolean).join(' and ');
+  if (got) toast(`Day ${n}: ${got}!`);
+  if (pulls.length) showPulls(pulls); else openDaily();
+}
+
+// ---- zombie book ----
+const ZB_ORDER = ['zombie', 'runner', 'skeleton', 'cone', 'big', 'shield', 'slime', 'minislime', 'nurse', 'goblin', 'spore', 'mushking', 'magician', 'gorilla', 'dragon'];
+const ZB_WHERE = {
+  zombie: 'Every stage', runner: 'Wave 2 and up', skeleton: 'Wave 3 and up', cone: 'Wave 4 and up', big: 'Wave 7 and up',
+  shield: 'Stage 3 and up', slime: 'Stage 5 and up', minislime: 'Comes out of slimes', nurse: 'Stage 8 and up',
+  goblin: 'Sometimes, if you are lucky', spore: 'Made by the Mushroom King',
+  mushking: 'Boss waves', magician: 'Boss waves', gorilla: 'Boss waves', dragon: 'Boss waves',
+};
+const speedWord = (s) => (s < 22 ? 'Very slow' : s < 34 ? 'Slow' : s < 46 ? 'Normal' : s < 70 ? 'Fast' : 'Very fast');
+function zombiePortrait(type, size) {
+  const d = ENEMIES[type], cv = document.createElement('canvas');
+  cv.style.width = cv.style.height = size + 'px';
+  const c = setupCanvas(cv, size, size);
+  const sc = d.boss ? size / 124 : (size / 80) * clamp(d.size, 0.75, 1.1);
+  c.translate(size / 2 - (d.boss ? 0 : 3 * sc), size * (d.boss ? 0.86 : 0.9));
+  c.fillStyle = 'rgba(0,0,0,.2)';
+  c.beginPath(); c.ellipse(0, 0, (d.boss ? 26 : 14) * sc * 1.6, 5 * sc * 1.4, 0, 0, TAU); c.fill();
+  c.scale(sc, sc);
+  ART[d.art](c, 0.3, d.pal ? ZPAL[d.pal] : null, { def: d });
+  return cv;
+}
+function openBook() {
+  sfx('click');
+  const body = $('modalBody'), reach = Math.min(MAX_STAGE, save.cleared + 1);
+  const known = (d) => !d.from || reach >= d.from;
+  const found = ZB_ORDER.filter((t) => known(ENEMIES[t])).length;
+  body.innerHTML = `<button class="x-btn" aria-label="Close">${ICONS.x}</button>
+    <h2 class="o" style="font-size:38px;padding:0 36px">Zombie Book</h2>
+    <p class="o" style="font-size:17px;color:#d9ddff">Know your enemy! Found ${found} of ${ZB_ORDER.length}.</p>
+    <div class="book" id="bookList"></div>`;
+  const list = $('bookList');
+  ZB_ORDER.forEach((type) => {
+    const d = ENEMIES[type], k0 = known(d);
+    const tough = d.boss ? 5 : clamp(Math.round(Math.log2((d.hp * (d.armor ? 1.6 : 1)) / 18)), 1, 5);
+    const row = document.createElement('div');
+    row.className = 'zrow' + (d.boss ? ' boss' : '') + (k0 ? '' : ' unknown');
+    row.appendChild(zombiePortrait(type, 72));
+    row.insertAdjacentHTML('beforeend', k0
+      ? `<div class="zi"><div class="zn">${d.name}${d.boss ? ' <span class="zb">BOSS</span>' : ''}</div><div class="zd">${d.desc}</div>
+        <div class="zs"><span><b class="zl">Tough</b>${'<i class="on"></i>'.repeat(tough)}${'<i></i>'.repeat(5 - tough)}</span><span>${speedWord(d.spd)}</span>
+        <span>${d.dmg ? `${icon('heart')}-${d.dmg}` : 'Harmless'}</span></div><div class="zw">${ZB_WHERE[type]}</div></div>`
+      : `<div class="zi"><div class="zn">???</div><div class="zd">Beat stage ${d.from - 1} to meet this one.</div></div>`);
+    list.appendChild(row);
+  });
+  body.querySelector('.x-btn').onclick = closeModal;
+  openModal(true);
+}
+
+// ---- victory chest ----
+function openVictoryChest(r, btn) {
+  if (r.chest) return;
+  const x = Math.random();
+  let html;
+  if (x < 0.12) {
+    const ch = pick(CH_BY_R[rollRarity(0)]), had = save.owned[ch.id];
+    save.owned[ch.id] = had ? Math.min(MAX_LV, had + 1) : 1;
+    r.chest = { ch };
+    html = `<span class="o prize-t">${had ? 'Fighter level up!' : 'A new fighter!'}</span>`;
+    sfx(ch.r >= 3 ? 'win' : 'reveal');
+    btn.innerHTML = html;
+    const card = charCard(ch, 'mini');
+    card.insertAdjacentHTML('beforeend', had ? `<span class="newtag up o">Lv.${save.owned[ch.id]}</span>` : '<span class="newtag o">NEW</span>');
+    btn.prepend(card);
+  } else if (x < 0.45) {
+    const g = randi(15, 40);
+    save.gems += g; r.chest = { gems: g };
+    btn.innerHTML = `<span class="prize">${icon('gem')}</span><span class="o prize-t">+${g} gems!</span>`;
+    sfx('coin');
+  } else {
+    const g = Math.max(20, Math.round((winGold(r.stage) * rand(0.25, 0.5)) / 10) * 10);
+    save.gold += g; r.chest = { gold: g };
+    btn.innerHTML = `<span class="prize">${icon('coin')}</span><span class="o prize-t">+${goldText(g)} gold!</span>`;
+    sfx('coin');
+  }
+  btn.classList.add('opened');
+  btn.disabled = true;
+  persist();
+}
+
 // ---- pop-up panels ----
 function openModal(dismissable) { modalDismiss = dismissable; $('modal').hidden = false; $('modalBody').scrollTop = 0; }
 function closeModal() { $('modal').hidden = true; }
@@ -3752,10 +4327,12 @@ function openSettings() {
       2. Drag two matching fighters (same fighter, same level) together to merge them into a stronger one.<br>
       3. Gold sword tiles make a fighter 50% stronger.<br>
       4. Upgrade the gold mine to earn more coins.<br>
-      5. When the Captain's ring is full, tap him for a Thunder Storm.<br>
+      5. When your hero's ring is full, tap the hero to use their power.<br>
       6. Win stages to earn gold. Buy new fighters in the Shop and level them up in Army.<br>
       7. Rarer fighters (Common up to Godly) cost more, but they are much stronger.<br>
-      8. Summons use gems and can give any fighter, even Godly ones!
+      8. Summons use gems and can give any fighter, even Godly ones!<br>
+      9. Unlock new heroes in Army, and buy castle upgrades in the Shop.<br>
+      10. Open the victory chest after each win, and claim a daily reward every day.
     </div>
     <button class="btn red small" id="btnReset">Reset progress</button>`;
   body.querySelector('.x-btn').onclick = closeModal;
@@ -3803,8 +4380,17 @@ function showResult(r) {
     ${r.firstWin && next ? `<p class="o" style="color:#ffe14d">Stage ${r.stage + 1} unlocked!</p>` : ''}
     ${r.win && !r.firstWin ? '<p class="o" style="font-size:16px;color:#d9ddff">Replay reward: half gold.</p>' : ''}
     <div class="rewards"><div class="pill">${icon('coin')}+${goldText(r.gold)}</div><div class="pill">${icon('gem')}+${r.gems}</div></div>
+    ${r.goblins ? `<p class="o" style="font-size:17px;color:#ffe14d">Treasure goblins caught: ${r.goblins}</p>` : ''}
+    ${r.win ? `<button class="chest-btn" id="rChest" aria-label="Open the victory chest"><canvas id="chestCv" width="180" height="120"></canvas>
+      <span class="o prize-t" style="font-size:21px">Tap the chest!</span></button>` : ''}
     <div class="row"><button class="btn blue" id="rHome">Home</button>
       <button class="btn green" id="rAgain">${next ? 'Next stage' : 'Play again'}</button></div>`;
+  if (r.win) {
+    const cv = $('chestCv');
+    cv.style.width = '180px'; cv.style.height = '120px';
+    drawChest(setupCanvas(cv, 180, 120), 90, 104, 1.25);
+    $('rChest').onclick = () => openVictoryChest(r, $('rChest'));
+  }
   $('rHome').onclick = () => { B = null; selStage = next ? r.stage + 1 : r.stage; goMenu('battle'); };
   $('rAgain').onclick = () => {
     const s = next ? r.stage + 1 : r.stage;
@@ -3882,6 +4468,8 @@ function boot() {
   $('btnSummon').onclick = () => doSummon(1);
   $('btnSummon10').onclick = () => doSummon(10);
   $('btnSettings').onclick = openSettings;
+  $('btnBook').onclick = openBook;
+  $('btnDaily').onclick = () => { sfx('click'); openDaily(); };
   $('modal').addEventListener('click', (e) => { if (e.target === $('modal') && modalDismiss) closeModal(); });
   document.addEventListener('pointerdown', audioUnlock);
   document.addEventListener('keydown', (e) => {
@@ -3902,6 +4490,7 @@ function boot() {
   selStage = clamp(save.stage || 1, 1, Math.min(MAX_STAGE, save.cleared + 1));
   canvas.style.visibility = 'hidden';
   showPage('battle');
+  if (dailyReady() && save.cleared >= 1) setTimeout(() => { if (scene === 'menu' && $('modal').hidden) openDaily(); }, 700);
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { SPR.clear(); LBL.clear(); if (scene === 'menu') renderPage(curPage); });
   requestAnimationFrame(frame);
   // Small hook for automated tests and curious grown-ups.
@@ -3909,6 +4498,7 @@ function boot() {
     get battle() { return B; }, get save() { return save; },
     start: startBattle, update, render, startWave, buy, moveUnit, sellUnit, upgradeMine, castHero, findPair,
     CH, CH_BY_R, RARITIES, ARCH, BALANCE, SLOT_DEFS, stageMul, hpMul, winGold, lvCost, summonOne,
+    ENEMIES, HEROES, UPGRADES, spawnEnemy, hurt, openDaily, openBook,
   };
 }
 boot();

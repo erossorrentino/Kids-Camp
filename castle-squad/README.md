@@ -21,8 +21,8 @@ without internet it falls back to a system font and still works.
 3. **Golden sword tiles** make whoever stands on them 50% stronger.
 4. **Gold mine.** The miner digs up coins every few seconds. Tap the
    green button under the mine to upgrade it.
-5. **Thunder Storm.** When the Captain's ring (top right) is full, tap
-   him to zap the zombies closest to the castle.
+5. **Hero power.** When your hero's ring (top right) is full, tap the
+   hero to use their power (see Heroes below).
 6. **Sell.** Drag a fighter onto the card tray to sell it for half price.
 7. Tap a fighter to see how far it shoots. Pause and x1/x2/x3 speed
    buttons are at the top.
@@ -46,8 +46,22 @@ without internet it falls back to a system font and still works.
   | Gorilla King    | Roars and stuns two of your fighters    |
   | Zombie Dragon   | Heals itself                            |
 
+- Other zombies to watch out for:
+
+  | Zombie          | From      | Trick                                              |
+  |-----------------|-----------|----------------------------------------------------|
+  | Knight Zombie   | stage 3   | Its shield blocks 40% of all damage                |
+  | Slime           | stage 5   | Pops into two fast little slimes                   |
+  | Nurse Zombie    | stage 8   | Heals the zombies around it every few seconds      |
+  | Treasure Goblin | sometimes | Runs past the castle; catch it for gold and 5 gems |
+
+- The **Zombie Book** (book button, top left) shows every zombie, how
+  tough and fast it is, and where it shows up. Zombies you haven't met
+  yet stay hidden until you reach their stage.
 - Winning a stage for the first time pays gold (more on later stages)
   and gems. Replaying a stage you already beat pays half the gold.
+- After every win, tap the **victory chest** for a bonus: extra gold,
+  gems, or sometimes a free fighter.
 
 ## 1,000 fighters and 7 rarities
 
@@ -79,8 +93,35 @@ puddles), Boomerang (hits going out and coming back) and Cannoneer
 - **Army:** see your collection, pick the 5 fighters in your squad, and
   level fighters up with gold (+10% damage per level, up to level 50).
   Epic and better fighters also get extra chain jumps, pierce or splash.
-- **Tasks:** goals like "Clear stage 50" or "Collect 100 fighters" that
-  pay gems and gold.
+- **Tasks:** goals like "Clear stage 50", "Collect 100 fighters" or
+  "Catch 5 treasure goblins" that pay gems and gold.
+- **Daily rewards** (calendar button, top left): claim a present once a
+  day. The 7 days go round in a circle: gold, gems, a free summon, and a
+  big gems-and-summon prize on day 7. A red dot shows when one is ready.
+
+## Heroes
+
+Your hero sits in the top-right corner of the battle. Pick one in Army.
+The Captain is free; the others are unlocked with gems.
+
+| Hero         | Power         | Gems | What it does                                               |
+|--------------|---------------|-----:|------------------------------------------------------------|
+| Captain Bolt | Thunder Storm | free | Zaps the 7 zombies closest to the castle and stuns them    |
+| Frost Queen  | Blizzard      | 300  | Freezes every zombie for 3 seconds, then slows them        |
+| Doctor Patch | Castle Repair | 500  | Fixes 5 castle hearts and shields the gate for 6 seconds   |
+| Battle King  | Battle Cry    | 800  | All fighters attack twice as fast for 8 seconds            |
+
+## Castle upgrades
+
+In the Shop, switch to **Castle upgrades** to spend gold on upgrades
+that last forever:
+
+| Upgrade       | Levels | Each level                                   |
+|---------------|-------:|----------------------------------------------|
+| Castle Walls  | 10     | +2 castle hearts                             |
+| Deep Mine     | 4      | The gold mine starts one level higher        |
+| War Chest     | 10     | +50 coins at the start of every battle       |
+| Hero Training | 5      | Hero power charges 8% faster                 |
 
 Progress is saved in the browser (`localStorage`) on that device.
 Progress from earlier versions of the game carries over automatically. Fighters
@@ -94,6 +135,8 @@ Numbers live near the top of the script in `index.html`:
   rarity.
 - `ARCH`: base damage, speed and range of each of the 12 fighter types.
 - `ENEMIES`, `BOSS_HP`: zombie health, speed, coins and castle damage.
+- `HEROES`, `UPGRADES`, `DAILY`: hero powers and prices, castle upgrade
+  prices, and the 7 daily rewards.
 - `BALANCE`: zombie speed, spawn spacing, overall toughness, how much
   tougher each wave gets (`growth`) and each stage gets (`stage`).
 - `winGold`, `lvCost`: stage rewards and level-up prices.
