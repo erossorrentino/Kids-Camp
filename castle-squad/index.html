@@ -423,13 +423,13 @@ function shade(hex, amt) {
 // shop = gold price range, unlock = stages you must clear before the shop sells it,
 // odds = summon chance in percent, lvF = level-up cost multiplier.
 const RARITIES = [
-  { key: 'common',    name: 'Common',    col: '#a3abbd', dark: '#6f778a', n: 400, pow: 1.0, cost: 100, shop: [150, 250],       unlock: 0,   odds: 45,  lvF: 1.0 },
-  { key: 'uncommon',  name: 'Uncommon',  col: '#58cf5b', dark: '#2f9e3a', n: 330, pow: 1.5, cost: 110, shop: [500, 800],       unlock: 3,   odds: 26,  lvF: 1.3 },
-  { key: 'rare',      name: 'Rare',      col: '#4a90f0', dark: '#2459b8', n: 280, pow: 2.2, cost: 125, shop: [1500, 2500],     unlock: 10,  odds: 15,  lvF: 1.7 },
-  { key: 'epic',      name: 'Epic',      col: '#a45ee8', dark: '#6a2fb0', n: 220, pow: 3.2, cost: 145, shop: [5000, 8000],     unlock: 30,  odds: 9,   lvF: 2.3 },
-  { key: 'legendary', name: 'Legendary', col: '#ffb52e', dark: '#c77a0c', n: 150, pow: 4.8, cost: 170, shop: [15000, 25000],   unlock: 75,  odds: 4,   lvF: 3.0 },
-  { key: 'mythic',    name: 'Mythic',    col: '#ff4f7a', dark: '#b8214a', n: 80,  pow: 7.0, cost: 200, shop: [45000, 70000],   unlock: 150, odds: 0.8, lvF: 4.0 },
-  { key: 'godly',     name: 'Godly',     col: '#ffe14d', dark: '#c9a400', n: 40,  pow: 10,  cost: 240, shop: [140000, 220000], unlock: 250, odds: 0.2, lvF: 5.2 },
+  { key: 'common',    name: 'Common',    col: '#a3abbd', dark: '#6f778a', n: 270, pow: 1.0, cost: 100, shop: [150, 250],       unlock: 0,   odds: 45,  lvF: 1.0 },
+  { key: 'uncommon',  name: 'Uncommon',  col: '#58cf5b', dark: '#2f9e3a', n: 220, pow: 1.5, cost: 110, shop: [500, 800],       unlock: 3,   odds: 26,  lvF: 1.3 },
+  { key: 'rare',      name: 'Rare',      col: '#4a90f0', dark: '#2459b8', n: 185, pow: 2.2, cost: 125, shop: [1500, 2500],     unlock: 10,  odds: 15,  lvF: 1.7 },
+  { key: 'epic',      name: 'Epic',      col: '#a45ee8', dark: '#6a2fb0', n: 145, pow: 3.2, cost: 145, shop: [5000, 8000],     unlock: 30,  odds: 9,   lvF: 2.3 },
+  { key: 'legendary', name: 'Legendary', col: '#ffb52e', dark: '#c77a0c', n: 100, pow: 4.8, cost: 170, shop: [15000, 25000],   unlock: 75,  odds: 4,   lvF: 3.0 },
+  { key: 'mythic',    name: 'Mythic',    col: '#ff4f7a', dark: '#b8214a', n: 53,  pow: 7.0, cost: 200, shop: [45000, 70000],   unlock: 150, odds: 0.8, lvF: 4.0 },
+  { key: 'godly',     name: 'Godly',     col: '#ffe14d', dark: '#c9a400', n: 27,  pow: 10,  cost: 240, shop: [140000, 220000], unlock: 250, odds: 0.2, lvF: 5.2 },
 ];
 
 // Twelve fighter types. Every character is one of these with its own
@@ -454,7 +454,7 @@ const RANK_COL = ['#7cc8ff', '#4a86f0', '#a466f0', '#ff9f2e', '#ff5a5a', '#2fd07
 const MAX_LV = 50;
 const lvMult = (lv) => Math.pow(1.1, lv - 1);
 
-// ---------- 1,500 characters, generated the same way every time ----------
+// ---------- 1,000 characters, generated the same way every time ----------
 const SKINS = ['#f7c9a3', '#f0b98a', '#d9955f', '#b0723f', '#7d4a26'];
 const OUTFITS = ['#4caf50', '#e5473d', '#3f6fd8', '#f2b632', '#8a5a3c', '#39b56a', '#7d4bc2', '#ff7eb6', '#2fb8c8', '#ff8a2e', '#5c6278', '#3b3355', '#c9a36b', '#e0e6f0'];
 const HATS = ['#3f9d4a', '#e04a3c', '#f7c531', '#3f6fd8', '#ffd23d', '#e8492e', '#7d4bc2', '#2b2238', '#ff7eb6', '#2fb8c8', '#8a5a3c', '#f4f6ff'];
@@ -481,7 +481,7 @@ const CLASSICS = [
   ['robot',  'Robo',       { main: '#4d9fe0', hat: '#d6e8f5', acc: '#ff4d4d', hair: '#2b2238' }],
   ['flamer', 'Flamer',     { main: '#ffcf3f', hat: '#e8492e', acc: '#d63a2f', hair: '#e8492e' }],
 ];
-const CH = [null];                         // CH[id], ids 1..1500
+const CH = [null];                         // CH[id], ids 1..1000
 const CH_BY_R = RARITIES.map(() => []);
 (function makeCharacters() {
   const rng = mulberry32(20260925);
@@ -582,16 +582,27 @@ const TASKS = [
   { stat: 'waves',    icon: 'flag',   text: (n) => `Clear ${pl(n, 'wave', 'waves')}`,             goals: [20, 100, 400, 1000, 2500, 5000, 10000], gems: [40, 60, 90, 130, 180, 250, 350] },
   { stat: 'bosses',   icon: 'skull',  text: (n) => `Beat ${pl(n, 'boss', 'bosses')}`,             goals: [1, 10, 40, 100, 300, 800, 2000], gems: [50, 80, 120, 160, 220, 300, 400] },
   { stat: 'cleared',  icon: 'trophy', text: (n) => `Clear stage ${n}`,                            goals: [1, 5, 10, 25, 50, 100, 150, 200, 300, 400, 500], gems: [60, 80, 100, 150, 200, 300, 350, 400, 500, 600, 1000] },
-  { stat: 'owned',    icon: 'army',   text: (n) => `Collect ${pl(n, 'fighter', 'fighters')}`,     goals: [8, 15, 30, 60, 120, 250, 500, 1000, 1500], gems: [40, 60, 90, 130, 180, 250, 350, 500, 1000] },
+  { stat: 'owned',    icon: 'army',   text: (n) => `Collect ${pl(n, 'fighter', 'fighters')}`,     goals: [8, 15, 30, 60, 120, 250, 500, 750, 1000], gems: [40, 60, 90, 130, 180, 250, 350, 500, 1000] },
   { stat: 'summons',  icon: 'orb',    text: (n) => `Summon ${pl(n, 'time', 'times')}`,            goals: [1, 10, 50, 150, 400, 1000], gems: [40, 80, 120, 180, 250, 400] },
   { stat: 'upgrades', icon: 'up',     text: (n) => `Level up fighters ${pl(n, 'time', 'times')}`, goals: [1, 10, 50, 200, 600, 1500], gems: [40, 70, 110, 160, 240, 350] },
 ];
 
 // ---------- save data (kept in this browser only) ----------
-const SAVE_KEY = 'castleSquad.v2', OLD_SAVE_KEY = 'castleSquad.v1';
+const SAVE_KEY = 'castleSquad.v3', V2_SAVE_KEY = 'castleSquad.v2', OLD_SAVE_KEY = 'castleSquad.v1';
+// The previous version had 1,500 fighters. Map each old id to a fighter of the same rarity.
+const V2_COUNTS = [400, 330, 280, 220, 150, 80, 40];
+function mapV2Id(old) {
+  let start = 1;
+  for (let r = 0; r < V2_COUNTS.length; r++) {
+    if (old < start + V2_COUNTS[r]) return CH_BY_R[r][(old - start) % CH_BY_R[r].length].id;
+    start += V2_COUNTS[r];
+  }
+  return 0;
+}
+function readSaved(key) { try { return JSON.parse(localStorage.getItem(key)); } catch (e) { return null; } }
 function defaultSave() {
   return {
-    v: 2, gems: 200, gold: 100, owned: { 1: 1, 2: 1, 3: 1, 4: 1, 5: 1 }, squad: [1, 2, 3, 4, 5],
+    v: 3, gems: 200, gold: 100, owned: { 1: 1, 2: 1, 3: 1, 4: 1, 5: 1 }, squad: [1, 2, 3, 4, 5],
     cleared: 0, stars: {}, stage: 1,
     stats: { kills: 0, merges: 0, bosses: 0, waves: 0, wins: 0, summons: 0, upgrades: 0 },
     tiers: {}, pity10: 0, pity50: 0, sfx: true, music: true, tutorialDone: false,
@@ -609,12 +620,24 @@ function fixSquad(s) {
 }
 function loadSave() {
   const d = defaultSave();
-  let s = null;
-  try { s = JSON.parse(localStorage.getItem(SAVE_KEY)); } catch (e) { s = null; }
-  if (s && s.v === 2) {
+  let s = readSaved(SAVE_KEY);
+  if (!(s && s.v === 3)) {
+    const s2 = readSaved(V2_SAVE_KEY);
+    if (s2 && s2.v === 2) {
+      s = Object.assign({}, s2, { v: 3, owned: {} });
+      Object.keys(s2.owned || {}).forEach((k) => {
+        const id = mapV2Id(Number(k));
+        if (id) s.owned[id] = clamp(Math.max(s.owned[id] || 0, s2.owned[k] | 0), 1, MAX_LV);
+      });
+      s.squad = Array.isArray(s2.squad) ? s2.squad.map((k) => mapV2Id(Number(k))) : [];
+    }
+  }
+  if (s && s.v === 3) {
     const out = Object.assign(d, s);
     out.stats = Object.assign(defaultSave().stats, s.stats || {});
-    out.owned = s.owned && typeof s.owned === 'object' ? s.owned : defaultSave().owned;
+    out.owned = {};
+    Object.keys(s.owned || {}).forEach((k) => { if (CH[k]) out.owned[k] = clamp(s.owned[k] | 0, 1, MAX_LV); });
+    if (!Object.keys(out.owned).length) out.owned = defaultSave().owned;
     fixSquad(out);
     return out;
   }

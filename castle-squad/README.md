@@ -46,7 +46,7 @@ without internet it falls back to a system font and still works.
 - Winning a stage for the first time pays gold (more on later stages)
   and gems. Replaying a stage you already beat pays half the gold.
 
-## 1,500 fighters and 7 rarities
+## 1,000 fighters and 7 rarities
 
 Every fighter has its own name, colors and stats, and is one of 12
 fighter types: Archer, Blaster, Bomber, Ice Wizard, Zapper, Ninja, Robo,
@@ -56,19 +56,19 @@ puddles), Boomerang (hits going out and coming back) and Cannoneer
 
 | Rarity    | Fighters | Damage | Battle cost | Shop price (gold) | Shop unlocks after | Summon chance |
 |-----------|---------:|-------:|------------:|------------------:|-------------------:|--------------:|
-| Common    | 400 | x1   | 100% | 150 to 250         | start     | 45%  |
-| Uncommon  | 330 | x1.5 | 110% | 500 to 800         | stage 3   | 26%  |
-| Rare      | 280 | x2.2 | 125% | 1,500 to 2,500     | stage 10  | 15%  |
-| Epic      | 220 | x3.2 | 145% | 5,000 to 8,000     | stage 30  | 9%   |
-| Legendary | 150 | x4.8 | 170% | 15,000 to 25,000   | stage 75  | 4%   |
-| Mythic    | 80  | x7   | 200% | 45,000 to 70,000   | stage 150 | 0.8% |
-| Godly     | 40  | x10  | 240% | 140,000 to 220,000 | stage 250 | 0.2% |
+| Common    | 270 | x1   | 100% | 150 to 250         | start     | 45%  |
+| Uncommon  | 220 | x1.5 | 110% | 500 to 800         | stage 3   | 26%  |
+| Rare      | 185 | x2.2 | 125% | 1,500 to 2,500     | stage 10  | 15%  |
+| Epic      | 145 | x3.2 | 145% | 5,000 to 8,000     | stage 30  | 9%   |
+| Legendary | 100 | x4.8 | 170% | 15,000 to 25,000   | stage 75  | 4%   |
+| Mythic    | 53  | x7   | 200% | 45,000 to 70,000   | stage 150 | 0.8% |
+| Godly     | 27  | x10  | 240% | 140,000 to 220,000 | stage 250 | 0.2% |
 
 - **Shop:** buy fighters with the gold you win in stages. Better rarities
   cost more gold, and they also cost more coins to call during a battle,
   but they hit much harder for what they cost.
 - **Summon:** 100 gems (or 900 for x10) for a random fighter from all
-  1,500, so you can get a Godly fighter long before you could buy one.
+  1,000, so you can get a Godly fighter long before you could buy one.
   Every 10 summons guarantees Epic or better; every 50 guarantees
   Legendary or better. Getting a fighter you already own levels it up
   for free.
@@ -79,7 +79,8 @@ puddles), Boomerang (hits going out and coming back) and Cannoneer
   pay gems and gold.
 
 Progress is saved in the browser (`localStorage`) on that device.
-Progress from the first version of the game carries over automatically.
+Progress from earlier versions of the game carries over automatically. Fighters
+from the old 1,500-fighter roster become a fighter of the same rarity and level.
 
 ## Tuning
 
