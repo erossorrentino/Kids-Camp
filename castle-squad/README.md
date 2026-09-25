@@ -32,8 +32,11 @@ without internet it falls back to a system font and still works.
 - 500 stages, 20 waves each, in 20 worlds of 25 stages. The worlds cycle
   through seven places: Green Meadow, Sandy Desert, Frosty Peaks, Zombie
   Lab, Spooky Graveyard, Gorilla Jungle and Lava Land.
-- Beat a stage to unlock the next one. Every stage is a little tougher
-  than the one before, and later stages send more of the tough zombies.
+- Beat a stage to unlock the next one. The game is hard: every stage is
+  tougher than the one before (about 1.2% more zombie health per stage,
+  on top of tough waves with lots of zombies), and later stages send more
+  of the tough zombies. Leveling up fighters and buying better ones is
+  how you keep up.
 - Every 5th wave has a boss. The order changes from stage to stage:
 
   | Boss            | Trick                                   |
@@ -96,7 +99,8 @@ Numbers live near the top of the script in `index.html`:
 - `winGold`, `lvCost`: stage rewards and level-up prices.
 
 These were balanced with a bot that plays full games at different points
-in the game. Examples: starter fighters at Lv.1 win stage 1, Rare
-fighters at Lv.6 win stage 100, Mythic at Lv.22 win stage 300, and Godly
-at around Lv.38 win stage 500. A 20-wave stage takes about 12 to 16
-minutes at x1 speed.
+in the game. Examples: starter fighters at Lv.1 only just win stage 1
+with good merging (a careless player loses it), Rare fighters need about
+Lv.10 for stage 100, Mythic about Lv.30 for stage 300, and Godly fighters
+need about Lv.46 to 50 for stage 500. A 20-wave stage takes about 15 to 20
+minutes at x1 speed, so the x2 and x3 buttons help.

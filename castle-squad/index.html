@@ -553,7 +553,7 @@ const mineCost = (lv) => [100, 200, 350, 550][lv - 1];
 const HERO_CHARGE = 28;
 // speed: zombie walk speed; gap: spacing between spawns; hp: extra toughness;
 // growth: how much tougher each wave gets; stage: how much tougher each stage gets
-const BALANCE = { speed: 1.2, gap: 0.8, hp: 1.15, growth: 1.195, stage: 1.0105 };
+const BALANCE = { speed: 1.25, gap: 0.8, hp: 1.6, growth: 1.2, stage: 1.012, count: 12, perWave: 2.6 };
 const stageMul = (s) => Math.pow(BALANCE.stage, s - 1);
 const hpMul = (s, w) => stageMul(s) * BALANCE.hp * Math.pow(BALANCE.growth, Math.max(0, w - 1));
 const winGold = (s) => 120 + 25 * s;
@@ -1755,7 +1755,7 @@ function newBattle(stage) {
 
 function makeWave(w, stage) {
   const q = [], boss = w % 5 === 0;
-  let n = Math.round(10 + w * 2.3);
+  let n = Math.round(BALANCE.count + w * BALANCE.perWave);
   if (boss) n = Math.round(n * 0.55);
   const gap = Math.max(0.36, 1.05 - w * 0.035) * BALANCE.gap;
   const late = Math.min(1, (stage - 1) / 150);        // later stages bring tougher zombies sooner
@@ -3141,6 +3141,8 @@ const TIPS = [
   'Summons can give Godly fighters you could never afford.',
   'Replaying a stage you already beat pays half the gold.',
   'Drag a fighter onto the card tray to sell it.',
+  'Every stage is tougher than the last. Level up your fighters in Army!',
+  'Stuck on a stage? Replay an old one for gold, then level up.',
 ];
 const icon = (name, cls) => `<span class="ico${cls ? ' ' + cls : ''}">${ICONS[name]}</span>`;
 const PAGE_SIZE = 12;
