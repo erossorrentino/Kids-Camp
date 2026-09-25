@@ -54,18 +54,19 @@ Flamer, Sniper (always hits the toughest zombie), Alchemist (poison
 puddles), Boomerang (hits going out and coming back) and Cannoneer
 (knocks zombies back down the road).
 
-| Rarity    | Fighters | Damage | Battle cost | Shop price (gold) | Shop unlocks after | Summon chance |
-|-----------|---------:|-------:|------------:|------------------:|-------------------:|--------------:|
-| Common    | 270 | x1   | 100% | 150 to 250         | start     | 45%  |
-| Uncommon  | 220 | x1.5 | 110% | 500 to 800         | stage 3   | 26%  |
-| Rare      | 185 | x2.2 | 125% | 1,500 to 2,500     | stage 10  | 15%  |
-| Epic      | 145 | x3.2 | 145% | 5,000 to 8,000     | stage 30  | 9%   |
-| Legendary | 100 | x4.8 | 170% | 15,000 to 25,000   | stage 75  | 4%   |
-| Mythic    | 53  | x7   | 200% | 45,000 to 70,000   | stage 150 | 0.8% |
-| Godly     | 27  | x10  | 240% | 140,000 to 220,000 | stage 250 | 0.2% |
+| Rarity    | Fighters | Damage | Battle cost | Shop price (gold) | Summon chance |
+|-----------|---------:|-------:|------------:|------------------:|--------------:|
+| Common    | 270 | x1   | 100% | 150 to 250         | 45%  |
+| Uncommon  | 220 | x1.5 | 110% | 500 to 800         | 26%  |
+| Rare      | 185 | x2.2 | 125% | 1,500 to 2,500     | 15%  |
+| Epic      | 145 | x3.2 | 145% | 5,000 to 8,000     | 9%   |
+| Legendary | 100 | x4.8 | 170% | 15,000 to 25,000   | 4%   |
+| Mythic    | 53  | x7   | 200% | 45,000 to 70,000   | 0.8% |
+| Godly     | 27  | x10  | 240% | 140,000 to 220,000 | 0.2% |
 
-- **Shop:** buy fighters with the gold you win in stages. Better rarities
-  cost more gold, and they also cost more coins to call during a battle,
+- **Shop:** buy any fighter, of any rarity, as soon as you have the gold.
+  There is nothing to unlock first. Gold comes from winning stages. Better
+  rarities cost more gold, and they also cost more coins to call during a battle,
   but they hit much harder for what they cost.
 - **Summon:** 100 gems (or 900 for x10) for a random fighter from all
   1,000, so you can get a Godly fighter long before you could buy one.
@@ -86,8 +87,8 @@ from the old 1,500-fighter roster become a fighter of the same rarity and level.
 
 Numbers live near the top of the script in `index.html`:
 
-- `RARITIES`: damage, battle cost, shop prices, unlock stage and summon
-  odds for each rarity.
+- `RARITIES`: damage, battle cost, shop prices and summon odds for each
+  rarity.
 - `ARCH`: base damage, speed and range of each of the 12 fighter types.
 - `ENEMIES`, `BOSS_HP`: zombie health, speed, coins and castle damage.
 - `BALANCE`: zombie speed, spawn spacing, overall toughness, how much

@@ -154,6 +154,7 @@ button{font-family:inherit;color:inherit;font-size:inherit}
 .card .nm{font-size:12px;line-height:1.1;text-align:center;align-self:stretch;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;min-height:2.2em;overflow-wrap:anywhere}
 .card .price{display:flex;align-items:center;gap:3px;font-size:14px;background:rgba(29,26,61,.85);border-radius:10px;padding:2px 8px}
 .card .price .ico{width:16px;height:16px}
+.card .price.short{color:#ff5a5a}
 .card .tag{font-size:13px;background:rgba(29,26,61,.85);border-radius:10px;padding:2px 8px;display:flex;gap:3px;align-items:center}
 .card .tag .ico{width:15px;height:15px}
 .card.dim canvas{filter:grayscale(1) brightness(.75)}
@@ -420,16 +421,16 @@ function shade(hex, amt) {
 
 // ---------- game data ----------
 // Seven rarities. pow = damage multiplier, cost = battle price per 100 base,
-// shop = gold price range, unlock = stages you must clear before the shop sells it,
+// shop = gold price range (every rarity is for sale from the start),
 // odds = summon chance in percent, lvF = level-up cost multiplier.
 const RARITIES = [
-  { key: 'common',    name: 'Common',    col: '#a3abbd', dark: '#6f778a', n: 270, pow: 1.0, cost: 100, shop: [150, 250],       unlock: 0,   odds: 45,  lvF: 1.0 },
-  { key: 'uncommon',  name: 'Uncommon',  col: '#58cf5b', dark: '#2f9e3a', n: 220, pow: 1.5, cost: 110, shop: [500, 800],       unlock: 3,   odds: 26,  lvF: 1.3 },
-  { key: 'rare',      name: 'Rare',      col: '#4a90f0', dark: '#2459b8', n: 185, pow: 2.2, cost: 125, shop: [1500, 2500],     unlock: 10,  odds: 15,  lvF: 1.7 },
-  { key: 'epic',      name: 'Epic',      col: '#a45ee8', dark: '#6a2fb0', n: 145, pow: 3.2, cost: 145, shop: [5000, 8000],     unlock: 30,  odds: 9,   lvF: 2.3 },
-  { key: 'legendary', name: 'Legendary', col: '#ffb52e', dark: '#c77a0c', n: 100, pow: 4.8, cost: 170, shop: [15000, 25000],   unlock: 75,  odds: 4,   lvF: 3.0 },
-  { key: 'mythic',    name: 'Mythic',    col: '#ff4f7a', dark: '#b8214a', n: 53,  pow: 7.0, cost: 200, shop: [45000, 70000],   unlock: 150, odds: 0.8, lvF: 4.0 },
-  { key: 'godly',     name: 'Godly',     col: '#ffe14d', dark: '#c9a400', n: 27,  pow: 10,  cost: 240, shop: [140000, 220000], unlock: 250, odds: 0.2, lvF: 5.2 },
+  { key: 'common',    name: 'Common',    col: '#a3abbd', dark: '#6f778a', n: 270, pow: 1.0, cost: 100, shop: [150, 250],       odds: 45,  lvF: 1.0 },
+  { key: 'uncommon',  name: 'Uncommon',  col: '#58cf5b', dark: '#2f9e3a', n: 220, pow: 1.5, cost: 110, shop: [500, 800],       odds: 26,  lvF: 1.3 },
+  { key: 'rare',      name: 'Rare',      col: '#4a90f0', dark: '#2459b8', n: 185, pow: 2.2, cost: 125, shop: [1500, 2500],     odds: 15,  lvF: 1.7 },
+  { key: 'epic',      name: 'Epic',      col: '#a45ee8', dark: '#6a2fb0', n: 145, pow: 3.2, cost: 145, shop: [5000, 8000],     odds: 9,   lvF: 2.3 },
+  { key: 'legendary', name: 'Legendary', col: '#ffb52e', dark: '#c77a0c', n: 100, pow: 4.8, cost: 170, shop: [15000, 25000],   odds: 4,   lvF: 3.0 },
+  { key: 'mythic',    name: 'Mythic',    col: '#ff4f7a', dark: '#b8214a', n: 53,  pow: 7.0, cost: 200, shop: [45000, 70000],   odds: 0.8, lvF: 4.0 },
+  { key: 'godly',     name: 'Godly',     col: '#ffe14d', dark: '#c9a400', n: 27,  pow: 10,  cost: 240, shop: [140000, 220000], odds: 0.2, lvF: 5.2 },
 ];
 
 // Twelve fighter types. Every character is one of these with its own
@@ -2157,8 +2158,7 @@ function endBattle(win) {
   }
   if (b.stats.merges > 0) save.tutorialDone = true;
   persist();
-  const newRarity = firstWin ? RARITIES.find((r) => r.unlock === st) : null;
-  b.result = { win, waves, gold, gems, stars, firstWin, stage: st, newRarity };
+  b.result = { win, waves, gold, gems, stars, firstWin, stage: st };
   b.banner = { text: win ? 'VICTORY!' : 'OH NO!', sub: win ? 'The castle is safe!' : 'The zombies got in!', t: 0, T: 3, col: win ? '#ffe14d' : '#ff6a5a' };
   sfx(win ? 'win' : 'lose');
   setTimeout(() => { if (B === b) showResult(b.result); }, 1500);
@@ -2848,15 +2848,13 @@ function charCard(ch, mode) {
   el.className = 'card o r' + ch.r;
   el.style.setProperty('--c', R.col);
   el.setAttribute('aria-label', `${ch.name}, ${R.name}${lv ? ', level ' + lv : ''}`);
-  const shopLocked = mode === 'shop' && !lv && save.cleared < R.unlock;
-  if (shopLocked) el.classList.add('dim');
+  const cantAfford = mode === 'shop' && !lv && save.gold < ch.shop;
   el.appendChild(portrait(ch, 72));
   if (mode !== 'mini') { const nm = document.createElement('div'); nm.className = 'nm'; nm.textContent = ch.name; el.appendChild(nm); }
   const foot = document.createElement('div');
   if (mode === 'shop') {
     if (lv) { foot.className = 'tag'; foot.innerHTML = `${icon('check')}Lv.${lv}`; }
-    else if (shopLocked) { foot.className = 'tag'; foot.innerHTML = `${icon('lock')}Stage ${R.unlock}`; }
-    else { foot.className = 'price'; foot.innerHTML = `${icon('coin')}${goldText(ch.shop)}`; }
+    else { foot.className = 'price' + (cantAfford ? ' short' : ''); foot.innerHTML = `${icon('coin')}${goldText(ch.shop)}`; }
   } else {
     foot.textContent = 'Lv.' + (lv || 1);
   }
@@ -2973,13 +2971,11 @@ function renderArmy() {
 
 // ---- Shop page ----
 function renderShop() {
-  chipRow($('shopChips'), RARITIES.map((R, i) => ({ label: R.name, value: i, col: R.col, r: i, locked: save.cleared < R.unlock })),
+  chipRow($('shopChips'), RARITIES.map((R, i) => ({ label: R.name, value: i, col: R.col, r: i })),
     shopR, (v) => { shopR = v; shopPage = 0; renderShop(); });
   const R = RARITIES[shopR], list = CH_BY_R[shopR];
   const have = list.filter((ch) => save.owned[ch.id]).length;
-  $('shopNote').innerHTML = save.cleared < R.unlock
-    ? `${icon('lock')} Clear stage ${R.unlock} to buy ${R.name} fighters. Summons can still give them!`
-    : `${R.name} fighters: ${goldText(R.shop[0])} to ${goldText(R.shop[1])} gold each. You own ${have} of ${list.length}.`;
+  $('shopNote').innerHTML = `${R.name} fighters: ${goldText(R.shop[0])} to ${goldText(R.shop[1])} gold each. You own ${have} of ${list.length}. Win stages to earn more gold!`;
   const pages = Math.ceil(list.length / PAGE_SIZE);
   shopPage = clamp(shopPage, 0, pages - 1);
   const grid = $('shopGrid');
@@ -3041,8 +3037,6 @@ function openChar(ch) {
       });
       body.appendChild(row);
     }
-  } else if (save.cleared < R.unlock) {
-    body.insertAdjacentHTML('beforeend', `<p class="o">${icon('lock')} Clear stage ${R.unlock} to buy ${R.name} fighters in the Shop, or get lucky with a Summon!</p>`);
   } else {
     body.insertAdjacentHTML('beforeend', `<button class="btn green" id="mBuy">Buy ${icon('coin')} ${goldText(ch.shop)}</button>
       <p class="o" style="font-size:15px;color:#d9ddff">You have ${goldText(save.gold)} gold. Win stages to earn more.</p>`);
@@ -3054,7 +3048,7 @@ function openChar(ch) {
   openModal(true);
 }
 function buyChar(ch) {
-  if (save.owned[ch.id] || save.gold < ch.shop || save.cleared < rarityOf(ch).unlock) { sfx('nope'); return; }
+  if (save.owned[ch.id] || save.gold < ch.shop) { sfx('nope'); return; }
   save.gold -= ch.shop;
   save.owned[ch.id] = 1;
   persist();
@@ -3283,7 +3277,6 @@ function showResult(r) {
     <p class="o">Stage ${r.stage} · Waves cleared: ${r.waves}/${MAX_WAVE}</p>
     ${r.win ? '' : '<p class="o">Merge more fighters, level them up, or try new ones from the Shop!</p>'}
     ${r.firstWin && next ? `<p class="o" style="color:#ffe14d">Stage ${r.stage + 1} unlocked!</p>` : ''}
-    ${r.newRarity ? `<p class="o" style="color:${r.newRarity.col}">The Shop now sells ${r.newRarity.name} fighters!</p>` : ''}
     ${r.win && !r.firstWin ? '<p class="o" style="font-size:16px;color:#d9ddff">Replay reward: half gold.</p>' : ''}
     <div class="rewards"><div class="pill">${icon('coin')}+${goldText(r.gold)}</div><div class="pill">${icon('gem')}+${r.gems}</div></div>
     <div class="row"><button class="btn blue" id="rHome">Home</button>
