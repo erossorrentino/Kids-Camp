@@ -29,8 +29,8 @@ export function boardTable(t, nameOf, { limit = 20, full = false } = {}) {
   let list = rows.slice(0, limit);
   if (me && !list.includes(me)) list = [...list, me];
   const nR = t.rounds;
-  return `<div class="table-wrap"><table class="tbl board"><thead><tr><th>Pos</th><th>Player</th><th>To par</th><th>Thru</th><th>Today</th>${Array.from({ length: nR }, (_, i) => `<th>R${i + 1}</th>`).join('')}<th>Tot</th></tr></thead><tbody>
-    ${list.map((r) => `<tr class="${r.human ? 'me' : ''} ${r.status === 'cut' ? 'cut' : ''}"><td>${esc(r.pos)}</td><td>${esc(r.human ? 'You' : nameOf(r.id))}${r.human ? '' : ` <span class="cc">${esc(proById(r.id).country)}</span>`}</td><td class="${toParClass(r.toPar)}"><b>${fmtToPar(r.toPar)}</b></td><td>${r.status === 'cut' ? '' : r.thru === 18 ? 'F' : r.thru || '–'}</td><td class="${toParClass(r.today)}">${r.today == null ? '' : fmtToPar(r.today)}</td>${Array.from({ length: nR }, (_, i) => `<td>${r.rounds[i] ?? ''}</td>`).join('')}<td>${r.total || ''}</td></tr>`).join('')}
+  return `<div class="table-wrap"><table class="tbl board"><thead><tr><th>Pos</th><th>Player</th><th>To par</th><th>Thru</th><th>Today</th>${Array.from({ length: nR }, (_, i) => `<th class="rcol">R${i + 1}</th>`).join('')}<th>Tot</th></tr></thead><tbody>
+    ${list.map((r) => `<tr class="${r.human ? 'me' : ''} ${r.status === 'cut' ? 'cut' : ''}"><td>${esc(r.pos)}</td><td>${esc(r.human ? 'You' : nameOf(r.id))}${r.human ? '' : ` <span class="cc">${esc(proById(r.id).country)}</span>`}</td><td class="${toParClass(r.toPar)}"><b>${fmtToPar(r.toPar)}</b></td><td>${r.status === 'cut' ? '' : r.thru === 18 ? 'F' : r.thru || '–'}</td><td class="${toParClass(r.today)}">${r.today == null ? '' : fmtToPar(r.today)}</td>${Array.from({ length: nR }, (_, i) => `<td class="rcol">${r.rounds[i] ?? ''}</td>`).join('')}<td>${r.total || ''}</td></tr>`).join('')}
   </tbody></table></div>${t.cutLine != null ? `<p class="muted small">Cut: ${fmtToPar(t.cutLine)} (top ${CUT_SIZE} and ties). Par ${coursePar(course)}.</p>` : ''}`;
 }
 
@@ -41,6 +41,7 @@ export function eventIntro(screens, app, c, t) {
   const r = t.round;
   const hp = humanPlayer(t);
   const played = (hp.scores[r] || []).filter((v) => v != null).length;
+  const shot = c.active && c.active.shot && c.active.shot.round === r ? c.active.shot : null;
   screens.show(`
     <div class="page narrow">
       <header class="page-head"><button class="back" data-a="hub">← Hub</button><h2>${esc(t.name)}</h2><span class="pill ${t.tour === 'MAJ' ? 'gold' : ''}">${TOURS[t.tour].name}</span></header>
@@ -49,7 +50,7 @@ export function eventIntro(screens, app, c, t) {
         <p>${esc(course.name)} · ${esc(course.region)}, ${esc(course.countryName)} · Par ${course.par} · ${course.yards.toLocaleString()} yds</p>
         ${conditionsHtml(t.cond[r], app.settings.units)}
         <p class="muted small">Purse ${money(t.purse)} · Winner's share ${money(t.purse * 0.18)} · ${t.players.length} players${t.rounds === 4 ? ` · Cut after round 2: top ${CUT_SIZE} and ties` : ''}</p>
-        <div class="actions left"><button class="btn primary big" data-a="playRound">${played ? `Resume at hole ${played + 1}` : `Tee off round ${r + 1}`}</button><button class="btn" data-a="simRound">Simulate this round</button></div>
+        <div class="actions left"><button class="btn primary big" data-a="playRound">${shot ? `Resume hole ${shot.hole + 1}, shot ${shot.strokes + 1}` : played ? `Resume at hole ${played + 1}` : `Tee off round ${r + 1}`}</button><button class="btn" data-a="simRound">Simulate this round</button></div>
       </section>
       ${r === 0 ? `<section class="card"><h3>Players to watch</h3><ul class="favs">${favs.map((p) => `<li data-a="pro" data-id="${p.id}"><b>${esc(p.name)}</b> <span class="muted">${esc(p.country)} · OVR ${p.ovr}</span></li>`).join('')}</ul></section>` : `<section class="card"><h3>Leaderboard</h3>${boardTable(t, app.nameOf, { limit: 10, full: true })}</section>`}
     </div>`);

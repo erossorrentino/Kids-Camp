@@ -50,7 +50,7 @@ export class Screens {
   hide() { this.root.hidden = true; this.root.innerHTML = ''; }
 
   // ---------------- title ----------------
-  title(hasCareer, careerInfo) {
+  title(hasCareer, careerInfo, loading = false) {
     this.show(`
       <div class="title-screen">
         <div class="brand">
@@ -59,8 +59,9 @@ export class Screens {
           <p class="brand-sub">Start at number 501 in the world. Win your way onto the World Tour, capture the majors, and become the best golfer on the planet.</p>
         </div>
         <nav class="menu">
+          ${loading ? '<div class="mbtn loadingsave" aria-live="polite"><span>Loading your saved career…</span><small>One moment</small></div>' : ''}
           ${hasCareer ? `<button class="mbtn primary" data-a="continue"><span>Continue career</span><small>${esc(careerInfo)}</small></button>` : ''}
-          <button class="mbtn ${hasCareer ? '' : 'primary'}" data-a="newCareer"><span>${hasCareer ? 'New career' : 'Start career'}</span><small>Create your golfer and turn pro</small></button>
+          ${loading ? '' : `<button class="mbtn ${hasCareer ? '' : 'primary'}" data-a="newCareer"><span>${hasCareer ? 'New career' : 'Start career'}</span><small>Create your golfer and turn pro</small></button>`}
           <button class="mbtn" data-a="quick"><span>Quick round</span><small>Any course, any pro, any conditions</small></button>
           <button class="mbtn" data-a="players"><span>Tour players</span><small>All 500 pros, their strengths and weaknesses</small></button>
           <button class="mbtn" data-a="courses"><span>Courses</span><small>100 championship courses in 8 styles</small></button>
@@ -138,6 +139,7 @@ export class Screens {
           <div class="hub-id">
             <div class="hub-name">${esc(g.name)} <span class="cc">${esc(g.country)}</span></div>
             <div class="hub-meta">Season ${c.year} · Week ${c.week} of ${SEASON_WEEKS}</div>
+            <div class="save-line" id="saveLine">${this.app.saveText ? esc(this.app.saveText()) : ''}</div>
           </div>
           <div class="hub-kpis">
             <div class="kpi"><small>World rank</small><b>#${r}</b>${move}</div>
@@ -497,7 +499,7 @@ export class Screens {
         <section class="card form settings">
           <div class="set"><label for="s-units">Distances</label>${sel('units', [['yards', 'Yards & feet'], ['meters', 'Meters']])}</div>
           <div class="set"><label for="s-rounds">Career event length</label>${sel('rounds', [[4, '4 rounds (full, with 36-hole cut)'], [2, '2 rounds'], [1, '1 round']])}</div>
-          <div class="set"><label for="s-quality">Graphics</label>${sel('quality', [['auto', 'Automatic'], ['high', 'High'], ['medium', 'Medium'], ['low', 'Low (older tablets)']])}</div>
+          <div class="set"><label for="s-quality">Graphics</label>${sel('quality', [['auto', 'Automatic'], ['high', 'High'], ['medium', 'Medium'], ['low', 'Low (phones, older tablets)']])}</div>
           <div class="set"><label for="s-swingSens">Swing accuracy</label>${sel('swingSens', [[0.6, 'Forgiving'], [1, 'Normal'], [1.4, 'Pro (unforgiving)']])}</div>
           <div class="set"><label for="s-sound">Sound</label>${chk('sound')}</div>
           <div class="set"><label for="s-aimHelp">Show flight preview</label>${chk('aimHelp')}</div>

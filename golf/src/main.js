@@ -10,7 +10,7 @@ import { eventIntro, roundSummary, eventResults, scorecardModal, boardModal, sco
 import { RoundController } from './game/round.js';
 import * as career from './game/career.js';
 import * as tourn from './game/tournament.js';
-import { loadCareer, saveCareer, deleteCareer, loadSettings, saveSettings, initCloud, hasCloud } from './game/storage.js';
+import { loadCareer, saveCareer, deleteCareer, loadSettings, saveSettings, initCloud, hasCloud, flushSaves, onSaveStatus, saveStatus, setRemoteHandler } from './game/storage.js';
 import { initAudio, setSound, sfx } from './audio.js';
 import { proById, generatePros } from './data/players.js';
 import { generateCourses, courseById } from './data/courses.js';
@@ -41,9 +41,116 @@ const app = {
 };
 window.__app = app;
 
+// ---------------- phone layout ----------------
+// Phones (in either orientation) get a compact HUD; the class is on <html>
+function applyLayout() {
+  const w = window.innerWidth, h = window.innerHeight;
+  const root = document.documentElement;
+  root.classList.toggle('compact', Math.min(w, h) < 540 || w < 700);
+  root.classList.toggle('portrait', h > w);
+}
+
+// ---------------- problems ----------------
+// Anything that goes wrong shows a card with a way out instead of leaving a
+// frozen or blank screen. Progress is saved first.
+let errShown = false;
+app.reportError = (err) => {
+  console.error(err);
+  if (errShown) return;
+  errShown = true;
+  if (app.career) saveCareer(app.career, { now: true });
+  const msg = String((err && (err.message || err)) || 'Unknown error').slice(0, 200);
+  const m = modal(`<h3>Something went wrong</h3><p>The game hit a problem${app.round ? ' during your round' : ''}. ${app.career ? 'Your career is saved up to your last shot.' : ''}</p><p class="muted small">${esc(msg)}</p>
+    <div class="actions"><button class="btn primary" data-reload>Reload the game</button><button class="btn" data-lowq>Reload with low graphics</button><button class="btn" data-close>Keep going</button></div>`, { onClose: () => { setTimeout(() => { errShown = false; }, 15000); } });
+  m.el.querySelector('[data-reload]').addEventListener('click', () => reloadGame(false));
+  m.el.querySelector('[data-lowq]').addEventListener('click', () => reloadGame(true));
+};
+
+function reloadGame(lowGraphics) {
+  if (lowGraphics) { app.settings.quality = 'low'; saveSettings(app.settings); }
+  if (app.career) saveCareer(app.career, { now: true });
+  setTimeout(() => location.reload(), 400);
+}
+
+window.addEventListener('error', (e) => {
+  const msg = String(e.message || '');
+  // Only the game's own code: ignore resize-observer noise and scripts the
+  // host page adds
+  if (!e.error || /ResizeObserver|Script error/i.test(msg)) return;
+  const where = `${e.filename || ''} ${e.error.stack || ''}`;
+  if (!/\/src\/|three\.module/.test(where)) return;
+  app.reportError(e.error);
+});
+
+// The device can take the 3D graphics away (low memory, switching apps).
+// Show what is happening, and offer a lighter reload if it doesn't recover.
+let gfxTimer = 0;
+function gfxNotice(on) {
+  let el = document.getElementById('gfxNotice');
+  clearTimeout(gfxTimer);
+  if (!on) { if (el) el.remove(); return; }
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'gfxNotice';
+    el.className = 'gfx-notice';
+    el.innerHTML = '<div class="spinner"></div><b>Reloading the 3D view…</b><span>Your device paused the graphics. Your progress is saved.</span><button class="btn primary" hidden>Reload with low graphics</button>';
+    el.querySelector('button').addEventListener('click', () => reloadGame(true));
+    document.body.appendChild(el);
+  }
+  if (app.career) saveCareer(app.career, { now: true });
+  gfxTimer = setTimeout(() => { const b = el.querySelector('button'); if (b) b.hidden = false; }, 4000);
+}
+
+// Save when the page is hidden or closed (switching apps on a phone)
+function saveNow() {
+  if (app.career) saveCareer(app.career, { now: true });
+  flushSaves();
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') saveNow(); });
+window.addEventListener('pagehide', saveNow);
+
+app.saveText = () => {
+  const st = saveStatus();
+  if (st.cloud) return '✓ Progress saved to your account';
+  if (hasCloud()) return st.local ? '✓ Progress saved on this device · syncing to your account' : 'Saving to your account…';
+  return st.local ? '✓ Progress saved on this device' : '⚠ This browser is blocking saves';
+};
+
+// A saved career turned up in the account after the game had already
+// started without it (slow connection): let the player pick
+setRemoteHandler((remote) => new Promise((resolve) => {
+  const cur = app.career;
+  const adopt = () => {
+    app.career = career.upgradeSave(remote);
+    saveCareer(app.career);
+    if (!app.round) { if (document.querySelector('.title-screen')) showTitle(); else if (app.fromHub) goHub(); }
+    toast(`Loaded ${remote.golfer.name}'s saved career`);
+    resolve();
+  };
+  if (!cur) { adopt(); return; }
+  if (cur.created === remote.created) {
+    if ((remote.savedAt || 0) > (cur.savedAt || 0) && !app.round) adopt(); else resolve();
+    return;
+  }
+  const info = (c) => `${esc(c.golfer.name)} · ${c.year} week ${c.week}`;
+  const m = modal(`<h3>We found your saved career</h3><p>Your account has <b>${info(remote)}</b> saved, but this device is playing <b>${info(cur)}</b>. Which one do you want to keep?</p>
+    <div class="actions"><button class="btn primary" data-saved>Load ${esc(remote.golfer.name)}</button><button class="btn" data-keep>Keep ${esc(cur.golfer.name)}</button></div>`, { onClose: () => resolve() });
+  m.el.querySelector('[data-saved]').addEventListener('click', () => {
+    if (app.round) { endRound(); }
+    m.close();
+    adopt();
+  });
+  m.el.querySelector('[data-keep]').addEventListener('click', () => m.close());
+}));
+
 // ---------------- boot ----------------
 function boot() {
+  applyLayout();
+  window.addEventListener('resize', applyLayout);
+  window.addEventListener('orientationchange', () => setTimeout(applyLayout, 250));
   app.world = new World($('view'), app.settings);
+  app.world.onContextLost = () => gfxNotice(true);
+  app.world.onContextRestored = () => gfxNotice(false);
   app.hud = new HUD($('hud'), app);
   app.hud.root.hidden = true;
   app.screens = new Screens($('screens'), app);
@@ -52,18 +159,22 @@ function boot() {
   document.addEventListener('pointerdown', () => initAudio(), { once: false });
   setupKeys();
   startMenuScene();
-  app.screens.title(false);
+  app.loadingSave = true;
+  app.screens.title(false, '', true);
   requestAnimationFrame(loop);
   loadCareer().then((c) => {
     app.cloudSave = hasCloud();
-    if (c) {
-      app.career = career.upgradeSave(c);
-      if (!app.round) showTitle();
-    }
+    app.loadingSave = false;
+    if (c) app.career = career.upgradeSave(c);
+    if (!app.round && document.querySelector('.title-screen')) showTitle();
     document.title = 'Fairway Legends';
     document.body.dataset.ready = '1';
   });
   initCloud().then(() => { app.cloudSave = hasCloud(); });
+  onSaveStatus(() => {
+    const el = document.getElementById('saveLine');
+    if (el) el.textContent = app.saveText();
+  });
 }
 
 function careerInfo() {
@@ -107,17 +218,23 @@ function menuCamera(dt, snap = false) {
 let last = performance.now();
 function loop(now) {
   // timeScale exists so automated playtests can fast-forward; it is 1 in play
-  const dt = Math.min(0.05, (now - last) / 1000) * (app.timeScale || 1);
+  const real = Math.max(0, (now - last) / 1000);
+  const dt = Math.min(0.05, real) * (app.timeScale || 1);
   last = now;
-  if (app.round) {
-    if (app.aimHold) app.round.nudgeAim(app.aimHold * dt * (app.round.putting ? 0.12 : 0.35));
-    app.round.fast = !!app.fastHold;
-    app.round.update(dt);
-  } else {
-    menuCamera(dt);
-  }
-  app.world.frame(dt);
   requestAnimationFrame(loop);
+  try {
+    if (app.round) {
+      if (app.aimHold) app.round.nudgeAim(app.aimHold * dt * (app.round.putting ? 0.12 : 0.35));
+      app.round.fast = !!app.fastHold;
+      app.round.update(dt);
+    } else {
+      menuCamera(dt);
+    }
+    app.world.perf.active = !!app.round;
+    app.world.frame(dt, real);
+  } catch (e) {
+    app.reportError(e);
+  }
 }
 
 // ---------------- keys ----------------
@@ -198,7 +315,7 @@ function pauseMenu() {
       ${t ? '<button class="mbtn" data-p="board"><span>Leaderboard</span></button>' : ''}
       <button class="mbtn" data-p="howto"><span>How to play</span></button>
       <label class="set"><span>Sound</span><input type="checkbox" data-p="sound" ${app.settings.sound ? 'checked' : ''}></label>
-      <button class="mbtn ghost" data-p="quit"><span>${t ? 'Save & exit to hub' : 'Quit round'}</span><small>${t ? 'Completed holes are saved; resume from the next hole' : ''}</small></button>
+      <button class="mbtn ghost" data-p="quit"><span>${t ? 'Save & exit to hub' : 'Quit round'}</span><small>${t ? 'Saved after every shot: you carry on from exactly where you stopped' : ''}</small></button>
     </div>`);
   m.el.addEventListener('click', (e) => {
     const b = e.target.closest('[data-p]');
@@ -226,7 +343,7 @@ function endRound() {
 function quitRound() {
   const t = app.round && app.round.opts.tournament;
   endRound();
-  if (t) { saveCareer(app.career); goHub(); }
+  if (t) { saveCareer(app.career, { now: true }); goHub(); }
   else showTitle();
 }
 
@@ -239,6 +356,7 @@ app.onAction = (a, d, elx) => {
     case 'back': app.fromHub && c ? goHub() : showTitle(); break;
     case 'continue': goHub(); break;
     case 'newCareer':
+      if (app.loadingSave) { toast('Still loading your saved career…'); break; }
       if (c) {
         const m = modal(`<h3>Start a new career?</h3><p>This replaces ${esc(c.golfer.name)}'s career (world #${career.rankOf(c)}). This can't be undone.</p><div class="actions"><button class="btn danger" data-go>Replace career</button><button class="btn" data-close>Keep it</button></div>`);
         m.el.querySelector('[data-go]').addEventListener('click', () => { m.close(); newCareerDraft(); });
@@ -452,9 +570,13 @@ function startTournamentRound() {
     cond: roundCond(t),
     tournament: t,
     crowd: true,
+    // carry on mid-hole if the game was closed between shots
+    resume: c.active.shot && c.active.shot.round === t.round ? c.active.shot : null,
+    onShotState: (st) => { c.active.shot = { ...st, round: t.round }; saveCareer(c); },
     leaderboardFn: () => tourn.leaderboard(t),
     simHole: (i) => tourn.simHumanHole(t, g, i),
     onHoleDone: (i, strokes, hs) => {
+      c.active.shot = null;
       tourn.recordHumanHole(t, i, strokes, hs.simmed);
       holeStats[i] = hs;
       trackHole(c, course.holes[i].par, strokes, hs);
@@ -517,6 +639,7 @@ function simTournamentRound() {
   const c = app.career;
   const t = c.active.t;
   const hp = tourn.humanPlayer(t);
+  c.active.shot = null;
   if (!hp.scores[t.round]) hp.scores[t.round] = [];
   for (let i = 0; i < 18; i++) {
     if (hp.scores[t.round][i] == null) tourn.recordHumanHole(t, i, tourn.simHumanHole(t, c.golfer, i), true);
@@ -592,7 +715,7 @@ function completeEventWeek() {
   const t = c.active.t;
   const hs = c.active.hs;
   const summary = career.completeWeek(c, hs);
-  saveCareer(c);
+  saveCareer(c, { now: true });
   if (summary.humanResult && summary.humanResult.pos === 1) sfx.applause(1.4);
   eventResults(app.screens, app, c, t, summary);
 }

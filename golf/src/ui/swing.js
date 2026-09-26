@@ -16,7 +16,14 @@ export class SwingInput {
 
   get pmax() {
     const h = this.target.clientHeight || window.innerHeight;
-    return Math.max(120, Math.min(260, h * 0.3));
+    return Math.max(90, Math.min(260, h * 0.3));
+  }
+
+  // Full power needs this much pull-down; if the swing starts low on a small
+  // screen, shrink it to the room left below the finger
+  pullFor(y0) {
+    const h = this.target.clientHeight || window.innerHeight;
+    return Math.max(60, Math.min(this.pmax, (h - y0 - 12) / 1.1));
   }
 
   down(e) {
@@ -26,7 +33,7 @@ export class SwingInput {
     if (e.button !== undefined && e.button !== 0) return;
     if (!round.beginDrag()) return;
     this.target.setPointerCapture(e.pointerId);
-    this.state = { x0: e.clientX, y0: e.clientY, maxDepth: 0, phase: 'back', pts: [{ x: e.clientX, y: e.clientY, t: performance.now() }], top: null };
+    this.state = { x0: e.clientX, y0: e.clientY, pull: this.pullFor(e.clientY), maxDepth: 0, phase: 'back', pts: [{ x: e.clientX, y: e.clientY, t: performance.now() }], top: null };
     this.app.hud.meterShow(e.clientX, e.clientY);
     e.preventDefault();
   }
@@ -37,7 +44,7 @@ export class SwingInput {
     const now = performance.now();
     s.pts.push({ x: e.clientX, y: e.clientY, t: now });
     if (s.pts.length > 400) s.pts.shift();
-    const depth = (e.clientY - s.y0) / this.pmax;
+    const depth = (e.clientY - s.y0) / s.pull;
     if (s.phase === 'back') {
       if (depth > s.maxDepth) {
         s.maxDepth = Math.min(1.1, depth);

@@ -53,12 +53,33 @@ export class World {
     this.container = container;
     this.settings = settings;
     this.quality = this.pickQuality(settings.quality);
-    this.renderer = new THREE.WebGLRenderer({ antialias: this.quality !== 'low', powerPreference: 'high-performance' });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.quality === 'high' ? 2 : this.quality === 'medium' ? 1.5 : 1));
+    this.renderer = new THREE.WebGLRenderer({ antialias: this.quality !== 'low', powerPreference: this.quality === 'high' ? 'high-performance' : 'default' });
+    // Phones get a lighter pixel budget; the frame-rate governor below can
+    // lower it further if the device still struggles
+    this.maxPR = Math.min(window.devicePixelRatio || 1, this.quality === 'high' ? 2 : this.quality === 'medium' ? 1.5 : 1.25);
+    this.pr = this.maxPR;
+    this.renderer.setPixelRatio(this.pr);
+    this.renderer.setClearColor(0x16281d, 1);
     this.renderer.shadowMap.enabled = this.quality !== 'low';
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = this.quality === 'high' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
     this.renderer.domElement.className = 'gl';
     container.appendChild(this.renderer.domElement);
+    // The browser can drop the GPU context (low memory, app switching).
+    // Keep the game alive and redraw once the context comes back.
+    this.lost = false;
+    this.onContextLost = null;
+    this.onContextRestored = null;
+    this.renderer.domElement.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      this.lost = true;
+      if (this.onContextLost) this.onContextLost();
+    });
+    this.renderer.domElement.addEventListener('webglcontextrestored', () => {
+      this.lost = false;
+      this.setPixelRatio(Math.max(0.75, this.pr - 0.25));
+      if (this.onContextRestored) this.onContextRestored();
+    });
+    this.perf = { t: 0, n: 0, slow: 0, active: false };
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(50, 1, 0.05, 12000);
@@ -111,17 +132,54 @@ export class World {
 
   pickQuality(q) {
     if (q && q !== 'auto') return q;
-    const small = Math.min(window.innerWidth, window.innerHeight) < 700;
+    const small = Math.min(window.innerWidth, window.innerHeight);
     const touch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    return touch || small ? 'medium' : 'high';
+    if (touch && small < 540) return 'low'; // phones
+    return touch || small < 700 ? 'medium' : 'high';
+  }
+
+  // Camera shots are framed for a landscape screen. On a tall (portrait)
+  // screen widen the vertical angle so the sides (the golfer, the target)
+  // stay in the picture.
+  fovFor(f) {
+    const a = this.camera.aspect;
+    if (!(a < 0.75)) return f;
+    const k = 0.75 / a;
+    const r = (Math.PI / 180) * f * 0.5;
+    return Math.min(92, (2 * Math.atan(Math.tan(r) * k) * 180) / Math.PI);
+  }
+
+  setPixelRatio(pr) {
+    this.pr = pr;
+    this.renderer.setPixelRatio(pr);
+    this.resize();
   }
 
   resize() {
-    const w = this.container.clientWidth || window.innerWidth;
-    const h = this.container.clientHeight || window.innerHeight;
+    const w = Math.max(1, this.container.clientWidth || window.innerWidth);
+    const h = Math.max(1, this.container.clientHeight || window.innerHeight);
+    // Never ask for a giant drawing buffer (some webviews report huge sizes)
+    const cap = Math.sqrt(3.2e6 / (w * h));
+    if (this.pr > cap) this.renderer.setPixelRatio(Math.max(0.5, cap));
+    else this.renderer.setPixelRatio(this.pr);
     this.renderer.setSize(w, h, false);
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
+  }
+
+  // Frame-rate governor: while playing, if the device can't keep up,
+  // render fewer pixels rather than stutter (or run out of memory)
+  governor(realDt) {
+    const p = this.perf;
+    if (!p.active || realDt <= 0 || realDt > 1) return;
+    p.t += realDt; p.n++;
+    if (p.t < 2.5) return;
+    const fps = p.n / p.t;
+    p.t = 0; p.n = 0;
+    if (fps < 24 && this.pr > 0.75) {
+      p.slow++;
+      if (p.slow >= 2) { p.slow = 0; this.setPixelRatio(Math.max(0.75, Math.round((this.pr - 0.25) * 100) / 100)); }
+    } else p.slow = 0;
   }
 
   setConditions(cond, style, headingOffset = 0) {
@@ -194,7 +252,8 @@ export class World {
     this.cam.fov = this.camGoal.fov;
   }
 
-  frame(dt) {
+  frame(dt, realDt = dt) {
+    this.governor(realDt);
     const g = this.camGoal;
     const a = 1 - Math.exp(-g.k * dt);
     this.cam.pos.lerp(g.pos, a);
@@ -202,8 +261,9 @@ export class World {
     this.cam.fov += (g.fov - this.cam.fov) * a;
     this.camera.position.copy(this.cam.pos);
     this.camera.lookAt(this.cam.look);
-    if (Math.abs(this.camera.fov - this.cam.fov) > 0.01) {
-      this.camera.fov = this.cam.fov;
+    const fov = this.fovFor(this.cam.fov);
+    if (Math.abs(this.camera.fov - fov) > 0.01) {
+      this.camera.fov = fov;
       this.camera.updateProjectionMatrix();
     }
     this.sky.position.copy(this.camera.position);
@@ -216,6 +276,6 @@ export class World {
     if (this.golfer) this.golfer.update(dt);
     this.particles.update(dt);
     this.tracer.update(this.camera);
-    this.renderer.render(this.scene, this.camera);
+    if (!this.lost) this.renderer.render(this.scene, this.camera);
   }
 }

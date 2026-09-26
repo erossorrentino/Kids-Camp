@@ -43,7 +43,7 @@ button { cursor: pointer; }
 [hidden] { display: none !important; }
 .noscript { padding: 24px; }
 
-#view { position: fixed; inset: 0; touch-action: none; }
+#view { position: fixed; inset: 0; touch-action: none; background: #16281d; }
 #view canvas.gl { display: block; width: 100%; height: 100%; }
 
 /* ---------------- shared bits ---------------- */
@@ -415,27 +415,91 @@ button { cursor: pointer; }
   .kpi { flex: 1 1 40%; }
   .settings .set { grid-template-columns: 1fr; }
   .result-hero { flex-direction: column; align-items: flex-start; }
-  .hud-top { max-width: calc(100% - 130px); }
-  .holecard { min-width: 0; }
-  .hc-hole { font-size: 20px; } .hc-par, .hc-yds { font-size: 16px; }
-  .lbstrip { display: none; }
-  .minimap { width: 96px; }
-  .minimap canvas { width: 88px; }
-  .clubbox { min-width: 0; flex: 1 1 auto; }
-  .club-name { font-size: 20px; }
-  .distbox { flex: 1 1 auto; }
-  .dist-main b { font-size: 30px; }
-  .btnrow { width: 100%; justify-content: space-between; }
-  .hbtn { padding: 0 9px; height: 40px; font-size: 12px; }
-  .aimbtns { top: 46%; }
-  .stats { top: auto; bottom: calc(var(--safe-b) + 250px); width: 180px; }
-  .intro { bottom: calc(var(--safe-b) + 200px); }
-  .swing-hint { top: 34%; font-size: 14px; }
-  .hc-row1 { gap: 8px; }
-  .hc-row2 { gap: 10px; font-size: 12px; }
-  .mm-cap { display: none; }
-  .in-num { font-size: 46px; min-width: 64px; }
 }
+
+/* ---------------- phones: compact HUD (html.compact, set from JS) ---------------- */
+.compact .hud-top { top: calc(var(--safe-t) + 6px); left: calc(var(--safe-l) + 6px); gap: 4px; max-width: calc(100% - 112px); }
+.compact .holecard { padding: 5px 9px 6px; min-width: 0; }
+.compact .hc-row1 { gap: 7px; }
+.compact .hc-hole { font-size: 18px; }
+.compact .hc-par, .compact .hc-yds { font-size: 15px; }
+.compact .hc-row2 { gap: 9px; font-size: 11px; margin-top: 3px; }
+.compact .hc-row2 b { font-size: 14px; }
+.compact .lie { padding: 3px 8px; gap: 6px; border-left-width: 3px; }
+.compact .lie-name, .compact .lie-pct { font-size: 13px; }
+.compact .lie-notes { font-size: 11px; }
+.compact .lbstrip { display: none; }
+.compact .minimap { top: calc(var(--safe-t) + 6px); right: calc(var(--safe-r) + 6px); width: 88px; padding: 3px; }
+.compact .minimap canvas { width: 82px; }
+.compact .minimap #mmOver { top: 3px; left: 3px; }
+.compact .mm-cap { display: none; }
+.compact .hud-bottom { left: calc(var(--safe-l) + 6px); right: calc(var(--safe-r) + 6px); bottom: calc(var(--safe-b) + 6px); gap: 5px; flex-wrap: wrap; }
+.compact .clubbox { min-width: 0; padding: 4px; gap: 4px; }
+.compact .icon-btn { width: 38px; height: 40px; }
+.compact .club-name { font-size: 18px; white-space: nowrap; }
+.compact .club-model { font-size: 9px; max-width: 150px; margin-bottom: 2px; }
+.compact .club-carry { font-size: 11px; margin-top: 2px; }
+.compact .ball-name { display: none; }
+.compact .distbox { padding: 4px 10px; gap: 0 10px; }
+.compact .dist-main { font-size: 12px; }
+.compact .dist-main b { font-size: 26px; }
+.compact .dist-sub { font-size: 11px; }
+.compact .wind { padding-left: 8px; }
+.compact .wind-arrow { font-size: 19px; }
+.compact .wind span { font-size: 12px; }
+.compact .btnrow { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; margin: 0; }
+.compact .hbtn { padding: 0 4px; height: 38px; font-size: 11px; letter-spacing: .03em; justify-content: center; gap: 4px; min-width: 0; white-space: nowrap; overflow: hidden; }
+.compact .shape-ball { width: 15px; height: 15px; }
+.compact .shape-ball i { left: 5px; top: 5px; width: 5px; height: 5px; }
+.compact .aimbtns { top: 42%; left: calc(var(--safe-l) + 4px); right: calc(var(--safe-r) + 4px); }
+.compact .aim-btn { width: 46px; height: 46px; font-size: 16px; }
+.compact .swing-hint { top: 27%; font-size: 13px; padding: 7px 10px; max-width: min(360px, 78vw); }
+.compact .stats { top: calc(var(--safe-t) + 6px); right: calc(var(--safe-r) + 100px); width: 150px; padding: 6px 9px; }
+.compact .st-head { font-size: 14px; margin-bottom: 3px; }
+.compact .st-row { font-size: 11px; line-height: 1.4; }
+.compact .intro { min-width: min(380px, 94vw); }
+.compact .in-num { font-size: 40px; min-width: 56px; padding: 0 10px; }
+.compact .in-body { padding: 8px 12px; }
+.compact .in-title { font-size: 19px; }
+.compact .in-sub { font-size: 12px; }
+.compact .in-skip { font-size: 9px; }
+.compact .meter-bar { height: 130px; }
+.compact .shape-pop { right: calc(var(--safe-r) + 6px); width: 190px; padding: 10px; }
+.compact .shape-pad { width: 140px; height: 140px; }
+.compact .msg-title { font-size: 28px; }
+.compact .msg-sub { font-size: 13px; }
+.compact .hr-name { font-size: 40px; }
+.compact .holeres { padding: 10px 20px; top: 26%; }
+/* portrait: club and distance each get a full row, buttons below */
+.compact.portrait .clubbox, .compact.portrait .distbox { flex: 1 1 100%; }
+.compact.portrait .btnrow { flex: 1 1 100%; }
+.compact.portrait .intro { bottom: calc(var(--safe-b) + 168px); }
+.compact.portrait .shape-pop { bottom: calc(var(--safe-b) + 168px); }
+.compact.portrait .stats { top: calc(var(--safe-t) + 160px); right: calc(var(--safe-r) + 6px); }
+/* landscape: one row along the bottom, buttons in two short rows */
+.compact:not(.portrait) .hud-bottom { flex-wrap: nowrap; align-items: stretch; }
+.compact:not(.portrait) .clubbox { flex: 0 1 230px; }
+.compact:not(.portrait) .distbox { flex: 0 1 210px; }
+.compact:not(.portrait) .btnrow { flex: 1 1 0; grid-auto-flow: row; grid-template-columns: repeat(3, 1fr); align-content: end; }
+.compact:not(.portrait) .hbtn { height: 30px; }
+.compact:not(.portrait) .intro { bottom: calc(var(--safe-b) + 76px); }
+.compact:not(.portrait) .shape-pop { bottom: calc(var(--safe-b) + 76px); right: calc(var(--safe-r) + 100px); }
+.compact:not(.portrait) .swing-hint { top: 30%; }
+.compact:not(.portrait) .meter-bar { height: 110px; }
+
+/* Touch screens: no frosted-glass blur over the live 3D view (costly on
+   phones and tablets, and glitchy on some); panels are a touch more solid */
+@media (hover: none) {
+  .panel { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(9, 23, 17, 0.9); }
+}
+button, .hbtn, .aim-btn, .mbtn, .tab { touch-action: manipulation; }
+
+/* graphics reset notice, save status */
+.gfx-notice { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; align-content: center; gap: 10px; padding: 24px; text-align: center; background: rgba(8,20,14,.92); font: 600 15px/1.4 var(--body); }
+.gfx-notice b { font: 800 22px/1.1 var(--display); text-transform: uppercase; letter-spacing: .04em; }
+.gfx-notice span { color: var(--muted); max-width: 32ch; }
+.save-line { font: 600 12px/1.2 var(--display); letter-spacing: .05em; text-transform: uppercase; color: var(--good); margin-top: 3px; }
+.mbtn.loadingsave { opacity: .85; cursor: default; border-style: dashed; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
@@ -460,3 +524,19 @@ button { cursor: pointer; }
 .yb-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font: 600 13px/1.1 var(--display); letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
 .yb-head b { font: 800 26px/1 var(--display); color: var(--flag); margin-right: 2px; }
 .yb-note { font-size: 13px; line-height: 1.4; color: #d4ded7; margin: 6px 0 0; }
+
+/* phones: menus and tables fit without sideways scrolling */
+@media (max-width: 520px) {
+  #screens { padding-left: calc(var(--safe-l) + 10px); padding-right: calc(var(--safe-r) + 10px); }
+  .card { padding: 12px 10px; }
+  .tbl th, .tbl td { padding: 6px 5px; }
+  .scorecard .table-wrap { padding: 3px; }
+  .tbl.scard th, .tbl.scard td { padding: 4px 1px; font-size: 12px; }
+  .tbl.scard th { font-size: 9px; letter-spacing: .02em; padding-left: 3px; }
+  .tbl.scard tr.score td { font-size: 14px; height: 28px; }
+  .sc-birdie, .sc-eagle, .sc-bogey, .sc-double { width: 21px; height: 21px; }
+  .modal { padding: 18px 14px 14px; }
+  .tbl.board .rcol { display: none; }
+  .tabs { flex-wrap: wrap; gap: 2px 0; overflow: visible; }
+  .tab { padding: 9px 8px; font-size: 13px; }
+}

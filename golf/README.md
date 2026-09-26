@@ -1,6 +1,6 @@
 # Fairway Legends
 
-A 3D golf game that runs in the browser (computer or tablet). You start as
+A 3D golf game that runs in the browser (computer, tablet or phone). You start as
 world #501 and try to become the best golfer in the world against 500 tour
 pros on 100 courses.
 
@@ -105,11 +105,30 @@ hole using your golfer's skills if you want to move on.
   flower bed, seaside holes get a lighthouse, and your shots leave divots
   in the fairway and pitch marks on the greens.
 
+## Phones
+
+On a phone the HUD switches to a compact layout (club and distance on
+their own rows in portrait, one row along the bottom in landscape), the
+camera widens on tall screens so your golfer and the target both fit, and
+the swing's pull-down shortens to the room left below your finger.
+Graphics default to **Low** on phones (fewer spectators, no shadows,
+lighter resolution), and if the frame rate still drops the game lowers
+its resolution on its own. If the phone takes the 3D view away (low
+memory, switching apps) the game says so, saves, and picks back up; if
+anything goes wrong it shows a card with a way out instead of a blank
+screen.
+
 ## Saving
 
-Career progress is saved after every hole in the browser's localStorage.
-When the game runs as a claude.ai artifact it also saves to your account,
-so it follows you between computer and tablet.
+Career progress is saved after **every shot** in the browser's
+localStorage (with a backup copy), and again whenever the page is hidden
+or closed. Close the game mid-hole and **Resume** puts your ball back
+exactly where it was. When the game runs as a claude.ai artifact it also
+saves to your account, so it follows you between computer, tablet and
+phone. The game never writes to your account until it has read what's
+saved there, so a slow connection can't replace a saved career; if you
+start a new career before the saved one arrives, it asks which to keep.
+The hub shows where your progress is saved.
 
 ## Code layout
 

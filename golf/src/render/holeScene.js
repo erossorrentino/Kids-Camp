@@ -378,7 +378,15 @@ export class HoleScene {
     geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     geo.setIndex(idx);
     geo.computeVertexNormals();
-    const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
+    // Distance haze is baked into the colors so the far ranges keep their
+    // shape instead of fading into a flat pale wall
+    const haze = new THREE.Color(hole.style.fog || '#c3d3e0');
+    const ca = geo.attributes.color;
+    for (let i = 0; i < ca.count; i++) {
+      const c = new THREE.Color(ca.getX(i), ca.getY(i), ca.getZ(i)).lerp(haze, 0.32);
+      ca.setXYZ(i, c.r, c.g, c.b);
+    }
+    const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, fog: false }));
     this.group.add(m);
   }
 
@@ -498,7 +506,8 @@ export class HoleScene {
     const g = hole.green;
     const spots = [];
     const approach = hole.finalHeading + Math.PI;
-    for (let i = 0; i < 700 && spots.length < 260; i++) {
+    const lite = this.quality === 'low';
+    for (let i = 0; i < 700 && spots.length < (lite ? 110 : 260); i++) {
       const a = rng.float(0, Math.PI * 2);
       const rel = Math.atan2(Math.sin(a - approach), Math.cos(a - approach));
       if (Math.abs(rel) < 0.8) continue;
@@ -514,7 +523,7 @@ export class HoleScene {
       const p = hole.pointAtS(s);
       const r = { x: Math.cos(p.heading), z: Math.sin(p.heading) };
       for (const side of [-1, 1]) {
-        if (rng.next() < 0.35) continue;
+        if (rng.next() < (lite ? 0.7 : 0.35)) continue;
         const lat = side * (hole.fairwayHalfWidth(s, side) + rng.float(9, 14));
         const x = p.x + r.x * lat, z = p.z + r.z * lat;
         const f = hole.fields(x, z);

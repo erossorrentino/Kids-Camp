@@ -216,8 +216,11 @@ export class HUD {
   meterShow(x, y) {
     const m = this.$('meter');
     m.hidden = false;
-    m.style.left = `${x + 34}px`;
-    m.style.top = `${Math.max(10, y - 20)}px`;
+    const W = window.innerWidth, H = window.innerHeight;
+    const mh = m.offsetHeight || 190;
+    // keep it on screen; flip to the left of the finger near the right edge
+    m.style.left = `${x + 120 > W ? Math.max(4, x - 110) : x + 34}px`;
+    m.style.top = `${Math.max(6, Math.min(H - mh - 6, y - 20))}px`;
     this.meterSet(0);
   }
   meterSet(p, phase = 'back') {

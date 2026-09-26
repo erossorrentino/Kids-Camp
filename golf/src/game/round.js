@@ -77,6 +77,18 @@ export class RoundController {
     // let the loading card paint before the heavy build
     setTimeout(() => {
       if (this.destroyed) return;
+      try {
+        this.buildHole(i);
+      } catch (e) {
+        this.hud.loaded();
+        if (this.app.reportError) this.app.reportError(e);
+        else throw e;
+      }
+    }, 30);
+  }
+
+  buildHole(i) {
+    {
       this.hole = new HoleModel(this.course, i, { pinDay: this.cond.pinDay || 0 });
       this.wind = this.windForHole(i);
       this.env = makeEnv(this.hole, { wind: this.wind.vec, firmness: this.cond.firm, stimp: this.cond.stimp, altitude: this.altitude });
@@ -107,8 +119,34 @@ export class RoundController {
       if (this.fx.hotHead && this.lastHoleRel > 0) this.dispMult *= 1.35;
       if (this.fx.slowStart && i < 3) this.dispMult *= 1.2;
       if (this.fx.lateFade > 0 && i >= 13) this.dispMult *= 1.15;
+      // Pick up a saved hole in progress where the last shot finished
+      const rs = this.opts.resume;
+      if (rs && rs.hole === i && rs.ball) {
+        this.opts.resume = null;
+        this.strokes = rs.strokes || 0;
+        this.putts = rs.putts || 0;
+        this.penalties = rs.penalties || 0;
+        this.hitFairway = rs.hitFairway ?? null;
+        this.girHit = !!rs.girHit;
+        this.plugged = !!rs.plugged;
+        this.ballPos = { ...rs.ball };
+        this.prevPos = rs.prev ? { ...rs.prev } : { ...this.ballPos, lie: this.hole.surfaceAt(rs.ball.x, rs.ball.z) };
+        this.hud.setStrokes(this.strokes);
+        this.hud.message('Welcome back', `Shot ${this.strokes + 1} on the ${ordinal(i + 1)}`, 'neutral');
+        this.prepareShot(true);
+        return;
+      }
       if (this.app.settings.flyover) this.startIntro(); else this.prepareShot(true);
-    }, 30);
+    }
+  }
+
+  // Everything needed to carry on this hole from where the ball lies now
+  shotState() {
+    return {
+      hole: this.holeIndex, strokes: this.strokes, putts: this.putts, penalties: this.penalties,
+      hitFairway: this.hitFairway, girHit: this.girHit, plugged: this.plugged,
+      ball: { ...this.ballPos }, prev: this.prevPos ? { ...this.prevPos } : null,
+    };
   }
 
   startIntro() {
@@ -185,6 +223,7 @@ export class RoundController {
     this.hud.setLie(this.lieInfo());
     this.hud.setStrokes(this.strokes);
     this.hud.showSwingHint(true);
+    if (this.strokes > 0 && this.opts.onShotState) this.opts.onShotState(this.shotState());
   }
 
   suggest() {
@@ -398,7 +437,13 @@ export class RoundController {
       const ly = this.hole.heightAt(land.x, land.z);
       const lookD = Math.min(ld, 90);
       const lookY = gy + (ly - gy) * (lookD / Math.max(1, ld)) + 1.2;
-      w.setCamera(V(b.x - f.x * 3.7 + r.x * 0.55, gy + 1.75, b.z - f.z * 3.7 + r.z * 0.55), V(b.x + f.x * lookD, lookY, b.z + f.z * lookD), 50, fast ? 10 : 3.5);
+      // On a tall phone screen stand a little further back and closer to the
+      // golfer's side so both the golfer and the target line fit
+      const tall = w.camera.aspect < 0.8;
+      // a short landscape phone: tilt down a little so the ball clears the HUD
+      const short = !tall && window.innerHeight < 540;
+      const back = tall ? 5 : 3.7, side = tall ? -0.2 : 0.55;
+      w.setCamera(V(b.x - f.x * back + r.x * side, gy + (tall ? 2.1 : 1.75), b.z - f.z * back + r.z * side), V(b.x + f.x * lookD, lookY - (short ? 0.12 * lookD : 0), b.z + f.z * lookD), short ? 54 : 50, fast ? 10 : 3.5);
     }
     w.focus.set(b.x, gy, b.z);
   }
