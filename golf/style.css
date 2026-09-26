@@ -213,7 +213,7 @@ button { cursor: pointer; }
 
 /* scorecard: a paper card */
 .scorecard .table-wrap { background: var(--paper); border-radius: 4px; padding: 6px; }
-.tbl.scard { color: var(--paper-ink); margin-bottom: 4px; }
+.tbl.scard { color: var(--paper-ink); margin-bottom: 4px; background: var(--paper); }
 .tbl.scard th, .tbl.scard td { border: 1px solid var(--paper-line); text-align: center; padding: 6px 4px; color: var(--paper-ink); font-size: 14px; }
 .tbl.scard th { background: #eef0e6; text-align: left; font-size: 11px; }
 .tbl.scard tr.par td { background: #f1f4ea; }

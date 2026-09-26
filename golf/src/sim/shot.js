@@ -121,7 +121,8 @@ export function slopeLie(hole, x, z, heading) {
 export function computeLaunch(inp) {
   const club = CLUB_BY_ID[inp.clubId];
   const { stats, fx, ball } = inp;
-  const rng = inp.rng || Math.random;
+  // Predictions use the typical lie (no flier, mid-range loss) so the aim ring stays put
+  const rng = inp.noRandom ? () => 0.5 : inp.rng || Math.random;
   const gauss = () => {
     if (inp.noRandom) return 0;
     let u = 0, v = 0;
@@ -154,7 +155,7 @@ export function computeLaunch(inp) {
   speed *= 1 - Math.abs(sl.uphillDeg) * 0.004;
 
   // Swing path error -> face / path -> start line + curvature
-  const dz = 1.5;
+  const dz = 3;
   const dev = inp.devDeg || 0;
   const e = Math.sign(dev) * Math.max(0, Math.abs(dev) - dz);
   const skill = skillForClub(club, p, stats);
@@ -164,8 +165,8 @@ export function computeLaunch(inp) {
   else k *= fx.ironErr;
   const over = Math.max(0, p - 1);
   k *= 1 + over * 6; // overswinging past 100% costs accuracy fast
-  let startDeg = e * 0.35 * k;
-  let axisDeg = e * 1.6 * k * ball.side;
+  let startDeg = e * 0.25 * k;
+  let axisDeg = e * 1.15 * k * ball.side;
   axisDeg += shape.x * 9 * ball.side;
   startDeg -= shape.x * 2.2;
   if (p > 0.5) axisDeg += fx.shapeBias * ball.side;

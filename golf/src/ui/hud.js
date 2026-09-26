@@ -240,7 +240,7 @@ export class HUD {
   trail(points, quality = 0) {
     const pl = this.$('trailLine');
     pl.setAttribute('points', points.map((p) => `${p.x},${p.y}`).join(' '));
-    pl.setAttribute('class', quality > 6 ? 'bad' : quality > 2 ? 'meh' : 'good');
+    pl.setAttribute('class', quality > 10 ? 'bad' : quality > 3 ? 'meh' : 'good');
   }
 
   message(title, sub = '', tone = 'neutral') {
@@ -273,7 +273,7 @@ export class HUD {
           ['Land angle', s.landAngle != null ? `${s.landAngle.toFixed(0)}°` : '—'],
         ];
     const dev = s.dev || 0;
-    const swingTxt = Math.abs(dev) < 1.5 ? 'Pure strike' : `Swing path ${Math.abs(dev).toFixed(0)}° ${dev > 0 ? 'right' : 'left'}`;
+    const swingTxt = Math.abs(dev) < 3 ? 'Pure strike' : `Swing path ${Math.abs(dev).toFixed(0)}° ${dev > 0 ? 'right' : 'left'}`;
     el.innerHTML = `<div class="st-head">${esc(s.club)}<span>${esc(swingTxt)}</span></div>${rows.map(([k, v]) => `<div class="st-row"><span>${k}</span><b>${v}</b></div>`).join('')}${s.note ? `<div class="st-note">${esc(s.note)}</div>` : ''}`;
     el.hidden = false;
     clearTimeout(this._stT);

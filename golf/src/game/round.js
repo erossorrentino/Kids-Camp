@@ -181,6 +181,7 @@ export class RoundController {
     if (snap) this.world.snapCamera();
     this.hud.setShot(this.shotInfo());
     this.hud.setLie(this.lieInfo());
+    this.hud.setStrokes(this.strokes);
     this.hud.showSwingHint(true);
   }
 
@@ -830,7 +831,7 @@ export class RoundController {
       this.updateFlight(dt);
     } else if (this.phase === 'result' && this.resumeAt && performance.now() > this.resumeAt) {
       this.resumeAt = 0;
-      this.world.tracer.mat.uniforms.uFade.value = 0.35;
+      this.world.tracer.reset();
       this.prepareShot();
     } else if (this.phase === 'holedone' && this.resumeAt && performance.now() > this.resumeAt) {
       this.resumeAt = 0;
