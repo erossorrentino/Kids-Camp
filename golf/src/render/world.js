@@ -2,7 +2,8 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { HoleScene } from './holeScene.js';
 import { Golfer } from './golfer.js';
-import { Ball, Tracer, AimRing, DotLine, GreenGrid, Particles } from './effects.js';
+import { Caddie } from './people.js';
+import { Ball, Tracer, AimRing, DotLine, GreenGrid, Particles, Marks } from './effects.js';
 
 function skyMaterial() {
   return new THREE.ShaderMaterial({
@@ -94,6 +95,8 @@ export class World {
     this.scene.add(this.grid.group);
     this.particles = new Particles();
     this.scene.add(this.particles.points);
+    this.marks = new Marks();
+    this.marks.addTo(this.scene);
     this.golfer = null;
     this.holeScene = null;
 
@@ -154,15 +157,28 @@ export class World {
     this.scene.add(this.holeScene.group);
     this.grid.build(hole);
     this.grid.setVisible(false);
+    this.marks.reset();
     this.tracer.reset();
     this.preview.clear();
     this.puttLine.clear();
   }
 
-  setGolfer(look) {
+  setGolfer(look, name = '') {
     if (this.golfer) this.scene.remove(this.golfer.root);
     this.golfer = new Golfer(look);
     this.scene.add(this.golfer.root);
+    if (this.caddie) this.scene.remove(this.caddie.group);
+    this.caddie = new Caddie(look, name);
+    this.scene.add(this.caddie.group);
+  }
+
+  hidePlayers() {
+    if (this.golfer) this.golfer.root.visible = false;
+    if (this.caddie) this.caddie.group.visible = false;
+  }
+
+  cheer(strength) {
+    if (this.holeScene) this.holeScene.cheer(strength);
   }
 
   // camera goals: the rig eases toward them

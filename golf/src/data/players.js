@@ -1,5 +1,6 @@
 // Generates the 500-player world tour, deterministically.
-import { RNG, clamp } from '../util/rng.js';
+import { RNG, clamp, mixSeed } from '../util/rng.js';
+import { proBag } from './clubsets.js';
 import { COUNTRIES, POOLS, STARS, REAL_NAME_BLOCKLIST } from './names.js';
 import { TRAITS, TRAIT_IDS } from './traits.js';
 
@@ -175,6 +176,14 @@ export function generatePros() {
     if (i > 250 && rng.chance(0.55)) pro.ball = rng.pick(['tourbal', 'softfeel', 'range', 'tourbal']);
     pros.push(pro);
   }
+  // Equipment: a separate generator so adding clubs never reshuffles the pros
+  const brng = new RNG(mixSeed(424242, 'bags'));
+  pros.forEach((pro, i) => {
+    pro.bag = proBag(pro.arch, i / N, (opts) => brng.pick(opts));
+    pro.look.shades = brng.chance(0.22);
+    pro.look.belt = brng.pick(['#1b1b1b', '#3b2a1f', '#f4f4f4', '#1d3557', '#8d5a3b']);
+    pro.look.shoe = brng.pick(['#1b1b1b', '#f4f4f4', pro.look.shirt, '#1d3557', '#8d5a3b']);
+  });
   CACHE = pros;
   return pros;
 }

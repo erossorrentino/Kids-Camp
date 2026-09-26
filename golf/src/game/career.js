@@ -3,6 +3,7 @@ import { generatePros, proById, STAT_KEYS, overall } from '../data/players.js';
 import { generateSeason, TOURS, SEASON_WEEKS, MAJORS } from '../data/tour.js';
 import { courseById } from '../data/courses.js';
 import { RNG, mixSeed } from '../util/rng.js';
+import { STARTER_BAG, normBag } from '../data/clubsets.js';
 import { HUMAN_ID, simulateWholeEvent, createTournament, results as tourneyResults } from './tournament.js';
 
 export const START_YEAR = 2026;
@@ -61,6 +62,7 @@ export function newCareer({ name, country, gender, look, stats }) {
       level: 1, xp: 0, sp: 0,
       money: 25000, careerMoney: 0,
       balls: ['range', 'tourbal'], ball: 'tourbal',
+      bag: { ...STARTER_BAG }, clubs: Object.values(STARTER_BAG),
       majorsWon: [],
     },
     year: START_YEAR,
@@ -364,3 +366,11 @@ export function golferOVR(g) {
 
 export const DEFAULT_STATS = { power: 58, accuracy: 56, irons: 56, shortGame: 55, putting: 56, recovery: 54, mental: 54, wind: 54, consistency: 58 };
 export { STAT_KEYS, courseById };
+
+// Older saves predate clubs: give them the starter bag
+export function upgradeSave(c) {
+  if (!c || !c.golfer) return c;
+  c.golfer.bag = normBag(c.golfer.bag);
+  if (!Array.isArray(c.golfer.clubs)) c.golfer.clubs = Object.values(c.golfer.bag);
+  return c;
+}

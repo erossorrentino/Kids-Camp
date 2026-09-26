@@ -50,8 +50,17 @@ export class Golfer {
     for (const side of [-1, 1]) {
       const thigh = limb(0.075, L.pants);
       const shin = limb(0.06, L.pants);
-      const shoe = new THREE.Mesh(new THREE.BoxGeometry(0.27, 0.08, 0.11), new THREE.MeshLambertMaterial({ color: '#f4f4f4' }));
-      shoe.castShadow = true;
+      // two-tone golf shoe: white upper, dark sole, rounded toe
+      const shoe = new THREE.Group();
+      const upper = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.075, 0.105), new THREE.MeshLambertMaterial({ color: '#f4f4f4' }));
+      upper.position.set(-0.02, 0.045, 0);
+      const toe = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.052, 0.075, 10, 1, false, 0, Math.PI), new THREE.MeshLambertMaterial({ color: '#f4f4f4' }));
+      toe.position.set(0.09, 0.045, 0);
+      const sole = new THREE.Mesh(new THREE.BoxGeometry(0.29, 0.018, 0.112), new THREE.MeshLambertMaterial({ color: '#2b2b2b' }));
+      sole.position.set(0.01, 0.009, 0);
+      const saddle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.078, 0.108), new THREE.MeshLambertMaterial({ color: L.shoe || '#1b1b1b' }));
+      saddle.position.set(0.02, 0.046, 0);
+      for (const m of [upper, toe, sole, saddle]) { m.castShadow = true; shoe.add(m); }
       this.root.add(thigh, shin, shoe);
       this.legs.push({ side, thigh, shin, shoe });
     }
@@ -62,6 +71,12 @@ export class Golfer {
     const hips = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.2, 0.36), new THREE.MeshLambertMaterial({ color: L.pants }));
     hips.castShadow = true;
     this.pelvis.add(hips);
+    // belt with a buckle
+    const belt = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.045, 0.38), new THREE.MeshLambertMaterial({ color: L.belt || '#1b1b1b' }));
+    belt.position.y = 0.11;
+    const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.04, 0.05), new THREE.MeshLambertMaterial({ color: '#c9ccd1' }));
+    buckle.position.set(0.13, 0.11, 0);
+    this.pelvis.add(belt, buckle);
     this.spine = new THREE.Group();
     this.pelvis.add(this.spine);
     this.chest = new THREE.Group();
@@ -74,6 +89,16 @@ export class Golfer {
     const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.1, 8), new THREE.MeshLambertMaterial({ color: L.skin }));
     neck.position.y = 0.6;
     this.chest.add(neck);
+    // polo collar and button placket
+    const shirtC = new THREE.Color(L.shirt);
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.022, 6, 14), new THREE.MeshLambertMaterial({ color: shirtC.clone().lerp(new THREE.Color('#ffffff'), 0.15) }));
+    collar.rotation.x = Math.PI / 2;
+    collar.position.y = 0.57;
+    const placket = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.12, 0.035), new THREE.MeshLambertMaterial({ color: shirtC.clone().multiplyScalar(0.8) }));
+    placket.position.set(0.19, 0.49, 0);
+    const logo = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.04, 0.05), new THREE.MeshLambertMaterial({ color: L.cap }));
+    logo.position.set(0.18, 0.44, -0.11);
+    this.chest.add(collar, placket, logo);
     this.headGroup = new THREE.Group();
     this.headGroup.position.y = 0.73;
     this.chest.add(this.headGroup);
@@ -83,13 +108,45 @@ export class Golfer {
     this.headGroup.add(head);
     const hairMat = new THREE.MeshLambertMaterial({ color: L.hair });
     const capMat = new THREE.MeshLambertMaterial({ color: L.cap });
+    const skinMat = new THREE.MeshLambertMaterial({ color: L.skin });
+    const dark = new THREE.MeshLambertMaterial({ color: '#1e1a18' });
+    // face: eyes, brows, nose, ears
+    for (const side of [-1, 1]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.013, 6, 4), dark);
+      eye.position.set(0.094, 0.012, side * 0.036);
+      const brow = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.008, 0.035), hairMat);
+      brow.position.set(0.096, 0.036, side * 0.036);
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.024, 6, 5), skinMat);
+      ear.scale.set(0.6, 1.2, 0.5);
+      ear.position.set(0, 0.0, side * 0.1);
+      this.headGroup.add(eye, brow, ear);
+    }
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.018, 0.04, 6), skinMat);
+    nose.rotation.z = -Math.PI / 2;
+    nose.position.set(0.112, -0.005, 0);
+    const mouth = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.006, 0.04), new THREE.MeshLambertMaterial({ color: '#8a4a3a' }));
+    mouth.position.set(0.1, -0.05, 0);
+    this.headGroup.add(nose, mouth);
+    if (L.shades) {
+      const shades = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.03, 0.13), new THREE.MeshLambertMaterial({ color: '#121212' }));
+      shades.position.set(0.1, 0.012, 0);
+      this.headGroup.add(shades);
+    }
+    // hair showing under the cap at the back and sides
+    // phi = 0 is the back of the head (the face looks along +x)
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.112, 12, 8, -Math.PI * 0.62, Math.PI * 1.24, Math.PI * 0.35, Math.PI * 0.38), hairMat);
+    hair.position.y = 0.005;
+    this.headGroup.add(hair);
     const cap = new THREE.Mesh(new THREE.SphereGeometry(0.11, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), capMat);
     cap.position.y = 0.03;
     this.headGroup.add(cap);
     const brim = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 0.012, 12, 1, false, -Math.PI / 2, Math.PI), capMat);
     brim.scale.set(1.3, 1, 1);
     brim.position.set(0.09, 0.035, 0);
-    this.headGroup.add(brim);
+    const capLogo = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.03, 0.045), new THREE.MeshLambertMaterial({ color: L.shirt }));
+    capLogo.position.set(0.105, 0.07, 0);
+    capLogo.rotation.z = -0.5;
+    this.headGroup.add(brim, capLogo);
     if (L.gender === 'f') {
       const tail = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 6), hairMat);
       tail.scale.set(1, 1.9, 1);
@@ -108,11 +165,13 @@ export class Golfer {
     // arms
     this.arms = [];
     for (const side of [-1, 1]) {
-      const upper = limb(0.048, L.shirt);
+      const upper = limb(0.045, L.skin);
+      const sleeve = limb(0.058, L.shirt);
       const fore = limb(0.04, L.skin);
+      // glove on the lead hand, bare trail hand
       const hand = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), new THREE.MeshLambertMaterial({ color: side < 0 ? '#f4f4f4' : L.skin }));
-      this.root.add(upper, fore, hand);
-      this.arms.push({ side, upper, fore, hand });
+      this.root.add(upper, sleeve, fore, hand);
+      this.arms.push({ side, upper, sleeve, fore, hand });
     }
     // club
     this.club = new THREE.Group();
@@ -128,28 +187,64 @@ export class Golfer {
     this.pose();
   }
 
-  setClub(kind, length) {
-    if (this.clubKind === kind && this.clubLen === length) return;
+  setClub(kind, length, look = null) {
+    const key = `${kind}|${length}|${look ? JSON.stringify(look) : ''}`;
+    if (this.clubKey === key) return;
+    this.clubKey = key;
     this.clubKind = kind;
     this.clubLen = length;
     while (this.club.children.length) this.club.remove(this.club.children[0]);
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.0045, length, 6), new THREE.MeshLambertMaterial({ color: '#c9ccd1' }));
+    const lk = look || {};
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.0045, length, 6), new THREE.MeshLambertMaterial({ color: kind === 'wood' || kind === 'hybrid' ? '#2a2d33' : '#c9ccd1' }));
     shaft.position.y = -length / 2;
     const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.011, 0.26, 8), new THREE.MeshLambertMaterial({ color: '#1b1b1b' }));
     grip.position.y = -0.1;
-    let head;
+    const parts = [shaft, grip];
+    const mat = (c) => new THREE.MeshLambertMaterial({ color: c });
+    const headY = -length;
     if (kind === 'wood' || kind === 'hybrid') {
-      head = new THREE.Mesh(new THREE.SphereGeometry(kind === 'wood' ? 0.062 : 0.045, 12, 8), new THREE.MeshLambertMaterial({ color: '#23262b' }));
-      head.scale.set(1.25, 0.6, 1);
-      head.position.set(0.035, -length, 0);
+      const size = (lk.size || 1) * (kind === 'wood' && length > 1.1 ? 1 : 0.78);
+      const crown = new THREE.Mesh(new THREE.SphereGeometry(0.062 * size, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), mat(lk.crown || '#23262b'));
+      crown.scale.set(1.3, 0.62, 1.05);
+      crown.position.set(0.035, headY + 0.004, 0);
+      const sole = new THREE.Mesh(new THREE.SphereGeometry(0.062 * size, 16, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), mat(lk.head || '#23262b'));
+      sole.scale.set(1.3, 0.28, 1.05);
+      sole.position.copy(crown.position);
+      const face = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.036 * size, 0.1 * size), mat('#9aa0a8'));
+      face.position.set(0.035 + 0.078 * size, headY + 0.012, 0);
+      parts.push(crown, sole, face);
     } else if (kind === 'putter') {
-      head = new THREE.Mesh(new THREE.BoxGeometry(0.035, 0.03, 0.11), new THREE.MeshLambertMaterial({ color: '#8f959c' }));
-      head.position.set(0.01, -length, 0);
+      if (lk.style === 'mallet') {
+        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.028, 16, 1, false, -Math.PI / 2, Math.PI), mat(lk.head || '#1b1b1b'));
+        body.rotation.z = Math.PI / 2;
+        body.rotation.y = Math.PI / 2;
+        body.position.set(-0.01, headY, 0);
+        const line = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.03, 0.006), mat(lk.accent || '#ffffff'));
+        line.position.set(-0.02, headY + 0.003, 0);
+        parts.push(body, line);
+      } else {
+        const body = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.028, 0.11), mat(lk.head || '#8f959c'));
+        body.position.set(0.01, headY, 0);
+        const line = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.029, 0.004), mat(lk.accent || '#ffffff'));
+        line.position.set(0.005, headY + 0.001, 0);
+        parts.push(body, line);
+      }
     } else {
-      head = new THREE.Mesh(new THREE.BoxGeometry(0.018, 0.05, 0.085), new THREE.MeshLambertMaterial({ color: '#b8bec6' }));
-      head.position.set(0.01, -length + 0.01, 0);
+      const size = lk.size || 1;
+      const thick = lk.style === 'blade' ? 0.012 : lk.style === 'wedge' ? 0.016 : 0.022;
+      const head = new THREE.Mesh(new THREE.BoxGeometry(thick, 0.05 * size, 0.082 * size), mat(lk.head || '#b8bec6'));
+      head.position.set(0.01, headY + 0.01, 0);
+      parts.push(head);
+      if (lk.style === 'cavity') {
+        const badge = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.02 * size, 0.04 * size), mat(lk.accent || '#c1121f'));
+        badge.position.set(0.01 - thick / 2 - 0.002, headY + 0.008, 0.004);
+        parts.push(badge);
+      }
+      const hosel = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.009, 0.05, 6), mat(lk.head || '#b8bec6'));
+      hosel.position.set(0.004, headY + 0.035, -0.035);
+      parts.push(hosel);
     }
-    for (const m of [shaft, grip, head]) { m.castShadow = true; this.club.add(m); }
+    for (const m of parts) { m.castShadow = true; this.club.add(m); }
     const setup = CLUB_SETUP[kind] || CLUB_SETUP.iron;
     this.setup = setup;
     this.putting = kind === 'putter';
@@ -218,7 +313,7 @@ export class Golfer {
       const ankle = new THREE.Vector3(0.0, 0.09, z * 1.12);
       place(leg.thigh, hipP, knee);
       place(leg.shin, knee, ankle);
-      leg.shoe.position.set(0.05, 0.04, z * 1.12);
+      leg.shoe.position.set(0.02, 0, z * 1.12);
     }
   }
 
@@ -238,6 +333,7 @@ export class Golfer {
       E = S.clone().addScaledVector(dir, l1 * cosA).addScaledVector(perp, l1 * sinA);
     }
     place(arm.upper, S, E);
+    place(arm.sleeve, S, new THREE.Vector3().lerpVectors(S, E, 0.55));
     place(arm.fore, E, T);
     arm.hand.position.copy(T);
   }
@@ -283,6 +379,9 @@ export class Golfer {
 
   update(dt) {
     const an = this.anim;
+    this.idleT = (this.idleT || 0) + dt;
+    // gentle breathing when standing over the ball
+    this.chest.scale.set(1, 1 + Math.sin(this.idleT * 1.6) * 0.008, 1 + Math.sin(this.idleT * 1.6) * 0.012);
     if (!an) return;
     an.t += dt;
     if (an.t < an.down) {

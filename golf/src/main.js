@@ -18,6 +18,7 @@ import { HoleModel } from './sim/hole.js';
 import { RNG, mixSeed } from './util/rng.js';
 import { traitEffects } from './data/traits.js';
 import { BALL_BY_ID } from './data/equipment.js';
+import { MODEL_BY_ID, normBag } from './data/clubsets.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -56,7 +57,7 @@ function boot() {
   loadCareer().then((c) => {
     app.cloudSave = hasCloud();
     if (c) {
-      app.career = c;
+      app.career = career.upgradeSave(c);
       if (!app.round) showTitle();
     }
     document.title = 'Fairway Legends';
@@ -86,7 +87,7 @@ function startMenuScene() {
   app.world.loadHole(hole, { crowd: false });
   app.world.aim.setVisible(false);
   app.world.ball.setVisible(false);
-  if (app.world.golfer) app.world.golfer.root.visible = false;
+  app.world.hidePlayers();
   app.menuT = 0;
   menuCamera(0, true);
 }
@@ -217,7 +218,7 @@ function endRound() {
   app.round = null;
   app.hud.detach();
   app.aimHold = 0;
-  if (app.world.golfer) app.world.golfer.root.visible = false;
+  app.world.hidePlayers();
   app.world.ball.setVisible(false);
   startMenuScene();
 }
@@ -288,6 +289,26 @@ app.onAction = (a, d, elx) => {
       break;
     }
     case 'useBall': c.golfer.ball = d.id; saveCareer(c); app.screens.hub(c, 'shop'); break;
+    case 'shopTab': app.screens.shopTab = d.t; app.screens.hub(c, 'shop'); break;
+    case 'buyClub': {
+      const m = MODEL_BY_ID[d.id];
+      if (m && c.golfer.money >= m.price && !c.golfer.clubs.includes(m.id)) {
+        c.golfer.money -= m.price;
+        c.golfer.clubs.push(m.id);
+        c.golfer.bag = { ...normBag(c.golfer.bag), [m.cat]: m.id };
+        saveCareer(c);
+        sfx.click();
+        toast(`${m.brand} ${m.name} is in your bag`);
+      }
+      app.screens.hub(c, 'shop');
+      break;
+    }
+    case 'useClub': {
+      const m = MODEL_BY_ID[d.id];
+      if (m) { c.golfer.bag = { ...normBag(c.golfer.bag), [m.cat]: m.id }; saveCareer(c); toast(`Switched to ${m.brand} ${m.name}`); }
+      app.screens.hub(c, 'shop');
+      break;
+    }
     case 'players': app.fromHub = false; app.playersOpts = { q: '', sort: 'rank', limit: 120 }; app.screens.players(app.playersOpts); break;
     case 'morePlayers': app.playersOpts.limit += 150; app.screens.players(app.playersOpts); break;
     case 'pro': app.screens.proCard(d.id); break;
@@ -427,7 +448,7 @@ function startTournamentRound() {
     holeList: [...Array(18).keys()],
     startPos: done,
     scores: hp.scores[t.round] || [],
-    golfer: { name: g.name, stats: g.stats, traits: g.traits, ball: g.ball, look: g.look, gender: g.gender },
+    golfer: { name: g.name, stats: g.stats, traits: g.traits, ball: g.ball, bag: g.bag, look: g.look, gender: g.gender },
     cond: roundCond(t),
     tournament: t,
     crowd: true,
@@ -554,7 +575,7 @@ function startPlayoff(tied, scores = []) {
     app.screens.hide();
     const g = c.golfer;
     const round = new RoundController(app, {
-      course, holeList: [17], golfer: { name: g.name, stats: g.stats, traits: g.traits, ball: g.ball, look: g.look, gender: g.gender },
+      course, holeList: [17], golfer: { name: g.name, stats: g.stats, traits: g.traits, ball: g.ball, bag: g.bag, look: g.look, gender: g.gender },
       cond: { ...t.cond[t.rounds - 1], seed: mixSeed(t.seed, 'po', scores.length) }, crowd: true,
       onRoundDone: (sc) => { endRound(); startPlayoff(tied, [...scores, sc[17]]); },
     });
@@ -595,10 +616,10 @@ function startQuick() {
   let golfer;
   if (q.proId) {
     const p = proById(q.proId);
-    golfer = { name: p.name, stats: p.stats, traits: p.traits, ball: q.ball, look: p.look, gender: p.gender };
+    golfer = { name: p.name, stats: p.stats, traits: p.traits, ball: q.ball, bag: p.bag, look: p.look, gender: p.gender };
   } else if (app.career) {
     const g = app.career.golfer;
-    golfer = { name: g.name, stats: g.stats, traits: g.traits, ball: q.ball, look: g.look, gender: g.gender };
+    golfer = { name: g.name, stats: g.stats, traits: g.traits, ball: q.ball, bag: g.bag, look: g.look, gender: g.gender };
   } else {
     const s = { power: 70, accuracy: 70, irons: 70, shortGame: 70, putting: 70, recovery: 70, mental: 70, wind: 70, consistency: 70 };
     golfer = { name: 'Club Pro', stats: s, traits: [], ball: q.ball, look: { shirt: '#2a9d8f', pants: '#2b2d42', cap: '#ffffff', skin: '#e8b996' }, gender: 'm' };

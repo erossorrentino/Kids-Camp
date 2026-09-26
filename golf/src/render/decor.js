@@ -5,6 +5,7 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { RNG, mixSeed, clamp } from '../util/rng.js';
 import { mergeGeos, TREE_UNIFORMS } from './trees.js';
+import { buildPeople } from './people.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -573,22 +574,10 @@ export function buildGrandstand(hole, board) {
     side.position.set(sx, (rows * 0.55 + 1) / 2, -rows * 0.45 + 0.45);
     grp.add(side);
   }
-  // seated spectators
-  const body = new THREE.CapsuleGeometry(0.19, 0.42, 3, 6).translate(0, 0.42, 0);
-  const head = new THREE.SphereGeometry(0.11, 8, 6).translate(0, 0.86, 0);
-  const shirts = ['#e63946', '#1d3557', '#f1faee', '#2a9d8f', '#e9c46a', '#ffffff', '#8ac926', '#ff006e', '#3a86ff', '#ffca3a'];
-  const skins = ['#f1c7a5', '#d49a73', '#8d5a3b', '#e8b996'];
-  const bm = new THREE.InstancedMesh(body, new THREE.MeshLambertMaterial(), people.length);
-  const hm = new THREE.InstancedMesh(head, new THREE.MeshLambertMaterial(), people.length);
-  const m4 = new THREE.Matrix4();
-  const c = new THREE.Color();
-  people.forEach((p, i) => {
-    m4.makeTranslation(p.x, p.y, p.z);
-    bm.setMatrixAt(i, m4); hm.setMatrixAt(i, m4);
-    bm.setColorAt(i, c.set(rng.pick(shirts)));
-    hm.setColorAt(i, c.set(rng.pick(skins)));
-  });
-  grp.add(bm, hm);
+  // spectators standing on the rows
+  const ppl = buildPeople(people.map((p) => ({ x: p.x, y: p.y - 0.05, z: p.z, face: 0 })), mixSeed(hole.seed, 'standppl'), { umbrellas: 0.02 });
+  grp.add(ppl.group);
+  grp.userData.people = ppl;
   // scoreboard beside the stand
   if (board && board.rows.length) {
     const sb = new THREE.Group();
@@ -652,4 +641,219 @@ export class Birds {
       b.r.rotation.z = -flap;
     }
   }
+}
+
+// ------------------------------------------------------------ bunker rakes
+export function buildRakes(hole) {
+  const list = [];
+  const rng = new RNG(mixSeed(hole.seed, 'rakes'));
+  for (const b of hole.bunkers) {
+    if (b.kind === 'pot') continue;
+    const a = rng.float(0, Math.PI * 2);
+    const edge = 1 + b.w1 * Math.sin(3 * a + b.p1) + b.w2 * Math.sin(5 * a + b.p2);
+    const u = Math.cos(a) * (b.rx * edge + 0.9), v = Math.sin(a) * (b.rz * edge + 0.9);
+    const c = Math.cos(b.rot), s = Math.sin(b.rot);
+    const x = b.x + u * c + v * s, z = b.z + u * s - v * c;
+    const f = hole.fields(x, z);
+    if (f.dB < 0.2 || f.dW < 1 || f.dG < 0.5) continue;
+    list.push({ x, z, y: hole.heightAt(x, z) + 0.03, rot: Math.atan2(u * c + v * s, u * s - v * c) + Math.PI / 2 });
+  }
+  if (!list.length) return new THREE.Group();
+  const parts = [];
+  const handle = new THREE.CylinderGeometry(0.014, 0.014, 1.7, 5).rotateZ(Math.PI / 2).translate(0, 0.02, 0);
+  const head = new THREE.BoxGeometry(0.05, 0.03, 0.55).translate(0.87, 0.03, 0);
+  const col = (g, c) => colorize(g, () => new THREE.Color(c));
+  parts.push(col(handle, '#f2c230'), col(head, '#2b2b2b'));
+  for (let i = -5; i <= 5; i++) parts.push(col(new THREE.BoxGeometry(0.02, 0.05, 0.012).translate(0.9, 0.005, i * 0.05), '#2b2b2b'));
+  const geo = mergeGeos(parts);
+  return instanced(geo, new THREE.MeshLambertMaterial({ vertexColors: true }), list.map((r) => ({ ...r, s: 1 })), { shadow: true });
+}
+
+// ------------------------------------------------------------ fountains
+export class Fountain {
+  constructor(x, y, z, h = 4) {
+    this.group = new THREE.Group();
+    this.group.position.set(x, y, z);
+    this.h = h;
+    const jetMat = new THREE.MeshLambertMaterial({ color: '#eef7ff', transparent: true, opacity: 0.75, emissive: '#223344' });
+    this.jet = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.24, 1, 10, 1, true), jetMat);
+    this.jet.position.y = h / 2;
+    this.jet.scale.y = h;
+    this.foam = new THREE.Mesh(new THREE.CircleGeometry(1.1, 20).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#e8f4f8', transparent: true, opacity: 0.55, depthWrite: false }));
+    this.foam.position.y = 0.04;
+    this.N = 160;
+    this.drops = [];
+    const geo = new THREE.BufferGeometry();
+    this.pos = new Float32Array(this.N * 3);
+    geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
+    this.points = new THREE.Points(geo, new THREE.PointsMaterial({ color: '#f4fbff', size: 0.2, transparent: true, opacity: 0.85, depthWrite: false }));
+    this.points.frustumCulled = false;
+    for (let i = 0; i < this.N; i++) this.drops.push(this.spawn(Math.random() * 2));
+    this.group.add(this.jet, this.foam, this.points);
+    this.t = 0;
+  }
+  spawn(age = 0) {
+    const a = Math.random() * Math.PI * 2, sp = 1 + Math.random() * 1.4;
+    return { x: 0, y: this.h, z: 0, vx: Math.cos(a) * sp, vy: Math.random() * 1.5, vz: Math.sin(a) * sp, age };
+  }
+  update(dt) {
+    this.t += dt;
+    this.jet.scale.y = this.h * (0.94 + 0.06 * Math.sin(this.t * 7));
+    for (let i = 0; i < this.N; i++) {
+      const d = this.drops[i];
+      d.vy -= 9.8 * dt;
+      d.x += d.vx * dt; d.y += d.vy * dt; d.z += d.vz * dt;
+      if (d.y < 0) this.drops[i] = this.spawn();
+      this.pos[i * 3] = d.x; this.pos[i * 3 + 1] = Math.max(0, d.y); this.pos[i * 3 + 2] = d.z;
+    }
+    this.points.geometry.attributes.position.needsUpdate = true;
+  }
+}
+
+export function buildFountains(hole) {
+  const out = [];
+  if (!['Parkland', 'Tropical', 'Desert', 'Coastal', 'Heathland'].includes(hole.styleName)) return out;
+  for (const w of hole.waters) {
+    if (w.type !== 'pond' || Math.min(w.rx, w.rz) < 10) continue;
+    out.push(new Fountain(w.x, w.level, w.z, 3 + Math.min(4, w.rx * 0.18)));
+  }
+  return out;
+}
+
+// ------------------------------------------------------------ bridges
+function bridgeMesh(len, width) {
+  const grp = new THREE.Group();
+  const wood = new THREE.MeshLambertMaterial({ color: '#8a6440' });
+  const dark = new THREE.MeshLambertMaterial({ color: '#5b412a' });
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(width, 0.14, len), wood);
+  deck.position.y = 0.07;
+  grp.add(deck);
+  for (let k = -len / 2 + 0.3; k < len / 2; k += 0.5) {
+    const plank = new THREE.Mesh(new THREE.BoxGeometry(width + 0.04, 0.02, 0.06), dark);
+    plank.position.set(0, 0.15, k);
+    grp.add(plank);
+  }
+  for (const side of [-1, 1]) {
+    const rail = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, len), wood);
+    rail.position.set(side * (width / 2 - 0.05), 0.95, 0);
+    grp.add(rail);
+    for (let k = -len / 2 + 0.1; k <= len / 2; k += len / Math.max(2, Math.round(len / 1.8))) {
+      const post = new THREE.Mesh(new THREE.BoxGeometry(0.09, 0.9, 0.09), dark);
+      post.position.set(side * (width / 2 - 0.05), 0.5, k);
+      grp.add(post);
+    }
+  }
+  grp.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  return grp;
+}
+
+export function buildBridges(hole) {
+  const grp = new THREE.Group();
+  const creeks = hole.waters.filter((w) => w.type === 'creek');
+  if (!creeks.length) return grp;
+  // along any line (centerline, cart path), find where it runs over water
+  const cross = (latFn, width) => {
+    let inS = null;
+    for (let s = 0; s <= hole.length; s += 0.5) {
+      const pt = hole.pointAtS(s);
+      const r = { x: Math.cos(pt.heading), z: Math.sin(pt.heading) };
+      const lat = latFn(s);
+      const x = pt.x + r.x * lat, z = pt.z + r.z * lat;
+      const f = hole.fields(x, z);
+      const wet = f.dW < 1.2;
+      if (wet && inS === null) inS = s;
+      if (!wet && inS !== null) {
+        const s0 = inS - 1.5, s1 = s + 1.5;
+        const a = hole.pointAtS(s0), b = hole.pointAtS(s1);
+        const la = latFn(s0), lb = latFn(s1);
+        const ra = { x: Math.cos(a.heading), z: Math.sin(a.heading) }, rb = { x: Math.cos(b.heading), z: Math.sin(b.heading) };
+        const A = { x: a.x + ra.x * la, z: a.z + ra.z * la }, B = { x: b.x + rb.x * lb, z: b.z + rb.z * lb };
+        const len = Math.hypot(B.x - A.x, B.z - A.z);
+        const y = Math.max(hole.heightAt(A.x, A.z), hole.heightAt(B.x, B.z)) + 0.05;
+        const br = bridgeMesh(len, width);
+        br.position.set((A.x + B.x) / 2, y, (A.z + B.z) / 2);
+        br.rotation.y = Math.atan2(B.x - A.x, B.z - A.z);
+        grp.add(br);
+        inS = null;
+      }
+    }
+  };
+  cross(() => 0, 2.4);
+  if (hole.cartPath) cross(() => hole.cartPath.side * hole.cartPath.lat, 2.8);
+  return grp;
+}
+
+// ------------------------------------------------------------ lighthouse
+export function buildLighthouse(x, y, z) {
+  const grp = new THREE.Group();
+  const H = 24, segs = 6;
+  for (let i = 0; i < segs; i++) {
+    const r0 = 2.6 - (i / segs) * 1.0, r1 = 2.6 - ((i + 1) / segs) * 1.0;
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(r1, r0, H / segs, 16), new THREE.MeshLambertMaterial({ color: i % 2 ? '#c8322c' : '#f5f3ee' }));
+    m.position.y = (H / segs) * (i + 0.5);
+    grp.add(m);
+  }
+  const gallery = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.1, 0.3, 16), new THREE.MeshLambertMaterial({ color: '#2b2b2b' }));
+  gallery.position.y = H + 0.15;
+  const lamp = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.2, 2.2, 12), new THREE.MeshLambertMaterial({ color: '#fff6c2', emissive: '#8a7a20' }));
+  lamp.position.y = H + 1.4;
+  const roof = new THREE.Mesh(new THREE.ConeGeometry(1.6, 1.8, 12), new THREE.MeshLambertMaterial({ color: '#c8322c' }));
+  roof.position.y = H + 3.4;
+  const base = new THREE.Mesh(new THREE.CylinderGeometry(5, 7, 4, 10), new THREE.MeshLambertMaterial({ color: '#7d7a72' }));
+  base.position.y = -1.5;
+  const house = new THREE.Mesh(new THREE.BoxGeometry(6, 3.2, 5), new THREE.MeshLambertMaterial({ color: '#f5f3ee' }));
+  house.position.set(4.5, 1.6, 0);
+  const hroof = new THREE.Mesh(new THREE.ConeGeometry(4.6, 1.8, 4), new THREE.MeshLambertMaterial({ color: '#c8322c' }));
+  hroof.rotation.y = Math.PI / 4;
+  hroof.scale.set(1, 1, 0.8);
+  hroof.position.set(4.5, 4.1, 0);
+  grp.add(gallery, lamp, roof, base, house, hroof);
+  grp.position.set(x, y, z);
+  grp.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  return grp;
+}
+
+// ------------------------------------------------------------ tee extras
+export function buildTeeExtras(hole) {
+  const grp = new THREE.Group();
+  const h = hole.tee.heading;
+  const f = { x: Math.sin(h), z: -Math.cos(h) }, r = { x: Math.cos(h), z: Math.sin(h) };
+  const side = hole.cartPath ? hole.cartPath.side : -1;
+  const at = (fw, lat) => { const x = f.x * fw + r.x * lat * side, z = f.z * fw + r.z * lat * side; return { x, z, y: hole.heightAt(x, z) }; };
+  // bin and water cooler
+  const bin = at(-2.5, 6.3);
+  const can = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.2, 0.7, 12), new THREE.MeshLambertMaterial({ color: '#1f4a33' }));
+  can.position.set(bin.x, bin.y + 0.35, bin.z);
+  const cool = at(-4.2, 6.2);
+  const stand = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.8, 0.4), new THREE.MeshLambertMaterial({ color: '#6b5a44' }));
+  stand.position.set(cool.x, cool.y + 0.4, cool.z);
+  const jug = new THREE.Mesh(new THREE.CylinderGeometry(0.17, 0.17, 0.4, 12), new THREE.MeshLambertMaterial({ color: '#e76f2c' }));
+  jug.position.set(cool.x, cool.y + 1.0, cool.z);
+  const lid = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.06, 12), new THREE.MeshLambertMaterial({ color: '#f4f4f0' }));
+  lid.position.set(cool.x, cool.y + 1.23, cool.z);
+  for (const m of [can, stand, jug, lid]) { m.castShadow = true; grp.add(m); }
+  // flower bed around the sign
+  if (['Parkland', 'Tropical', 'Desert', 'Coastal', 'Heathland', 'Mountain'].includes(hole.styleName)) {
+    const c = at(-3, 7.5);
+    const bed = new THREE.Mesh(new THREE.CircleGeometry(1.9, 24).rotateX(-Math.PI / 2), new THREE.MeshLambertMaterial({ color: '#5a3d28' }));
+    bed.position.set(c.x, c.y + 0.03, c.z);
+    bed.receiveShadow = true;
+    grp.add(bed);
+    const rng = new RNG(mixSeed(hole.seed, 'bed'));
+    const palette = hole.styleName === 'Tropical' ? ['#ff006e', '#ffbe0b', '#fb5607', '#ff4d6d'] : hole.styleName === 'Desert' ? ['#f2c230', '#e76f51', '#a4c639'] : ['#e63946', '#ffffff', '#f2c230', '#9b5de5', '#ff85a1'];
+    const items = [];
+    for (let i = 0; i < 70; i++) {
+      const a = rng.float(0, Math.PI * 2), rr = Math.sqrt(rng.next()) * 1.7;
+      const x = c.x + Math.cos(a) * rr, z = c.z + Math.sin(a) * rr;
+      items.push({ x, z, y: c.y + 0.02, s: rng.float(0.9, 1.4), rot: rng.float(0, 6.28), color: rng.pick(palette) });
+    }
+    const flower = mergeGeos([
+      colorize(new THREE.CylinderGeometry(0.012, 0.012, 0.25, 4).translate(0, 0.125, 0), () => new THREE.Color('#3f7428')),
+      colorize(new THREE.IcosahedronGeometry(0.07, 0).translate(0, 0.28, 0), () => new THREE.Color('#ffffff')),
+      colorize(new THREE.IcosahedronGeometry(0.09, 0).scale(1, 0.6, 1).translate(0, 0.09, 0), () => new THREE.Color('#2f5a22')),
+    ]);
+    const m = instanced(flower, new THREE.MeshLambertMaterial({ vertexColors: true }), items);
+    if (m) grp.add(m);
+  }
+  return grp;
 }

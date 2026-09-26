@@ -62,6 +62,17 @@ hole using your golfer's skills if you want to move on.
   1-5 **advantages / disadvantages** (Bomber, Putting Machine, Wind
   Whisperer, Choker, The Yips, Hook Prone and 29 more). Traits change both
   the AI scoring and how the ball behaves when you play as that pro.
+- **29 club sets** in five slots (driver, woods & hybrid, irons, wedges,
+  putter) in `src/data/clubsets.js`. Each trades one strength for another:
+  a low-spin Rocket driver that flies far but punishes mishits, a
+  Stable Max with a huge sweet spot, a draw-biased driver that fights a
+  slice, a deck-friendly mini driver, blades that shape the ball vs.
+  super game improvement irons that stay straight, high-bounce wedges for
+  sand and low-bounce tour wedges for spin, mallet, milled, counterbalanced
+  and arm-lock putters (aim, pace, nerve, longer read). Each set has its
+  own head in 3D (wood crowns and faces, cavity backs vs. blades, blade vs.
+  mallet putters), the pros each carry a bag that suits their game, and
+  you buy and swap sets in the pro shop.
 - **12 golf balls** with trade-offs (distance vs. spin vs. straightness vs.
   wind vs. putting) in `src/data/equipment.js`, bought with prize money.
 - **Career**: Challenger Tour, World Tour, four majors and a $40M Tour
@@ -76,11 +87,23 @@ hole using your golfer's skills if you want to move on.
 - **Broadcast-style HUD**: lie and slope, "plays like" yardage, wind, a
   launch-monitor readout after every shot (ball speed, launch, spin,
   carry, total, height, curve, land angle), shot tracer, minimap.
+- **Yardage book**: each course card draws all 18 holes from above with a
+  caddie's note on how to play them (doglegs, bunkers, water, two-tier
+  greens, uphill or downhill), plus the course record.
+- **People**: your golfer has shoes, belt, collar and logo, face, hair,
+  cap and optional shades, and breathes at address; a caddie with your
+  name on the bib carries your bag; galleries line the fairways and
+  cheer birdies and holed shots, with marshals, TV camera towers,
+  grandstands and carts driving the paths.
 - **Scenery**: species trees in three variants each that sway in the wind,
   grass tufts, wildflowers, fescue, heather, desert shrubs, rocks, reeds
   by the water, cart paths, tee signs with a hole map, clubhouse, homes
   behind the white stakes, galleries, a grandstand and scoreboard on
   tournament finishing holes, clouds, birds, and synthesized sound.
+  Creeks run downhill through a shallow valley with footbridges; ponds
+  get fountains, bunkers get rakes, tees get a ball washer, cooler and
+  flower bed, seaside holes get a lighthouse, and your shots leave divots
+  in the fairway and pitch marks on the greens.
 
 ## Saving
 
@@ -107,7 +130,7 @@ golf/
     tune_physics.mjs             fits drag/lift to tour data (--search)
     bot_round.mjs                a bot plays holes through the physics
     calibrate_sim.mjs            AI scoring averages by rating
-    dev/view.html                hole viewer (?c=course&h=hole&v=tee|green|top|trees|stand)
+    dev/view.html                hole viewer (?c=course&h=hole&v=tee|green|top|trees|stand|water|golfer|caddie|crowd)
 ```
 
 The simulation modules (`src/data`, `src/sim`, `src/game`) have no

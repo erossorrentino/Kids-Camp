@@ -7,6 +7,7 @@ import { simulate, BALL_R, SURFACES } from '../sim/physics.js';
 import { clubTable, suggestClub } from '../sim/caddie.js';
 import { CLUBS, CLUB_BY_ID, BALL_BY_ID } from '../data/equipment.js';
 import { traitEffects } from '../data/traits.js';
+import { gearFor, normBag, MODEL_BY_ID } from '../data/clubsets.js';
 import { RNG, mixSeed, clamp } from '../util/rng.js';
 import { sfx, setWind } from '../audio.js';
 import { simHole, courseProfile, effectiveStats } from '../sim/aisim.js';
@@ -50,7 +51,8 @@ export class RoundController {
     this.fast = false;
     this.lastHoleRel = 0;
     this.destroyed = false;
-    this.table = clubTable(this.golfer.stats, this.fx, this.ball, this.aero, 1.225 * Math.exp(-this.altitude / 8500));
+    this.bag = normBag(this.golfer.bag);
+    this.table = clubTable(this.golfer.stats, this.fx, this.ball, this.aero, 1.225 * Math.exp(-this.altitude / 8500), this.bag);
     this.world.setGolfer({ ...this.golfer.look, gender: this.golfer.gender });
   }
 
@@ -288,15 +290,17 @@ export class RoundController {
   updateGolfer() {
     const g = this.world.golfer;
     const c = CLUB_BY_ID[this.club];
-    g.setClub(c.kind, c.length);
+    g.setClub(c.kind, c.length, gearFor(this.bag, this.club).look);
     g.placeAt(this.ballPos, this.heading);
     g.address();
+    const cad = this.world.caddie;
+    if (cad) { cad.group.visible = true; cad.place(this.ballPos, this.heading, this.putting, (x, z) => this.hole.heightAt(x, z)); }
   }
 
   shotInput(power) {
     const b = this.ballPos;
     return {
-      clubId: this.club, power, stats: this.golfer.stats, fx: this.fx, ball: this.ball, aero: this.aero,
+      clubId: this.club, power, stats: this.golfer.stats, fx: this.fx, ball: this.ball, aero: this.aero, gear: gearFor(this.bag, this.club),
       lie: this.lie, plugged: this.plugged, slope: slopeLie(this.hole, b.x, b.z, this.heading),
       distToPin: this.distToPin, shape: this.shape,
     };
@@ -341,7 +345,7 @@ export class RoundController {
 
   puttPreviewFrac() {
     const p = this.golfer.stats.putting;
-    return clamp((0.22 + (p - 50) * 0.011) * this.fx.puttPreview, 0.12, 0.9);
+    return clamp((0.22 + (p - 50) * 0.011) * this.fx.puttPreview * gearFor(this.bag, 'PT').read, 0.12, 0.92);
   }
 
   updatePuttPreview(power) {
@@ -351,7 +355,7 @@ export class RoundController {
     const dist = this.distToPin;
     // At rest, preview the pace that would roll to the hole; while dragging, the actual pace
     const pw = this.dragging ? power : Math.min(1, (dist + 0.35) / this.puttScale);
-    const pt = computePutt({ power: pw, scale: this.puttScale, stimp: this.cond.stimp, heading: this.heading, stats: this.golfer.stats, fx: this.fx, ball: this.ball, devDeg: 0, noRandom: true, distToPin: dist });
+    const pt = computePutt({ power: pw, scale: this.puttScale, stimp: this.cond.stimp, heading: this.heading, stats: this.golfer.stats, fx: this.fx, ball: this.ball, gear: gearFor(this.bag, 'PT'), devDeg: 0, noRandom: true, distToPin: dist });
     const r = simulate({ pos: { x: b.x, y: b.y + BALL_R, z: b.z }, vel: pt.vel, rolling: true, env: { ...this.env, cup: null }, maxTime: 20 });
     const S = r.samples;
     const pts = [];
@@ -440,6 +444,7 @@ export class RoundController {
       elev,
       playsLike,
       club: c,
+      model: gearFor(this.bag, this.club),
       carry: t ? t.carry : null,
       predCarry: this.predCarry,
       putting: this.putting,
@@ -517,7 +522,7 @@ export class RoundController {
     const pressure = this.pressure();
     if (this.putting) {
       this.putts++;
-      const pt = computePutt({ power, scale: this.puttScale, stimp: this.cond.stimp, heading: this.heading, stats: this.golfer.stats, fx: this.fx, ball: this.ball, devDeg: dev, distToPin: this.distToPin, pressure, rng: this.rand });
+      const pt = computePutt({ power, scale: this.puttScale, stimp: this.cond.stimp, heading: this.heading, stats: this.golfer.stats, fx: this.fx, ball: this.ball, gear: gearFor(this.bag, 'PT'), devDeg: dev, distToPin: this.distToPin, pressure, rng: this.rand });
       res = simulate({ pos: { x: b.x, y: b.y + BALL_R, z: b.z }, vel: pt.vel, rolling: true, env: this.env, rng: this.rand, pinIn: false });
       launchInfo = { putt: true, speed: pt.v0 };
     } else {
@@ -532,6 +537,12 @@ export class RoundController {
       this.world.particles.burst(b.x, b.y + 0.05, b.z, 'grass', 0.6 + power * 0.4);
     }
     if (this.lie === 'bunker') this.world.particles.burst(b.x, b.y + 0.05, b.z, 'sand', 1.3);
+    // irons and wedges off turf take a divot just past the ball
+    if (!this.putting && club.kind !== 'wood' && power > 0.35 && ['fairway', 'first', 'rough', 'tee'].includes(this.lie)) {
+      const f = fwdOf(this.heading);
+      const dx = b.x + f.x * 0.15, dz = b.z + f.z * 0.15;
+      this.world.marks.add('divot', dx, this.hole.heightAt(dx, dz), dz, this.heading, club.kind === 'wedge' ? 1.1 : 0.9);
+    }
     this.flight = { res, t: 0, ev: 0, launchInfo, club, power, dev, start: { ...b }, camMode: 'launch', landT: res.land ? res.land.t : 0 };
     this.world.tracer.reset();
     this.phase = 'flight';
@@ -572,6 +583,7 @@ export class RoundController {
       if (e.type === 'bounce') {
         if (e.surface === 'bunker') { sfx.sand(); this.world.particles.burst(e.x, e.y, e.z, 'sand', 1); }
         else sfx.bounce(e.speed);
+        if (e.surface === 'green' && e.speed > 4 && !this.putting) this.world.marks.add('pitch', e.x, this.hole.heightAt(e.x, e.z), e.z, 0, 1);
       } else if (e.type === 'tree') sfx.tree();
       else if (e.type === 'pin') sfx.pin();
       else if (e.type === 'water') { sfx.splash(); this.world.particles.burst(e.x, e.y, e.z, 'water', 1.2); this.world.ball.setVisible(false); }

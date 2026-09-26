@@ -35,7 +35,7 @@ function makeBlob(rng, x, z, rx, rz, rotA, wobble = 0.1) {
   return { x, z, rx, rz, rot: rotA, w1: rng.float(0, wobble), w2: rng.float(0, wobble * 0.6), p1: rng.float(0, 6.28), p2: rng.float(0, 6.28) };
 }
 
-function segSDF(points, x, z, halfW) {
+function segSDF(points, x, z, halfW, out = null) {
   let best = Infinity;
   for (let i = 0; i < points.length - 1; i++) {
     const a = points[i], b = points[i + 1];
@@ -44,10 +44,11 @@ function segSDF(points, x, z, halfW) {
     let t = ((x - a.x) * vx + (z - a.z) * vz) / l2;
     t = t < 0 ? 0 : t > 1 ? 1 : t;
     const d = Math.hypot(x - (a.x + vx * t), z - (a.z + vz * t));
-    if (d < best) best = d;
+    if (d < best) { best = d; if (out) { out.i = i; out.t = t; } }
   }
   return best - halfW;
 }
+const SEG = { i: 0, t: 0 };
 
 export class HoleModel {
   constructor(course, holeIndex, opts = {}) {
@@ -445,17 +446,26 @@ export class HoleModel {
       const v = blobSDF(b, x, z);
       if (v < dB) { dB = v; bunker = b; }
     }
-    let dW = Infinity, water = null;
+    let dW = Infinity, water = null, waterLevel = 0;
     for (const w of this.waters) {
-      const v = w.type === 'creek' ? segSDF(w.points, x, z, w.half) : blobSDF(w, x, z);
-      if (v < dW) { dW = v; water = w; }
+      if (w.type === 'creek') {
+        const v = segSDF(w.points, x, z, w.half, SEG);
+        if (v < dW) {
+          dW = v; water = w;
+          // creeks run downhill: the surface follows the channel
+          waterLevel = w.levels ? w.levels[SEG.i] + (w.levels[SEG.i + 1] - w.levels[SEG.i]) * SEG.t : 0;
+        }
+      } else {
+        const v = blobSDF(w, x, z);
+        if (v < dW) { dW = v; water = w; waterLevel = w.level; }
+      }
     }
     let dO = Infinity;
     if (this.ocean) dO = this.ocean.offset - d * this.ocean.side;
     let dC = Infinity;
     const cp = this.cartPath;
     if (cp) dC = Math.max(Math.abs(d - cp.side * cp.lat) - cp.half, cp.s0 - s, s - cp.s1);
-    return { s, d, dF, dR, dG, dT, dB, bunker, dW, water, dO, dC };
+    return { s, d, dF, dR, dG, dT, dB, bunker, dW, water, waterLevel, dO, dC };
   }
 
   fairwayHalfWidth(s, d) {
@@ -521,8 +531,14 @@ export class HoleModel {
       h += dh * keepGreen;
     }
     // Water banks (outside the green)
+    if (f.water && f.water.type === 'creek' && f.dW < 32) {
+      // A creek runs in a shallow valley, so it can be seen from the approach
+      const vOut = smoothstep(3, 18, f.dG);
+      const valley = f.waterLevel + 0.3 + Math.max(0, f.dW) * 0.1;
+      if (valley < h) h = lerp(h, valley, (1 - smoothstep(14, 32, f.dW)) * vOut);
+    }
     if (f.water && f.dW < 6) {
-      const level = f.water.level;
+      const level = f.waterLevel;
       const gOut = smoothstep(1, 5, f.dG);
       const bank = f.dW < 0 ? level - 0.35 - Math.min(1.6, -f.dW * 0.35) : level + 0.3 + f.dW * 0.28;
       if (bank < h) h = lerp(h, bank, gOut);
@@ -557,6 +573,16 @@ export class HoleModel {
           const ang = (a / 16) * Math.PI * 2;
           pts.push({ x: w.x + Math.cos(ang) * w.rx * 1.1, z: w.z + Math.sin(ang) * w.rz * 1.1 });
         }
+      }
+      if (w.type === 'creek') {
+        // follow the ground, then force the water to only ever run downhill
+        const lv = w.points.map((p) => this.baseHeight(p.x, p.z, this.fields(p.x, p.z)) - 0.8);
+        const down = lv[0] >= lv[lv.length - 1];
+        if (down) { for (let i = 1; i < lv.length; i++) lv[i] = Math.min(lv[i], lv[i - 1] - 0.03); }
+        else { for (let i = lv.length - 2; i >= 0; i--) lv[i] = Math.min(lv[i], lv[i + 1] - 0.03); }
+        w.levels = lv.map((v) => Math.min(v, this.greenBaseY - 1.2));
+        w.level = Math.min(...w.levels);
+        continue;
       }
       for (const p of pts) lo = Math.min(lo, this.baseHeight(p.x, p.z, this.fields(p.x, p.z)));
       w.level = lo - 0.6;
@@ -612,7 +638,7 @@ export class HoleModel {
 
   waterAt(x, z) {
     const f = this.fields(x, z);
-    if (f.dW < 0 && f.water) return { level: f.water.level, body: f.water };
+    if (f.dW < 0 && f.water) return { level: f.waterLevel, body: f.water };
     if (this.ocean && f.dO < 0) return { level: this.ocean.level, body: this.ocean };
     return null;
   }

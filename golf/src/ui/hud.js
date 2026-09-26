@@ -2,6 +2,7 @@
 import { YD } from '../sim/hole.js';
 import { CLUBS } from '../data/equipment.js';
 import { esc, fmtToPar, toParClass } from './dom.js';
+import { drawHoleMap } from './holemap.js';
 
 const MM_W = 132, MM_H = 224;
 
@@ -28,6 +29,7 @@ export class HUD {
         <div class="clubbox panel">
           <button class="icon-btn" data-h="clubDown" aria-label="Previous club">&#9664;</button>
           <div class="club-mid">
+            <div class="club-model" id="clubModel"></div>
             <div class="club-name" id="clubName">Driver</div>
             <div class="club-carry" id="clubCarry">Full carry 275 yds</div>
           </div>
@@ -192,6 +194,7 @@ export class HUD {
     this.shot = info;
     const c = info.club;
     this.$('clubName').textContent = c.name;
+    this.$('clubModel').textContent = info.model ? `${info.model.brand} ${info.model.name}` : '';
     if (info.putting) this.$('clubCarry').textContent = `Putter range ${this.d(info.puttScale)} ${this.u(info.puttScale)}`;
     else this.$('clubCarry').textContent = info.carry ? `Full carry ${this.d(info.carry)} ${this.u(info.carry)}` : '';
     const small = info.putting;
@@ -333,62 +336,11 @@ export class HUD {
   // ---------------- minimap ----------------
   buildMinimap(hole) {
     const g = this.mmBase.getContext('2d');
-    const W = MM_W, H = MM_H;
-    const sc = 2;
-    const th = Math.atan2(hole.gdir.x, -hole.gdir.z);
-    const cos = Math.cos(th), sin = Math.sin(th);
-    // extents in hole-aligned coordinates
-    let umin = Infinity, umax = -Infinity;
-    for (const p of hole.path) {
-      const u = p.x * cos + p.z * sin;
-      umin = Math.min(umin, u); umax = Math.max(umax, u);
-    }
-    const vmin = -25, vmax = hole.straightLen + 35;
-    const s = H / (vmax - vmin);
-    const uc = (umin + umax) / 2;
-    this.mm = { cos, sin, s, uc, vmin, W, H };
-    const img = g.createImageData(W * sc, H * sc);
-    const col = {
-      fairway: [111, 174, 69], green: [146, 208, 92], fringe: [121, 184, 76], tee: [122, 185, 76], first: [88, 150, 58],
-      rough: [60, 118, 44], deep: [44, 92, 33], fescue: [168, 158, 100], heather: [118, 98, 110], waste: [205, 180, 138], bunker: [236, 224, 186], path: [190, 186, 176],
-    };
-    for (let py = 0; py < H * sc; py++) {
-      for (let px = 0; px < W * sc; px++) {
-        const w = this.mmToWorld(px / sc, py / sc);
-        let c;
-        if (!hole.inBounds(w.x, w.z)) c = [26, 44, 34];
-        else if (hole.waterAt(w.x, w.z)) c = [60, 122, 160];
-        else c = col[hole.surfaceAt(w.x, w.z)] || [60, 118, 44];
-        const k = (py * W * sc + px) * 4;
-        img.data[k] = c[0]; img.data[k + 1] = c[1]; img.data[k + 2] = c[2]; img.data[k + 3] = 255;
-      }
-    }
-    g.putImageData(img, 0, 0);
-    g.save();
-    g.scale(sc, sc);
-    g.fillStyle = 'rgba(20,52,24,0.85)';
-    for (const t of hole.trees) {
-      const p = this.worldToMm(t.x, t.z);
-      if (p.x < -5 || p.x > W + 5 || p.y < -5 || p.y > H + 5) continue;
-      g.beginPath();
-      g.arc(p.x, p.y, Math.max(0.8, Math.max(t.canopyR, 0.6) * s), 0, Math.PI * 2);
-      g.fill();
-    }
-    g.restore();
+    this.mm = drawHoleMap(g, hole, MM_W, MM_H, { sc: 2 });
   }
 
-  mmToWorld(px, py) {
-    const m = this.mm;
-    const v = m.vmin + (m.H - py) / m.s;
-    const u = m.uc + (px - m.W / 2) / m.s;
-    return { x: u * m.cos + v * m.sin, z: u * m.sin - v * m.cos };
-  }
-  worldToMm(x, z) {
-    const m = this.mm;
-    const u = x * m.cos + z * m.sin;
-    const v = x * m.sin - z * m.cos;
-    return { x: m.W / 2 + (u - m.uc) * m.s, y: m.H - (v - m.vmin) * m.s };
-  }
+  mmToWorld(px, py) { return this.mm.toWorld(px, py); }
+  worldToMm(x, z) { return this.mm.toMap(x, z); }
 
   drawMinimapOverlay(round) {
     if (!this.mm || !round.hole) return;

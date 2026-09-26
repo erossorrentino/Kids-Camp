@@ -5,6 +5,10 @@ import { generatePros, proById, STAT_KEYS, STAT_LABELS, STAT_HELP, overall } fro
 import { generateCourses, courseById, STYLES } from '../data/courses.js';
 import { COUNTRIES } from '../data/names.js';
 import { BALLS, BALL_BY_ID, ballBars } from '../data/equipment.js';
+import { CLUB_CATS, CLUB_MODELS, MODEL_BY_ID, modelBars, normBag } from '../data/clubsets.js';
+import { HoleModel } from '../sim/hole.js';
+import { drawHoleMap, caddieNote } from './holemap.js';
+import { RNG, mixSeed } from '../util/rng.js';
 import { TRAITS } from '../data/traits.js';
 import { TOURS, MAJORS, SEASON_WEEKS } from '../data/tour.js';
 import {
@@ -264,13 +268,18 @@ export class Screens {
           <div><small>Best round</small><b>${c.stats.best ?? '–'}</b></div>
         </div>
         ${traits.length ? `<h4>Traits</h4><ul class="traits">${(g.traits || []).map((t) => `<li class="${TRAITS[t].kind}"><b>${esc(TRAITS[t].name)}</b> ${esc(TRAITS[t].desc)}</li>`).join('')}</ul>` : ''}
-        <h4>In the bag</h4><p>${esc(BALL_BY_ID[g.ball].name)} ball · <button class="linkbtn" data-a="tab" data-t="shop">Change ball</button></p>
+        <h4>In the bag</h4>
+        <ul class="baglist">${Object.entries(CLUB_CATS).map(([cat, v]) => { const m = MODEL_BY_ID[normBag(g.bag)[cat]]; return `<li><small>${esc(v.label)}</small> ${esc(m.brand)} ${esc(m.name)}</li>`; }).join('')}<li><small>Ball</small> ${esc(BALL_BY_ID[g.ball].name)}</li></ul>
+        <p><button class="linkbtn" data-a="tab" data-t="shop">Visit the pro shop</button></p>
       </section></div>`;
   }
 
   hubShop(c) {
     const g = c.golfer;
-    return `<p class="muted">Each ball trades one strength for another. Prize money buys new ones; you can switch any time between events.</p>
+    const sub = this.shopTab || 'clubs';
+    const head = `<div class="chips shop-tabs"><button class="chipbtn ${sub === 'clubs' ? 'on' : ''}" data-a="shopTab" data-t="clubs">Clubs</button><button class="chipbtn ${sub === 'balls' ? 'on' : ''}" data-a="shopTab" data-t="balls">Balls</button><span class="muted small">Bank: ${money(g.money)}</span></div>`;
+    if (sub === 'clubs') return head + this.clubShop(c);
+    return `${head}<p class="muted">Each ball trades one strength for another. Prize money buys new ones; you can switch any time between events.</p>
       <div class="balls">${BALLS.map((b) => {
         const owned = g.balls.includes(b.id);
         const bars = ballBars(b);
@@ -281,6 +290,34 @@ export class Screens {
           <div class="bc-foot">${g.ball === b.id ? '<span class="pill">In your bag</span>' : owned ? `<button class="btn" data-a="useBall" data-id="${b.id}">Use this ball</button>` : `<button class="btn primary" data-a="buyBall" data-id="${b.id}" ${g.money < b.price ? 'disabled' : ''}>Buy ${money(b.price, true)}</button>`}</div>
         </article>`;
       }).join('')}</div>`;
+  }
+
+  clubShop(c) {
+    const g = c.golfer;
+    const bag = normBag(g.bag);
+    const owned = new Set(g.clubs || []);
+    const sw = (m) => {
+      const lk = m.look || {};
+      const col = lk.crown || lk.accent || lk.head || '#999';
+      return `<span class="club-swatch ${m.cat}" style="--h:${lk.head || '#999'};--a:${col}"></span>`;
+    };
+    const bagRow = Object.entries(CLUB_CATS).map(([cat, v]) => {
+      const m = MODEL_BY_ID[bag[cat]];
+      return `<div class="bagslot">${sw(m)}<div><small>${esc(v.label)}</small><b>${esc(m.brand)} ${esc(m.name)}</b></div></div>`;
+    }).join('');
+    return `<section class="card"><h3>Your bag</h3><div class="bagrow">${bagRow}</div><p class="muted small">14 clubs: driver, 3-wood, 5-wood, 4-hybrid, 5-iron to pitching wedge, gap, sand and lob wedge, and a putter. Each set trades one strength for another.</p></section>
+      ${Object.entries(CLUB_CATS).map(([cat, v]) => `
+        <h3 class="shop-cat">${esc(v.label)}</h3>
+        <div class="balls">${CLUB_MODELS.filter((m) => m.cat === cat).map((m) => {
+          const inBag = bag[cat] === m.id;
+          const has = owned.has(m.id) || m.price === 0;
+          return `<article class="ballcard ${inBag ? 'on' : ''}">
+            <div class="bc-head">${sw(m)}<div><small>${esc(m.brand)}</small><h4>${esc(m.name)}</h4></div><b class="price">${m.price ? money(m.price, true) : 'Free'}</b></div>
+            ${Object.entries(modelBars(m)).map(([k, val]) => statBar(k, val)).join('')}
+            <ul class="proscons">${m.pros.map((p) => `<li class="adv">${esc(p)}</li>`).join('')}${m.cons.map((p) => `<li class="dis">${esc(p)}</li>`).join('')}</ul>
+            <div class="bc-foot">${inBag ? '<span class="pill">In your bag</span>' : has ? `<button class="btn" data-a="useClub" data-id="${m.id}">Put in bag</button>` : `<button class="btn primary" data-a="buyClub" data-id="${m.id}" ${g.money < m.price ? 'disabled' : ''}>Buy ${money(m.price, true)}</button>`}</div>
+          </article>`;
+        }).join('')}</div>`).join('')}`;
   }
 
   hubTrophies(c) {
@@ -339,7 +376,8 @@ export class Screens {
           <div>
             <h4>Advantages &amp; disadvantages</h4>
             <ul class="traits">${p.traits.map((t) => `<li class="${TRAITS[t].kind}"><b>${esc(TRAITS[t].name)}</b> ${esc(TRAITS[t].desc)}</li>`).join('') || '<li class="muted">No standout traits</li>'}</ul>
-            <h4>Plays</h4><p>${esc(b.name)} (${esc(b.brand)})</p>
+            <h4>In the bag</h4>
+            <ul class="baglist">${Object.entries(CLUB_CATS).map(([cat, v]) => { const m = MODEL_BY_ID[normBag(p.bag)[cat]]; return `<li><small>${esc(v.label)}</small> ${esc(m.brand)} ${esc(m.name)}</li>`; }).join('')}<li><small>Ball</small> ${esc(b.name)}</li></ul>
             ${d ? `<div class="facts small"><div><small>Points</small><b>${d.pts.toFixed(1)}</b></div><div><small>Season wins</small><b>${d.wins}</b></div><div><small>Career wins</small><b>${d.cw}</b></div><div><small>Season money</small><b>${money(d.money, true)}</b></div></div>` : ''}
           </div>
         </div>
@@ -376,16 +414,46 @@ export class Screens {
     const front = c.holes.slice(0, 9), back = c.holes.slice(9);
     const row = (hs, lab, key) => `<tr><th>${lab}</th>${hs.map((h) => `<td>${h[key]}</td>`).join('')}<td><b>${key === 'n' ? (hs[0].n === 1 ? 'Out' : 'In') : hs.reduce((s, h) => s + h[key], 0)}</b></td></tr>`;
     const card = (hs) => `<div class="table-wrap"><table class="tbl scard">${row(hs, 'Hole', 'n')}${row(hs, 'Yards', 'yards')}${row(hs, 'Par', 'par')}<tr><th>Index</th>${hs.map((h) => `<td>${h.si}</td>`).join('')}<td></td></tr></table></div>`;
-    return modal(`
+    const rec = this.courseRecord(c);
+    const m = modal(`
       <div class="coursecard">
         <div class="co-style">${esc(c.style)}</div>
         <h3>${esc(c.name)}</h3>
         <p class="muted">${esc(c.region)}, ${esc(c.countryName)} · Est. ${c.est} · Designed by ${esc(c.designer)}</p>
         <p>${esc(st.desc)}</p>
-        <div class="facts small"><div><small>Par</small><b>${c.par}</b></div><div><small>Length</small><b>${c.yards.toLocaleString()} yds</b></div><div><small>Greens</small><b>Stimp ${c.stimp}</b></div><div><small>Firmness</small><b>${c.firm > 0.7 ? 'Firm' : c.firm > 0.45 ? 'Medium' : 'Soft'}</b></div><div><small>Wind</small><b>${c.wind[0]}–${c.wind[1]} mph</b></div><div><small>Signature</small><b>No. ${c.signature}</b></div></div>
+        <div class="facts small"><div><small>Par</small><b>${c.par}</b></div><div><small>Length</small><b>${c.yards.toLocaleString()} yds</b></div><div><small>Greens</small><b>Stimp ${c.stimp}</b></div><div><small>Firmness</small><b>${c.firm > 0.7 ? 'Firm' : c.firm > 0.45 ? 'Medium' : 'Soft'}</b></div><div><small>Wind</small><b>${c.wind[0]}–${c.wind[1]} mph</b></div><div><small>Signature</small><b>No. ${c.signature}</b></div><div><small>Course record</small><b>${rec.score} \u00b7 ${esc(rec.holder.name)} (${rec.year})</b></div></div>
         ${card(front)}${card(back)}
         <div class="actions"><button class="btn primary" data-a="playCourse" data-id="${c.id}">Play a quick round here</button></div>
+        <h4>Yardage book</h4>
+        <div class="ybook">${c.holes.map((h, i) => `
+          <article class="yb-hole">
+            <canvas data-yb="${i}" width="180" height="300" aria-label="Map of hole ${h.n}"></canvas>
+            <div class="yb-info"><div class="yb-head"><b>${h.n}</b><span>Par ${h.par}</span><span>${h.yards} yds</span><span>Index ${h.si}</span></div>
+            <p class="yb-note" data-ybnote="${i}">Loading\u2026</p></div>
+          </article>`).join('')}</div>
       </div>`, { wide: true });
+    // Draw the 18 maps a few at a time so the card opens instantly
+    const body = m.el;
+    let i = 0;
+    const step = () => {
+      const cv = body.querySelector(`[data-yb="${i}"]`);
+      if (!cv || !cv.isConnected) return;
+      const hole = new HoleModel(c, i);
+      drawHoleMap(cv.getContext('2d'), hole, 90, 150, { sc: 2, pin: true });
+      body.querySelector(`[data-ybnote="${i}"]`).textContent = caddieNote(hole);
+      i++;
+      if (i < 18) setTimeout(step, 16);
+    };
+    setTimeout(step, 60);
+    return m;
+  }
+
+  courseRecord(c) {
+    const r = new RNG(mixSeed(c.seed, 'record'));
+    const pros = generatePros();
+    const holder = pros[r.int(0, 60)];
+    const score = c.par - r.int(7, 11);
+    return { holder, score, year: r.int(Math.max(c.est + 20, 1990), 2025) };
   }
 
   // ---------------- quick round ----------------

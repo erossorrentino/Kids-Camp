@@ -230,3 +230,28 @@ export class Particles {
     g.setDrawRange(0, L.length);
   }
 }
+
+// Divots on the fairway and pitch marks on greens; they stay for the hole
+export class Marks {
+  constructor(max = 120) {
+    this.max = max;
+    const divot = new THREE.CircleGeometry(1, 10).rotateX(-Math.PI / 2);
+    this.divots = new THREE.InstancedMesh(divot, new THREE.MeshLambertMaterial({ color: '#6b4a2e', polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8 }), max);
+    const ring = new THREE.RingGeometry(0.035, 0.06, 12).rotateX(-Math.PI / 2);
+    this.pitches = new THREE.InstancedMesh(ring, new THREE.MeshBasicMaterial({ color: '#2f5a22', polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8 }), max);
+    for (const m of [this.divots, this.pitches]) { m.count = 0; m.frustumCulled = false; }
+    this.m4 = new THREE.Matrix4();
+  }
+  addTo(scene) { scene.add(this.divots, this.pitches); }
+  reset() { this.divots.count = 0; this.pitches.count = 0; }
+  add(kind, x, y, z, heading = 0, size = 1) {
+    const m = kind === 'divot' ? this.divots : this.pitches;
+    if (m.count >= this.max) return;
+    const q = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), -heading);
+    const s = kind === 'divot' ? new THREE.Vector3(0.07 * size, 1, 0.16 * size) : new THREE.Vector3(size, 1, size);
+    this.m4.compose(new THREE.Vector3(x, y + 0.01, z), q, s);
+    m.setMatrixAt(m.count, this.m4);
+    m.count++;
+    m.instanceMatrix.needsUpdate = true;
+  }
+}

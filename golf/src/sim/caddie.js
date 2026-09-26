@@ -2,20 +2,22 @@
 import { CLUBS } from '../data/equipment.js';
 import { computeLaunch, launchState } from './shot.js';
 import { simulate, flatEnv } from './physics.js';
+import { gearFor } from '../data/clubsets.js';
 
 // Carry and total (meters) for every club at full power on flat fairway
-export function clubTable(stats, fx, ball, aero, rho = 1.225) {
+export function clubTable(stats, fx, ball, aero, rho = 1.225, bag = null) {
   const env = flatEnv({ rho });
   const out = {};
   for (const c of CLUBS) {
     if (c.kind === 'putter') continue;
-    const L = computeLaunch({ clubId: c.id, power: 1, stats, fx, ball, lie: 'tee', noRandom: true, heading: 0 });
+    const gear = gearFor(bag, c.id);
+    const L = computeLaunch({ clubId: c.id, power: 1, stats, fx, ball, gear, lie: 'tee', noRandom: true, heading: 0 });
     const st = launchState(0, L);
     const r = simulate({ pos: { x: 0, y: 0.03, z: 0 }, vel: st.vel, spin: st.spin, env, ball: aero, maxTime: 20 });
     // Carry at partial power, for inverting distance -> power
     const curve = [0];
     for (let i = 1; i <= 10; i++) {
-      const Lp = computeLaunch({ clubId: c.id, power: i / 10, stats, fx, ball, lie: 'tee', noRandom: true, heading: 0 });
+      const Lp = computeLaunch({ clubId: c.id, power: i / 10, stats, fx, ball, gear, lie: 'tee', noRandom: true, heading: 0 });
       const sp = launchState(0, Lp);
       curve.push(simulate({ pos: { x: 0, y: 0.03, z: 0 }, vel: sp.vel, spin: sp.spin, env, ball: aero, maxTime: 20 }).carry);
     }

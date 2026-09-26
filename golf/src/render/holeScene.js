@@ -2,7 +2,8 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { makeTerrainMaterial } from './terrainMaterial.js';
 import { buildTrees, TREE_UNIFORMS } from './trees.js';
-import { buildGroundCover, buildCartPath, buildTeeFurniture, buildHouses, buildClubhouse, buildGrandstand, Birds } from './decor.js';
+import { buildGroundCover, buildCartPath, buildTeeFurniture, buildHouses, buildClubhouse, buildGrandstand, Birds, buildRakes, buildFountains, buildBridges, buildLighthouse, buildTeeExtras } from './decor.js';
+import { buildPeople, buildMarshals, buildCameraTower, Cart } from './people.js';
 import { RNG, mixSeed, smoothstep, clamp, Noise2D } from '../util/rng.js';
 
 const CL = (v) => clamp(v, -60, 60);
@@ -174,7 +175,8 @@ export class HoleScene {
           const l = Math.hypot(dx, dz) || 1;
           dx /= l; dz /= l;
           const hw = w.half + 3;
-          posArr.push(pts[i].x - dz * hw, w.level, pts[i].z + dx * hw, pts[i].x + dz * hw, w.level, pts[i].z - dx * hw);
+          const lv = w.levels ? w.levels[i] : w.level;
+          posArr.push(pts[i].x - dz * hw, lv, pts[i].z + dx * hw, pts[i].x + dz * hw, lv, pts[i].z - dx * hw);
         }
         const idx = [];
         for (let i = 0; i < pts.length - 1; i++) {
@@ -226,7 +228,33 @@ export class HoleScene {
     if (this.quality !== 'low') this.group.add(buildHouses(hole));
     if (hole.index === 0) this.group.add(buildClubhouse(hole, 'tee'));
     if (hole.index === hole.course.holes.length - 1) this.group.add(buildClubhouse(hole, 'green'));
-    if (this.opts.crowd && (hole.index === 17 || hole.index === hole.course.signature - 1)) this.group.add(buildGrandstand(hole, this.opts.board));
+    if (this.opts.crowd && (hole.index === 17 || hole.index === hole.course.signature - 1)) {
+      const stand = buildGrandstand(hole, this.opts.board);
+      this.standPeople = stand.userData.people || null;
+      this.group.add(stand);
+    }
+    this.group.add(buildRakes(hole));
+    this.group.add(buildBridges(hole));
+    this.group.add(buildTeeExtras(hole));
+    this.fountains = buildFountains(hole);
+    for (const f of this.fountains) this.group.add(f.group);
+    if (this.seaSide) {
+      // a lighthouse on the far shore
+      const b = hole.bounds;
+      const cx = (b.minX + b.maxX) / 2, cz = (b.minZ + b.maxZ) / 2;
+      const r = { x: Math.cos(hole.teeHeading) * this.seaSide, z: Math.sin(hole.teeHeading) * this.seaSide };
+      const f = { x: Math.sin(hole.teeHeading), z: -Math.cos(hole.teeHeading) };
+      const d = (b.maxX - b.minX) / 2 + 520;
+      const lx = cx + r.x * d + f.x * 240, lz = cz + r.z * d + f.z * 240;
+      const ly = Math.max(this.seaLevel + 2, this.farH(lx, lz, hole.fields(lx, lz)));
+      this.group.add(buildLighthouse(lx, ly, lz));
+    }
+    this.carts = [];
+    if (hole.cartPath && this.quality !== 'low') {
+      const cart = new Cart(hole, mixSeed(hole.seed, 'cart'));
+      this.carts.push(cart);
+      this.group.add(cart.group);
+    }
     this.birds = [];
     if (this.quality !== 'low') {
       const mid = hole.pointAtS(hole.length / 2);
@@ -495,27 +523,40 @@ export class HoleScene {
       }
     }
     if (!spots.length) return;
-    const body = new THREE.CapsuleGeometry(0.2, 0.75, 3, 6).translate(0, 0.62, 0);
-    const head = new THREE.SphereGeometry(0.12, 8, 6).translate(0, 1.36, 0);
-    const skinTones = ['#f1c7a5', '#d49a73', '#8d5a3b', '#e8b996', '#6b4029'];
-    const shirts = ['#e63946', '#1d3557', '#f1faee', '#2a9d8f', '#e9c46a', '#264653', '#ffffff', '#8ac926', '#ff006e', '#3a86ff', '#ffca3a', '#6a4c93'];
-    const bm = new THREE.InstancedMesh(body, new THREE.MeshLambertMaterial(), spots.length);
-    const hm = new THREE.InstancedMesh(head, new THREE.MeshLambertMaterial(), spots.length);
-    const m4 = new THREE.Matrix4();
-    const q = new THREE.Quaternion();
-    const c = new THREE.Color();
-    spots.forEach((sp, i) => {
-      const y = hole.heightAt(sp.x, sp.z);
-      const k = rng.float(0.9, 1.1);
-      q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), sp.face);
-      m4.compose(new THREE.Vector3(sp.x, y, sp.z), q, new THREE.Vector3(k, k, k));
-      bm.setMatrixAt(i, m4);
-      hm.setMatrixAt(i, m4);
-      bm.setColorAt(i, c.set(rng.pick(shirts)));
-      hm.setColorAt(i, c.set(rng.pick(skinTones)));
-    });
-    bm.castShadow = this.quality === 'high';
-    this.group.add(bm, hm);
+    for (const sp of spots) sp.y = hole.heightAt(sp.x, sp.z);
+    this.crowd = buildPeople(spots, mixSeed(hole.seed, 'people'));
+    this.group.add(this.crowd.group);
+    // Marshals with "Quiet please" paddles either side of the green front
+    const g2 = hole.green;
+    const ms = [];
+    for (const side of [-1, 1]) {
+      const a = hole.finalHeading + Math.PI + side * 1.0;
+      const rr = Math.max(g2.rx, g2.rz) + 7;
+      const x = g2.x + Math.sin(a) * rr, z = g2.z - Math.cos(a) * rr;
+      const f = hole.fields(x, z);
+      if (f.dB > 1 && f.dW > 2) ms.push({ x, z, y: hole.heightAt(x, z), face: Math.atan2(g2.x - x, g2.z - z) });
+    }
+    // and one at the tee
+    const tr = { x: Math.cos(hole.tee.heading), z: Math.sin(hole.tee.heading) };
+    const side = hole.cartPath ? -hole.cartPath.side : 1;
+    ms.push({ x: tr.x * 9 * side, z: tr.z * 9 * side, y: hole.heightAt(tr.x * 9 * side, tr.z * 9 * side), face: Math.atan2(-tr.x * side, -tr.z * side) });
+    this.marshals = buildMarshals(ms, mixSeed(hole.seed, 'marshal'));
+    this.group.add(this.marshals.group);
+    // TV camera tower off the back corner of the green
+    if (this.quality !== 'low') {
+      const a = hole.finalHeading + rng.sign() * 2.2;
+      const rr = Math.max(g2.rx, g2.rz) + 24;
+      const x = g2.x + Math.sin(a) * rr, z = g2.z - Math.cos(a) * rr;
+      const f = hole.fields(x, z);
+      if (f.dW > 4 && f.dB > 3 && f.dO > 4 && hole.inBounds(x, z)) {
+        this.group.add(buildCameraTower(x, hole.heightAt(x, z), z, Math.atan2(g2.x - x, g2.z - z)));
+      }
+    }
+  }
+
+  cheer(strength = 1) {
+    if (this.crowd) this.crowd.cheer(strength);
+    if (this.standPeople) this.standPeople.cheer(strength);
   }
 
   update(dt, wind) {
@@ -523,6 +564,10 @@ export class HoleScene {
     TREE_UNIFORMS.uTime.value += dt;
     TREE_UNIFORMS.uWind.value.set(wind.x, wind.z);
     for (const b of this.birds || []) b.update(dt);
+    if (this.crowd) this.crowd.update(dt);
+    if (this.standPeople) this.standPeople.update(dt);
+    for (const c of this.carts || []) c.update(dt);
+    for (const f of this.fountains || []) f.update(dt);
     if (this.flag) {
       // Point the flag downwind and ripple it
       const speed = Math.hypot(wind.x, wind.z);

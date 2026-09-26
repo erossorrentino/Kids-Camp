@@ -2,8 +2,7 @@
 // leaderboard can reveal them hole by hole as you play), cut, playoff, payouts.
 import { proById } from '../data/players.js';
 import { courseById } from '../data/courses.js';
-import { courseProfile, simRound, drawForm, drawDayForm, simHole, effectiveStats } from '../sim/aisim.js';
-import { traitEffects } from '../data/traits.js';
+import { courseProfile, simRound, drawForm, drawDayForm, simHole, effectiveStats, fxWithGear } from '../sim/aisim.js';
 import { RNG, mixSeed, clamp } from '../util/rng.js';
 import { purseShare, pointsShare, splitTies, TOURS } from '../data/tour.js';
 
@@ -93,7 +92,7 @@ export function simAIRound(t, r) {
   for (const p of t.players) {
     if (p.id === HUMAN_ID || p.status !== 'active') continue;
     const pro = proById(p.id);
-    if (!pro.fx) pro.fx = traitEffects(pro.traits);
+    if (!pro.fx) pro.fx = fxWithGear(pro.traits, pro.bag);
     const behind = totalOf(p, r) - par * r - lead;
     const finalRound = r === t.rounds - 1;
     const pressure = finalRound && behind <= 4 ? (i) => (i >= 9 ? (i - 8) / 10 : 0.1) : null;
@@ -126,7 +125,7 @@ export function simHumanHole(t, golfer, holeIdx, salt = 0) {
   const prof = courseProfile(course);
   const c = t.cond[Math.min(t.round, t.cond.length - 1)];
   const rng = new RNG(mixSeed(t.seed, 'humansim', t.round, holeIdx, salt));
-  const fx = traitEffects(golfer.traits || []);
+  const fx = fxWithGear(golfer.traits || [], golfer.bag);
   const s = effectiveStats(golfer.stats, 0);
   return simHole(s, fx, prof.holes[holeIdx], { windMph: c.windMph, stimp: c.stimp, firm: c.firm }, () => rng.next());
 }
@@ -233,7 +232,7 @@ export function simPlayoff(t, tied, humanScores = []) {
     const res = alive.map((id) => {
       if (id === HUMAN_ID) return { id, s: humanScores[hole] };
       const pro = proById(id);
-      const fx = pro.fx || traitEffects(pro.traits);
+      const fx = pro.fx || fxWithGear(pro.traits, pro.bag);
       return { id, s: simHole(effectiveStats(pro.stats, 1), fx, prof.holes[17], { windMph: c.windMph, stimp: c.stimp, firm: c.firm }, () => rng.next()) };
     });
     if (res.some((x) => x.s == null)) return { pending: true, alive, log, hole };

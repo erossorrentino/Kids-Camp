@@ -6,6 +6,7 @@ import { clamp } from '../util/rng.js';
 import { HoleModel } from './hole.js';
 import { traitEffects } from '../data/traits.js';
 import { STAT_KEYS } from '../data/players.js';
+import { bagSimFx } from '../data/clubsets.js';
 
 // Tour make percentage by putt length (feet)
 const MAKE = [[1, 1], [2, 0.99], [3, 0.96], [4, 0.88], [5, 0.77], [6, 0.66], [7, 0.58], [8, 0.5], [10, 0.4], [12, 0.32], [15, 0.23], [20, 0.15], [25, 0.1], [30, 0.07], [40, 0.045], [50, 0.03], [60, 0.02], [90, 0.012]];
@@ -169,8 +170,21 @@ export function effectiveStats(base, shift) {
  * Simulate an 18-hole round. Returns an array of 18 hole scores.
  * ctx: { roundIndex, rounds, contention: fn(holeIdx) -> 0..1 pressure, home: bool, form }
  */
+// Traits plus the small scoring edge (or cost) of a pro's equipment
+export function fxWithGear(traits, bag) {
+  const fx = { ...traitEffects(traits) };
+  if (!bag) return fx;
+  const g = bagSimFx(bag);
+  fx.driveYds += g.driveYds;
+  fx.fairwayPct += g.fairwayPct;
+  fx.ironProx *= g.ironProx;
+  fx.scramble += g.scramble;
+  fx.puttOdds *= g.puttOdds;
+  return fx;
+}
+
 export function simRound(pro, prof, cond, rng, ctx = {}) {
-  const fx = pro.fx || traitEffects(pro.traits);
+  const fx = pro.fx || fxWithGear(pro.traits, pro.bag);
   const scores = [];
   let prev = 0; // previous hole relative to par
   const styleB = fx.styleBonus[prof.style] ? 2.5 : 0;

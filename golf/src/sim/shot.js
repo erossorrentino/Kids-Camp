@@ -44,18 +44,20 @@ function skillForClub(club, power, stats) {
 }
 
 // Lie effects: returns multipliers and dispersion
-export function lieEffect(lie, club, distToPin, stats, fx, rng, plugged) {
+export function lieEffect(lie, club, distToPin, stats, fx, rng, plugged, gear = null) {
   const out = { speed: 1, spin: 1, launch: 0, disp: 1, note: '' };
   const rec = (factor, kind) => {
-    // Recovery skill and traits reduce how much of the penalty applies
-    const scale = (1.3 - stats.recovery / 100) * (kind === 'bunker' ? fx.bunker : fx.rough);
-    return 1 - (1 - factor) * Math.max(0.15, scale);
+    // Recovery skill, traits and club design reduce how much of the penalty applies
+    let scale = (1.3 - stats.recovery / 100) * (kind === 'bunker' ? fx.bunker : fx.rough);
+    if (gear) scale *= 1 - (kind === 'bunker' ? gear.sand : gear.rough);
+    return 1 - (1 - factor) * Math.max(0.1, scale);
   };
   switch (lie) {
     case 'tee':
       break;
     case 'fairway':
-      if (club.id === 'DR') { out.speed = 0.93; out.launch = -2.5; out.disp = 1.3; out.note = 'Driver off the deck'; }
+      if (club.id === 'DR' && gear && gear.deck) { out.speed = 0.98; out.launch = -1; out.disp = 1.08; out.note = 'Mini driver off the deck'; }
+      else if (club.id === 'DR') { out.speed = 0.93; out.launch = -2.5; out.disp = 1.3; out.note = 'Driver off the deck'; }
       break;
     case 'fringe':
     case 'first':
@@ -131,17 +133,19 @@ export function computeLaunch(inp) {
     return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
   };
   const p = Math.max(0.02, inp.power);
-  const lie = lieEffect(inp.lie, club, inp.distToPin ?? 999, stats, fx, rng, inp.plugged);
+  // The club model in the bag for this club (distance, launch, spin, forgiveness...)
+  const gear = inp.gear || { speed: 1, launch: 0, spin: 1, forgive: 0.5, work: 1, bias: 0, sand: 0, rough: 0 };
+  const lie = lieEffect(inp.lie, club, inp.distToPin ?? 999, stats, fx, rng, inp.plugged, gear);
   let sf = speedFactor(stats);
   if (club.kind === 'wood' || club.kind === 'hybrid') sf *= fx.speedDrive;
   const soft = ball.soft ? 1 + ball.soft * 0.02 * ((70 - stats.power) / 40) : 1;
   const tempo = inp.tempo ?? 1;
-  let speed = club.speed * sf * ball.speed * soft * p * lie.speed * tempo;
+  let speed = club.speed * sf * ball.speed * soft * p * lie.speed * tempo * gear.speed;
 
   const isWood = club.kind === 'wood' || club.kind === 'hybrid';
-  let spin = club.spin * (0.32 + 0.68 * Math.min(p, 1)) * (isWood ? ball.spinD : ball.spinW) * lie.spin;
+  let spin = club.spin * (0.32 + 0.68 * Math.min(p, 1)) * (isWood ? ball.spinD : ball.spinW) * lie.spin * gear.spin;
   if (!isWood) spin *= fx.spinMult;
-  let launchDeg = club.launch + lie.launch + (club.kind === 'wedge' ? (1 - Math.min(p, 1)) * 4 : 0);
+  let launchDeg = club.launch + lie.launch + gear.launch + (club.kind === 'wedge' ? (1 - Math.min(p, 1)) * 4 : 0);
 
   // Intentional shaping from the impact-point control
   const shape = inp.shape || { x: 0, y: 0 };
@@ -165,11 +169,12 @@ export function computeLaunch(inp) {
   else k *= fx.ironErr;
   const over = Math.max(0, p - 1);
   k *= 1 + over * 6; // overswinging past 100% costs accuracy fast
+  k *= 1.45 - 0.9 * gear.forgive; // a bigger sweet spot forgives a crooked swing
   let startDeg = e * 0.25 * k;
   let axisDeg = e * 1.15 * k * ball.side;
-  axisDeg += shape.x * 9 * ball.side;
-  startDeg -= shape.x * 2.2;
-  if (p > 0.5) axisDeg += fx.shapeBias * ball.side;
+  axisDeg += shape.x * 9 * ball.side * gear.work;
+  startDeg -= shape.x * 2.2 * gear.work;
+  if (p > 0.5) axisDeg += (fx.shapeBias + gear.bias) * ball.side;
   axisDeg -= sl.sideDeg * 1.4; // ball above feet draws, below feet fades
 
   // Random dispersion from skill, lie, pressure and traits
@@ -177,7 +182,7 @@ export function computeLaunch(inp) {
   let pf = 1 + pressure * (1 - stats.mental / 100) * 0.9;
   if (fx.pressure < 0) pf *= 1 + pressure * 0.6;
   if (fx.pressure > 0) pf = 1 + (pf - 1) * 0.4;
-  const D = (1.45 - skill / 100) * fx.dispersion * lie.disp * pf * (1 + over * 3) * (inp.dispMult || 1);
+  const D = (1.45 - skill / 100) * fx.dispersion * lie.disp * pf * (1 + over * 3) * (inp.dispMult || 1) * (1.25 - 0.5 * gear.forgive);
   const cons = 1.25 - stats.consistency * 0.004;
   startDeg += gauss() * 0.9 * D;
   axisDeg += gauss() * 2.6 * D * ball.side;
@@ -217,9 +222,12 @@ export function computePutt(inp) {
   const dz = 1.2;
   const dev = inp.devDeg || 0;
   const e = Math.sign(dev) * Math.max(0, Math.abs(dev) - dz);
-  let startDeg = e * 0.1 * (0.6 + skill) + gauss() * 0.3 * skill * pf * fastPenalty;
-  v0 *= 1 + gauss() * 0.025 * skill * pf * fastPenalty * fx.lag;
-  if (fx.yips && inp.distToPin < 2.5 && rng() < fx.shortPuttMiss + pressure * 0.05) {
+  // Putter model: aim = start-line error, pace = speed error, nerve = calms pressure and yips
+  const pt = inp.gear || { aim: 1, pace: 1, nerve: 0 };
+  pf = 1 + (pf - 1) * (1 - pt.nerve * 0.6);
+  let startDeg = e * 0.1 * (0.6 + skill) * pt.aim + gauss() * 0.3 * skill * pf * fastPenalty * pt.aim;
+  v0 *= 1 + gauss() * 0.025 * skill * pf * fastPenalty * fx.lag * pt.pace;
+  if (fx.yips && inp.distToPin < 2.5 && rng() < (fx.shortPuttMiss + pressure * 0.05) * (1 - pt.nerve)) {
     startDeg += (rng() < 0.5 ? -1 : 1) * (1.5 + rng() * 2);
   }
   const h = inp.heading + startDeg * deg;
