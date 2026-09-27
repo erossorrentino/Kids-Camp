@@ -17,6 +17,43 @@ function limb(radius, color) {
   return m;
 }
 
+const lam = (color) => new THREE.MeshLambertMaterial({ color });
+
+// A body part turned on a lathe. profile is [radius, t] with t running 0..1
+// along the part, so place() can stretch it between two joints while the
+// radii (the muscle shape) stay true to size.
+function lathe(profile, mat, segs = 12) {
+  const g = new THREE.LatheGeometry(profile.map(([r, t]) => new THREE.Vector2(r, t)), segs);
+  const m = new THREE.Mesh(g, mat);
+  m.castShadow = true;
+  return m;
+}
+
+// Profiles in metres. Trousers hang looser and straighter than bare legs.
+const PROFILE = {
+  thighTrouser: [[0, 0], [0.086, 0], [0.089, 0.1], [0.082, 0.45], [0.07, 0.8], [0.064, 1]],
+  thighSkin: [[0, 0], [0.08, 0], [0.083, 0.12], [0.072, 0.5], [0.057, 0.85], [0.05, 1]],
+  shorts: [[0, 0], [0.09, 0], [0.093, 0.3], [0.089, 0.85], [0.087, 1], [0.07, 1]],
+  shinTrouser: [[0.061, 0], [0.062, 0.2], [0.058, 0.62], [0.056, 0.94], [0.059, 1], [0, 1]],
+  shinSkin: [[0.047, 0], [0.055, 0.22], [0.051, 0.45], [0.039, 0.8], [0.034, 1], [0, 1]],
+  sock: [[0, 0], [0.042, 0], [0.044, 0.6], [0.047, 0.92], [0.046, 1], [0.036, 1]],
+  upperArm: [[0, 0], [0.047, 0], [0.05, 0.16], [0.047, 0.42], [0.04, 0.8], [0.036, 1]],
+  forearm: [[0.037, 0], [0.043, 0.2], [0.038, 0.6], [0.028, 0.95], [0.027, 1], [0, 1]],
+  sleeve: [[0.057, 0], [0.058, 0.3], [0.055, 0.94], [0.054, 1], [0.043, 1]],
+  // torso around the spine, from the waist (inside the belt) to the neck
+  torsoM: [[0, 0.05], [0.12, 0.05], [0.129, 0.12], [0.14, 0.2], [0.152, 0.28], [0.162, 0.36], [0.166, 0.43], [0.158, 0.49], [0.136, 0.54], [0.096, 0.58], [0.062, 0.61], [0, 0.625]],
+  torsoF: [[0, 0.05], [0.112, 0.05], [0.114, 0.12], [0.121, 0.2], [0.139, 0.3], [0.149, 0.36], [0.148, 0.43], [0.142, 0.48], [0.122, 0.53], [0.088, 0.575], [0.058, 0.605], [0, 0.62]],
+};
+
+// Half-width of a lathe profile at height y
+function profileR(profile, y) {
+  for (let i = 1; i < profile.length; i++) {
+    const [r0, y0] = profile[i - 1], [r1, y1] = profile[i];
+    if (y >= y0 && y <= y1 && y1 > y0) return r0 + ((y - y0) / (y1 - y0)) * (r1 - r0);
+  }
+  return 0;
+}
+
 function place(mesh, a, b) {
   const d = new THREE.Vector3().subVectors(b, a);
   const L = d.length();
@@ -80,79 +117,118 @@ export class Golfer {
     const L = this.look;
     const shirtMap = shirtTexture(L.shirt, L.accent, L.pattern);
     const shirtMat = () => new THREE.MeshLambertMaterial(shirtMap ? { color: '#ffffff', map: shirtMap } : { color: L.shirt });
-    // legs (static)
+    const female = L.gender === 'f';
+    const skin = lam(L.skin);
+    const pantsMat = lam(L.pants);
+    // legs (posed every frame in poseLegs)
     this.legs = [];
     for (const side of [-1, 1]) {
-      const thigh = limb(0.075, L.pants);
-      // shorts show the shins, with socks above the shoe
-      const shin = limb(0.06, L.shorts ? L.skin : L.pants);
-      const sock = L.shorts ? limb(0.064, L.socks) : null;
-      if (sock) this.root.add(sock);
-      // two-tone golf shoe: white upper, dark sole, rounded toe
+      const thigh = lathe(L.shorts ? PROFILE.thighSkin : PROFILE.thighTrouser, L.shorts ? skin : pantsMat, 16);
+      const shin = lathe(L.shorts ? PROFILE.shinSkin : PROFILE.shinTrouser, L.shorts ? skin : pantsMat, 16);
+      // the knee sits just inside the leg: it only shows to fill the bend
+      const knee = new THREE.Mesh(new THREE.SphereGeometry(L.shorts ? 0.045 : 0.06, 14, 10), L.shorts ? skin : pantsMat);
+      knee.castShadow = true;
+      // shorts over bare thighs, with socks above the shoe
+      const shorts = L.shorts ? lathe(PROFILE.shorts, pantsMat) : null;
+      const sock = L.shorts ? lathe(PROFILE.sock, lam(L.socks), 16) : null;
+      for (const m of [shorts, sock]) if (m) this.root.add(m);
+      // two-tone golf shoe: white upper, dark sole, rounded toe and heel
       const shoe = new THREE.Group();
-      const upper = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.075, 0.105), new THREE.MeshLambertMaterial({ color: '#f4f4f4' }));
-      upper.position.set(-0.02, 0.045, 0);
-      const toe = new THREE.Mesh(new THREE.CylinderGeometry(0.052, 0.052, 0.075, 10, 1, false, 0, Math.PI), new THREE.MeshLambertMaterial({ color: '#f4f4f4' }));
-      toe.position.set(0.09, 0.045, 0);
-      const sole = new THREE.Mesh(new THREE.BoxGeometry(0.29, 0.018, 0.112), new THREE.MeshLambertMaterial({ color: '#2b2b2b' }));
-      sole.position.set(0.01, 0.009, 0);
-      const saddle = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.078, 0.108), new THREE.MeshLambertMaterial({ color: L.shoe || '#1b1b1b' }));
-      saddle.position.set(0.02, 0.046, 0);
-      for (const m of [upper, toe, sole, saddle]) { m.castShadow = true; shoe.add(m); }
-      this.root.add(thigh, shin, shoe);
-      this.legs.push({ side, thigh, shin, shoe, sock });
+      const white = lam('#f4f4f4');
+      const upper = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.07, 0.1), white);
+      upper.position.set(-0.01, 0.045, 0);
+      const toe = new THREE.Mesh(new THREE.SphereGeometry(0.052, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), white);
+      toe.scale.set(1.2, 1.25, 1);
+      toe.position.set(0.085, 0.018, 0);
+      const heel = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.075, 12, 1, false, Math.PI, Math.PI), white);
+      heel.position.set(-0.11, 0.046, 0);
+      const sole = new THREE.Mesh(new THREE.BoxGeometry(0.29, 0.02, 0.108), lam('#2b2b2b'));
+      sole.position.set(0.0, 0.01, 0);
+      const saddle = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.074, 0.104), lam(L.shoe));
+      saddle.position.set(0.01, 0.047, 0);
+      const tongue = new THREE.Mesh(new THREE.BoxGeometry(0.07, 0.02, 0.06), white);
+      tongue.position.set(0.03, 0.085, 0);
+      tongue.rotation.z = -0.35;
+      for (const m of [upper, toe, heel, sole, saddle, tongue]) { m.castShadow = true; shoe.add(m); }
+      this.root.add(thigh, knee, shin, shoe);
+      this.legs.push({ side, thigh, knee, shin, shoe, sock, shorts });
     }
     // pelvis + torso chain
     this.pelvis = new THREE.Group();
     this.pelvis.position.set(0, 0.93, 0);
     this.root.add(this.pelvis);
-    const hips = new THREE.Mesh(new THREE.BoxGeometry(0.24, 0.2, 0.36), new THREE.MeshLambertMaterial({ color: L.pants }));
+    // rounded hips and seat (wider on women)
+    const hips = new THREE.Mesh(new THREE.SphereGeometry(1, 18, 12), pantsMat);
+    hips.scale.set(female ? 0.101 : 0.098, 0.104, female ? 0.166 : 0.158);
+    hips.position.y = 0.022;
     hips.castShadow = true;
     this.pelvis.add(hips);
-    // belt with a buckle
-    const belt = new THREE.Mesh(new THREE.BoxGeometry(0.26, 0.045, 0.38), new THREE.MeshLambertMaterial({ color: L.belt || '#1b1b1b' }));
-    belt.position.y = 0.11;
-    const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.04, 0.05), new THREE.MeshLambertMaterial({ color: '#c9ccd1' }));
-    buckle.position.set(0.13, 0.11, 0);
-    this.pelvis.add(belt, buckle);
     this.spine = new THREE.Group();
     this.pelvis.add(this.spine);
     this.chest = new THREE.Group();
     this.spine.add(this.chest);
-    const torso = new THREE.Mesh(new THREE.CapsuleGeometry(0.17, 0.3, 4, 12), shirtMat());
-    torso.scale.set(0.95, 1, 1.22);
-    torso.position.y = 0.3;
-    torso.castShadow = true;
+    // torso: shoulders broader than the waist, flatter front to back
+    const prof = female ? PROFILE.torsoF : PROFILE.torsoM;
+    const sx = female ? 0.9 : 0.82, sz = female ? 1.24 : 1.32;
+    this.torsoShape = { prof, sx, sz };
+    const torso = lathe(prof, shirtMat(), 20);
+    torso.scale.set(sx, 1, sz);
     this.chest.add(torso);
+    // belt with a buckle, snug at the waist
+    const waistR = profileR(prof, 0.085);
+    const belt = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.042, 22, 1, true), new THREE.MeshLambertMaterial({ color: L.belt, side: THREE.DoubleSide }));
+    belt.scale.set(waistR * sx + 0.007, 1, waistR * sz + 0.007);
+    belt.position.y = 0.085;
+    const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.012, 0.036, 0.048), lam('#c9ccd1'));
+    buckle.position.set(waistR * sx + 0.01, 0.085, 0);
+    this.chest.add(belt, buckle);
+    // the shoulder joints sit inside the torso so the sleeves grow out of it
+    const shoulderZ = profileR(prof, 0.49) * sz - 0.036;
     if (L.vest) {
       // sweater vest over the shirt: the sleeves and collar still show
-      const vest = new THREE.Mesh(new THREE.CapsuleGeometry(0.1715, 0.16, 4, 12), new THREE.MeshLambertMaterial({ color: L.vest }));
-      vest.scale.set(0.955, 1, 1.225);
-      vest.position.y = 0.31;
-      vest.castShadow = true;
-      const vtrim = new THREE.Mesh(new THREE.TorusGeometry(0.166, 0.008, 6, 20), new THREE.MeshLambertMaterial({ color: L.accent }));
-      vtrim.rotation.x = Math.PI / 2;
-      vtrim.scale.set(0.955, 1.225, 1);
-      vtrim.position.y = 0.11;
+      const vprof = prof.filter(([, y]) => y <= 0.5).map(([r, y]) => [r * 1.045, y]);
+      vprof.push([profileR(prof, 0.53) * 1.03, 0.53], [0.075, 0.56]);
+      const vest = lathe(vprof, lam(L.vest), 20);
+      vest.scale.set(sx, 1, sz);
+      const vtrim = new THREE.Mesh(new THREE.CylinderGeometry(1, 1, 0.02, 22, 1, true), lam(L.accent));
+      const vr = profileR(prof, 0.12) * 1.06;
+      vtrim.scale.set(vr * sx, 1, vr * sz);
+      vtrim.position.y = 0.12;
       this.chest.add(vest, vtrim);
     }
-    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 0.1, 8), new THREE.MeshLambertMaterial({ color: L.skin }));
-    neck.position.y = 0.6;
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(female ? 0.044 : 0.049, female ? 0.052 : 0.058, 0.13, 10), skin);
+    neck.position.y = 0.64;
     this.chest.add(neck);
     // polo collar and button placket
     const shirtC = new THREE.Color(L.shirt);
-    const collar = new THREE.Mesh(new THREE.TorusGeometry(0.07, 0.022, 6, 14), new THREE.MeshLambertMaterial({ color: shirtC.clone().lerp(new THREE.Color('#ffffff'), 0.15) }));
+    const collar = new THREE.Mesh(new THREE.TorusGeometry(female ? 0.056 : 0.062, 0.017, 6, 16), lam(shirtC.clone().lerp(new THREE.Color('#ffffff'), 0.15)));
     collar.rotation.x = Math.PI / 2;
-    collar.position.y = 0.57;
-    const placket = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.12, 0.035), new THREE.MeshLambertMaterial({ color: shirtC.clone().multiplyScalar(0.8) }));
-    placket.position.set(0.19, 0.49, 0);
-    const logo = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.04, 0.05), new THREE.MeshLambertMaterial({ color: L.cap }));
-    logo.position.set(0.18, 0.44, -0.11);
+    collar.position.y = 0.597;
+    const frontX = (y, z = 0) => {
+      const r = profileR(prof, y);
+      return r * sx * Math.sqrt(Math.max(0, 1 - (z / (r * sz)) ** 2));
+    };
+    const placket = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.1, 0.032), lam(shirtC.clone().multiplyScalar(0.8)));
+    placket.position.set(frontX(0.52) - 0.001, 0.52, 0);
+    placket.rotation.z = -0.35;
+    const logo = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.036, 0.046), lam(L.cap));
+    logo.position.set(frontX(0.43, -0.09) + 0.002, 0.43, -0.09);
     this.chest.add(collar, placket, logo);
     this.headGroup = new THREE.Group();
     this.headGroup.position.y = 0.73;
     this.chest.add(this.headGroup);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.105, 14, 10), new THREE.MeshLambertMaterial({ color: L.skin }));
+    // one mesh for the head: a narrower jaw, the chin a little forward
+    const headGeo = new THREE.SphereGeometry(0.105, 18, 14);
+    const hp = headGeo.attributes.position;
+    for (let i = 0; i < hp.count; i++) {
+      const x = hp.getX(i), y = hp.getY(i), z = hp.getZ(i);
+      const low = Math.max(0, -y / 0.105); // 0 at the middle, 1 at the chin
+      const zk = 1 - (female ? 0.3 : 0.24) * low * low;
+      const xk = x > 0 ? 1 + 0.12 * low : 1 - 0.08 * low;
+      hp.setXYZ(i, x * xk, y, z * zk);
+    }
+    headGeo.computeVertexNormals();
+    const head = new THREE.Mesh(headGeo, new THREE.MeshLambertMaterial({ color: L.skin }));
     head.scale.set(1, 1.12, 0.95);
     head.castShadow = true;
     this.headGroup.add(head);
@@ -192,21 +268,29 @@ export class Golfer {
     this.hubAnchor.position.set(0.02, 0.5, 0);
     this.chest.add(this.hubAnchor);
     this.shL = new THREE.Object3D();
-    this.shL.position.set(0.0, 0.5, -0.2);
+    this.shL.position.set(0.0, 0.5, -shoulderZ);
     this.shR = new THREE.Object3D();
-    this.shR.position.set(0.0, 0.5, 0.2);
+    this.shR.position.set(0.0, 0.5, shoulderZ);
     this.chest.add(this.shL, this.shR);
-    // arms
+    // arms: shaped upper arm and forearm, elbow joint, short sleeve, hand
     this.arms = [];
     for (const side of [-1, 1]) {
-      const upper = limb(0.045, L.skin);
-      const sleeve = new THREE.Mesh(limb(0.058, L.shirt).geometry, shirtMat());
-      sleeve.castShadow = true;
-      const fore = limb(0.04, L.skin);
-      // glove on the lead hand, bare trail hand
-      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.045, 8, 6), new THREE.MeshLambertMaterial({ color: side < 0 ? L.glove : L.skin }));
-      this.root.add(upper, sleeve, fore, hand);
-      this.arms.push({ side, upper, sleeve, fore, hand });
+      const upper = lathe(PROFILE.upperArm, skin);
+      const sleeve = lathe(PROFILE.sleeve, shirtMat());
+      const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), skin);
+      const fore = lathe(PROFILE.forearm, skin);
+      // glove on the lead hand, bare trail hand; a mitten shape with a thumb
+      const handMat = side < 0 ? lam(L.glove) : skin;
+      const hand = new THREE.Group();
+      const palm = new THREE.Mesh(new THREE.SphereGeometry(1, 10, 8), handMat);
+      palm.scale.set(0.03, 0.05, 0.036);
+      palm.position.y = 0.03;
+      const thumb = new THREE.Mesh(new THREE.SphereGeometry(1, 6, 5), handMat);
+      thumb.scale.set(0.014, 0.03, 0.014);
+      thumb.position.set(0.02, 0.03, -side * 0.02);
+      for (const m of [palm, thumb]) { m.castShadow = true; hand.add(m); }
+      this.root.add(upper, sleeve, elbow, fore, hand);
+      this.arms.push({ side, upper, sleeve, elbow, fore, hand });
     }
     // club
     this.club = new THREE.Group();
@@ -304,11 +388,11 @@ export class Golfer {
       }
       case 'flat': {
         const top = new THREE.Mesh(new THREE.SphereGeometry(0.118, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2), capMat);
-        top.scale.set(1.18, 0.55, 1.03);
-        add(top, 0.015, 0.04, 0);
+        top.scale.set(1.18, 0.74, 1.05);
+        add(top, 0.015, 0.035, 0);
         add(brim(0.07, 1.2), 0.1, 0.038, 0);
         const btn = new THREE.Mesh(new THREE.SphereGeometry(0.012, 6, 4), capMat);
-        add(btn, 0.02, 0.105, 0);
+        add(btn, 0.02, 0.122, 0);
         break;
       }
       case 'cowboy': {
@@ -469,16 +553,22 @@ export class Golfer {
     this.poseLegs(this.finishFrac, 0.12);
   }
 
-  poseLegs(finish, kneeX) {
+  poseLegs(finish, kneeX, stance = 1) {
     for (const leg of this.legs) {
-      const z = leg.side * 0.15;
-      const hipP = new THREE.Vector3(-0.02, 0.9, leg.side * 0.1);
-      const knee = new THREE.Vector3(kneeX + (leg.side > 0 && finish > 0.3 ? 0.1 * finish : 0), 0.5, z * 1.05 + (leg.side > 0 ? -0.08 * finish : 0));
-      const ankle = new THREE.Vector3(0.0, 0.09, z * 1.12);
+      const z = leg.side * 0.15 * stance;
+      const hipP = new THREE.Vector3(-0.012, 0.925, leg.side * 0.088);
+      const knee = new THREE.Vector3(kneeX + (leg.side > 0 && finish > 0.3 ? 0.1 * finish : 0), 0.5, z * 1.02 + (leg.side > 0 ? -0.08 * finish : 0));
+      const ankle = new THREE.Vector3(0.0, 0.09, z * 1.1);
       place(leg.thigh, hipP, knee);
+      leg.knee.position.copy(knee);
       place(leg.shin, knee, ankle);
+      if (leg.shorts) place(leg.shorts, hipP.clone().add(new THREE.Vector3(0, 0.03, 0)), hipP.clone().lerp(knee, 0.6));
       if (leg.sock) place(leg.sock, ankle, ankle.clone().lerp(knee, 0.3));
-      leg.shoe.position.set(0.02, 0, z * 1.12);
+      leg.shoe.position.set(0.02, 0, z * 1.1);
+      // trail heel comes up and the foot rolls in the finish
+      leg.shoe.rotation.z = leg.side > 0 ? -0.9 * Math.max(0, finish - 0.4) : 0;
+      if (leg.side > 0 && finish > 0.4) leg.shoe.position.y = 0.06 * (finish - 0.4) / 0.6;
+      else leg.shoe.position.y = 0;
     }
   }
 
@@ -522,7 +612,7 @@ export class Golfer {
     this.club.position.copy(tL);
     tmpQ.setFromUnitVectors(V(0, -1, 0), dir);
     this.club.quaternion.copy(tmpQ);
-    this.poseLegs(0, 0.04);
+    this.poseLegs(0, 0.04, 0.72);
     this.root.position.y = this.baseY + jump;
   }
 
@@ -542,9 +632,12 @@ export class Golfer {
       E = S.clone().addScaledVector(dir, l1 * cosA).addScaledVector(perp, l1 * sinA);
     }
     place(arm.upper, S, E);
-    place(arm.sleeve, S, new THREE.Vector3().lerpVectors(S, E, 0.55));
+    place(arm.sleeve, S, new THREE.Vector3().lerpVectors(S, E, 0.5));
+    arm.elbow.position.copy(E);
     place(arm.fore, E, T);
-    arm.hand.position.copy(T);
+    // the hand continues the line of the forearm from the wrist
+    arm.hand.position.copy(T).addScaledVector(dir.copy(T).sub(E).normalize(), -0.012);
+    arm.hand.quaternion.copy(arm.fore.quaternion);
   }
 
   placeAt(ballPos, heading) {

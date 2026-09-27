@@ -80,6 +80,13 @@ hole using your golfer's skills if you want to move on.
   the Veins...). Buy them in the pro shop's **Characters** tab with prize
   money and play your career as them; switch any time. Each has their own
   look, shown as a 3D portrait rendered by the game.
+- **Shaped bodies** (`src/render/golfer.js`): torsos turned on a lathe
+  with broad shoulders tapering to the waist (a slimmer waist and wider
+  hips for women), rounded hips under a belt, thighs and calves with
+  muscle shape, knees and elbows that bend cleanly, short sleeves, hands
+  with a thumb that follow the forearm, a head with a narrower jaw, and
+  golf shoes with a toe cap and heel; the trail heel lifts in the finish.
+  `tools/dev/body.html` lines golfers up in different poses to check them.
 - **Detailed golfers**: caps, visors, bucket hats, flat caps, cowboy hats
   and beanies; short, long, curly, bun, ponytail, mohawk or bald; stubble,
   beards and mustaches; striped, hooped, checked or argyle shirts; sweater
