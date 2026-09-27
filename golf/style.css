@@ -594,3 +594,9 @@ img[data-portrait].ready { opacity: 1; }
   .cn-pic { width: 96px; height: 124px; }
   .cn-pic img { width: 96px; }
 }
+/* players market: tour pros */
+.boost.neg { color: var(--bad); }
+.cc-abil li.adv b { color: var(--good); }
+.cc-abil li.dis b { color: var(--bad); }
+.buybar select { width: auto; }
+.procard2 h4 .cc { margin-left: 4px; font-size: 11px; }

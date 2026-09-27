@@ -179,6 +179,13 @@ export function buildFields(c, week, humanEventId) {
       weighted.sort((a, b) => b.k - a.k);
       pick = weighted.slice(0, size).map((x) => x.id);
     }
+    // you can't play against the pro you're playing as
+    const me = c.golfer.char;
+    if (ev.id === humanEventId && me && pick.includes(me)) {
+      pick = pick.filter((id) => id !== me);
+      const sub = ranked.find((id) => id !== me && !used.has(id) && !pick.includes(id));
+      if (sub) pick.push(sub);
+    }
     pick.forEach((id) => used.add(id));
     fields[ev.id] = pick;
   }

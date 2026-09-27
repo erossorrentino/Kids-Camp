@@ -19,7 +19,7 @@ import { RNG, mixSeed } from './util/rng.js';
 import { traitEffects } from './data/traits.js';
 import { BALL_BY_ID } from './data/equipment.js';
 import { MODEL_BY_ID, normBag } from './data/clubsets.js';
-import { CHAR_BY_ID, playAs } from './data/characters.js';
+import { CHAR_BY_ID, playAs, marketItem } from './data/characters.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -414,28 +414,32 @@ app.onAction = (a, d, elx) => {
       break;
     }
     case 'buyChar': {
-      const ch = CHAR_BY_ID[d.id];
+      const it = marketItem(d.id);
       const g = c.golfer;
-      if (ch && g.money >= ch.price && !g.chars.includes(ch.id)) {
-        g.money -= ch.price;
-        g.chars.push(ch.id);
-        g.char = ch.id;
+      if (it && g.money >= it.price && !g.chars.includes(it.id)) {
+        g.money -= it.price;
+        g.chars.push(it.id);
+        g.char = it.id;
         saveCareer(c, { now: true });
         sfx.applause(0.6);
-        toast(`${ch.name} joined your team! You're playing as ${ch.name.split(' ')[0]}.`);
+        toast(`${it.name} joined your team! You're playing as ${it.name.split(' ')[0]}.`);
       }
+      document.querySelectorAll('.modal-wrap').forEach((m) => m.remove());
       app.screens.hub(c, 'players');
       break;
     }
     case 'useChar': {
       const g = c.golfer;
       if (!d.id) { g.char = null; toast('Playing as yourself'); }
-      else if (g.chars.includes(d.id)) { g.char = d.id; toast(`Playing as ${CHAR_BY_ID[d.id].name}`); }
+      else if (g.chars.includes(d.id)) { g.char = d.id; toast(`Playing as ${marketItem(d.id).name}`); }
       saveCareer(c);
+      document.querySelectorAll('.modal-wrap').forEach((m) => m.remove());
       app.screens.hub(c, app.screens.tab || 'players');
       break;
     }
-    case 'charInfo': app.screens.charCard(c, d.id); break;
+    case 'charInfo': if (CHAR_BY_ID[d.id]) app.screens.charCard(c, d.id); else app.screens.proCard(d.id); break;
+    case 'playersView': app.screens.playersView = d.t; app.screens.buyOpts.limit = 24; app.screens.hub(c, 'players'); break;
+    case 'moreBuy': app.screens.buyOpts.limit += 24; app.screens.hub(c, 'players'); break;
     case 'useClub': {
       const m = MODEL_BY_ID[d.id];
       if (m) { c.golfer.bag = { ...normBag(c.golfer.bag), [m.cat]: m.id }; saveCareer(c); toast(`Switched to ${m.brand} ${m.name}`); }
@@ -477,6 +481,9 @@ app.onFilter = (k, v) => {
   else if (k === 'playersSort') { app.playersOpts.sort = v; rerenderList('players'); }
   else if (k === 'courses') { app.coursesOpts.q = v; rerenderList('courses'); }
   else if (k === 'rank') { app.screens.rankFilter = v; rerenderList('rank'); }
+  else if (k === 'buy') { app.screens.buyOpts.q = v; app.screens.buyOpts.limit = 24; rerenderList('buy'); }
+  else if (k === 'buySort') { app.screens.buyOpts.sort = v; rerenderList('buy'); }
+  else if (k === 'buyAfford') { app.screens.buyOpts.afford = v === 'yes'; app.screens.buyOpts.limit = 24; rerenderList('buy'); }
 };
 
 // Re-render a list screen while keeping focus in its search box
@@ -487,6 +494,7 @@ function rerenderList(kind) {
   if (kind === 'players') app.screens.players({ ...app.playersOpts, pick });
   else if (kind === 'courses') app.screens.courses({ ...app.coursesOpts, pick });
   else if (kind === 'rank') app.screens.hub(app.career, 'rankings');
+  else if (kind === 'buy') app.screens.hub(app.career, 'players');
   const inp = document.querySelector(`[data-filter="${kind === 'rank' ? 'rank' : kind}"]`);
   if (inp && active && active.dataset && active.dataset.filter) {
     inp.focus();

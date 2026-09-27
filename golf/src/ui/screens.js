@@ -16,15 +16,16 @@ import {
   ACHIEVEMENTS, DEFAULT_STATS, golferOVR, season,
 } from '../game/career.js';
 import { HUMAN_ID } from '../game/tournament.js';
-import { CHARACTERS, CHAR_BY_ID, CHAR_TIERS, playAs, abilityList, charBoostOf } from '../data/characters.js';
+import { CHARACTERS, CHAR_BY_ID, CHAR_TIERS, playAs, abilityList, charBoostOf, marketItem, proPrice } from '../data/characters.js';
 import { fillPortraits } from '../render/portrait.js';
 
 const TOUR_TAG = { CH: 'Challenger', WT: 'World Tour', MAJ: 'Major', FIN: 'Finale' };
 
 // The active character's boost to one skill, shown next to your trained value
 function charBoost(g, k) {
-  const v = g.char ? charBoostOf(CHAR_BY_ID[g.char], k) : 0;
-  return v ? `<em class="boost">+${v}</em>` : '';
+  if (!g.char) return '';
+  const v = playAs(g).stats[k] - g.stats[k];
+  return v ? `<em class="boost ${v < 0 ? 'neg' : ''}">${v > 0 ? '+' : '−'}${Math.abs(v)}</em>` : '<em class="boost"></em>';
 }
 
 export class Screens {
@@ -32,6 +33,8 @@ export class Screens {
     this.root = root;
     this.app = app;
     this.tab = 'week';
+    this.playersView = 'pros';
+    this.buyOpts = { q: '', sort: 'ovr', afford: false, limit: 24 };
     root.addEventListener('click', (e) => {
       const a = e.target.closest('[data-a]');
       if (!a) return;
@@ -166,7 +169,7 @@ export class Screens {
           <button class="hub-avatar" data-a="tab" data-t="players" aria-label="Players"><img data-portrait="me" alt=""></button>
           <div class="hub-id">
             <div class="hub-name">${esc(g.name)} <span class="cc">${esc(g.country)}</span></div>
-            ${g.char && CHAR_BY_ID[g.char] ? `<div class="hub-char">Playing as <b>${esc(CHAR_BY_ID[g.char].name)}</b></div>` : ''}
+            ${g.char && marketItem(g.char) ? `<div class="hub-char">Playing as <b>${esc(marketItem(g.char).name)}</b></div>` : ''}
             <div class="hub-meta">Season ${c.year} · Week ${c.week} of ${SEASON_WEEKS}</div>
             <div class="save-line" id="saveLine">${this.app.saveText ? esc(this.app.saveText()) : ''}</div>
           </div>
@@ -283,7 +286,7 @@ export class Screens {
     const g = c.golfer;
     return `<div class="cols">
       <section class="card"><div class="card-head"><h3>Skills</h3><span class="pill">Overall ${golferOVR(g)}</span></div>
-        <p class="muted small">Your own skills are fixed. The only way to get better is to <b>buy a better player</b> with your prize money${g.char && CHAR_BY_ID[g.char] ? `; the green numbers are ${esc(CHAR_BY_ID[g.char].name)}’s boost` : ''}. Levels pay a cash bonus toward the next one.</p>
+        <p class="muted small">Your own skills are fixed. The only way to get better is to <b>buy a better player</b> with your prize money${g.char && marketItem(g.char) ? `; the numbers beside them show how ${esc(marketItem(g.char).name)} changes them` : ''}. Levels pay a cash bonus toward the next one.</p>
         ${STAT_KEYS.map((k) => `<div class="upg ro">${statBar(STAT_LABELS[k], g.stats[k], charBoost(g, k))}<small>${esc(STAT_HELP[k])}</small></div>`).join('')}
         <p><button class="btn primary" data-a="tab" data-t="players">Buy a better player</button></p>
       </section>
@@ -299,7 +302,7 @@ export class Screens {
           <div><small>Greens in reg.</small><b>${c.stats.girChances ? Math.round((c.stats.gir / c.stats.girChances) * 100) + '%' : '–'}</b></div>
           <div><small>Best round</small><b>${c.stats.best ?? '–'}</b></div>
         </div>
-        ${g.char && CHAR_BY_ID[g.char] ? `<h4>${esc(CHAR_BY_ID[g.char].name)}’s abilities</h4><ul class="traits">${abilityList(CHAR_BY_ID[g.char]).map((t) => `<li class="adv"><b>${esc(t.name)}</b> ${esc(t.desc)}</li>`).join('')}</ul>` : ''}
+        ${g.char && marketItem(g.char) ? `<h4>${esc(marketItem(g.char).name)}’s strengths and weaknesses</h4><ul class="traits">${playAs(g).traits.map((t) => TRAITS[t]).filter(Boolean).map((t) => `<li class="${t.kind}"><b>${esc(t.name)}</b> ${esc(t.desc)}</li>`).join('') || '<li class="muted">No standout traits</li>'}</ul>` : ''}
         <h4>In the bag</h4>
         <ul class="baglist">${Object.entries(CLUB_CATS).map(([cat, v]) => { const m = MODEL_BY_ID[normBag(g.bag)[cat]]; return `<li><small>${esc(v.label)}</small> ${esc(m.brand)} ${esc(m.name)}</li>`; }).join('')}<li><small>Ball</small> ${esc(BALL_BY_ID[g.ball].name)}</li></ul>
         <p><button class="linkbtn" data-a="tab" data-t="shop">Visit the pro shop</button></p>
@@ -324,43 +327,100 @@ export class Screens {
       }).join('')}</div>`;
   }
 
-  // ---------------- characters ----------------
+  // ---------------- players market ----------------
   charShop(c) {
     const g = c.golfer;
     const owned = new Set(g.chars || []);
     const me = playAs(g);
     const base = overall(g.stats);
     const now = overall(me.stats);
-    const card = (ch) => {
-      const has = owned.has(ch.id);
-      const on = g.char === ch.id;
+    const view = this.playersView || 'pros';
+    const pros = generatePros();
+    const ownedList = [...owned].map((id) => marketItem(id)).filter(Boolean);
+    const foot = (id, price) => {
+      const on = g.char === id;
+      return on ? '<span class="pill gold">Playing</span>' : owned.has(id) ? `<button class="btn" data-a="useChar" data-id="${id}">Play as</button>` : `<button class="btn primary" data-a="buyChar" data-id="${id}" ${g.money < price ? 'disabled' : ''}>Buy ${money(price, true)}</button>`;
+    };
+    const special = (ch) => {
       const tier = CHAR_TIERS[ch.tier];
       const withOvr = overall(playAs({ ...g, char: ch.id }).stats);
-      return `<article class="charcard ${on ? 'on' : ''}" style="--tier:${tier.color}">
+      return `<article class="charcard ${g.char === ch.id ? 'on' : ''}" style="--tier:${tier.color}">
         <button class="cc-pic" data-a="charInfo" data-id="${ch.id}" aria-label="More about ${esc(ch.name)}"><img data-portrait="${ch.id}" alt=""></button>
         <div class="cc-body">
-          <div class="cc-top"><span class="cc-tier">${esc(tier.name)}</span><b class="price">${has ? 'Owned' : money(ch.price, true)}</b></div>
+          <div class="cc-top"><span class="cc-tier">${esc(tier.name)}</span><b class="price">${owned.has(ch.id) ? 'Owned' : money(ch.price, true)}</b></div>
           <h4>${esc(ch.name)}</h4>
           <p class="cc-tag">${esc(ch.tagline)}</p>
           <div class="cc-boost">${Object.keys(ch.boost).map((k) => `<span>+${charBoostOf(ch, k)} ${esc(STAT_LABELS[k])}</span>`).join('')}${ch.all ? `<span class="all">+${ch.all} all skills</span>` : ''}</div>
           <ul class="cc-abil">${abilityList(ch).map((t) => `<li><b>${esc(t.name)}</b> ${esc(t.desc)}</li>`).join('')}</ul>
-          <div class="cc-foot"><span class="muted small">Your overall ${withOvr}</span>${on ? '<span class="pill gold">Playing</span>' : has ? `<button class="btn" data-a="useChar" data-id="${ch.id}">Play as</button>` : `<button class="btn primary" data-a="buyChar" data-id="${ch.id}" ${g.money < ch.price ? 'disabled' : ''}>Buy ${money(ch.price, true)}</button>`}</div>
+          <div class="cc-foot"><span class="muted small">Overall ${withOvr}</span>${foot(ch.id, ch.price)}</div>
         </div>
       </article>`;
     };
+    const proCardHtml = (p) => {
+      const price = proPrice(p);
+      const top = [...STAT_KEYS].sort((a, b) => p.stats[b] - p.stats[a]).slice(0, 3);
+      return `<article class="charcard procard2 ${g.char === p.id ? 'on' : ''}" style="--tier:${p.ovr >= 88 ? '#f2c230' : p.ovr >= 80 ? '#c792ff' : p.ovr >= 70 ? '#5fb2ff' : '#7fd05a'}">
+        <button class="cc-pic" data-a="charInfo" data-id="${p.id}" aria-label="More about ${esc(p.name)}"><img data-portrait="${p.id}" alt=""></button>
+        <div class="cc-body">
+          <div class="cc-top"><span class="cc-tier">Overall ${p.ovr}</span><b class="price">${owned.has(p.id) ? 'Owned' : money(price, true)}</b></div>
+          <h4>${esc(p.name)} <span class="cc">${esc(p.country)}</span></h4>
+          <div class="cc-boost">${top.map((k) => `<span>${esc(STAT_LABELS[k])} ${p.stats[k]}</span>`).join('')}</div>
+          <ul class="cc-abil">${p.traits.map((t) => TRAITS[t]).filter(Boolean).map((t) => `<li class="${t.kind}"><b>${esc(t.name)}</b> ${esc(t.desc)}</li>`).join('') || '<li class="muted">No standout traits</li>'}</ul>
+          <div class="cc-foot"><span class="muted small">${p.star ? 'Star · ' : ''}Age ${p.age}</span>${foot(p.id, price)}</div>
+        </div>
+      </article>`;
+    };
+    let body = '';
+    if (view === 'special') {
+      body = Object.entries(CHAR_TIERS).map(([tid, t]) => `
+        <h3 class="shop-cat" style="color:${t.color}">${esc(t.name)}s</h3>
+        <div class="chars">${CHARACTERS.filter((ch) => ch.tier === tid).map(special).join('')}</div>`).join('');
+    } else if (view === 'mine') {
+      body = `<div class="chars">
+        <article class="charcard ${!g.char ? 'on' : ''}" style="--tier:#9fb3a7">
+          <button class="cc-pic" data-a="tab" data-t="golfer" aria-label="Your golfer"><img data-portrait="you" alt=""></button>
+          <div class="cc-body"><div class="cc-top"><span class="cc-tier">You</span></div><h4>${esc(g.name)}</h4><p class="cc-tag">Your own golfer, with the standard skills.</p>
+          <div class="cc-foot"><span class="muted small">Overall ${base}</span>${!g.char ? '<span class="pill gold">Playing</span>' : '<button class="btn" data-a="useChar" data-id="">Play as</button>'}</div></div>
+        </article>
+        ${ownedList.map((it) => (it.kind === 'special' ? special(CHAR_BY_ID[it.id]) : proCardHtml(it.pro))).join('')}
+      </div>${ownedList.length ? '' : '<p class="muted">You haven’t bought anyone yet.</p>'}`;
+    } else {
+      const o = this.buyOpts;
+      const f = (o.q || '').toLowerCase();
+      let list = pros.filter((p) => (!f || p.name.toLowerCase().includes(f) || p.country.toLowerCase() === f || COUNTRIES[p.country].name.toLowerCase().includes(f) || p.traits.some((t) => TRAITS[t].name.toLowerCase().includes(f)))
+        && (!o.afford || owned.has(p.id) || proPrice(p) <= g.money));
+      const key = o.sort || 'ovr';
+      list.sort((a, b) => key === 'cheap' ? proPrice(a) - proPrice(b) || b.ovr - a.ovr
+        : key === 'name' ? a.last.localeCompare(b.last)
+        : key === 'ovr' ? b.ovr - a.ovr
+        : b.stats[key] - a.stats[key] || b.ovr - a.ovr);
+      const shown = list.slice(0, o.limit);
+      const sortOpts = [['ovr', 'Best overall'], ['cheap', 'Cheapest first'], ['name', 'Name'], ...STAT_KEYS.map((k) => [k, `Best ${STAT_LABELS[k].toLowerCase()}`])];
+      body = `<div class="toolbar buybar">
+          <input type="search" data-filter="buy" value="${esc(o.q)}" placeholder="Search name, country or trait" aria-label="Search players">
+          <select data-filter="buySort" aria-label="Sort">${sortOpts.map(([v, t]) => `<option value="${v}" ${key === v ? 'selected' : ''}>${t}</option>`).join('')}</select>
+          <select data-filter="buyAfford" aria-label="Show"><option value="no" ${!o.afford ? 'selected' : ''}>Everyone</option><option value="yes" ${o.afford ? 'selected' : ''}>I can afford</option></select>
+        </div>
+        <p class="muted small">${list.length} player${list.length === 1 ? '' : 's'}. Tap a picture for their full card.</p>
+        <div class="chars">${shown.map(proCardHtml).join('')}</div>
+        ${list.length > shown.length ? `<div class="actions"><button class="btn" data-a="moreBuy">Show more (${list.length - shown.length} more)</button></div>` : ''}`;
+    }
     return `<section class="card char-now">
         <div class="cn-pic"><img data-portrait="me" data-pose="fist" alt=""></div>
         <div>
           <small class="muted">Playing as</small>
           <h3>${esc(me.charName || `${g.name} (yourself)`)}</h3>
-          <p class="muted small">Overall <b class="cn-ovr">${now}</b>${now !== base ? ` <span class="up">+${now - base} from ${esc(me.charName.split(' ')[0])}</span>` : ''} · on your own ${base}</p>
+          <p class="muted small">Overall <b class="cn-ovr">${now}</b>${now !== base ? ` <span class="${now > base ? 'up' : 'down'}">${now > base ? '+' : '−'}${Math.abs(now - base)}</span>` : ''} · on your own ${base} · Bank <b>${money(g.money)}</b></p>
           ${g.char ? '<button class="btn" data-a="useChar" data-id="">Play as yourself</button>' : ''}
         </div>
       </section>
-      <p class="muted">This is the only way to get better: buy a better player with your prize money. Each one raises your skills and brings special abilities, and you play as them in every event. Switch any time. <span class="bankline">Bank: <b>${money(g.money)}</b></span></p>
-      ${Object.entries(CHAR_TIERS).map(([tid, t]) => `
-        <h3 class="shop-cat" style="color:${t.color}">${esc(t.name)}s</h3>
-        <div class="chars">${CHARACTERS.filter((ch) => ch.tier === tid).map(card).join('')}</div>`).join('')}`;
+      <p class="muted">Buying a better player is the only way to get better. Buy any of the 500 tour pros, or one of the special players, with your prize money, then play every event as them. Switch any time.</p>
+      <div class="chips shop-tabs">
+        <button class="chipbtn ${view === 'pros' ? 'on' : ''}" data-a="playersView" data-t="pros">Tour pros (${pros.length})</button>
+        <button class="chipbtn ${view === 'special' ? 'on' : ''}" data-a="playersView" data-t="special">Special players (${CHARACTERS.length})</button>
+        <button class="chipbtn ${view === 'mine' ? 'on' : ''}" data-a="playersView" data-t="mine">My players (${ownedList.length + 1})</button>
+      </div>
+      ${body}`;
   }
 
   charCard(c, id) {
@@ -385,8 +445,13 @@ export class Screens {
 
   fillCharPortraits(c) {
     const g = c.golfer;
-    const looks = { me: playAs(g).look };
-    for (const ch of CHARACTERS) looks[ch.id] = ch.look;
+    const looks = { me: { ...playAs(g).look, gender: playAs(g).gender }, you: { ...g.look, gender: g.gender } };
+    for (const im of this.root.querySelectorAll('img[data-portrait]')) {
+      const id = im.dataset.portrait;
+      if (looks[id]) continue;
+      const it = marketItem(id);
+      if (it) looks[id] = it.pro ? { ...it.look, gender: it.pro.gender } : it.look;
+    }
     fillPortraits(this.app.world.renderer, this.root, looks);
   }
 
@@ -479,7 +544,8 @@ export class Screens {
             ${d ? `<div class="facts small"><div><small>Points</small><b>${d.pts.toFixed(1)}</b></div><div><small>Season wins</small><b>${d.wins}</b></div><div><small>Career wins</small><b>${d.cw}</b></div><div><small>Season money</small><b>${money(d.money, true)}</b></div></div>` : ''}
           </div>
         </div>
-        <div class="actions"><button class="btn primary" data-a="playAsPro" data-id="${p.id}">Play a quick round as ${esc(p.first)}</button></div>
+        <div class="actions">${c ? (c.golfer.char === p.id ? '<span class="pill gold">You’re playing as them</span>' : (c.golfer.chars || []).includes(p.id) ? `<button class="btn primary" data-a="useChar" data-id="${p.id}">Play my career as ${esc(p.first)}</button>` : `<button class="btn primary" data-a="buyChar" data-id="${p.id}" ${c.golfer.money < proPrice(p) ? 'disabled' : ''}>Buy for ${money(proPrice(p))}</button>`) : ''}<button class="btn" data-a="playAsPro" data-id="${p.id}">Play a quick round as ${esc(p.first)}</button></div>
+        ${c && !(c.golfer.chars || []).includes(p.id) && c.golfer.money < proPrice(p) ? `<p class="muted small">You have ${money(c.golfer.money)}. Win prize money to afford ${esc(p.first)}.</p>` : ''}
       </div>`, { wide: true });
   }
 

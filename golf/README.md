@@ -75,14 +75,18 @@ hole using your golfer's skills if you want to move on.
   you buy and swap sets in the pro shop.
 - **Buying players is the only way to get better.** Every career golfer
   starts with the same skills (overall 56) and no strengths or
-  weaknesses, and skills can't be trained. The **Players** tab sells 12
-  players (`src/data/characters.js`) in four tiers, from Birdie Bex ($25K)
-  to the Golden Eagle ($15M). Each lifts every skill a little and their
-  signature skills a lot, and brings special abilities (Lag Master,
-  Bomber, Wind Whisperer, Ice in the Veins...). You play your career as
-  the one you pick; switch any time. Each has their own look, shown as a
-  3D portrait rendered by the game. Levels pay a cash bonus toward the
-  next player. Careers saved before this change are set back to the
+  weaknesses, and skills can't be trained. The **Players** tab
+  (`src/data/characters.js`) sells **all 500 tour pros**, priced by their
+  overall rating from $20K (overall 60) to about $30M for the biggest
+  stars; buy one and you play your career as them, with their skills,
+  their strengths *and* weaknesses, and their look (they sit out the
+  events you play). Search by name, country or trait, sort by rating,
+  price or any skill, and show only the ones you can afford; any pro's
+  card in Tour players has a Buy button too. There are also 12 special
+  players with no weaknesses, from Birdie Bex ($25K, overall 62) to the
+  Golden Eagle ($40M, overall 96, the best golfer in the game). Switch
+  between the players you own any time; each is shown as a 3D portrait
+  rendered by the game. Levels pay a cash bonus toward the next player. Careers saved before this change are set back to the
   standard skills, with any skill points they had paid back in cash.
 - **Shaped bodies** (`src/render/golfer.js`): torsos turned on a lathe
   with broad shoulders tapering to the waist (a slimmer waist and wider
