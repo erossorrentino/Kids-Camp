@@ -81,7 +81,7 @@ export function roundSummary(screens, app, c, t, info) {
 export function eventResults(screens, app, c, t, summary) {
   const hr = summary.humanResult;
   const win = hr && hr.pos === 1;
-  const lvl = summary.levels ? `<div class="reward"><b>Level up!</b> +${summary.levels * 4} skill points</div>` : '';
+  const lvl = summary.levels ? `<div class="reward"><b>Level up!</b> +${money(summary.levelCash || 0)} bonus to buy better players</div>` : '';
   const ach = summary.newAchievements.map((k) => `<div class="reward gold"><b>${esc(ACHIEVEMENTS[k].name)}</b> ${esc(ACHIEVEMENTS[k].desc)}</div>`).join('');
   const rankMove = summary.rankAfter < summary.rankBefore ? `up ${summary.rankBefore - summary.rankAfter}` : summary.rankAfter > summary.rankBefore ? `down ${summary.rankAfter - summary.rankBefore}` : 'no change';
   const po = t.playoff ? `<p class="muted">Won in a playoff by ${esc(t.playoff.winner === 'you' ? 'you' : app.nameOf(t.playoff.winner))} after ${t.playoff.log.length} extra hole${t.playoff.log.length === 1 ? '' : 's'}.</p>` : '';

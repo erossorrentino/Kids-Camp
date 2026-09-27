@@ -73,13 +73,17 @@ hole using your golfer's skills if you want to move on.
   own head in 3D (wood crowns and faces, cavity backs vs. blades, blade vs.
   mallet putters), the pros each carry a bag that suits their game, and
   you buy and swap sets in the pro shop.
-- **12 characters to buy** (`src/data/characters.js`) in four tiers, from
-  Birdie Bex ($25K) to the Golden Eagle ($15M). Each lifts every skill a
-  little and their signature skills a lot, on top of what you've trained,
-  and brings special abilities (Lag Master, Bomber, Wind Whisperer, Ice in
-  the Veins...). Buy them in the pro shop's **Characters** tab with prize
-  money and play your career as them; switch any time. Each has their own
-  look, shown as a 3D portrait rendered by the game.
+- **Buying players is the only way to get better.** Every career golfer
+  starts with the same skills (overall 56) and no strengths or
+  weaknesses, and skills can't be trained. The **Players** tab sells 12
+  players (`src/data/characters.js`) in four tiers, from Birdie Bex ($25K)
+  to the Golden Eagle ($15M). Each lifts every skill a little and their
+  signature skills a lot, and brings special abilities (Lag Master,
+  Bomber, Wind Whisperer, Ice in the Veins...). You play your career as
+  the one you pick; switch any time. Each has their own look, shown as a
+  3D portrait rendered by the game. Levels pay a cash bonus toward the
+  next player. Careers saved before this change are set back to the
+  standard skills, with any skill points they had paid back in cash.
 - **Shaped bodies** (`src/render/golfer.js`): torsos turned on a lathe
   with broad shoulders tapering to the waist (a slimmer waist and wider
   hips for women), rounded hips under a belt, thighs and calves with
@@ -99,7 +103,7 @@ hole using your golfer's skills if you want to move on.
   wind vs. putting) in `src/data/equipment.js`, bought with prize money.
 - **Career**: Challenger Tour, World Tour, four majors and a $40M Tour
   Championship; 36-hole cuts, sudden-death playoffs, purses, a points
-  race, world rankings with weekly decay, XP / levels / skill points,
+  race, world rankings with weekly decay, XP and levels (with cash bonuses),
   achievements, and a results history. Other events are simulated
   shot by shot from each pro's stats (`src/sim/aisim.js`, calibrated to
   tour scoring averages).

@@ -37,11 +37,13 @@ export function xpForLevel(level) {
   return 500 + level * 180;
 }
 
-export function statCost(value) {
-  return value >= 92 ? 3 : value >= 84 ? 2 : 1;
+// Skills are fixed: you get better only by buying better players. Levels
+// pay a cash bonus toward the next one.
+export function levelBonus(level) {
+  return 25000 + 15000 * level;
 }
 
-export function newCareer({ name, country, gender, look, stats }) {
+export function newCareer({ name, country, gender, look }) {
   const pros = generatePros();
   const rng = new RNG(mixSeed('career', name, Date.now() & 0xffff));
   const p = {};
@@ -58,7 +60,7 @@ export function newCareer({ name, country, gender, look, stats }) {
     savedAt: Date.now(),
     golfer: {
       name, country, gender, look,
-      stats: { ...stats },
+      stats: { ...DEFAULT_STATS },
       traits: [],
       level: 1, xp: 0, sp: 0,
       money: 25000, careerMoney: 0,
@@ -254,7 +256,9 @@ export function completeWeek(c, humanSummary = null) {
   const summary = { week: c.week, year: c.year, humanResult, rankBefore: beforeRank, rankAfter: afterRank, xp: 0, levels: 0, newAchievements: [] };
   if (humanResult) {
     summary.xp = eventXP(humanResult, humanSummary);
-    summary.levels = addXP(c, summary.xp);
+    const lv = addXP(c, summary.xp);
+    summary.levels = lv.levels;
+    summary.levelCash = lv.cash;
   }
   summary.newAchievements = checkAchievements(c, humanResult, humanSummary);
   c.active = null;
@@ -281,24 +285,15 @@ function eventXP(r, hs) {
 export function addXP(c, xp) {
   const g = c.golfer;
   g.xp += xp;
-  let levels = 0;
+  let levels = 0, cash = 0;
   while (g.xp >= xpForLevel(g.level)) {
     g.xp -= xpForLevel(g.level);
     g.level++;
-    g.sp += 4;
+    cash += levelBonus(g.level);
     levels++;
   }
-  return levels;
-}
-
-export function upgradeStat(c, key) {
-  const g = c.golfer;
-  const v = g.stats[key];
-  const cost = statCost(v);
-  if (v >= 99 || g.sp < cost) return false;
-  g.stats[key] = v + 1;
-  g.sp -= cost;
-  return true;
+  g.money += cash;
+  return { levels, cash };
 }
 
 export function checkAchievements(c, hr, hs) {
@@ -373,6 +368,20 @@ export { STAT_KEYS, courseById };
 // Older saves predate clubs: give them the starter bag
 export function upgradeSave(c) {
   if (!c || !c.golfer) return c;
+  // Skills used to be trainable. They are now the same for everyone, so an
+  // older career is set back to them and every point it spent or saved is
+  // paid back in cash to buy players with.
+  const g = c.golfer;
+  const spent = STAT_KEYS.reduce((a, k) => a + Math.max(0, (g.stats[k] || 0) - DEFAULT_STATS[k]), 0) + (g.sp || 0);
+  const hadTraits = (g.traits || []).length > 0;
+  if (spent > 0 || hadTraits || STAT_KEYS.some((k) => g.stats[k] !== DEFAULT_STATS[k])) {
+    const refund = spent * 20000;
+    g.stats = { ...DEFAULT_STATS };
+    g.traits = [];
+    g.sp = 0;
+    g.money += refund;
+    c.skillsReset = { points: spent, refund, hadTraits };
+  }
   c.golfer.bag = normBag(c.golfer.bag);
   if (!Array.isArray(c.golfer.clubs)) c.golfer.clubs = Object.values(c.golfer.bag);
   if (!Array.isArray(c.golfer.chars)) c.golfer.chars = [];

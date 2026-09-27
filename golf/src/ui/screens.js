@@ -12,8 +12,8 @@ import { RNG, mixSeed } from '../util/rng.js';
 import { TRAITS } from '../data/traits.js';
 import { TOURS, MAJORS, SEASON_WEEKS } from '../data/tour.js';
 import {
-  thisWeek, eligibility, rankings, rankOf, seasonPointsTable, moneyTable, xpForLevel, statCost,
-  upgradeStat, ACHIEVEMENTS, DEFAULT_STATS, golferOVR, season,
+  thisWeek, eligibility, rankings, rankOf, seasonPointsTable, moneyTable, xpForLevel, levelBonus,
+  ACHIEVEMENTS, DEFAULT_STATS, golferOVR, season,
 } from '../game/career.js';
 import { HUMAN_ID } from '../game/tournament.js';
 import { CHARACTERS, CHAR_BY_ID, CHAR_TIERS, playAs, abilityList, charBoostOf } from '../data/characters.js';
@@ -90,15 +90,12 @@ export class Screens {
   // ---------------- new career ----------------
   newCareer(draft) {
     const countries = Object.entries(COUNTRIES).sort((a, b) => a[1].name.localeCompare(b[1].name));
-    const pts = draft.bonus;
     const shirts = ['#1d3557', '#c1121f', '#2a9d8f', '#e9c46a', '#f1faee', '#111111', '#6a4c93', '#ff006e', '#3a86ff', '#8ac926', '#f4a261', '#669bbc'];
     const pants = ['#1b1b1b', '#2b2d42', '#e9e4d8', '#8d99ae', '#f1f1f1', '#6b705c'];
     const skins = ['#f5d0b5', '#e8b996', '#d49a73', '#b87d56', '#8d5a3b', '#6b4029'];
     const hairs = ['#1e1a18', '#3b2a1f', '#6b4a2e', '#b5532b', '#d9a441', '#e8e2d0', '#8d99ae'];
     const sel = (key, label, opts) => `<div><label for="f-${key}">${label}</label><select id="f-${key}" data-field="look.${key}">${opts.map(([v, t]) => `<option value="${v}" ${String(draft.look[key] || '') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>`;
     const swatches = (field, list, cur) => list.map((c) => `<button class="swatch${c === cur ? ' on' : ''}" style="--c:${c}" data-a="look" data-field="${field}" data-v="${c}" aria-label="${field} ${c}"></button>`).join('');
-    const advs = Object.entries(TRAITS).filter(([, t]) => t.kind === 'adv');
-    const diss = Object.entries(TRAITS).filter(([, t]) => t.kind === 'dis');
     this.show(`
       <div class="page narrow">
         <header class="page-head"><button class="back" data-a="title">← Back</button><h2>Create your golfer</h2></header>
@@ -129,17 +126,9 @@ export class Screens {
           <label>Skin tone</label><div class="swatches">${swatches('skin', skins, draft.look.skin)}</div>
         </section>
         <section class="card">
-          <div class="card-head"><h3>Skills</h3><span class="pill ${pts ? 'warn' : ''}">${pts} bonus point${pts === 1 ? '' : 's'} left</span></div>
-          <p class="muted">Every rookie starts around world #501 level. Spend your bonus points where you want an edge; you earn more every time you level up.</p>
-          ${STAT_KEYS.map((k) => `<div class="upg">${statBar(STAT_LABELS[k], draft.stats[k])}<button class="mini" data-a="draftStat" data-k="${k}" data-d="-1" ${draft.stats[k] <= DEFAULT_STATS[k] ? 'disabled' : ''} aria-label="Lower ${STAT_LABELS[k]}">−</button><button class="mini" data-a="draftStat" data-k="${k}" data-d="1" ${pts <= 0 ? 'disabled' : ''} aria-label="Raise ${STAT_LABELS[k]}">+</button><small>${esc(STAT_HELP[k])}</small></div>`).join('')}
-        </section>
-        <section class="card">
-          <h3>Signature strength and weakness <span class="muted small">(optional)</span></h3>
-          <div class="row2">
-            <div><label for="f-adv">Strength</label><select id="f-adv" data-field="adv"><option value="">None</option>${advs.map(([k, t]) => `<option value="${k}" ${draft.adv === k ? 'selected' : ''}>${esc(t.name)}: ${esc(t.desc)}</option>`).join('')}</select></div>
-            <div><label for="f-dis">Weakness</label><select id="f-dis" data-field="dis"><option value="">None</option>${diss.map(([k, t]) => `<option value="${k}" ${draft.dis === k ? 'selected' : ''}>${esc(t.name)}: ${esc(t.desc)}</option>`).join('')}</select></div>
-          </div>
-          <p class="muted small">Pick a strength only together with a weakness; it keeps things fair.</p>
+          <h3>Skills</h3>
+          <p class="muted">Every rookie starts with the same skills (overall ${overall(DEFAULT_STATS)}) and no special abilities. You can't train or change them: to get better, win prize money and <b>buy better players</b> in the Players tab.</p>
+          ${STAT_KEYS.map((k) => statBar(STAT_LABELS[k], DEFAULT_STATS[k])).join('')}
         </section>
         <div class="actions"><button class="btn primary big" data-a="createCareer">Turn pro</button></div>
       </div>`);
@@ -160,20 +149,21 @@ export class Screens {
     const prev = c.prevRank[HUMAN_ID];
     const move = prev && prev !== r ? `<span class="${prev > r ? 'up' : 'down'}">${prev > r ? '▲' : '▼'}${Math.abs(prev - r)}</span>` : '';
     const lvlPct = Math.round((g.xp / xpForLevel(g.level)) * 100);
-    const tabs = [['week', 'This week'], ['schedule', 'Schedule'], ['rankings', 'World ranking'], ['race', 'Season race'], ['golfer', `Golfer${g.sp ? ` (${g.sp})` : ''}`], ['shop', 'Pro shop'], ['trophies', 'Trophy room']];
+    const tabs = [['week', 'This week'], ['schedule', 'Schedule'], ['rankings', 'World ranking'], ['race', 'Season race'], ['players', 'Players'], ['golfer', 'Golfer'], ['shop', 'Pro shop'], ['trophies', 'Trophy room']];
     let body = '';
     if (tab === 'week') body = this.hubWeek(c);
     else if (tab === 'schedule') body = this.hubSchedule(c);
     else if (tab === 'rankings') body = this.rankingTable(c);
     else if (tab === 'race') body = this.raceTable(c);
     else if (tab === 'golfer') body = this.hubGolfer(c);
+    else if (tab === 'players') body = this.charShop(c);
     else if (tab === 'shop') body = this.hubShop(c);
     else if (tab === 'trophies') body = this.hubTrophies(c);
     this.show(`
       <div class="page">
         <header class="hub-head">
           <button class="back" data-a="title">← Menu</button>
-          <button class="hub-avatar" data-a="shopTab" data-t="chars" aria-label="Characters"><img data-portrait="me" alt=""></button>
+          <button class="hub-avatar" data-a="tab" data-t="players" aria-label="Players"><img data-portrait="me" alt=""></button>
           <div class="hub-id">
             <div class="hub-name">${esc(g.name)} <span class="cc">${esc(g.country)}</span></div>
             ${g.char && CHAR_BY_ID[g.char] ? `<div class="hub-char">Playing as <b>${esc(CHAR_BY_ID[g.char].name)}</b></div>` : ''}
@@ -291,12 +281,11 @@ export class Screens {
 
   hubGolfer(c) {
     const g = c.golfer;
-    const traits = (g.traits || []).map((t) => TRAITS[t]).filter(Boolean);
     return `<div class="cols">
-      <section class="card"><div class="card-head"><h3>Skills</h3><span class="pill ${g.sp ? 'warn' : ''}">${g.sp} skill point${g.sp === 1 ? '' : 's'}</span></div>
-        <p class="muted small">Level up by playing events: finishes, birdies and eagles all earn XP. Each level gives 4 skill points. Skills above 84 cost 2 points, above 92 cost 3.</p>
-        ${g.char && CHAR_BY_ID[g.char] ? `<p class="small charnote">Playing as <b>${esc(CHAR_BY_ID[g.char].name)}</b>: the green numbers are their boost on top of your skills.</p>` : ''}
-        ${STAT_KEYS.map((k) => `<div class="upg">${statBar(STAT_LABELS[k], g.stats[k], charBoost(g, k))}<button class="mini" data-a="upgrade" data-k="${k}" ${g.sp < statCost(g.stats[k]) || g.stats[k] >= 99 ? 'disabled' : ''} aria-label="Upgrade ${STAT_LABELS[k]}">+${statCost(g.stats[k])}</button><small>${esc(STAT_HELP[k])}</small></div>`).join('')}
+      <section class="card"><div class="card-head"><h3>Skills</h3><span class="pill">Overall ${golferOVR(g)}</span></div>
+        <p class="muted small">Your own skills are fixed. The only way to get better is to <b>buy a better player</b> with your prize money${g.char && CHAR_BY_ID[g.char] ? `; the green numbers are ${esc(CHAR_BY_ID[g.char].name)}’s boost` : ''}. Levels pay a cash bonus toward the next one.</p>
+        ${STAT_KEYS.map((k) => `<div class="upg ro">${statBar(STAT_LABELS[k], g.stats[k], charBoost(g, k))}<small>${esc(STAT_HELP[k])}</small></div>`).join('')}
+        <p><button class="btn primary" data-a="tab" data-t="players">Buy a better player</button></p>
       </section>
       <section class="card"><h3>Career</h3>
         <div class="facts">
@@ -310,7 +299,6 @@ export class Screens {
           <div><small>Greens in reg.</small><b>${c.stats.girChances ? Math.round((c.stats.gir / c.stats.girChances) * 100) + '%' : '–'}</b></div>
           <div><small>Best round</small><b>${c.stats.best ?? '–'}</b></div>
         </div>
-        ${traits.length ? `<h4>Traits</h4><ul class="traits">${(g.traits || []).map((t) => `<li class="${TRAITS[t].kind}"><b>${esc(TRAITS[t].name)}</b> ${esc(TRAITS[t].desc)}</li>`).join('')}</ul>` : ''}
         ${g.char && CHAR_BY_ID[g.char] ? `<h4>${esc(CHAR_BY_ID[g.char].name)}’s abilities</h4><ul class="traits">${abilityList(CHAR_BY_ID[g.char]).map((t) => `<li class="adv"><b>${esc(t.name)}</b> ${esc(t.desc)}</li>`).join('')}</ul>` : ''}
         <h4>In the bag</h4>
         <ul class="baglist">${Object.entries(CLUB_CATS).map(([cat, v]) => { const m = MODEL_BY_ID[normBag(g.bag)[cat]]; return `<li><small>${esc(v.label)}</small> ${esc(m.brand)} ${esc(m.name)}</li>`; }).join('')}<li><small>Ball</small> ${esc(BALL_BY_ID[g.ball].name)}</li></ul>
@@ -320,9 +308,8 @@ export class Screens {
 
   hubShop(c) {
     const g = c.golfer;
-    const sub = this.shopTab || 'chars';
-    const head = `<div class="chips shop-tabs"><button class="chipbtn ${sub === 'chars' ? 'on' : ''}" data-a="shopTab" data-t="chars">Characters</button><button class="chipbtn ${sub === 'clubs' ? 'on' : ''}" data-a="shopTab" data-t="clubs">Clubs</button><button class="chipbtn ${sub === 'balls' ? 'on' : ''}" data-a="shopTab" data-t="balls">Balls</button><span class="muted small">Bank: ${money(g.money)}</span></div>`;
-    if (sub === 'chars') return head + this.charShop(c);
+    const sub = this.shopTab === 'balls' ? 'balls' : 'clubs';
+    const head = `<div class="chips shop-tabs"><button class="chipbtn ${sub === 'clubs' ? 'on' : ''}" data-a="shopTab" data-t="clubs">Clubs</button><button class="chipbtn ${sub === 'balls' ? 'on' : ''}" data-a="shopTab" data-t="balls">Balls</button><span class="muted small">Bank: ${money(g.money)}</span></div>`;
     if (sub === 'clubs') return head + this.clubShop(c);
     return `${head}<p class="muted">Each ball trades one strength for another. Prize money buys new ones; you can switch any time between events.</p>
       <div class="balls">${BALLS.map((b) => {
@@ -366,11 +353,11 @@ export class Screens {
         <div>
           <small class="muted">Playing as</small>
           <h3>${esc(me.charName || `${g.name} (yourself)`)}</h3>
-          <p class="muted small">Overall <b class="cn-ovr">${now}</b>${now !== base ? ` <span class="up">+${now - base} from ${esc(me.charName.split(' ')[0])}</span>` : ''} · your trained skills ${base}</p>
+          <p class="muted small">Overall <b class="cn-ovr">${now}</b>${now !== base ? ` <span class="up">+${now - base} from ${esc(me.charName.split(' ')[0])}</span>` : ''} · on your own ${base}</p>
           ${g.char ? '<button class="btn" data-a="useChar" data-id="">Play as yourself</button>' : ''}
         </div>
       </section>
-      <p class="muted">Characters add a boost on top of the skills you train, and bring special abilities. Buy one with your prize money and play as them in every event. Switch any time.</p>
+      <p class="muted">This is the only way to get better: buy a better player with your prize money. Each one raises your skills and brings special abilities, and you play as them in every event. Switch any time. <span class="bankline">Bank: <b>${money(g.money)}</b></span></p>
       ${Object.entries(CHAR_TIERS).map(([tid, t]) => `
         <h3 class="shop-cat" style="color:${t.color}">${esc(t.name)}s</h3>
         <div class="chars">${CHARACTERS.filter((ch) => ch.tier === tid).map(card).join('')}</div>`).join('')}`;
@@ -629,7 +616,7 @@ export class Screens {
         <div><h4>Shape and spin</h4><p><b>Shape</b> sets where the club strikes the ball: left for a draw, right for a fade, top for a low shot with less spin, bottom for a high shot that stops fast.</p></div>
         <div><h4>Putting</h4><p>On the green you get a putter. Pull back to set the pace (the meter shows how far it would roll on a flat green), then push up. The dotted line previews the break; better putters see more of it. <b>Grid</b> shows slope arrows (red is steep). <b>Range</b> changes how far a full stroke rolls.</p></div>
         <div><h4>Lies and conditions</h4><p>Rough, bunkers and slopes change the shot (see the box under the scorecard). Wind, altitude, firm links turf and green speed all change how far the ball flies and rolls. Water is a one-stroke penalty and a drop; out of bounds costs stroke and distance.</p></div>
-        <div><h4>Career</h4><p>You start at #501. Challenger Tour events are open to everyone. Reach the top 125 (or win a Challenger event) for World Tour starts, the top 60 for the majors, and the top 30 in the season race for the $40M Tour Championship. Level up to raise your skills, and spend prize money on better balls.</p></div>
+        <div><h4>Career</h4><p>You start at #501. Challenger Tour events are open to everyone. Reach the top 125 (or win a Challenger event) for World Tour starts, the top 60 for the majors, and the top 30 in the season race for the $40M Tour Championship. Your skills are fixed: spend prize money in the Players tab to buy better players (and on clubs and balls in the pro shop). Levels pay a cash bonus.</p></div>
         <div><h4>Keys</h4><p>A/D aim · W/S club · Space hold to fast-forward · V camera · G green grid · C scorecard · L leaderboard · Esc menu</p></div>
       </div>`, { wide: true });
   }

@@ -5,7 +5,7 @@ import { World } from './render/world.js';
 import { HUD } from './ui/hud.js';
 import { Screens } from './ui/screens.js';
 import { SwingInput } from './ui/swing.js';
-import { modal, toast, esc, fmtToPar } from './ui/dom.js';
+import { modal, toast, esc, fmtToPar, money } from './ui/dom.js';
 import { eventIntro, roundSummary, eventResults, scorecardModal, boardModal, scorecardHtml } from './ui/eventScreens.js';
 import { RoundController } from './game/round.js';
 import * as career from './game/career.js';
@@ -363,14 +363,6 @@ app.onAction = (a, d, elx) => {
         m.el.querySelector('[data-go]').addEventListener('click', () => { m.close(); newCareerDraft(); });
       } else newCareerDraft();
       break;
-    case 'draftStat': {
-      const k = d.k, dd = +d.d;
-      const dr = app.draft;
-      if (dd > 0 && dr.bonus > 0 && dr.stats[k] < 75) { dr.stats[k]++; dr.bonus--; }
-      if (dd < 0 && dr.stats[k] > career.DEFAULT_STATS[k]) { dr.stats[k]--; dr.bonus++; }
-      app.screens.newCareer(dr);
-      break;
-    }
     case 'look': app.draft.look[d.field] = d.v; app.screens.newCareer(app.draft); break;
     case 'createCareer': createCareer(); break;
     case 'tab': app.screens.hub(c, d.t); break;
@@ -394,7 +386,6 @@ app.onAction = (a, d, elx) => {
     case 'simRound': simTournamentRound(); break;
     case 'nextRound': nextTournamentRound(); break;
     case 'finishEvent': finishEvent(); break;
-    case 'upgrade': if (career.upgradeStat(c, d.k)) { saveCareer(c); sfx.click(); } app.screens.hub(c, 'golfer'); break;
     case 'buyBall': {
       const b = BALL_BY_ID[d.id];
       if (c.golfer.money >= b.price && !c.golfer.balls.includes(b.id)) {
@@ -408,7 +399,7 @@ app.onAction = (a, d, elx) => {
       break;
     }
     case 'useBall': c.golfer.ball = d.id; saveCareer(c); app.screens.hub(c, 'shop'); break;
-    case 'shopTab': app.screens.shopTab = d.t; app.screens.hub(c, 'shop'); break;
+    case 'shopTab': if (d.t === 'chars') { app.screens.hub(c, 'players'); break; } app.screens.shopTab = d.t; app.screens.hub(c, 'shop'); break;
     case 'buyClub': {
       const m = MODEL_BY_ID[d.id];
       if (m && c.golfer.money >= m.price && !c.golfer.clubs.includes(m.id)) {
@@ -433,7 +424,7 @@ app.onAction = (a, d, elx) => {
         sfx.applause(0.6);
         toast(`${ch.name} joined your team! You're playing as ${ch.name.split(' ')[0]}.`);
       }
-      app.screens.hub(c, 'shop');
+      app.screens.hub(c, 'players');
       break;
     }
     case 'useChar': {
@@ -441,7 +432,7 @@ app.onAction = (a, d, elx) => {
       if (!d.id) { g.char = null; toast('Playing as yourself'); }
       else if (g.chars.includes(d.id)) { g.char = d.id; toast(`Playing as ${CHAR_BY_ID[d.id].name}`); }
       saveCareer(c);
-      app.screens.hub(c, app.screens.tab || 'shop');
+      app.screens.hub(c, app.screens.tab || 'players');
       break;
     }
     case 'charInfo': app.screens.charCard(c, d.id); break;
@@ -526,8 +517,6 @@ app.onField = (k, v) => {
       if (key === 'pattern' || key === 'shorts') app.screens.newCareer(app.draft);
       else app.screens.refreshDraftPreview(app.draft);
     }
-    else if (k === 'adv') app.draft.adv = v;
-    else if (k === 'dis') app.draft.dis = v;
   }
 };
 
@@ -536,7 +525,6 @@ function newCareerDraft() {
   app.draft = {
     name: '', country: 'USA', gender: 'm',
     look: { shirt: '#1d3557', pants: '#e9e4d8', cap: '#f1faee', skin: '#e8b996', hair: '#3b2a1f', hat: 'cap', hairStyle: 'short', beard: 'none', pattern: 'solid', accent: '#f1faee', vest: '', shorts: '', shades: '' },
-    stats: { ...career.DEFAULT_STATS }, bonus: 12, adv: '', dis: '',
   };
   app.screens.newCareer(app.draft);
 }
@@ -545,16 +533,14 @@ function createCareer() {
   const d = app.draft;
   const name = (document.getElementById('f-name')?.value || d.name).trim();
   if (!name) { toast('Give your golfer a name'); document.getElementById('f-name')?.focus(); return; }
-  if (d.adv && !d.dis) { toast('A strength needs a weakness to go with it'); return; }
-  const c = career.newCareer({ name, country: d.country, gender: d.gender, look: d.look, stats: d.stats });
-  c.golfer.traits = [d.adv, d.dis].filter(Boolean);
-  if (d.bonus > 0) c.golfer.sp += d.bonus;
+  // everyone starts with the same skills and no traits
+  const c = career.newCareer({ name, country: d.country, gender: d.gender, look: d.look });
   app.career = c;
   saveCareer(c);
   app.draft = null;
   goHub();
   setTimeout(() => {
-    modal(`<h3>Welcome to the tour, ${esc(name)}</h3><p>You're ranked <b>#501</b> in the world. The Challenger Tour is open to you every week; win there (or climb into the top 125) to earn World Tour starts. You also have <b>two sponsor invitations</b> to try a World Tour event early.</p><p>Tip: open <b>How to play</b> from the menu for the swing, putting and aiming controls.</p><div class="actions"><button class="btn primary" data-close>Let's go</button></div>`);
+    modal(`<h3>Welcome to the tour, ${esc(name)}</h3><p>You're ranked <b>#501</b> in the world. The Challenger Tour is open to you every week; win there (or climb into the top 125) to earn World Tour starts. You also have <b>two sponsor invitations</b> to try a World Tour event early.</p><p>Your skills are fixed. To get better, win prize money and <b>buy better players</b> in the <b>Players</b> tab: you have enough for your first one already.</p><p>Tip: open <b>How to play</b> from the menu for the swing, putting and aiming controls.</p><div class="actions"><button class="btn primary" data-close>Let's go</button></div>`);
   }, 200);
 }
 
@@ -562,6 +548,13 @@ function goHub() {
   if (!app.career) { showTitle(); return; }
   app.fromHub = true;
   app.screens.hub(app.career, app.screens.tab || 'week');
+  // one-time note for careers started when skills could be trained
+  const r = app.career.skillsReset;
+  if (r) {
+    delete app.career.skillsReset;
+    saveCareer(app.career);
+    modal(`<h3>Skills are now fixed</h3><p>Every golfer now starts with the same skills and no strengths or weaknesses. The only way to get better is to <b>buy a better player</b> in the <b>Players</b> tab.</p>${r.refund ? `<p>Your ${r.points} skill point${r.points === 1 ? '' : 's'} ${r.points === 1 ? 'was' : 'were'} paid back as <b>${esc(money(r.refund))}</b> to spend on players.</p>` : ''}<div class="actions"><button class="btn primary" data-a="tab" data-t="players" data-close>See the players</button><button class="btn" data-close>OK</button></div>`);
+  }
 }
 
 function enterEvent(id) {
