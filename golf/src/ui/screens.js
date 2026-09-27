@@ -16,8 +16,16 @@ import {
   upgradeStat, ACHIEVEMENTS, DEFAULT_STATS, golferOVR, season,
 } from '../game/career.js';
 import { HUMAN_ID } from '../game/tournament.js';
+import { CHARACTERS, CHAR_BY_ID, CHAR_TIERS, playAs, abilityList, charBoostOf } from '../data/characters.js';
+import { fillPortraits } from '../render/portrait.js';
 
 const TOUR_TAG = { CH: 'Challenger', WT: 'World Tour', MAJ: 'Major', FIN: 'Finale' };
+
+// The active character's boost to one skill, shown next to your trained value
+function charBoost(g, k) {
+  const v = g.char ? charBoostOf(CHAR_BY_ID[g.char], k) : 0;
+  return v ? `<em class="boost">+${v}</em>` : '';
+}
 
 export class Screens {
   constructor(root, app) {
@@ -25,6 +33,14 @@ export class Screens {
     this.app = app;
     this.tab = 'week';
     root.addEventListener('click', (e) => {
+      const a = e.target.closest('[data-a]');
+      if (!a) return;
+      e.preventDefault();
+      this.app.onAction(a.dataset.a, a.dataset, a);
+    });
+    // Buttons inside pop-ups (pro card, course card, character card) use the same actions
+    const modalRoot = document.getElementById('modal');
+    if (modalRoot) modalRoot.addEventListener('click', (e) => {
       const a = e.target.closest('[data-a]');
       if (!a) return;
       e.preventDefault();
@@ -78,6 +94,8 @@ export class Screens {
     const shirts = ['#1d3557', '#c1121f', '#2a9d8f', '#e9c46a', '#f1faee', '#111111', '#6a4c93', '#ff006e', '#3a86ff', '#8ac926', '#f4a261', '#669bbc'];
     const pants = ['#1b1b1b', '#2b2d42', '#e9e4d8', '#8d99ae', '#f1f1f1', '#6b705c'];
     const skins = ['#f5d0b5', '#e8b996', '#d49a73', '#b87d56', '#8d5a3b', '#6b4029'];
+    const hairs = ['#1e1a18', '#3b2a1f', '#6b4a2e', '#b5532b', '#d9a441', '#e8e2d0', '#8d99ae'];
+    const sel = (key, label, opts) => `<div><label for="f-${key}">${label}</label><select id="f-${key}" data-field="look.${key}">${opts.map(([v, t]) => `<option value="${v}" ${String(draft.look[key] || '') === v ? 'selected' : ''}>${t}</option>`).join('')}</select></div>`;
     const swatches = (field, list, cur) => list.map((c) => `<button class="swatch${c === cur ? ' on' : ''}" style="--c:${c}" data-a="look" data-field="${field}" data-v="${c}" aria-label="${field} ${c}"></button>`).join('');
     const advs = Object.entries(TRAITS).filter(([, t]) => t.kind === 'adv');
     const diss = Object.entries(TRAITS).filter(([, t]) => t.kind === 'dis');
@@ -85,17 +103,29 @@ export class Screens {
       <div class="page narrow">
         <header class="page-head"><button class="back" data-a="title">← Back</button><h2>Create your golfer</h2></header>
         <section class="card form">
-          <label for="f-name">Name</label>
-          <input id="f-name" data-field="name" maxlength="24" value="${esc(draft.name)}" placeholder="Your name">
-          <div class="row2">
-            <div><label for="f-country">Country</label>
-              <select id="f-country" data-field="country">${countries.map(([k, v]) => `<option value="${k}" ${k === draft.country ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select></div>
-            <div><label for="f-gender">Golfer</label>
-              <select id="f-gender" data-field="gender"><option value="m" ${draft.gender === 'm' ? 'selected' : ''}>Cap &amp; short hair</option><option value="f" ${draft.gender === 'f' ? 'selected' : ''}>Cap &amp; ponytail</option></select></div>
+          <div class="create-top">
+            <div class="create-preview"><img id="draftPic" data-portrait="draft" alt="Your golfer"></div>
+            <div class="create-fields">
+              <label for="f-name">Name</label>
+              <input id="f-name" data-field="name" maxlength="24" value="${esc(draft.name)}" placeholder="Your name">
+              <label for="f-country">Country</label>
+              <select id="f-country" data-field="country">${countries.map(([k, v]) => `<option value="${k}" ${k === draft.country ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>
+            </div>
+          </div>
+          <div class="row3">
+            ${sel('hat', 'Hat', [['cap', 'Cap'], ['visor', 'Visor'], ['bucket', 'Bucket hat'], ['flat', 'Flat cap'], ['cowboy', 'Cowboy hat'], ['beanie', 'Beanie'], ['none', 'No hat']])}
+            ${sel('hairStyle', 'Hair', [['short', 'Short'], ['ponytail', 'Ponytail'], ['long', 'Long'], ['bun', 'Bun'], ['curly', 'Curly'], ['mohawk', 'Mohawk'], ['bald', 'Bald']])}
+            ${sel('beard', 'Face', [['none', 'Clean'], ['stubble', 'Stubble'], ['mustache', 'Mustache'], ['goatee', 'Goatee'], ['beard', 'Beard']])}
+            ${sel('pattern', 'Shirt style', [['solid', 'Plain'], ['stripes', 'Stripes'], ['hoops', 'Hoops'], ['checks', 'Checks'], ['argyle', 'Argyle']])}
+            ${sel('shorts', 'Legs', [['', 'Trousers'], ['1', 'Shorts']])}
+            ${sel('shades', 'Sunglasses', [['', 'No'], ['1', 'Yes']])}
           </div>
           <label>Shirt</label><div class="swatches">${swatches('shirt', shirts, draft.look.shirt)}</div>
-          <label>Trousers</label><div class="swatches">${swatches('pants', pants, draft.look.pants)}</div>
-          <label>Cap</label><div class="swatches">${swatches('cap', shirts, draft.look.cap)}</div>
+          ${draft.look.pattern && draft.look.pattern !== 'solid' ? `<label>Pattern colour</label><div class="swatches">${swatches('accent', shirts, draft.look.accent)}</div>` : ''}
+          <label>Sweater vest</label><div class="swatches"><button class="swatch none${!draft.look.vest ? ' on' : ''}" data-a="look" data-field="vest" data-v="" aria-label="No vest">✕</button>${swatches('vest', shirts, draft.look.vest)}</div>
+          <label>${draft.look.shorts ? 'Shorts' : 'Trousers'}</label><div class="swatches">${swatches('pants', pants, draft.look.pants)}</div>
+          <label>Hat</label><div class="swatches">${swatches('cap', shirts, draft.look.cap)}</div>
+          <label>Hair colour</label><div class="swatches">${swatches('hair', hairs, draft.look.hair)}</div>
           <label>Skin tone</label><div class="swatches">${swatches('skin', skins, draft.look.skin)}</div>
         </section>
         <section class="card">
@@ -113,6 +143,13 @@ export class Screens {
         </section>
         <div class="actions"><button class="btn primary big" data-a="createCareer">Turn pro</button></div>
       </div>`);
+    this.refreshDraftPreview(draft);
+  }
+
+  refreshDraftPreview(draft) {
+    const im = this.root.querySelector('#draftPic');
+    if (!im) return;
+    fillPortraits(this.app.world.renderer, im.parentElement, { draft: { ...draft.look, gender: draft.gender } }, { w: 150, h: 190 });
   }
 
   // ---------------- career hub ----------------
@@ -136,8 +173,10 @@ export class Screens {
       <div class="page">
         <header class="hub-head">
           <button class="back" data-a="title">← Menu</button>
+          <button class="hub-avatar" data-a="shopTab" data-t="chars" aria-label="Characters"><img data-portrait="me" alt=""></button>
           <div class="hub-id">
             <div class="hub-name">${esc(g.name)} <span class="cc">${esc(g.country)}</span></div>
+            ${g.char && CHAR_BY_ID[g.char] ? `<div class="hub-char">Playing as <b>${esc(CHAR_BY_ID[g.char].name)}</b></div>` : ''}
             <div class="hub-meta">Season ${c.year} · Week ${c.week} of ${SEASON_WEEKS}</div>
             <div class="save-line" id="saveLine">${this.app.saveText ? esc(this.app.saveText()) : ''}</div>
           </div>
@@ -151,6 +190,7 @@ export class Screens {
         <nav class="tabs">${tabs.map(([k, v]) => `<button class="tab${k === tab ? ' on' : ''}" data-a="tab" data-t="${k}">${esc(v)}</button>`).join('')}</nav>
         <div class="tab-body">${body}</div>
       </div>`);
+    this.fillCharPortraits(c);
   }
 
   eventCard(c, ev, big = false) {
@@ -255,7 +295,8 @@ export class Screens {
     return `<div class="cols">
       <section class="card"><div class="card-head"><h3>Skills</h3><span class="pill ${g.sp ? 'warn' : ''}">${g.sp} skill point${g.sp === 1 ? '' : 's'}</span></div>
         <p class="muted small">Level up by playing events: finishes, birdies and eagles all earn XP. Each level gives 4 skill points. Skills above 84 cost 2 points, above 92 cost 3.</p>
-        ${STAT_KEYS.map((k) => `<div class="upg">${statBar(STAT_LABELS[k], g.stats[k])}<button class="mini" data-a="upgrade" data-k="${k}" ${g.sp < statCost(g.stats[k]) || g.stats[k] >= 99 ? 'disabled' : ''} aria-label="Upgrade ${STAT_LABELS[k]}">+${statCost(g.stats[k])}</button><small>${esc(STAT_HELP[k])}</small></div>`).join('')}
+        ${g.char && CHAR_BY_ID[g.char] ? `<p class="small charnote">Playing as <b>${esc(CHAR_BY_ID[g.char].name)}</b>: the green numbers are their boost on top of your skills.</p>` : ''}
+        ${STAT_KEYS.map((k) => `<div class="upg">${statBar(STAT_LABELS[k], g.stats[k], charBoost(g, k))}<button class="mini" data-a="upgrade" data-k="${k}" ${g.sp < statCost(g.stats[k]) || g.stats[k] >= 99 ? 'disabled' : ''} aria-label="Upgrade ${STAT_LABELS[k]}">+${statCost(g.stats[k])}</button><small>${esc(STAT_HELP[k])}</small></div>`).join('')}
       </section>
       <section class="card"><h3>Career</h3>
         <div class="facts">
@@ -270,6 +311,7 @@ export class Screens {
           <div><small>Best round</small><b>${c.stats.best ?? '–'}</b></div>
         </div>
         ${traits.length ? `<h4>Traits</h4><ul class="traits">${(g.traits || []).map((t) => `<li class="${TRAITS[t].kind}"><b>${esc(TRAITS[t].name)}</b> ${esc(TRAITS[t].desc)}</li>`).join('')}</ul>` : ''}
+        ${g.char && CHAR_BY_ID[g.char] ? `<h4>${esc(CHAR_BY_ID[g.char].name)}’s abilities</h4><ul class="traits">${abilityList(CHAR_BY_ID[g.char]).map((t) => `<li class="adv"><b>${esc(t.name)}</b> ${esc(t.desc)}</li>`).join('')}</ul>` : ''}
         <h4>In the bag</h4>
         <ul class="baglist">${Object.entries(CLUB_CATS).map(([cat, v]) => { const m = MODEL_BY_ID[normBag(g.bag)[cat]]; return `<li><small>${esc(v.label)}</small> ${esc(m.brand)} ${esc(m.name)}</li>`; }).join('')}<li><small>Ball</small> ${esc(BALL_BY_ID[g.ball].name)}</li></ul>
         <p><button class="linkbtn" data-a="tab" data-t="shop">Visit the pro shop</button></p>
@@ -278,8 +320,9 @@ export class Screens {
 
   hubShop(c) {
     const g = c.golfer;
-    const sub = this.shopTab || 'clubs';
-    const head = `<div class="chips shop-tabs"><button class="chipbtn ${sub === 'clubs' ? 'on' : ''}" data-a="shopTab" data-t="clubs">Clubs</button><button class="chipbtn ${sub === 'balls' ? 'on' : ''}" data-a="shopTab" data-t="balls">Balls</button><span class="muted small">Bank: ${money(g.money)}</span></div>`;
+    const sub = this.shopTab || 'chars';
+    const head = `<div class="chips shop-tabs"><button class="chipbtn ${sub === 'chars' ? 'on' : ''}" data-a="shopTab" data-t="chars">Characters</button><button class="chipbtn ${sub === 'clubs' ? 'on' : ''}" data-a="shopTab" data-t="clubs">Clubs</button><button class="chipbtn ${sub === 'balls' ? 'on' : ''}" data-a="shopTab" data-t="balls">Balls</button><span class="muted small">Bank: ${money(g.money)}</span></div>`;
+    if (sub === 'chars') return head + this.charShop(c);
     if (sub === 'clubs') return head + this.clubShop(c);
     return `${head}<p class="muted">Each ball trades one strength for another. Prize money buys new ones; you can switch any time between events.</p>
       <div class="balls">${BALLS.map((b) => {
@@ -292,6 +335,72 @@ export class Screens {
           <div class="bc-foot">${g.ball === b.id ? '<span class="pill">In your bag</span>' : owned ? `<button class="btn" data-a="useBall" data-id="${b.id}">Use this ball</button>` : `<button class="btn primary" data-a="buyBall" data-id="${b.id}" ${g.money < b.price ? 'disabled' : ''}>Buy ${money(b.price, true)}</button>`}</div>
         </article>`;
       }).join('')}</div>`;
+  }
+
+  // ---------------- characters ----------------
+  charShop(c) {
+    const g = c.golfer;
+    const owned = new Set(g.chars || []);
+    const me = playAs(g);
+    const base = overall(g.stats);
+    const now = overall(me.stats);
+    const card = (ch) => {
+      const has = owned.has(ch.id);
+      const on = g.char === ch.id;
+      const tier = CHAR_TIERS[ch.tier];
+      const withOvr = overall(playAs({ ...g, char: ch.id }).stats);
+      return `<article class="charcard ${on ? 'on' : ''}" style="--tier:${tier.color}">
+        <button class="cc-pic" data-a="charInfo" data-id="${ch.id}" aria-label="More about ${esc(ch.name)}"><img data-portrait="${ch.id}" alt=""></button>
+        <div class="cc-body">
+          <div class="cc-top"><span class="cc-tier">${esc(tier.name)}</span><b class="price">${has ? 'Owned' : money(ch.price, true)}</b></div>
+          <h4>${esc(ch.name)}</h4>
+          <p class="cc-tag">${esc(ch.tagline)}</p>
+          <div class="cc-boost">${Object.keys(ch.boost).map((k) => `<span>+${charBoostOf(ch, k)} ${esc(STAT_LABELS[k])}</span>`).join('')}${ch.all ? `<span class="all">+${ch.all} all skills</span>` : ''}</div>
+          <ul class="cc-abil">${abilityList(ch).map((t) => `<li><b>${esc(t.name)}</b> ${esc(t.desc)}</li>`).join('')}</ul>
+          <div class="cc-foot"><span class="muted small">Your overall ${withOvr}</span>${on ? '<span class="pill gold">Playing</span>' : has ? `<button class="btn" data-a="useChar" data-id="${ch.id}">Play as</button>` : `<button class="btn primary" data-a="buyChar" data-id="${ch.id}" ${g.money < ch.price ? 'disabled' : ''}>Buy ${money(ch.price, true)}</button>`}</div>
+        </div>
+      </article>`;
+    };
+    return `<section class="card char-now">
+        <div class="cn-pic"><img data-portrait="me" data-pose="fist" alt=""></div>
+        <div>
+          <small class="muted">Playing as</small>
+          <h3>${esc(me.charName || `${g.name} (yourself)`)}</h3>
+          <p class="muted small">Overall <b class="cn-ovr">${now}</b>${now !== base ? ` <span class="up">+${now - base} from ${esc(me.charName.split(' ')[0])}</span>` : ''} · your trained skills ${base}</p>
+          ${g.char ? '<button class="btn" data-a="useChar" data-id="">Play as yourself</button>' : ''}
+        </div>
+      </section>
+      <p class="muted">Characters add a boost on top of the skills you train, and bring special abilities. Buy one with your prize money and play as them in every event. Switch any time.</p>
+      ${Object.entries(CHAR_TIERS).map(([tid, t]) => `
+        <h3 class="shop-cat" style="color:${t.color}">${esc(t.name)}s</h3>
+        <div class="chars">${CHARACTERS.filter((ch) => ch.tier === tid).map(card).join('')}</div>`).join('')}`;
+  }
+
+  charCard(c, id) {
+    const ch = CHAR_BY_ID[id];
+    if (!ch) return;
+    const g = c.golfer;
+    const has = (g.chars || []).includes(id);
+    const on = g.char === id;
+    const tier = CHAR_TIERS[ch.tier];
+    const m = modal(`<div class="charbig" style="--tier:${tier.color}">
+        <div class="cb-pics"><img data-portrait="${id}" data-pose="fist" alt=""><img data-portrait="${id}" data-pose="arms" alt=""></div>
+        <div class="cc-top"><span class="cc-tier">${esc(tier.name)}</span><b class="price">${has ? 'Owned' : money(ch.price)}</b></div>
+        <h3>${esc(ch.name)}</h3>
+        <p class="cc-tag">${esc(ch.tagline)}</p>
+        ${STAT_KEYS.map((k) => statBar(STAT_LABELS[k], g.stats[k], `<em class="boost">+${charBoostOf(ch, k)}</em>`)).join('')}
+        <ul class="cc-abil">${abilityList(ch).map((t) => `<li><b>${esc(t.name)}</b> ${esc(t.desc)}</li>`).join('')}</ul>
+        <div class="actions">${on ? '<span class="pill gold">Playing</span>' : has ? `<button class="btn primary" data-a="useChar" data-id="${id}">Play as ${esc(ch.name.split(' ')[0])}</button>` : `<button class="btn primary" data-a="buyChar" data-id="${id}" ${g.money < ch.price ? 'disabled' : ''}>Buy for ${money(ch.price)}</button>`}<button class="btn" data-close>Close</button></div>
+      </div>`);
+    m.el.addEventListener('click', (e) => { if (e.target.closest('[data-a]')) m.close(); });
+    fillPortraits(this.app.world.renderer, m.el, { [id]: ch.look }, { w: 150, h: 190 });
+  }
+
+  fillCharPortraits(c) {
+    const g = c.golfer;
+    const looks = { me: playAs(g).look };
+    for (const ch of CHARACTERS) looks[ch.id] = ch.look;
+    fillPortraits(this.app.world.renderer, this.root, looks);
   }
 
   clubShop(c) {

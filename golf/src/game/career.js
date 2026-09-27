@@ -5,6 +5,7 @@ import { courseById } from '../data/courses.js';
 import { RNG, mixSeed } from '../util/rng.js';
 import { STARTER_BAG, normBag } from '../data/clubsets.js';
 import { HUMAN_ID, simulateWholeEvent, createTournament, results as tourneyResults } from './tournament.js';
+import { playAs } from '../data/characters.js';
 
 export const START_YEAR = 2026;
 export const DECAY = 0.984; // weekly ranking-points decay
@@ -63,6 +64,7 @@ export function newCareer({ name, country, gender, look, stats }) {
       money: 25000, careerMoney: 0,
       balls: ['range', 'tourbal'], ball: 'tourbal',
       bag: { ...STARTER_BAG }, clubs: Object.values(STARTER_BAG),
+      chars: [], char: null,
       majorsWon: [],
     },
     year: START_YEAR,
@@ -360,8 +362,9 @@ export function skipWeek(c) {
   return completeWeek(c, null);
 }
 
+// Overall rating as you actually play (your active character's boost included)
 export function golferOVR(g) {
-  return overall(g.stats);
+  return overall(playAs(g).stats);
 }
 
 export const DEFAULT_STATS = { power: 58, accuracy: 56, irons: 56, shortGame: 55, putting: 56, recovery: 54, mental: 54, wind: 54, consistency: 58 };
@@ -372,5 +375,7 @@ export function upgradeSave(c) {
   if (!c || !c.golfer) return c;
   c.golfer.bag = normBag(c.golfer.bag);
   if (!Array.isArray(c.golfer.clubs)) c.golfer.clubs = Object.values(c.golfer.bag);
+  if (!Array.isArray(c.golfer.chars)) c.golfer.chars = [];
+  if (c.golfer.char && !c.golfer.chars.includes(c.golfer.char)) c.golfer.char = null;
   return c;
 }

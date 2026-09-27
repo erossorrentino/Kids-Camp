@@ -73,6 +73,21 @@ hole using your golfer's skills if you want to move on.
   own head in 3D (wood crowns and faces, cavity backs vs. blades, blade vs.
   mallet putters), the pros each carry a bag that suits their game, and
   you buy and swap sets in the pro shop.
+- **12 characters to buy** (`src/data/characters.js`) in four tiers, from
+  Birdie Bex ($25K) to the Golden Eagle ($15M). Each lifts every skill a
+  little and their signature skills a lot, on top of what you've trained,
+  and brings special abilities (Lag Master, Bomber, Wind Whisperer, Ice in
+  the Veins...). Buy them in the pro shop's **Characters** tab with prize
+  money and play your career as them; switch any time. Each has their own
+  look, shown as a 3D portrait rendered by the game.
+- **Detailed golfers**: caps, visors, bucket hats, flat caps, cowboy hats
+  and beanies; short, long, curly, bun, ponytail, mohawk or bald; stubble,
+  beards and mustaches; striped, hooped, checked or argyle shirts; sweater
+  vests, shorts with socks, glove and shoe colours, sunglasses. You pick
+  them when you create your golfer (with a live 3D preview), and the pros
+  wear them too. After holing out, the camera cuts to your golfer's
+  reaction: arms up for an eagle, a fist pump for a birdie, a tip of the
+  cap for par, hands on hips for a bogey.
 - **12 golf balls** with trade-offs (distance vs. spin vs. straightness vs.
   wind vs. putting) in `src/data/equipment.js`, bought with prize money.
 - **Career**: Challenger Tour, World Tour, four majors and a $40M Tour

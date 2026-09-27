@@ -19,6 +19,7 @@ import { RNG, mixSeed } from './util/rng.js';
 import { traitEffects } from './data/traits.js';
 import { BALL_BY_ID } from './data/equipment.js';
 import { MODEL_BY_ID, normBag } from './data/clubsets.js';
+import { CHAR_BY_ID, playAs } from './data/characters.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -421,6 +422,29 @@ app.onAction = (a, d, elx) => {
       app.screens.hub(c, 'shop');
       break;
     }
+    case 'buyChar': {
+      const ch = CHAR_BY_ID[d.id];
+      const g = c.golfer;
+      if (ch && g.money >= ch.price && !g.chars.includes(ch.id)) {
+        g.money -= ch.price;
+        g.chars.push(ch.id);
+        g.char = ch.id;
+        saveCareer(c, { now: true });
+        sfx.applause(0.6);
+        toast(`${ch.name} joined your team! You're playing as ${ch.name.split(' ')[0]}.`);
+      }
+      app.screens.hub(c, 'shop');
+      break;
+    }
+    case 'useChar': {
+      const g = c.golfer;
+      if (!d.id) { g.char = null; toast('Playing as yourself'); }
+      else if (g.chars.includes(d.id)) { g.char = d.id; toast(`Playing as ${CHAR_BY_ID[d.id].name}`); }
+      saveCareer(c);
+      app.screens.hub(c, app.screens.tab || 'shop');
+      break;
+    }
+    case 'charInfo': app.screens.charCard(c, d.id); break;
     case 'useClub': {
       const m = MODEL_BY_ID[d.id];
       if (m) { c.golfer.bag = { ...normBag(c.golfer.bag), [m.cat]: m.id }; saveCareer(c); toast(`Switched to ${m.brand} ${m.name}`); }
@@ -494,6 +518,14 @@ app.onField = (k, v) => {
     if (k === 'name') app.draft.name = v;
     else if (k === 'country') app.draft.country = v;
     else if (k === 'gender') app.draft.gender = v;
+    else if (k.startsWith('look.')) {
+      const key = k.slice(5);
+      app.draft.look[key] = v;
+      if (key === 'hairStyle') app.draft.gender = ['ponytail', 'long', 'bun'].includes(v) ? 'f' : 'm';
+      // the pattern colour row only shows for patterned shirts, so redraw
+      if (key === 'pattern' || key === 'shorts') app.screens.newCareer(app.draft);
+      else app.screens.refreshDraftPreview(app.draft);
+    }
     else if (k === 'adv') app.draft.adv = v;
     else if (k === 'dis') app.draft.dis = v;
   }
@@ -503,7 +535,7 @@ app.onField = (k, v) => {
 function newCareerDraft() {
   app.draft = {
     name: '', country: 'USA', gender: 'm',
-    look: { shirt: '#1d3557', pants: '#e9e4d8', cap: '#f1faee', skin: '#e8b996', hair: '#3b2a1f' },
+    look: { shirt: '#1d3557', pants: '#e9e4d8', cap: '#f1faee', skin: '#e8b996', hair: '#3b2a1f', hat: 'cap', hairStyle: 'short', beard: 'none', pattern: 'solid', accent: '#f1faee', vest: '', shorts: '', shades: '' },
     stats: { ...career.DEFAULT_STATS }, bonus: 12, adv: '', dis: '',
   };
   app.screens.newCareer(app.draft);
@@ -560,7 +592,7 @@ function startTournamentRound() {
   const done = (hp.scores[t.round] || []).filter((v) => v != null).length;
   const holeStats = [];
   app.screens.hide();
-  const g = c.golfer;
+  const g = playAs(c.golfer); // you, as your active character
   const round = new RoundController(app, {
     course,
     holeList: [...Array(18).keys()],
@@ -642,7 +674,7 @@ function simTournamentRound() {
   c.active.shot = null;
   if (!hp.scores[t.round]) hp.scores[t.round] = [];
   for (let i = 0; i < 18; i++) {
-    if (hp.scores[t.round][i] == null) tourn.recordHumanHole(t, i, tourn.simHumanHole(t, c.golfer, i), true);
+    if (hp.scores[t.round][i] == null) tourn.recordHumanHole(t, i, tourn.simHumanHole(t, playAs(c.golfer), i), true);
   }
   const course = courseById(t.courseId);
   hp.scores[t.round].forEach((s, i) => trackHole(c, course.holes[i].par, s, { simmed: true }));
@@ -692,11 +724,11 @@ function startPlayoff(tied, scores = []) {
   const go = (sim) => {
     m.close();
     if (sim) {
-      startPlayoff(tied, [...scores, tourn.simHumanHole(t, c.golfer, 17, 1000 + scores.length)]);
+      startPlayoff(tied, [...scores, tourn.simHumanHole(t, playAs(c.golfer), 17, 1000 + scores.length)]);
       return;
     }
     app.screens.hide();
-    const g = c.golfer;
+    const g = playAs(c.golfer);
     const round = new RoundController(app, {
       course, holeList: [17], golfer: { name: g.name, stats: g.stats, traits: g.traits, ball: g.ball, bag: g.bag, look: g.look, gender: g.gender },
       cond: { ...t.cond[t.rounds - 1], seed: mixSeed(t.seed, 'po', scores.length) }, crowd: true,
@@ -741,7 +773,7 @@ function startQuick() {
     const p = proById(q.proId);
     golfer = { name: p.name, stats: p.stats, traits: p.traits, ball: q.ball, bag: p.bag, look: p.look, gender: p.gender };
   } else if (app.career) {
-    const g = app.career.golfer;
+    const g = playAs(app.career.golfer);
     golfer = { name: g.name, stats: g.stats, traits: g.traits, ball: q.ball, bag: g.bag, look: g.look, gender: g.gender };
   } else {
     const s = { power: 70, accuracy: 70, irons: 70, shortGame: 70, putting: 70, recovery: 70, mental: 70, wind: 70, consistency: 70 };

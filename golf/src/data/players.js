@@ -183,6 +183,15 @@ export function generatePros() {
     pro.look.shades = brng.chance(0.22);
     pro.look.belt = brng.pick(['#1b1b1b', '#3b2a1f', '#f4f4f4', '#1d3557', '#8d5a3b']);
     pro.look.shoe = brng.pick(['#1b1b1b', '#f4f4f4', pro.look.shirt, '#1d3557', '#8d5a3b']);
+    // a separate stream so adding looks never changes anything above
+    const lrng = new RNG(mixSeed(515151, 'looks', i));
+    const f = pro.gender === 'f';
+    pro.look.hat = lrng.weighted(['cap', 'visor', 'none', 'bucket', 'flat'], (h) => ({ cap: 10, visor: f ? 4 : 1.5, none: 2, bucket: 0.8, flat: f ? 0.2 : 0.8 }[h]));
+    pro.look.hairStyle = f ? lrng.pick(['ponytail', 'ponytail', 'long', 'bun', 'short', 'curly']) : lrng.weighted(['short', 'curly', 'bald', 'long'], (h) => ({ short: 10, curly: 1.5, bald: 1.2, long: 0.5 }[h]));
+    pro.look.beard = f ? 'none' : lrng.weighted(['none', 'stubble', 'beard', 'mustache', 'goatee'], (b) => ({ none: 10, stubble: 3, beard: 2, mustache: 0.8, goatee: 0.8 }[b]));
+    pro.look.pattern = lrng.weighted(['solid', 'stripes', 'hoops', 'checks', 'argyle'], (p) => ({ solid: 10, stripes: 1.5, hoops: 1.5, checks: 0.6, argyle: 0.4 }[p]));
+    pro.look.accent = lrng.pick(['#ffffff', '#1b1b1b', pro.look.cap, '#c9a227']);
+    if (lrng.chance(0.08)) pro.look.vest = lrng.pick(['#1d3557', '#2e6b4f', '#6b705c', '#1b1b1b']);
   });
   CACHE = pros;
   return pros;

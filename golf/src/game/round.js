@@ -813,7 +813,21 @@ export class RoundController {
     const rel = this.strokes - par;
     if (rel <= -1) sfx.applause(rel <= -2 ? 1.3 : 0.9);
     else if (rel === 0) sfx.applause(0.4);
+    this.reactionShot(rel <= -2 ? 'arms' : rel === -1 ? 'fist' : rel === 0 ? 'tip' : 'sad');
     this.completeHole(false);
+  }
+
+  // Cut to the golfer's reaction, like the TV coverage does
+  reactionShot(kind) {
+    const g = this.world.golfer;
+    if (!g) return;
+    g.react(kind);
+    const p = g.root.position;
+    const r = rightOf(this.heading), f = fwdOf(this.heading);
+    const cx = p.x + r.x * 4.2 + f.x * 1.2, cz = p.z + r.z * 4.2 + f.z * 1.2;
+    const cy = Math.max(p.y, this.hole.heightAt(cx, cz)) + 1.35;
+    this.world.setCamera(V(cx, cy, cz), V(p.x, p.y + 1.1, p.z), 46, 3);
+    this.world.focus.set(p.x, p.y, p.z);
   }
 
   completeHole(pickedUp) {
