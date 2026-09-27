@@ -3,7 +3,7 @@
 import { esc, fmtToPar, toParClass, money, ordinal, modal } from './dom.js';
 import { courseById } from '../data/courses.js';
 import { proById } from '../data/players.js';
-import { TOURS } from '../data/tour.js';
+import { TOURS, scoringBonuses, bonusTotal } from '../data/tour.js';
 import { leaderboard, coursePar, humanPlayer, CUT_SIZE } from '../game/tournament.js';
 import { ACHIEVEMENTS } from '../game/career.js';
 
@@ -50,6 +50,7 @@ export function eventIntro(screens, app, c, t) {
         <p>${esc(course.name)} · ${esc(course.region)}, ${esc(course.countryName)} · Par ${course.par} · ${course.yards.toLocaleString()} yds</p>
         ${conditionsHtml(t.cond[r], app.settings.units)}
         <p class="muted small">Purse ${money(t.purse)} · Winner's share ${money(t.purse * 0.18)} · ${t.players.length} players${t.rounds === 4 ? ` · Cut after round 2: top ${CUT_SIZE} and ties` : ''}</p>
+        ${payInfo(t)}
         <div class="actions left"><button class="btn primary big" data-a="playRound">${shot ? `Resume hole ${shot.hole + 1}, shot ${shot.strokes + 1}` : played ? `Resume at hole ${played + 1}` : `Tee off round ${r + 1}`}</button><button class="btn" data-a="simRound">Simulate this round</button></div>
       </section>
       ${r === 0 ? `<section class="card"><h3>Players to watch</h3><ul class="favs">${favs.map((p) => `<li data-a="pro" data-id="${p.id}"><b>${esc(p.name)}</b> <span class="muted">${esc(p.country)} · OVR ${p.ovr}</span></li>`).join('')}</ul></section>` : `<section class="card"><h3>Leaderboard</h3>${boardTable(t, app.nameOf, { limit: 10, full: true })}</section>`}
@@ -70,12 +71,35 @@ export function roundSummary(screens, app, c, t, info) {
       <header class="page-head"><h2>${esc(t.name)}</h2><span class="pill">Round ${info.round + 1}</span></header>
       <section class="card result-hero ${rel < 0 ? 'good' : rel > 0 ? 'bad' : ''}">
         <div class="rh-score"><b>${tot}</b><span class="${toParClass(rel)}">${fmtToPar(rel)}</span></div>
-        <div><div class="rh-pos">${info.missedCut ? 'Missed cut' : `Position ${esc(me.pos)}`}</div><div class="muted">Total ${fmtToPar(me.toPar)} · ${esc(next)}</div></div>
+        <div><div class="rh-pos">${info.missedCut ? 'Missed cut' : `Position ${esc(me.pos)}`}</div><div class="muted">Total ${fmtToPar(me.toPar)} · ${esc(next)}</div>${bonusSoFar(c, t)}</div>
       </section>
       ${scorecardHtml(course, sc, info.holeStats)}
       <section class="card"><h3>Leaderboard</h3>${boardTable(t, app.nameOf, { limit: 10, full: true })}</section>
       <div class="actions">${info.missedCut || info.done ? '<button class="btn primary big" data-a="finishEvent">See final results</button>' : `<button class="btn primary big" data-a="nextRound">On to round ${info.round + 2}</button><button class="btn" data-a="hub">Save & exit</button>`}</div>
     </div>`);
+}
+
+// Everyone who tees it up gets paid; say how before the first round
+function payInfo(t) {
+  const tour = TOURS[t.tour];
+  const b = scoringBonuses(t.tour);
+  const cut = t.rounds === 4 && t.tour !== 'FIN';
+  return `<div class="payinfo"><b>Everyone gets paid.</b> ${cut ? `Miss the cut: ${money(tour.minPay)}. Make the cut: at least ${money(tour.minPay * 1.5)}, more the higher you finish.` : `Every finisher earns at least ${money(tour.minPay * 1.5)}.`} Bonuses for the holes you play: ${money(b.birdie)} a birdie, ${money(b.eagle)} an eagle, ${money(b.ace)} for a hole-in-one.</div>`;
+}
+
+function bonusSoFar(c, t) {
+  const hs = c.active && c.active.hs;
+  const b = hs ? bonusTotal(t.tour, hs) : { total: 0 };
+  return b.total ? `<div class="up small">${money(b.total)} in scoring bonuses so far this week</div>` : '';
+}
+
+function paycheck(hr) {
+  const b = hr.bonus || { total: 0, lines: [] };
+  const rows = [[hr.made ? `Prize money (${hr.posText})` : 'Missed-cut paycheck', hr.money], ...b.lines.map((l) => [`${l.name} bonus × ${l.n}`, l.amount])];
+  return `<section class="card paycheck"><h3>Your paycheck</h3>
+    <table class="tbl"><tbody>${rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td class="num">${money(v)}</td></tr>`).join('')}
+    <tr class="me"><td><b>Total</b></td><td class="num"><b>${money(hr.money + b.total)}</b></td></tr></tbody></table>
+    <p class="muted small">Spend it on better players in the Players tab.</p></section>`;
 }
 
 export function eventResults(screens, app, c, t, summary) {
@@ -86,14 +110,16 @@ export function eventResults(screens, app, c, t, summary) {
   const rankMove = summary.rankAfter < summary.rankBefore ? `up ${summary.rankBefore - summary.rankAfter}` : summary.rankAfter > summary.rankBefore ? `down ${summary.rankAfter - summary.rankBefore}` : 'no change';
   const po = t.playoff ? `<p class="muted">Won in a playoff by ${esc(t.playoff.winner === 'you' ? 'you' : app.nameOf(t.playoff.winner))} after ${t.playoff.log.length} extra hole${t.playoff.log.length === 1 ? '' : 's'}.</p>` : '';
   const se = summary.seasonEnd;
+  const pay = hr ? paycheck(hr) : '';
   screens.show(`
     <div class="page narrow">
       <header class="page-head"><h2>${esc(t.name)}</h2><span class="pill">Final</span></header>
       <section class="card result-hero ${win ? 'win' : ''}">
         <div class="rh-score"><b>${hr ? esc(hr.posText) : ''}</b><span class="${toParClass(hr && hr.toPar)}">${hr ? fmtToPar(hr.toPar) : ''}</span></div>
         <div><div class="rh-pos">${win ? 'Champion!' : hr && hr.made ? `Finished ${esc(hr.posText)}` : 'Missed the cut'}</div>
-        <div class="muted">${money(hr ? hr.money : 0)} · ${hr ? hr.pts.toFixed(1) : 0} ranking points · World rank #${summary.rankAfter} (${rankMove})</div></div>
+        <div class="muted">${money(hr ? hr.money + ((hr.bonus && hr.bonus.total) || 0) : 0)} earned · ${hr ? hr.pts.toFixed(1) : 0} ranking points · World rank #${summary.rankAfter} (${rankMove})</div></div>
       </section>
+      ${pay}
       <div class="rewards"><div class="reward"><b>+${summary.xp} XP</b></div>${lvl}${ach}</div>
       ${po}
       <section class="card"><h3>Final leaderboard</h3>${boardTable(t, app.nameOf, { limit: 15, full: true })}</section>

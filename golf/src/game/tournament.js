@@ -250,6 +250,7 @@ export function results(t) {
   const rows = leaderboard(t, { full: true });
   const made = rows.filter((x) => x.status === 'active');
   const tour = TOURS[t.tour];
+  const minPay = tour.minPay || 0;
   const alloc = splitTies(made, 'toPar', (pos) => purseShare(pos));
   const palloc = splitTies(made, 'toPar', (pos) => pointsShare(pos));
   const salloc = splitTies(made, 'toPar', (pos) => pointsShare(pos));
@@ -276,7 +277,9 @@ export function results(t) {
       toPar: row.toPar,
       total: row.total,
       rounds: row.rounds,
-      money: Math.round(t.purse * share),
+      // everyone who enters gets paid: a missed cut earns the tour's
+      // minimum, and making the cut always pays more than that
+      money: row.status === 'cut' ? minPay : Math.max(Math.round(t.purse * share), Math.round(minPay * 1.5)),
       pts: Math.round(t.pts * pshare * 100) / 100,
       seasonPts: Math.round(tour.season * sshare),
       made: row.status === 'active',

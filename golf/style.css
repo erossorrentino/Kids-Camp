@@ -600,3 +600,8 @@ img[data-portrait].ready { opacity: 1; }
 .cc-abil li.dis b { color: var(--bad); }
 .buybar select { width: auto; }
 .procard2 h4 .cc { margin-left: 4px; font-size: 11px; }
+/* everyone gets paid */
+.payinfo { font-size: 13px; line-height: 1.45; color: #d4ded7; background: rgba(127,208,90,.08); border-left: 3px solid var(--good); border-radius: 4px; padding: 8px 10px; margin: 8px 0; }
+.payinfo b { color: var(--good); }
+.paycheck .tbl td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.paycheck .tbl tr.me td { background: rgba(127,208,90,.12); }

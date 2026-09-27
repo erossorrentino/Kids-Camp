@@ -19,6 +19,7 @@ import { RNG, mixSeed } from './util/rng.js';
 import { traitEffects } from './data/traits.js';
 import { BALL_BY_ID } from './data/equipment.js';
 import { MODEL_BY_ID, normBag } from './data/clubsets.js';
+import { scoringBonuses } from './data/tour.js';
 import { CHAR_BY_ID, playAs, marketItem } from './data/characters.js';
 
 const $ = (id) => document.getElementById(id);
@@ -614,6 +615,13 @@ function startTournamentRound() {
       holeStats[i] = hs;
       trackHole(c, course.holes[i].par, strokes, hs);
       saveCareer(c);
+      // tell them what a good hole just earned
+      if (!hs.simmed) {
+        const rel = strokes - course.holes[i].par;
+        const b = scoringBonuses(t.tour);
+        const earned = (strokes === 1 ? b.ace : 0) + (rel <= -3 ? b.albatross : rel === -2 ? b.eagle : rel === -1 ? b.birdie : 0);
+        if (earned) setTimeout(() => toast(`+${money(earned)} ${strokes === 1 ? 'hole-in-one' : rel <= -3 ? 'albatross' : rel === -2 ? 'eagle' : 'birdie'} bonus`), 900);
+      }
     },
     onRoundDone: (scores, hstats) => {
       trackRound(c, scores, hstats);

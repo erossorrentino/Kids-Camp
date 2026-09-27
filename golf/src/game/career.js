@@ -1,6 +1,6 @@
 // Career mode: you start as world #501 and try to become #1.
 import { generatePros, proById, STAT_KEYS, overall } from '../data/players.js';
-import { generateSeason, TOURS, SEASON_WEEKS, MAJORS } from '../data/tour.js';
+import { generateSeason, TOURS, SEASON_WEEKS, MAJORS, bonusTotal } from '../data/tour.js';
 import { courseById } from '../data/courses.js';
 import { RNG, mixSeed } from '../util/rng.js';
 import { STARTER_BAG, normBag } from '../data/clubsets.js';
@@ -246,10 +246,12 @@ export function completeWeek(c, humanSummary = null) {
       const res = tourneyResults(c.active.t);
       applyResults(c, ev, res, true);
       const me = res.find((r) => r.id === HUMAN_ID);
-      humanResult = { ...me, event: ev, field: res.length, winner: res.find((r) => r.pos === 1) };
-      c.history.unshift({ year: c.year, week: ev.week, eventId: ev.id, name: ev.name, tour: ev.tour, courseId: ev.courseId, pos: me.pos, posText: me.posText, toPar: me.toPar, money: me.money, pts: me.pts, rounds: me.rounds });
-      c.golfer.money += me.money;
-      c.golfer.careerMoney += me.money;
+      // bonuses for the birdies, eagles and aces you played yourself
+      const bonus = bonusTotal(ev.tour, humanSummary);
+      humanResult = { ...me, event: ev, field: res.length, winner: res.find((r) => r.pos === 1), bonus };
+      c.history.unshift({ year: c.year, week: ev.week, eventId: ev.id, name: ev.name, tour: ev.tour, courseId: ev.courseId, pos: me.pos, posText: me.posText, toPar: me.toPar, money: me.money + bonus.total, pts: me.pts, rounds: me.rounds });
+      c.golfer.money += me.money + bonus.total;
+      c.golfer.careerMoney += me.money + bonus.total;
       if (ev.tour === 'MAJ' && me.pos === 1) c.golfer.majorsWon.push(ev.name);
     } else {
       const ids = fields[ev.id] || [];

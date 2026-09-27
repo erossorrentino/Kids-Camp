@@ -4,12 +4,32 @@ import { generateCourses } from './courses.js';
 
 export const SEASON_WEEKS = 24;
 
+// minPay: what every entrant who misses the cut is paid (making the cut
+// pays at least 1.5x this). birdie: the bonus per birdie you play yourself.
 export const TOURS = {
-  CH:  { name: 'Challenger Tour', short: 'Challenger', field: 96,  purse: [900000, 1400000], pts: 14, season: 0 },
-  WT:  { name: 'World Tour', short: 'World Tour', field: 120, purse: [8000000, 12000000], pts: 50, season: 500 },
-  MAJ: { name: 'Major Championship', short: 'Major', field: 120, purse: [18000000, 21000000], pts: 100, season: 750 },
-  FIN: { name: 'Tour Championship', short: 'Finale', field: 30, purse: [40000000, 40000000], pts: 60, season: 0 },
+  CH:  { name: 'Challenger Tour', short: 'Challenger', field: 96,  purse: [900000, 1400000], pts: 14, season: 0, minPay: 10000, birdie: 2000 },
+  WT:  { name: 'World Tour', short: 'World Tour', field: 120, purse: [8000000, 12000000], pts: 50, season: 500, minPay: 25000, birdie: 5000 },
+  MAJ: { name: 'Major Championship', short: 'Major', field: 120, purse: [18000000, 21000000], pts: 100, season: 750, minPay: 50000, birdie: 10000 },
+  FIN: { name: 'Tour Championship', short: 'Finale', field: 30, purse: [40000000, 40000000], pts: 60, season: 0, minPay: 150000, birdie: 15000 },
 };
+
+// Scoring bonuses for the holes you play yourself (not simulated ones)
+export function scoringBonuses(tour) {
+  const b = TOURS[tour].birdie;
+  return { birdie: b, eagle: b * 5, albatross: b * 10, ace: b * 25 };
+}
+
+export function bonusTotal(tour, hs) {
+  if (!hs) return { total: 0, lines: [] };
+  const v = scoringBonuses(tour);
+  const lines = [
+    ['Birdie', hs.birdies || 0, v.birdie],
+    ['Eagle', hs.eagles || 0, v.eagle],
+    ['Albatross', hs.albatross || 0, v.albatross],
+    ['Hole-in-one', hs.aces || 0, v.ace],
+  ].filter(([, n]) => n > 0).map(([name, n, each]) => ({ name, n, each, amount: n * each }));
+  return { total: lines.reduce((a, l) => a + l.amount, 0), lines };
+}
 
 export const MAJORS = [
   { week: 6, name: 'The Augustine Invitational', style: ['Parkland'], fixed: true, blurb: 'Azaleas, slick greens and a green jacket.' },
