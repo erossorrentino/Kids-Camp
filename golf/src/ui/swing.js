@@ -59,6 +59,9 @@ export class SwingInput {
       }
     } else {
       this.app.hud.meterSet(s.maxDepth, 'down');
+      // the golfer starts down with the finger
+      const prog = (s.downStart.y - e.clientY) / Math.max(1, s.downStart.y - s.y0);
+      this.app.round.dragForward(prog);
       const q = this.deviation(e.clientX, e.clientY);
       this.app.hud.trail(s.pts.filter((p) => p.t >= s.downStart.t), Math.abs(q));
       if (e.clientY <= s.y0) this.strike(e.clientX, e.clientY, now);

@@ -36,8 +36,11 @@ game falls back to system fonts.
 
 Pushing up and to the right fades or slices the ball; up and to the left
 draws or hooks it. Pulling past 100% is an overswing: more speed, much
-less accuracy. A slow, hesitant push loses speed. **Sim hole** scores a
-hole using your golfer's skills if you want to move on.
+less accuracy. A slow, hesitant push loses speed. The golfer starts the
+downswing with your finger as you push, and each strike is rated as it
+happens (Perfect, Pure, Slight draw, Fade, Slice, Hook, and a note if the
+tempo was slow). **Sim hole** scores a hole using your golfer's skills if
+you want to move on.
 
 ## What's in it
 
@@ -95,6 +98,18 @@ hole using your golfer's skills if you want to move on.
   with a thumb that follow the forearm, a head with a narrower jaw, and
   golf shoes with a toe cap and heel; the trail heel lifts in the finish.
   `tools/dev/body.html` lines golfers up in different poses to check them.
+- **A real swing sequence** (`swingState` in `src/render/golfer.js`): the
+  wrists set gradually going back while the shoulders turn about twice as
+  far as the hips and the weight moves onto the trail side. The downswing
+  works from the ground up: the weight shifts and the hips unwind first,
+  the chest follows, the arms drop, and the wrists hold their angle until
+  late so the clubhead whips through. At impact the hips are open, the
+  hands lead the ball and the head stays behind it; then the golfer
+  rotates to a balanced finish with the chest past the target, the club
+  wrapped behind the neck, the trail foot up on its toe and the eyes
+  following the ball. Chips use a shorter version, putts a still-headed
+  pendulum. A swish builds to impact. `tools/dev/swing.html` shows a swing
+  frame by frame from face-on and down the line.
 - **Detailed golfers**: caps, visors, bucket hats, flat caps, cowboy hats
   and beanies; short, long, curly, bun, ponytail, mohawk or bald; stubble,
   beards and mustaches; striped, hooped, checked or argyle shirts; sweater

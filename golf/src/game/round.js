@@ -535,6 +535,12 @@ export class RoundController {
     }
   }
 
+  // The forward push has begun: the golfer's downswing follows it (0..1)
+  dragForward(f) {
+    if (!this.dragging) return;
+    this.world.golfer.setDownswing(f);
+  }
+
   cancelDrag() {
     this.dragging = false;
     this.world.golfer.address();
@@ -555,7 +561,8 @@ export class RoundController {
     const c = CLUB_BY_ID[this.club];
     const sens = this.app.settings.swingSens || 1;
     const dev = devDeg * sens;
-    this.world.golfer.swing(power, () => this.launchShot(power, dev, tempo, c));
+    const toImpact = this.world.golfer.swing(power, () => this.launchShot(power, dev, tempo, c));
+    if (!this.putting) sfx.whoosh(power, toImpact);
   }
 
   launchShot(power, dev, tempo, club) {
@@ -578,6 +585,7 @@ export class RoundController {
       launchInfo = { speed: L.speed, launch: L.launchDeg, spin: L.spinRpm, axis: L.axisDeg, start: L.startDeg, note: L.lieNote };
     }
     sfx.impact(club.kind, power);
+    this.hud.strike(dev, tempo, this.putting);
     if (club.kind !== 'putter' && ['fairway', 'rough', 'first', 'deep', 'fescue', 'heather'].includes(this.lie)) {
       this.world.particles.burst(b.x, b.y + 0.05, b.z, 'grass', 0.6 + power * 0.4);
     }

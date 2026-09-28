@@ -1,0 +1,83 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Swing film strip</title>
+<style>html,body{margin:0;height:100%;background:#1c2a22}#c{position:fixed;inset:0}</style></head>
+<body><div id="c"></div>
+<script type="module">
+// Frames of one swing side by side, face-on (top row) and down the line
+// (bottom row): ?club=wood|iron|putter&frames=10
+import * as THREE from '../../vendor/three.module.min.js';
+import { Golfer } from '../../src/render/golfer.js';
+const q = new URLSearchParams(location.search);
+const kind = q.get('club') || 'wood';
+const W = innerWidth, H = innerHeight;
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(1);
+renderer.setSize(W, H);
+renderer.setScissorTest(true);
+document.getElementById('c').appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.add(new THREE.HemisphereLight(0xdfeaff, 0x55704a, 1.5));
+const sun = new THREE.DirectionalLight(0xfff1dc, 2.2);
+sun.position.set(4, 8, 5);
+scene.add(sun);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(400, 400), new THREE.MeshLambertMaterial({ color: '#5f9e45' }));
+ground.rotation.x = -Math.PI / 2;
+scene.add(ground);
+const ball = new THREE.Mesh(new THREE.SphereGeometry(0.03, 12, 8), new THREE.MeshLambertMaterial({ color: '#ffffff' }));
+scene.add(ball);
+const g = new Golfer({ shirt: '#c1121f', pants: '#1b1b1b', cap: '#ffffff' });
+const len = kind === 'putter' ? 0.86 : kind === 'iron' ? 0.94 : 1.12;
+g.setClub(kind, len, { crown: '#23262b' });
+g.placeAt({ x: 0, y: 0, z: 0 }, 0);
+g.baseY = 0;
+scene.add(g.root);
+scene.updateMatrixWorld(true);
+// ball sits in front of the golfer (they face +x)
+ball.position.set(0, 0.03, 0);
+ball.updateMatrixWorld(true);
+// capture the swing: backswing positions, then the animated downswing
+const frames = [];
+const P = +(q.get('p') || 1);
+for (const p of [0, 0.35, 0.7, 1.0]) frames.push(() => { g.setBackswing(p * P); });
+const snaps = [];
+frames.forEach((f) => { f(); snaps.push(snapshot()); });
+g.setBackswing(P);
+g.swing(P, null);
+const an = g.anim;
+const times = [an.down * 0.45, an.down * 0.75, an.down * 0.98, an.down + an.follow * 0.12, an.down + an.follow * 0.3, an.down + an.follow * 0.6, an.down + an.follow + 0.2];
+let t = 0;
+for (const tt of times) { g.update(tt - t); t = tt; snaps.push(snapshot()); }
+function snapshot() {
+  // copy every mesh's world transform so we can redraw this pose later
+  g.root.updateMatrixWorld(true);
+  const m = [];
+  g.root.traverse((o) => { if (o.isMesh) m.push([o, o.matrixWorld.clone()]); });
+  return m;
+}
+// ?f=0,3,6 picks frames; rows: face on, down the line, and the game's camera
+const pick = q.get('f') ? q.get('f').split(',').map(Number) : null;
+const shown = pick ? pick.map((i) => snaps[i]) : snaps;
+snaps.length = 0;
+snaps.push(...shown);
+const n = snaps.length;
+const rows = q.get('game') ? 3 : 2;
+const cw = W / n, ch = H / rows;
+const cams = [0, 1, 2].map((i) => new THREE.PerspectiveCamera(i === 2 ? 50 : 30, cw / ch, 0.1, 200));
+cams[0].position.set(6.2, 1.2, 0.2); cams[0].lookAt(-0.4, 1.0, 0);          // face on
+cams[1].position.set(-0.3, 1.4, 6.2); cams[1].lookAt(-0.3, 1.0, 0);          // down the line (from behind the golfer's back)
+cams[2].position.set(0.55, 1.75, 3.7); cams[2].lookAt(0, 1.2, -90);          // the game's address camera
+g.root.traverse((o) => { if (o.isMesh) o.matrixAutoUpdate = false; });
+snaps.forEach((snap, i) => {
+  for (const [o, mw] of snap) { o.matrix.copy(mw); o.matrixWorld.copy(mw); }
+  cams.forEach((cam, row) => {
+    renderer.setViewport(i * cw, (rows - 1 - row) * ch, cw, ch);
+    renderer.setScissor(i * cw, (rows - 1 - row) * ch, cw, ch);
+    scene.background = new THREE.Color(['#9cc4e4', '#a8cbe6', '#b4d2ea'][row]);
+    // keep the stored world matrices: render without recomputing them
+    scene.matrixWorldAutoUpdate = false;
+    renderer.render(scene, cam);
+  });
+});
+document.title = 'ready';
+</script>
+</body></html>

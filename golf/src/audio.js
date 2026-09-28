@@ -76,6 +76,14 @@ function tone(freq, dur, { type = 'sine', gain = 0.3, when = 0, slide = 0 } = {}
 }
 
 export const sfx = {
+  // the club swishing down, loudest as it reaches the ball
+  whoosh(power, toImpact = 0.2) {
+    if (!ctx) return;
+    const p = Math.max(0.2, Math.min(1.1, power));
+    const t = Math.max(0.06, toImpact);
+    noise(t + 0.18, { freq: 500 + 700 * p, q: 0.7, gain: 0.22 * p, attack: t * 0.9, decay: t + 0.16 });
+    noise(t + 0.1, { freq: 1600 + 900 * p, q: 1.4, gain: 0.08 * p, attack: t * 0.95, decay: t + 0.08 });
+  },
   impact(kind, power) {
     if (!ctx) return;
     const p = Math.max(0.15, Math.min(1.1, power));

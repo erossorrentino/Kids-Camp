@@ -67,6 +67,7 @@ export class HUD {
         <div class="meter-txt" id="meterTxt">0%</div>
       </div>
       <svg class="swing-trail" id="swingTrail"><polyline id="trailLine" points=""/></svg>
+      <div class="strike" id="strike" hidden></div>
       <div class="msg" id="msg" hidden><div class="msg-title" id="msgTitle"></div><div class="msg-sub" id="msgSub"></div></div>
       <div class="stats panel" id="shotStats" hidden></div>
       <div class="intro panel" id="intro" hidden></div>
@@ -247,6 +248,29 @@ export class HUD {
     const pl = this.$('trailLine');
     pl.setAttribute('points', points.map((p) => `${p.x},${p.y}`).join(' '));
     pl.setAttribute('class', quality > 10 ? 'bad' : quality > 3 ? 'meh' : 'good');
+  }
+
+  // How the strike came off, flashed at impact
+  strike(dev, tempo, putt) {
+    const el = this.$('strike');
+    const a = Math.abs(dev);
+    const right = dev > 0;
+    let title, tone;
+    if (a < 1.5) { title = 'Perfect'; tone = 'gold'; }
+    else if (a < 3) { title = putt ? 'Pure roll' : 'Pure'; tone = 'good'; }
+    else if (putt) { title = a < 7 ? `Slightly ${right ? 'right' : 'left'}` : right ? 'Pushed' : 'Pulled'; tone = a < 7 ? 'ok' : 'bad'; }
+    else if (a < 7) { title = right ? 'Slight fade' : 'Slight draw'; tone = 'ok'; }
+    else if (a < 14) { title = right ? 'Fade' : 'Draw'; tone = 'ok'; }
+    else { title = right ? 'Slice' : 'Hook'; tone = 'bad'; }
+    const sub = tempo < 0.995 ? `Slow tempo · ${Math.round((1 - tempo) * 100)}% less speed` : a < 3 ? 'Smooth tempo' : '';
+    el.innerHTML = `<b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}`;
+    el.dataset.tone = tone;
+    el.hidden = false;
+    el.classList.remove('pop');
+    void el.offsetWidth;
+    el.classList.add('pop');
+    clearTimeout(this._strikeT);
+    this._strikeT = setTimeout(() => { el.hidden = true; }, 1700);
   }
 
   message(title, sub = '', tone = 'neutral') {

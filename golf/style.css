@@ -378,6 +378,15 @@ button { cursor: pointer; }
 .swing-trail polyline.good { stroke: #7fd05a; }
 .swing-trail polyline.meh { stroke: #f2c230; }
 .swing-trail polyline.bad { stroke: #ff5a4e; }
+.strike { position: absolute; left: 50%; top: 36%; transform: translateX(-50%); display: grid; justify-items: center; gap: 2px; padding: 6px 16px 7px; border-radius: 999px; background: rgba(9,23,17,.72); border: 1px solid rgba(255,255,255,.18); pointer-events: none; white-space: nowrap; }
+.strike b { font: 800 22px/1 var(--display); text-transform: uppercase; letter-spacing: .06em; }
+.strike span { font: 600 11px/1.1 var(--display); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+.strike[data-tone="gold"] b { color: #f2c230; }
+.strike[data-tone="good"] b { color: #b5f08f; }
+.strike[data-tone="ok"] b { color: #ffe7a3; }
+.strike[data-tone="bad"] b { color: #ffb09f; }
+.strike.pop { animation: strikepop 1.7s ease-out forwards; }
+@keyframes strikepop { 0% { transform: translateX(-50%) scale(.7); opacity: 0; } 10% { transform: translateX(-50%) scale(1.08); opacity: 1; } 18% { transform: translateX(-50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) translateY(-8px); } }
 .msg { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); text-align: center; pointer-events: none; }
 .msg.pop { animation: pop .35s ease-out; }
 .msg-title { font: 800 clamp(30px, 5vw, 48px)/1 var(--display); text-transform: uppercase; letter-spacing: .02em; text-shadow: 0 2px 14px rgba(0,0,0,.6); }
