@@ -4,7 +4,7 @@ import { proById } from '../data/players.js';
 import { courseById } from '../data/courses.js';
 import { courseProfile, simRound, drawForm, drawDayForm, simHole, effectiveStats, fxWithGear } from '../sim/aisim.js';
 import { RNG, mixSeed, clamp } from '../util/rng.js';
-import { purseShare, pointsShare, splitTies, TOURS } from '../data/tour.js';
+import { purseShare, pointsShare, splitTies, TOURS, MISSED_CUT_PAY } from '../data/tour.js';
 
 export const HUMAN_ID = 'you';
 export const CUT_SIZE = 65;
@@ -250,7 +250,7 @@ export function results(t) {
   const rows = leaderboard(t, { full: true });
   const made = rows.filter((x) => x.status === 'active');
   const tour = TOURS[t.tour];
-  const minPay = tour.minPay || 0;
+  const madeMin = tour.madeMin || 0;
   const alloc = splitTies(made, 'toPar', (pos) => purseShare(pos));
   const palloc = splitTies(made, 'toPar', (pos) => pointsShare(pos));
   const salloc = splitTies(made, 'toPar', (pos) => pointsShare(pos));
@@ -277,9 +277,9 @@ export function results(t) {
       toPar: row.toPar,
       total: row.total,
       rounds: row.rounds,
-      // everyone who enters gets paid: a missed cut earns the tour's
-      // minimum, and making the cut always pays more than that
-      money: row.status === 'cut' ? minPay : Math.max(Math.round(t.purse * share), Math.round(minPay * 1.5)),
+      // everyone who enters gets paid: a missed cut earns $5,000, and making
+      // the cut always pays at least the tour's minimum
+      money: row.status === 'cut' ? MISSED_CUT_PAY : Math.max(Math.round(t.purse * share), madeMin),
       pts: Math.round(t.pts * pshare * 100) / 100,
       seasonPts: Math.round(tour.season * sshare),
       made: row.status === 'active',

@@ -108,9 +108,9 @@ hole using your golfer's skills if you want to move on.
 - **Career**: Challenger Tour, World Tour, four majors and a $40M Tour
   Championship; 36-hole cuts, sudden-death playoffs, purses, a points
   race, world rankings with weekly decay, XP and levels (with cash bonuses),
-  and **every entry pays**: missing the cut still earns a paycheck ($10K
-  on the Challenger Tour, $25K World Tour, $50K majors), making it pays
-  at least 1.5x that, and the holes you play yourself earn scoring
+  and **every entry pays**: missing the cut still earns $5,000, making
+  it pays at least $15K on the Challenger Tour ($37.5K World Tour, $75K
+  majors), and the holes you play yourself earn scoring
   bonuses ($2K-$15K a birdie, 5x for an eagle, 25x for a hole-in-one),
   achievements, and a results history. Other events are simulated
   shot by shot from each pro's stats (`src/sim/aisim.js`, calibrated to

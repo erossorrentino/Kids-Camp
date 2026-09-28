@@ -3,7 +3,7 @@
 import { esc, fmtToPar, toParClass, money, ordinal, modal } from './dom.js';
 import { courseById } from '../data/courses.js';
 import { proById } from '../data/players.js';
-import { TOURS, scoringBonuses, bonusTotal } from '../data/tour.js';
+import { TOURS, scoringBonuses, bonusTotal, MISSED_CUT_PAY } from '../data/tour.js';
 import { leaderboard, coursePar, humanPlayer, CUT_SIZE } from '../game/tournament.js';
 import { ACHIEVEMENTS } from '../game/career.js';
 
@@ -84,7 +84,7 @@ function payInfo(t) {
   const tour = TOURS[t.tour];
   const b = scoringBonuses(t.tour);
   const cut = t.rounds === 4 && t.tour !== 'FIN';
-  return `<div class="payinfo"><b>Everyone gets paid.</b> ${cut ? `Miss the cut: ${money(tour.minPay)}. Make the cut: at least ${money(tour.minPay * 1.5)}, more the higher you finish.` : `Every finisher earns at least ${money(tour.minPay * 1.5)}.`} Bonuses for the holes you play: ${money(b.birdie)} a birdie, ${money(b.eagle)} an eagle, ${money(b.ace)} for a hole-in-one.</div>`;
+  return `<div class="payinfo"><b>Everyone gets paid.</b> ${cut ? `Miss the cut: ${money(MISSED_CUT_PAY)}. Make the cut: at least ${money(tour.madeMin)}, more the higher you finish.` : `Every finisher earns at least ${money(tour.madeMin)}.`} Bonuses for the holes you play: ${money(b.birdie)} a birdie, ${money(b.eagle)} an eagle, ${money(b.ace)} for a hole-in-one.</div>`;
 }
 
 function bonusSoFar(c, t) {

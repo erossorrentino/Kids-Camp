@@ -4,14 +4,17 @@ import { generateCourses } from './courses.js';
 
 export const SEASON_WEEKS = 24;
 
-// minPay: what every entrant who misses the cut is paid (making the cut
-// pays at least 1.5x this). birdie: the bonus per birdie you play yourself.
+// Missing the cut pays MISSED_CUT_PAY on every tour. madeMin: the least
+// anyone who makes the cut is paid. birdie: the bonus per birdie you play
+// yourself.
 export const TOURS = {
-  CH:  { name: 'Challenger Tour', short: 'Challenger', field: 96,  purse: [900000, 1400000], pts: 14, season: 0, minPay: 10000, birdie: 2000 },
-  WT:  { name: 'World Tour', short: 'World Tour', field: 120, purse: [8000000, 12000000], pts: 50, season: 500, minPay: 25000, birdie: 5000 },
-  MAJ: { name: 'Major Championship', short: 'Major', field: 120, purse: [18000000, 21000000], pts: 100, season: 750, minPay: 50000, birdie: 10000 },
-  FIN: { name: 'Tour Championship', short: 'Finale', field: 30, purse: [40000000, 40000000], pts: 60, season: 0, minPay: 150000, birdie: 15000 },
+  CH:  { name: 'Challenger Tour', short: 'Challenger', field: 96,  purse: [900000, 1400000], pts: 14, season: 0, madeMin: 15000, birdie: 2000 },
+  WT:  { name: 'World Tour', short: 'World Tour', field: 120, purse: [8000000, 12000000], pts: 50, season: 500, madeMin: 37500, birdie: 5000 },
+  MAJ: { name: 'Major Championship', short: 'Major', field: 120, purse: [18000000, 21000000], pts: 100, season: 750, madeMin: 75000, birdie: 10000 },
+  FIN: { name: 'Tour Championship', short: 'Finale', field: 30, purse: [40000000, 40000000], pts: 60, season: 0, madeMin: 225000, birdie: 15000 },
 };
+
+export const MISSED_CUT_PAY = 5000;
 
 // Scoring bonuses for the holes you play yourself (not simulated ones)
 export function scoringBonuses(tour) {
