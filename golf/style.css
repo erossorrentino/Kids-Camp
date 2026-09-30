@@ -254,6 +254,16 @@ button { cursor: pointer; }
 .shop-h { font: 700 20px/1 var(--display); text-transform: uppercase; letter-spacing: .02em; margin: 18px 0 10px; }
 .styles { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
 .styles.balls-c { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+@media (max-width: 560px) {
+  .styles { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .styles.balls-c { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .stylecard { padding: 8px; }
+  .stylecard h4 { font-size: 15px; }
+  .stylecard .bc-foot { flex-direction: column; align-items: stretch; }
+  .stylecard .bc-foot .btn { width: 100%; padding-left: 6px; padding-right: 6px; }
+  .stylecard .price { text-align: center; }
+  .stylecard .pill { align-self: center; }
+}
 .stylecard { background: rgba(14, 33, 24, .95); border: 1px solid var(--line); border-radius: var(--r); padding: 12px; display: flex; flex-direction: column; gap: 6px; }
 .stylecard.on { border-color: var(--flag); box-shadow: 0 0 0 1px var(--flag) inset; }
 .stylecard h4 { font: 700 18px/1.05 var(--display); text-transform: uppercase; margin: 0; }
