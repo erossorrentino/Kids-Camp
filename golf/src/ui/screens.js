@@ -23,6 +23,7 @@ import { BRAND_BY_ID, SLOTS, sponsorOffers, SPONSOR_TIERS } from '../game/sponso
 import { cupAvailable, CUP_WEEK } from '../game/cup.js';
 import { renderTrophyRoom } from '../render/trophyRoom.js';
 import { GAMES, GAME_ORDER } from '../game/minigames.js';
+import { TRAILS, BALL_COLORS } from '../data/cosmetics.js';
 
 const TOUR_TAG = { CH: 'Challenger', WT: 'World Tour', MAJ: 'Major', FIN: 'Finale' };
 
@@ -44,6 +45,30 @@ export function trophyItems(c) {
   for (const cup of c.cups || []) items.push({ kind: 'cup', plaque: `Cup ${cup.year}` });
   for (const car of c.garage || []) items.push({ kind: 'car', color: car.color });
   return items;
+}
+
+// A little picture of a shot trail: the ball's arc drawn in the trail's colours
+let prevN = 0;
+function trailPreview(t) {
+  const id = `tp${prevN++}`;
+  const stops = t.rainbow ? ['#ff3b3b', '#ffb13b', '#f8ff3b', '#4dff6a', '#3bc8ff', '#7a5cff', '#ff4fd8'] : [...(t.colors || ['#ffc93c'])].reverse();
+  const grad = stops.map((c, i) => `<stop offset="${stops.length > 1 ? (i / (stops.length - 1)) * 100 : 0}%" stop-color="${c}"/>`).join('');
+  const path = t.zigzag ? 'M10 70 L28 48 L36 54 L52 30 L60 36 L78 18 L88 24 L104 16 L118 22 L130 34 L140 30 L152 50 L158 46 L170 68' : 'M10 70 Q90 -20 170 68';
+  const dots = { fire: ['#ffb13b', '#ff5a1a'], ice: ['#e8fbff', '#9fe3ff'], sparkle: ['#fff2a8'], spark: ['#9fe3ff'], confetti: ['#ff5fa2', '#3a86ff', '#7fd05a', '#f2c230', '#c792ff'] }[t.particles];
+  let bits = '';
+  if (dots) {
+    const r = new RNG(mixSeed('trailprev', t.id));
+    for (let i = 0; i < 16; i++) {
+      const k = r.float(0.08, 0.95);
+      // follow the curve: quadratic bezier from (10,70) via (90,-20) to (170,68)
+      const x = (1 - k) * (1 - k) * 10 + 2 * (1 - k) * k * 90 + k * k * 170 + r.float(-6, 6);
+      const y = (1 - k) * (1 - k) * 70 + 2 * (1 - k) * k * -20 + k * k * 68 + r.float(-6, 6);
+      const c = dots[i % dots.length];
+      bits += t.particles === 'confetti' ? `<rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="3.4" height="2" fill="${c}" transform="rotate(${r.int(0, 90)} ${x.toFixed(1)} ${y.toFixed(1)})"/>` : `<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${r.float(0.8, 1.9).toFixed(1)}" fill="${c}"/>`;
+    }
+  }
+  return `<svg class="sc-prev" viewBox="0 0 180 80" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" x2="1">${grad}</linearGradient></defs>
+    <path d="${path}" fill="none" stroke="url(#${id})" stroke-width="${t.id === 'classic' ? 3 : 4.5}" stroke-linecap="round" stroke-linejoin="round"/>${bits}<circle cx="170" cy="68" r="3.4" fill="#fff"/></svg>`;
 }
 
 export class Screens {
@@ -428,9 +453,11 @@ export class Screens {
 
   hubShop(c) {
     const g = c.golfer;
-    const sub = this.shopTab === 'balls' ? 'balls' : 'clubs';
-    const head = `<div class="chips shop-tabs"><button class="chipbtn ${sub === 'clubs' ? 'on' : ''}" data-a="shopTab" data-t="clubs">Clubs</button><button class="chipbtn ${sub === 'balls' ? 'on' : ''}" data-a="shopTab" data-t="balls">Balls</button><span class="muted small">Bank: ${money(g.money)}</span></div>`;
+    const sub = ['balls', 'style'].includes(this.shopTab) ? this.shopTab : 'clubs';
+    const tab = (id, label) => `<button class="chipbtn ${sub === id ? 'on' : ''}" data-a="shopTab" data-t="${id}">${label}</button>`;
+    const head = `<div class="chips shop-tabs">${tab('clubs', 'Clubs')}${tab('balls', 'Balls')}${tab('style', 'Style')}<span class="muted small">Bank: ${money(g.money)}</span></div>`;
     if (sub === 'clubs') return head + this.clubShop(c);
+    if (sub === 'style') return head + this.styleShop(c);
     return `${head}<p class="muted">Each ball trades one strength for another. Prize money buys new ones; you can switch any time between events.</p>
       <div class="balls">${BALLS.map((b) => {
         const owned = g.balls.includes(b.id);
@@ -442,6 +469,29 @@ export class Screens {
           <div class="bc-foot">${g.ball === b.id ? '<span class="pill">In your bag</span>' : owned ? `<button class="btn" data-a="useBall" data-id="${b.id}">Use this ball</button>` : `<button class="btn primary" data-a="buyBall" data-id="${b.id}" ${g.money < b.price ? 'disabled' : ''}>Buy ${money(b.price, true)}</button>`}</div>
         </article>`;
       }).join('')}</div>`;
+  }
+
+  // Tracer trails and ball colours: just for looks, they never change a shot
+  styleShop(c) {
+    const g = c.golfer;
+    const trails = g.trails || ['classic'];
+    const cols = g.ballColors || ['white'];
+    const foot = (on, owned, buyA, useA, id, price) => on ? '<span class="pill">Equipped</span>'
+      : owned ? `<button class="btn" data-a="${useA}" data-id="${id}">Use it</button>`
+      : `<button class="btn primary" data-a="${buyA}" data-id="${id}" ${g.money < price ? 'disabled' : ''}>Buy ${money(price, true)}</button>`;
+    return `<p class="muted">Show off! Trails and ball colours change how your shots look, never how they fly. Everyone sees them in replays too.</p>
+      <h3 class="shop-h">Shot trails</h3>
+      <div class="styles">${TRAILS.map((t) => `<article class="stylecard ${g.trail === t.id ? 'on' : ''}">
+        ${trailPreview(t)}
+        <div class="sc-body"><h4>${esc(t.name)}</h4><p class="muted small">${esc(t.desc)}</p></div>
+        <div class="bc-foot"><b class="price">${t.price ? money(t.price, true) : 'Free'}</b>${foot(g.trail === t.id, trails.includes(t.id), 'buyTrail', 'useTrail', t.id, t.price)}</div>
+      </article>`).join('')}</div>
+      <h3 class="shop-h">Ball colours</h3>
+      <div class="styles balls-c">${BALL_COLORS.map((b) => `<article class="stylecard ${g.ballColor === b.id ? 'on' : ''}">
+        <div class="sc-ball" style="--bc:${b.color}"></div>
+        <div class="sc-body"><h4>${esc(b.name)}</h4></div>
+        <div class="bc-foot"><b class="price">${b.price ? money(b.price, true) : 'Free'}</b>${foot(g.ballColor === b.id, cols.includes(b.id), 'buyBallColor', 'useBallColor', b.id, b.price)}</div>
+      </article>`).join('')}</div>`;
   }
 
   // ---------------- players market ----------------

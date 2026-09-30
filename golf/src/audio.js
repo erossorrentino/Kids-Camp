@@ -139,6 +139,21 @@ export const sfx = {
   },
   groan() { noise(0.9, { type: 'lowpass', freq: 380, gain: 0.25, attack: 0.15, decay: 0.8 }); },
   click() { tone(900, 0.03, { type: 'square', gain: 0.05 }); },
+  // shop purchase: a cash-register ding
+  cash() { if (!ctx) return; noise(0.08, { freq: 2400, q: 1.2, gain: 0.12 }); tone(1568, 0.5, { type: 'triangle', gain: 0.16, when: 0.06 }); tone(2093, 0.6, { type: 'sine', gain: 0.12, when: 0.12 }); },
+  // a startled duck
+  quack(n = 1) {
+    if (!ctx) return;
+    for (let i = 0; i < n; i++) {
+      const w = i * 0.19 + Math.random() * 0.05;
+      tone(300 + Math.random() * 40, 0.13, { type: 'sawtooth', gain: 0.07, when: w, slide: -110 });
+      noise(0.11, { freq: 1100, q: 3, gain: 0.07, when: w });
+    }
+  },
+  // wings flapping away
+  flap() { if (!ctx) return; for (let i = 0; i < 6; i++) noise(0.05, { type: 'lowpass', freq: 700, gain: 0.12, when: i * 0.09 }); },
+  // camera shutters in the gallery
+  shutter(n = 3) { if (!ctx) return; for (let i = 0; i < n; i++) noise(0.03, { freq: 4200, q: 0.9, gain: 0.05, when: 0.05 + Math.random() * 0.6 }); },
   // the crowd: a hopeful rising "ooooh" and a disappointed falling one
   ooh(strength = 1) { crowdVowel(strength, 1.25, -0.35); },
   aah(strength = 1) { crowdVowel(strength, 1.1, 0.25); },

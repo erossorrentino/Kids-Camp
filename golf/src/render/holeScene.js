@@ -1,5 +1,6 @@
 // Builds all 3D objects for one hole from a HoleModel.
 import * as THREE from '../../vendor/three.module.min.js';
+import { Wildlife } from './wildlife.js';
 import { makeTerrainMaterial } from './terrainMaterial.js';
 import { buildTrees, TREE_UNIFORMS } from './trees.js';
 import { buildGroundCover, buildCartPath, buildTeeFurniture, buildHouses, buildClubhouse, buildGrandstand, Birds, buildRakes, buildFountains, buildBridges, buildLighthouse, buildTeeExtras } from './decor.js';
@@ -280,6 +281,9 @@ export class HoleScene {
         this.group.add(b.group);
       }
     }
+    // ducks, rabbits, squirrels and (at night) fireflies
+    this.wildlife = new Wildlife(hole, { quality: this.quality, night: this.opts.night, rain: this.opts.rain });
+    this.group.add(this.wildlife.group);
   }
 
   buildFarGround(mat, shadows) {
@@ -657,11 +661,27 @@ export class HoleScene {
     if (this.standPeople) this.standPeople.cheer(strength);
   }
 
+  clap(strength = 1) {
+    if (this.crowd) this.crowd.clap(strength);
+    if (this.standPeople) this.standPeople.clap(strength);
+  }
+
+  watch(v, pointing = false) {
+    if (this.crowd) this.crowd.watch(v, pointing);
+    if (this.standPeople) this.standPeople.watch(v, pointing);
+  }
+
+  flash(n = 4, over = 1.2) {
+    if (this.crowd) this.crowd.flash(n, over);
+    if (this.standPeople) this.standPeople.flash(Math.ceil(n / 2), over);
+  }
+
   update(dt, wind) {
     this.uniforms.uTime.value += dt;
     TREE_UNIFORMS.uTime.value += dt;
     TREE_UNIFORMS.uWind.value.set(wind.x, wind.z);
     for (const b of this.birds || []) b.update(dt);
+    if (this.wildlife) this.wildlife.update(dt);
     if (this.crowd) this.crowd.update(dt);
     if (this.standPeople) this.standPeople.update(dt);
     for (const c of this.carts || []) c.update(dt);

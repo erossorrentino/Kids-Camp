@@ -24,7 +24,9 @@ export class Ball {
   setVisible(v) { this.mesh.visible = v; this.shadow.visible = v; }
 }
 
-// A camera-facing ribbon that draws the ball's flight like a TV tracer
+// A camera-facing ribbon that draws the ball's flight like a TV tracer.
+// Styles: a solid colour, a gradient along the flight (fire, ice), a
+// rainbow, and a flickering zig-zag for lightning.
 export class Tracer {
   constructor(color = 0xffc93c) {
     this.max = 1200;
@@ -38,26 +40,55 @@ export class Tracer {
     for (let i = 0; i < this.max - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
     geo.setIndex(idx);
     this.mat = new THREE.ShaderMaterial({
-      uniforms: { uColor: { value: new THREE.Color(color) }, uFade: { value: 1 } },
+      uniforms: {
+        uColor: { value: new THREE.Color(color) }, uColor2: { value: new THREE.Color(color) }, uColor3: { value: new THREE.Color(color) },
+        uFade: { value: 1 }, uMode: { value: 0 }, uTime: { value: 0 },
+      },
       vertexShader: 'attribute float alpha; varying float vA; void main(){ vA = alpha; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-      fragmentShader: 'uniform vec3 uColor; uniform float uFade; varying float vA; void main(){ gl_FragColor = vec4(uColor, vA * uFade); }',
+      fragmentShader: `uniform vec3 uColor, uColor2, uColor3; uniform float uFade, uMode, uTime; varying float vA;
+        vec3 hue(float h){ return clamp(abs(mod(h * 6.0 + vec3(0.0, 4.0, 2.0), 6.0) - 3.0) - 1.0, 0.0, 1.0); }
+        void main(){
+          // vA runs 0.25 (oldest) .. 0.95 (newest)
+          float k = clamp((vA - 0.25) / 0.7, 0.0, 1.0);
+          vec3 c = uColor;
+          float a = vA;
+          if (uMode > 0.5 && uMode < 1.5) { c = k > 0.5 ? mix(uColor2, uColor, (k - 0.5) * 2.0) : mix(uColor3, uColor2, k * 2.0); }
+          else if (uMode > 1.5 && uMode < 2.5) { c = hue(fract(k * 1.2 + uTime * 0.15)); a = 0.35 + 0.6 * k; }
+          else if (uMode > 2.5) { c = mix(uColor2, uColor, k); a *= 0.7 + 0.3 * sin(uTime * 40.0 + k * 20.0); }
+          gl_FragColor = vec4(c, a * uFade);
+        }`,
       transparent: true, depthWrite: false, side: THREE.DoubleSide,
     });
+    this.style = null;
+    this.t = 0;
     this.mesh = new THREE.Mesh(geo, this.mat);
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 5;
     geo.setDrawRange(0, 0);
   }
   reset() { this.pts = []; this.mesh.geometry.setDrawRange(0, 0); this.mat.uniforms.uFade.value = 1; }
+  // style: an entry from TRAILS (or null for the plain tracer)
+  setStyle(style, fallback = '#ffc93c') {
+    this.style = style || null;
+    const u = this.mat.uniforms;
+    const cols = (style && style.colors) || [fallback];
+    u.uColor.value.set(cols[0]);
+    u.uColor2.value.set(cols[1] || cols[0]);
+    u.uColor3.value.set(cols[2] || cols[1] || cols[0]);
+    u.uMode.value = !style ? 0 : style.rainbow ? 2 : style.zigzag ? 3 : cols.length > 1 ? 1 : 0;
+  }
   push(x, y, z) {
     const last = this.pts[this.pts.length - 1];
     if (last && (last.x - x) ** 2 + (last.y - y) ** 2 + (last.z - z) ** 2 < 0.25) return;
     if (this.pts.length >= this.max) return;
     this.pts.push(new THREE.Vector3(x, y, z));
   }
-  update(camera) {
+  update(camera, dt = 0.016) {
+    this.t += dt;
+    this.mat.uniforms.uTime.value = this.t;
     const n = this.pts.length;
     if (n < 2) { this.mesh.geometry.setDrawRange(0, 0); return; }
+    const zig = this.style && this.style.zigzag;
     const cp = camera.position;
     const t = new THREE.Vector3(), side = new THREE.Vector3(), toCam = new THREE.Vector3();
     for (let i = 0; i < n; i++) {
@@ -67,9 +98,12 @@ export class Tracer {
       toCam.subVectors(cp, p);
       const dist = toCam.length();
       side.crossVectors(t, toCam.normalize()).normalize();
-      const w = Math.min(0.9, 0.05 + dist * 0.0035);
-      this.pos[i * 6] = p.x + side.x * w; this.pos[i * 6 + 1] = p.y + side.y * w; this.pos[i * 6 + 2] = p.z + side.z * w;
-      this.pos[i * 6 + 3] = p.x - side.x * w; this.pos[i * 6 + 4] = p.y - side.y * w; this.pos[i * 6 + 5] = p.z - side.z * w;
+      const w = Math.min(0.9, 0.05 + dist * 0.0035) * (this.style && this.style.id !== 'classic' ? 1.35 : 1);
+      // lightning: jitter the ribbon sideways into a crackling bolt
+      const j = zig ? Math.sin(i * 1.7 + Math.floor(this.t * 14) * 3.1) * w * 2.2 : 0;
+      const cx = p.x + side.x * j, cy = p.y + side.y * j, cz = p.z + side.z * j;
+      this.pos[i * 6] = cx + side.x * w; this.pos[i * 6 + 1] = cy + side.y * w; this.pos[i * 6 + 2] = cz + side.z * w;
+      this.pos[i * 6 + 3] = cx - side.x * w; this.pos[i * 6 + 4] = cy - side.y * w; this.pos[i * 6 + 5] = cz - side.z * w;
       const al = 0.25 + 0.7 * (i / n);
       this.alpha[i * 2] = al; this.alpha[i * 2 + 1] = al;
     }
@@ -113,6 +147,23 @@ function dotTexture() {
   g.beginPath(); g.arc(16, 16, 13, 0, Math.PI * 2); g.fill();
   DOT_TEX = new THREE.CanvasTexture(c);
   return DOT_TEX;
+}
+
+// A soft round glow for sparks and embers
+let SOFT_TEX = null;
+function softTexture() {
+  if (SOFT_TEX) return SOFT_TEX;
+  const c = document.createElement('canvas');
+  c.width = c.height = 32;
+  const g = c.getContext('2d');
+  const gr = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+  gr.addColorStop(0, 'rgba(255,255,255,1)');
+  gr.addColorStop(0.4, 'rgba(255,255,255,0.75)');
+  gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr;
+  g.fillRect(0, 0, 32, 32);
+  SOFT_TEX = new THREE.CanvasTexture(c);
+  return SOFT_TEX;
 }
 
 // Dotted line of points (flight preview / putt preview)
@@ -468,4 +519,257 @@ export class Rain {
     }
     this.mesh.geometry.attributes.position.needsUpdate = true;
   }
+}
+
+// ---------------------------------------------------------------- trail sparks
+// Particles left behind the ball for the fancy trails
+export class TrailSparks {
+  constructor() {
+    this.max = 900;
+    const geo = new THREE.BufferGeometry();
+    this.pos = new Float32Array(this.max * 3);
+    this.col = new Float32Array(this.max * 3);
+    this.alp = new Float32Array(this.max);
+    this.siz = new Float32Array(this.max);
+    geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(this.col, 3));
+    geo.setAttribute('alpha', new THREE.BufferAttribute(this.alp, 1));
+    geo.setAttribute('size', new THREE.BufferAttribute(this.siz, 1));
+    // each particle has its own size (in metres, kept between 1.5 and 22
+    // pixels on screen) and fades out on its own
+    this.mat = new THREE.ShaderMaterial({
+      uniforms: { uMap: { value: softTexture() }, uScale: { value: 420 }, uSquare: { value: 0 } },
+      vertexShader: `attribute float alpha; attribute float size; attribute vec3 color; varying float vA; varying vec3 vC; uniform float uScale;
+        void main(){ vA = alpha; vC = color; vec4 mv = modelViewMatrix * vec4(position, 1.0); gl_Position = projectionMatrix * mv;
+          gl_PointSize = clamp(size * uScale / max(0.1, -mv.z), 1.5, 22.0); }`,
+      fragmentShader: `uniform sampler2D uMap; uniform float uSquare; varying float vA; varying vec3 vC;
+        void main(){ float a = uSquare > 0.5 ? step(abs(gl_PointCoord.x - 0.5), 0.45) * step(abs(gl_PointCoord.y - 0.5), 0.28) : texture2D(uMap, gl_PointCoord).a;
+          if (a * vA < 0.02) discard; gl_FragColor = vec4(vC, a * vA);
+          #include <colorspace_fragment>
+        }`,
+      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+    });
+    this.points = new THREE.Points(geo, this.mat);
+    this.points.frustumCulled = false;
+    this.points.renderOrder = 6;
+    this.live = [];
+    this.kind = null;
+    this.acc = 0;
+    this.confetti = ['#ff5fa2', '#3a86ff', '#7fd05a', '#f2c230', '#c792ff', '#ff7b39'].map((c) => new THREE.Color(c));
+    this.tmp = new THREE.Color();
+  }
+  setKind(k) {
+    this.kind = k || null;
+    // glowing kinds add light; fire smoke and confetti are solid
+    const m = this.mat;
+    const blend = k === 'confetti' || k === 'fire' ? THREE.NormalBlending : THREE.AdditiveBlending;
+    if (m.blending !== blend) { m.blending = blend; m.needsUpdate = true; }
+    m.uniforms.uSquare.value = k === 'confetti' ? 1 : 0;
+    this.clear();
+  }
+  emit(x, y, z, dt, camDist) {
+    if (!this.kind) return;
+    this.acc += dt * (this.kind === 'confetti' ? 70 : 60);
+    const spread = Math.max(1, camDist / 40);
+    while (this.acc >= 1 && this.live.length < this.max) {
+      this.acc -= 1;
+      const k = this.kind;
+      const c = k === 'fire' ? new THREE.Color().setHSL(0.01 + Math.random() * 0.11, 1, 0.5 + Math.random() * 0.15)
+        : k === 'ice' ? new THREE.Color().setHSL(0.54, 0.6, 0.72 + Math.random() * 0.22)
+        : k === 'sparkle' ? new THREE.Color('#fff0a0')
+        : k === 'spark' ? new THREE.Color().setHSL(0.58, 1, 0.72)
+        : this.confetti[Math.floor(Math.random() * this.confetti.length)];
+      const sp = k === 'fire' ? 1.2 : k === 'confetti' ? 2.2 : 0.8;
+      const life = k === 'confetti' ? 2.2 : k === 'fire' ? 0.6 + Math.random() * 0.5 : 1.1 + Math.random() * 0.6;
+      const size = k === 'fire' ? 0.3 : k === 'confetti' ? 0.16 : k === 'sparkle' ? 0.26 : k === 'spark' ? 0.14 : 0.2;
+      this.live.push({ x: x + (Math.random() - 0.5) * 0.3 * spread, y: y + (Math.random() - 0.5) * 0.3 * spread, z: z + (Math.random() - 0.5) * 0.3 * spread,
+        vx: (Math.random() - 0.5) * sp, vy: k === 'fire' ? Math.random() * 1.2 : (Math.random() - 0.5) * sp, vz: (Math.random() - 0.5) * sp,
+        life, max: life, color: c, tw: Math.random() * 6, size: size * (0.7 + Math.random() * 0.6) });
+    }
+  }
+  update(dt) {
+    const L = this.live;
+    for (let i = L.length - 1; i >= 0; i--) {
+      const p = L[i];
+      p.life -= dt;
+      if (p.life <= 0) { L.splice(i, 1); continue; }
+      p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+      if (this.kind === 'confetti') { p.vy -= 1.5 * dt; p.vx *= 0.98; p.vz *= 0.98; }
+    }
+    const k = this.kind;
+    for (let i = 0; i < L.length; i++) {
+      const p = L[i];
+      const age = 1 - p.life / p.max; // 0 new .. 1 gone
+      let a = Math.min(1, p.life / 0.35);
+      let size = p.size;
+      let c = p.color;
+      if (k === 'fire') {
+        // flames cool from yellow to red to grey smoke as they rise and grow
+        c = this.tmp.copy(p.color).lerp(SMOKE, Math.max(0, age - 0.45) * 1.6);
+        size *= 1 + age * 1.6;
+        a *= 0.9 - age * 0.4;
+      } else if (k === 'sparkle' || k === 'spark') {
+        a *= 0.5 + 0.5 * Math.sin(p.life * 18 + p.tw);
+      }
+      this.pos[i * 3] = p.x; this.pos[i * 3 + 1] = p.y; this.pos[i * 3 + 2] = p.z;
+      this.col[i * 3] = c.r; this.col[i * 3 + 1] = c.g; this.col[i * 3 + 2] = c.b;
+      this.alp[i] = a;
+      this.siz[i] = size;
+    }
+    const g = this.points.geometry;
+    for (const n of ['position', 'color', 'alpha', 'size']) g.attributes[n].needsUpdate = true;
+    g.setDrawRange(0, L.length);
+  }
+  clear() { this.live = []; this.points.geometry.setDrawRange(0, 0); }
+}
+const SMOKE = new THREE.Color('#6a6560');
+
+// ---------------------------------------------------------------- sand
+// Footprints in a bunker from where you walked in to where you stood, and
+// the crater the club leaves. After the shot the caddie rakes it all smooth,
+// leaving neat rake lines behind.
+export class SandPrints {
+  constructor(max = 1400) {
+    const flat = (geo, opacity, color = '#000000') => {
+      const m = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8 }), max);
+      m.count = 0;
+      m.frustumCulled = false;
+      m.renderOrder = 2;
+      return m;
+    };
+    // a shoe: sole and heel (the toe ends up pointing along +z once laid flat)
+    const sole = new THREE.CircleGeometry(1, 12).scale(0.05, 0.075, 1).translate(0, -0.045, 0);
+    const heel = new THREE.CircleGeometry(1, 10).scale(0.042, 0.045, 1).translate(0, 0.075, 0);
+    const shoe = mergeFlat([sole, heel]).rotateX(-Math.PI / 2);
+    this.feet = flat(shoe, 0.22);
+    // raked grooves: long strips that follow the sand, dark and light in turn
+    this.rakeGroup = new THREE.Group();
+    const rm = (color, opacity) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -8 });
+    this.rakeMats = [rm('#000000', 0.11), rm('#ffffff', 0.12)];
+    this.crater = flat(new THREE.CircleGeometry(1, 16).rotateX(-Math.PI / 2), 0.26);
+    this.max = max;
+    this.paths = [];
+    this.m4 = new THREE.Matrix4();
+    this.q = new THREE.Quaternion();
+    this.up = new THREE.Vector3(0, 1, 0);
+  }
+  addTo(scene) { scene.add(this.feet, this.crater, this.rakeGroup); }
+  reset() {
+    for (const m of [this.feet, this.crater]) m.count = 0;
+    for (const c of [...this.rakeGroup.children]) { c.geometry.dispose(); this.rakeGroup.remove(c); }
+    this.paths = [];
+    this.pendingRake = false;
+  }
+  get rakedStrips() { return this.rakeGroup.children.length; }
+  put(mesh, x, y, z, yaw, sx, sz) {
+    if (mesh.count >= this.max) return;
+    this.q.setFromAxisAngle(this.up, yaw);
+    this.m4.compose(new THREE.Vector3(x, y + 0.02, z), this.q, new THREE.Vector3(sx, 1, sz));
+    mesh.setMatrixAt(mesh.count++, this.m4);
+    mesh.instanceMatrix.needsUpdate = true;
+  }
+  // Walk into the bunker toward the ball at `ball`, entering from the side
+  // facing `from`, and take a stance for a shot along `heading`
+  walkIn(hole, ball, from, heading) {
+    // already standing here (the shot was just set up again)
+    if (this.paths.some((p) => Math.hypot(p.ball.x - ball.x, p.ball.z - ball.z) < 0.1)) return;
+    let dx = from.x - ball.x, dz = from.z - ball.z;
+    const L = Math.hypot(dx, dz) || 1;
+    dx /= L; dz /= L;
+    // find where the walk crosses the bunker edge
+    let edge = null;
+    for (let d = 0.4; d < 35; d += 0.3) {
+      const x = ball.x + dx * d, z = ball.z + dz * d;
+      if (hole.surfaceAt(x, z) !== 'bunker') { edge = { x, z }; break; }
+    }
+    if (!edge) return;
+    const r = { x: Math.cos(heading), z: Math.sin(heading) };
+    const f = { x: Math.sin(heading), z: -Math.cos(heading) };
+    // the stance: to the left of the ball for a right-hander
+    const st = { x: ball.x - r.x * 0.62, z: ball.z - r.z * 0.62 };
+    const path = { pts: [], from: edge, to: st, ball: { x: ball.x, z: ball.z } };
+    const wx = st.x - edge.x, wz = st.z - edge.z;
+    const wl = Math.hypot(wx, wz);
+    const yaw = Math.atan2(wx, wz);
+    const n = Math.max(1, Math.floor(wl / 0.36));
+    for (let i = 1; i < n; i++) {
+      const k = i / n;
+      const side = i % 2 ? 0.1 : -0.1;
+      const x = edge.x + wx * k + Math.cos(yaw) * side, z = edge.z + wz * k - Math.sin(yaw) * side;
+      this.put(this.feet, x, hole.heightAt(x, z), z, yaw + (Math.random() - 0.5) * 0.25, 1, 1);
+      path.pts.push({ x, z });
+    }
+    // feet wriggled in at address, facing the ball
+    const face = Math.atan2(r.x, r.z);
+    for (const s of [-1, 1]) {
+      const x = st.x + f.x * 0.23 * s, z = st.z + f.z * 0.23 * s;
+      this.put(this.feet, x, hole.heightAt(x, z), z, face + s * 0.12, 1.15, 1.2);
+      path.pts.push({ x, z });
+    }
+    this.paths.push(path);
+  }
+  // Where the club hit the sand
+  splash(hole, ball, heading) {
+    const f = { x: Math.sin(heading), z: -Math.cos(heading) };
+    const x = ball.x + f.x * 0.08, z = ball.z + f.z * 0.08;
+    this.put(this.crater, x, hole.heightAt(x, z), z, Math.atan2(f.x, f.z), 0.2, 0.42);
+    if (this.paths.length) this.paths[this.paths.length - 1].pts.push({ x, z });
+    this.pendingRake = true;
+  }
+  // The caddie smooths every footprint and leaves rake lines
+  rakeAll(hole) {
+    if (!this.pendingRake) return;
+    this.pendingRake = false;
+    this.feet.count = 0;
+    this.crater.count = 0;
+    this.feet.instanceMatrix.needsUpdate = true;
+    const buf = [[], []];
+    for (const p of this.paths) {
+      const wx = p.to.x - p.from.x, wz = p.to.z - p.from.z;
+      const wl = Math.hypot(wx, wz) || 1;
+      const fx = wx / wl, fz = wz / wl;
+      const ax = fz, az = -fx; // across the path
+      // grooves along the walk, about 1.4 m wide, from just outside the
+      // first footprint to just past where you stood
+      for (let k = -10; k <= 10; k++) {
+        const lat = k * 0.07;
+        const out = buf[k & 1];
+        let prev = null;
+        for (let d = -0.5; d <= wl + 0.9; d += 0.25) {
+          const x = p.from.x + fx * d + ax * lat, z = p.from.z + fz * d + az * lat;
+          if (hole.surfaceAt(x, z) !== 'bunker') { prev = null; continue; }
+          const y = hole.heightAt(x, z) + 0.02;
+          const w = 0.014;
+          const cur = [x + ax * w, y, z + az * w, x - ax * w, y, z - az * w];
+          if (prev) out.push(...prev.slice(0, 3), ...prev.slice(3), ...cur.slice(0, 3), ...cur.slice(0, 3), ...prev.slice(3), ...cur.slice(3));
+          prev = cur;
+        }
+      }
+    }
+    buf.forEach((arr, i) => {
+      if (!arr.length) return;
+      const g = new THREE.BufferGeometry();
+      g.setAttribute('position', new THREE.Float32BufferAttribute(arr, 3));
+      const m = new THREE.Mesh(g, this.rakeMats[i]);
+      m.material.side = THREE.DoubleSide;
+      m.renderOrder = 2;
+      this.rakeGroup.add(m);
+    });
+    this.paths = [];
+  }
+}
+
+function mergeFlat(geos) {
+  let n = 0;
+  for (const g of geos) n += (g.index ? g.index.count : g.attributes.position.count);
+  const pos = new Float32Array(n * 3);
+  let o = 0;
+  for (const g0 of geos) {
+    const g = g0.index ? g0.toNonIndexed() : g0;
+    pos.set(g.attributes.position.array, o);
+    o += g.attributes.position.array.length;
+  }
+  const out = new THREE.BufferGeometry();
+  out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  return out;
 }

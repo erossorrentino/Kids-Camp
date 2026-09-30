@@ -75,6 +75,7 @@ export function newCareer({ name, country, gender, look }) {
       bag: { ...STARTER_BAG }, clubs: Object.values(STARTER_BAG),
       chars: [], char: null,
       majorsWon: [],
+      trails: ['classic'], trail: 'classic', ballColors: ['white'], ballColor: 'white',
     },
     year: START_YEAR,
     week: 1,
@@ -441,6 +442,8 @@ export function upgradeSave(c) {
   if (c.golfer.char && !c.golfer.chars.includes(c.golfer.char)) c.golfer.char = null;
   if (!c.sponsors) c.sponsors = {};
   if (!Array.isArray(c.garage)) c.garage = [];
+  if (!Array.isArray(g.trails)) { g.trails = ['classic']; g.trail = 'classic'; }
+  if (!Array.isArray(g.ballColors)) { g.ballColors = ['white']; g.ballColor = 'white'; }
   if (!c.rival) c.rival = pickRival(c, rankings(c), HUMAN_ID);
   return c;
 }

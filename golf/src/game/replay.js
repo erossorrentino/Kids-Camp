@@ -6,6 +6,7 @@ import { YD } from '../sim/hole.js';
 import { sfx } from '../audio.js';
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
+const TMP = new THREE.Vector3();
 
 export function sampleAt(res, t, out = {}) {
   const S = res.samples;
@@ -64,6 +65,7 @@ export class ReplayDirector {
     const ez = end.z + f.z * (shot.putt ? 2.2 : 7) + r.z * (shot.putt ? 1.2 : 4);
     this.endCam = V(ex, hole.heightAt(ex, ez) + (shot.putt ? 0.55 : 1.4), ez);
     world.tracer.reset();
+    world.sparks.clear();
     world.ball.setVisible(true);
   }
 
@@ -100,7 +102,10 @@ export class ReplayDirector {
     const gy = this.hole.heightAt(p.x, p.z);
     const w = this.world;
     w.ball.set(p.x, p.y, p.z, gy, w.camera.position);
-    if (!this.shot.putt) w.tracer.push(p.x, p.y, p.z);
+    if (!this.shot.putt) {
+      w.tracer.push(p.x, p.y, p.z);
+      if (!p.rolling && p.y - gy > 0.25) w.sparks.emit(p.x, p.y, p.z, dt * (slow ? 0.38 : 1), w.camera.position.distanceTo(TMP.set(p.x, p.y, p.z)));
+    }
     w.focus.set(p.x, gy, p.z);
     while (this.ev < res.events.length && res.events[this.ev].t <= tt) {
       const e = res.events[this.ev++];

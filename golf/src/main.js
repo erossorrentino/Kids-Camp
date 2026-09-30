@@ -33,6 +33,7 @@ import { BALL_BY_ID } from './data/equipment.js';
 import { MODEL_BY_ID, normBag } from './data/clubsets.js';
 import { scoringBonuses } from './data/tour.js';
 import { CHAR_BY_ID, playAs, marketItem } from './data/characters.js';
+import { TRAIL_BY_ID, BALL_COLOR_BY_ID } from './data/cosmetics.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -455,6 +456,23 @@ app.onAction = (a, d, elx) => {
       break;
     }
     case 'useBall': c.golfer.ball = d.id; saveCareer(c); app.screens.hub(c, 'shop'); break;
+    case 'buyTrail': case 'buyBallColor': {
+      const trail = a === 'buyTrail';
+      const item = trail ? TRAIL_BY_ID[d.id] : BALL_COLOR_BY_ID[d.id];
+      const list = trail ? c.golfer.trails : c.golfer.ballColors;
+      if (item && c.golfer.money >= item.price && !list.includes(item.id)) {
+        c.golfer.money -= item.price;
+        list.push(item.id);
+        if (trail) c.golfer.trail = item.id; else c.golfer.ballColor = item.id;
+        saveCareer(c);
+        sfx.cash();
+        toast(trail ? `${item.name} trail equipped: go and hit one!` : `${item.name} balls in your bag`);
+      }
+      app.screens.hub(c, 'shop');
+      break;
+    }
+    case 'useTrail': c.golfer.trail = d.id; saveCareer(c); app.screens.hub(c, 'shop'); break;
+    case 'useBallColor': c.golfer.ballColor = d.id; saveCareer(c); app.screens.hub(c, 'shop'); break;
     case 'shopTab': if (d.t === 'chars') { app.screens.hub(c, 'players'); break; } app.screens.shopTab = d.t; app.screens.hub(c, 'shop'); break;
     case 'buyClub': {
       const m = MODEL_BY_ID[d.id];
@@ -702,7 +720,7 @@ function startTournamentRound() {
     holeList: [...Array(18).keys()],
     startPos: done,
     scores: hp.scores[t.round] || [],
-    golfer: { name: g.name, stats: g.stats, traits: g.traits, ball: g.ball, bag: g.bag, look: { ...g.look, ...sponsorLook(c) }, gender: g.gender },
+    golfer: { name: g.name, stats: g.stats, traits: g.traits, ball: g.ball, bag: g.bag, look: { ...g.look, ...sponsorLook(c) }, gender: g.gender, trail: g.trail, ballColor: g.ballColor },
     cond: roundCond(t),
     tournament: t,
     crowd: true,
@@ -772,6 +790,7 @@ function watchReplay(shot) {
   setAmbience({ rain: shot.cond.weather === 'rain' ? 0.7 : 0, night: !!shot.cond.night });
   app.world.loadHole(hole, { crowd: shot.crowd });
   app.world.setGolfer(shot.look);
+  app.world.setTrail(TRAIL_BY_ID[shot.trail], shot.ballColor, shot.tint);
   const g = app.world.golfer;
   g.setClub(shot.club.kind, shot.club.length);
   g.placeAt(shot.start, shot.heading);
@@ -919,7 +938,7 @@ function startPlayoff(tied, scores = []) {
     app.screens.hide();
     const g = playAs(c.golfer);
     const round = new RoundController(app, {
-      course, holeList: [17], golfer: { name: g.name, stats: g.stats, traits: g.traits, ball: g.ball, bag: g.bag, look: { ...g.look, ...sponsorLook(c) }, gender: g.gender },
+      course, holeList: [17], golfer: { name: g.name, stats: g.stats, traits: g.traits, ball: g.ball, bag: g.bag, look: { ...g.look, ...sponsorLook(c) }, gender: g.gender, trail: g.trail, ballColor: g.ballColor },
       cond: { ...t.cond[t.rounds - 1], seed: mixSeed(t.seed, 'po', scores.length) }, crowd: true,
       onRoundDone: (sc) => { endRound(); startPlayoff(tied, [...scores, sc[17]]); },
     });
@@ -962,7 +981,7 @@ function golferFor(proId, ball) {
   }
   if (app.career) {
     const g = playAs(app.career.golfer);
-    return { name: g.name, stats: g.stats, traits: g.traits, ball: ball || g.ball, bag: g.bag, look: { ...g.look, ...sponsorLook(app.career) }, gender: g.gender };
+    return { name: g.name, stats: g.stats, traits: g.traits, ball: ball || g.ball, bag: g.bag, look: { ...g.look, ...sponsorLook(app.career) }, gender: g.gender, trail: g.trail, ballColor: g.ballColor };
   }
   const s = { power: 70, accuracy: 70, irons: 70, shortGame: 70, putting: 70, recovery: 70, mental: 70, wind: 70, consistency: 70 };
   return { name: 'Club Pro', stats: s, traits: [], ball: ball || 'tourbal', look: { shirt: '#2a9d8f', pants: '#2b2d42', cap: '#ffffff', skin: '#e8b996' }, gender: 'm' };
@@ -1190,7 +1209,7 @@ function playCup(sim) {
   app.screens.hide();
   const round = new RoundController(app, {
     course, holeList: holes, cond, crowd: true,
-    golfer: { name: g.name, stats: g.stats, traits: g.traits, ball: g.ball, bag: g.bag, look: { ...g.look, ...sponsorLook(c) }, gender: g.gender },
+    golfer: { name: g.name, stats: g.stats, traits: g.traits, ball: g.ball, bag: g.bag, look: { ...g.look, ...sponsorLook(c) }, gender: g.gender, trail: g.trail, ballColor: g.ballColor },
     versus: { name: rival.name, id: rival.id, scores },
     onRoundDone: () => {
       const v = round.versus;

@@ -1,9 +1,10 @@
 // Renderer, sky, lights, camera rig and per-hole scene management.
 import * as THREE from '../../vendor/three.module.min.js';
 import { HoleScene } from './holeScene.js';
+import { sfx } from '../audio.js';
 import { Golfer } from './golfer.js';
 import { Caddie } from './people.js';
-import { Ball, Tracer, AimRing, DotLine, GreenGrid, Particles, Marks, BallMarkers, Celebration, Rain } from './effects.js';
+import { Ball, Tracer, AimRing, DotLine, GreenGrid, Particles, Marks, BallMarkers, Celebration, Rain, TrailSparks, SandPrints } from './effects.js';
 
 function skyMaterial() {
   return new THREE.ShaderMaterial({
@@ -138,6 +139,11 @@ export class World {
     this.scene.add(this.party.points);
     this.rain = new Rain(this.quality === 'low' ? 1100 : 2200);
     this.scene.add(this.rain.mesh);
+    this.sand = new SandPrints();
+    this.sand.addTo(this.scene);
+    this.sparks = new TrailSparks();
+    this.scene.add(this.sparks.points);
+    this.trail = null;
     this.night = false;
     this.golfer = null;
     this.holeScene = null;
@@ -259,7 +265,22 @@ export class World {
     this.night = night;
     // the ball glows a little under the lights so it's easy to follow
     this.ball.mesh.material.emissive.set(night ? '#8a8a7a' : '#222222');
-    this.tracer.mat.uniforms.uColor.value.set(night ? '#7ff0ff' : '#ffc93c');
+    this.applyTrail();
+  }
+
+  // The player's tracer style and ball colour (cosmetic)
+  setTrail(trail, ballColor = '#ffffff', fallbackColor = null) {
+    this.trail = trail || null;
+    this.trailFallback = fallbackColor;
+    this.ball.mesh.material.color.set(ballColor || '#ffffff');
+    this.applyTrail();
+  }
+
+  applyTrail() {
+    const t = this.trail;
+    const plain = this.trailFallback || (this.night ? '#7ff0ff' : '#ffc93c');
+    this.tracer.setStyle(t && t.id !== 'classic' ? t : null, plain);
+    this.sparks.setKind(t && t.particles ? t.particles : null);
   }
 
   loadHole(hole, opts = {}) {
@@ -267,11 +288,12 @@ export class World {
       this.scene.remove(this.holeScene.group);
       this.holeScene.dispose();
     }
-    this.holeScene = new HoleScene(hole, { quality: this.quality, crowd: opts.crowd, board: opts.board, night: this.night });
+    this.holeScene = new HoleScene(hole, { quality: this.quality, crowd: opts.crowd, board: opts.board, night: this.night, rain: this.rain.level > 0 });
     this.scene.add(this.holeScene.group);
     this.grid.build(hole);
     this.grid.setVisible(false);
     this.marks.reset();
+    this.sand.reset();
     this.markers.reset();
     this.tracer.reset();
     this.preview.clear();
@@ -322,6 +344,25 @@ export class World {
     if (this.caddie) this.caddie.group.visible = false;
   }
 
+  // A ball landed or splashed at x,z: nearby animals scatter
+  scare(x, z, radius = 18, quiet = false) {
+    const w = this.holeScene && this.holeScene.wildlife;
+    if (!w) return null;
+    const r = w.scare(x, z, radius);
+    if (!quiet && r.flew) { sfx.quack(Math.min(4, 1 + r.flew)); sfx.flap(); }
+    else if (!quiet && r.swam) sfx.quack(2);
+    return r;
+  }
+
+  // The gallery: polite applause, turning to follow the ball, photos
+  clap(strength = 1) { if (this.holeScene) this.holeScene.clap(strength); }
+  crowdWatch(x, y, z, pointing = false) {
+    if (!this.holeScene) return;
+    this.watchV = this.watchV || new THREE.Vector3();
+    this.holeScene.watch(x == null ? null : this.watchV.set(x, y, z), pointing);
+  }
+  flashes(n = 4, over = 1.2) { if (this.holeScene) this.holeScene.flash(n, over); }
+
   cheer(strength) {
     if (this.holeScene) this.holeScene.cheer(strength);
   }
@@ -370,7 +411,8 @@ export class World {
     this.party.update(dt);
     this.rain.update(dt, this.camera, this.wind);
     this.markers.update(dt, this.camera);
-    this.tracer.update(this.camera);
+    this.tracer.update(this.camera, dt);
+    this.sparks.update(dt);
     if (!this.lost) this.renderer.render(this.scene, this.camera);
   }
 }

@@ -47,8 +47,16 @@ const PARTS = (() => {
   const cap = M(new THREE.SphereGeometry(0.118, 10, 5, 0, Math.PI * 2, 0, Math.PI / 2).translate(0, 1.66, 0), new THREE.CylinderGeometry(0.09, 0.09, 0.012, 10, 1, false, -Math.PI / 2, Math.PI).scale(1, 1, 1.3).translate(0, 1.67, 0.08));
   const sunhat = M(new THREE.CylinderGeometry(0.1, 0.12, 0.1, 10).translate(0, 1.72, 0), new THREE.CylinderGeometry(0.24, 0.24, 0.015, 14).translate(0, 1.68, 0));
   const hair = M(new THREE.SphereGeometry(0.118, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.6).translate(0, 1.64, -0.01));
+  // clapping: forearms forward, hands in front of the chest (open / together)
+  const armsClap = M(cylBetween(V(-0.23, 1.44, 0), V(-0.25, 1.17, 0.1), 0.055, 0.05), cylBetween(V(-0.25, 1.17, 0.1), V(-0.07, 1.3, 0.3), 0.05, 0.045),
+    cylBetween(V(0.23, 1.44, 0), V(0.25, 1.17, 0.1), 0.055, 0.05), cylBetween(V(0.25, 1.17, 0.1), V(0.07, 1.3, 0.3), 0.05, 0.045));
+  const handsOpen = M(new THREE.SphereGeometry(0.04, 6, 4).translate(-0.08, 1.31, 0.31), new THREE.SphereGeometry(0.04, 6, 4).translate(0.08, 1.31, 0.31));
+  const handsShut = M(new THREE.SphereGeometry(0.04, 6, 4).translate(-0.03, 1.32, 0.32), new THREE.SphereGeometry(0.04, 6, 4).translate(0.03, 1.32, 0.32));
+  // one arm down, the other pointing up at the ball
+  const armsPoint = M(cylBetween(V(0.23, 1.44, 0), V(0.27, 0.95, 0.03), 0.055, 0.045), cylBetween(V(-0.23, 1.44, 0), V(-0.3, 1.8, 0.5), 0.055, 0.045));
+  const handsPoint = M(new THREE.SphereGeometry(0.04, 6, 4).translate(0.27, 0.93, 0.03), new THREE.SphereGeometry(0.04, 6, 4).translate(-0.31, 1.82, 0.54), new THREE.CylinderGeometry(0.012, 0.012, 0.09, 4).rotateX(Math.PI / 2 - 0.6).translate(-0.32, 1.85, 0.6));
   const umbrella = M(new THREE.ConeGeometry(0.62, 0.3, 10, 1, true).translate(0, 2.25, 0), new THREE.CylinderGeometry(0.012, 0.012, 1.2, 5).translate(0.02, 1.62, 0.1));
-  return { legs, shoes, torso, armsDown, armsUp, head, handsUp, handsDown, cap, sunhat, hair, umbrella };
+  return { legs, shoes, torso, armsDown, armsUp, head, handsUp, handsDown, cap, sunhat, hair, umbrella, armsClap, handsOpen, handsShut, armsPoint, handsPoint };
 })();
 
 const SHIRTS = ['#e63946', '#1d3557', '#f1faee', '#2a9d8f', '#e9c46a', '#264653', '#ffffff', '#8ac926', '#ff006e', '#3a86ff', '#ffca3a', '#6a4c93', '#f4a261', '#b5e48c', '#90e0ef', '#ffafcc'];
@@ -59,14 +67,17 @@ const HATS = ['#ffffff', '#1d3557', '#e63946', '#f2c230', '#2a9d8f', '#1b1b1b', 
 const UMBRELLAS = ['#c1121f', '#1d3557', '#f2c230', '#2a9d8f', '#ffffff', '#6a4c93'];
 
 /**
- * Spectators at the given spots [{x,y,z,face}] -> { group, cheer(strength), update(dt) }
+ * Spectators at the given spots [{x,y,z,face}] -> { group, cheer(strength),
+ * clap(strength), watch(point, pointing), flash(n), update(dt) }. They cheer
+ * with raised arms, clap, turn to follow the ball (some point at it) and take
+ * photos.
  * opts.vest: marshal-style yellow shirts
  */
 export function buildPeople(spots, seed = 1, opts = {}) {
   const rng = new RNG(seed);
   const group = new THREE.Group();
   const n = spots.length;
-  if (!n) return { group, cheer() {}, update() {} };
+  if (!n) return { group, cheer() {}, clap() {}, watch() {}, flash() {}, update() {} };
   const mat = () => new THREE.MeshLambertMaterial({ vertexColors: true });
   const people = spots.map((sp) => {
     const kid = rng.chance(0.1);
@@ -100,43 +111,141 @@ export function buildPeople(spots, seed = 1, opts = {}) {
     mk(PARTS.hair, all.filter((p) => p.hat === 'hair'), (p) => p.hair),
     mk(PARTS.umbrella, all.filter((p) => p.umbrella), (p) => p.umbrella),
   ];
-  const armsDown = mk(PARTS.armsDown, all, (p) => p.shirt);
-  const handsDown = mk(PARTS.handsDown, all, (p) => p.skin);
-  const armsUp = mk(PARTS.armsUp, all, (p) => p.shirt);
-  const handsUp = mk(PARTS.handsUp, all, (p) => p.skin);
+  // arm poses: every pose mesh holds everyone, and people not in that pose
+  // are scaled to nothing, so each spectator can do their own thing
+  const skin = (p) => p.skin, shirt = (p) => p.shirt;
+  const poses = {
+    down: [mk(PARTS.armsDown, all, shirt), mk(PARTS.handsDown, all, skin)],
+    up: [mk(PARTS.armsUp, all, shirt), mk(PARTS.handsUp, all, skin)],
+    clap: [mk(PARTS.armsClap, all, shirt)],
+    point: [mk(PARTS.armsPoint, all, shirt), mk(PARTS.handsPoint, all, skin)],
+  };
+  const clapOpen = mk(PARTS.handsOpen, all, skin);
+  const clapShut = mk(PARTS.handsShut, all, skin);
   parts[0].m.castShadow = true;
   parts[2].m.castShadow = true;
+  for (const p of people) {
+    p.yaw = p.face;
+    p.pose = 'down';
+    p.pointer = rng.chance(0.22);
+    p.clapper = rng.chance(0.85);
+    p.rate = rng.float(5.5, 8);
+  }
   const m4 = new THREE.Matrix4();
   const q = new THREE.Quaternion();
   const sc = new THREE.Vector3();
   const pos = new THREE.Vector3();
-  const write = (entry, lift = null) => {
+  let t = 0;
+  const write = (entry, show = null) => {
     entry.list.forEach((p, i) => {
-      q.setFromAxisAngle(UP, p.face);
-      sc.set(p.s, p.s, p.s);
-      pos.set(p.x, p.y + (lift ? lift(p) : 0), p.z);
+      q.setFromAxisAngle(UP, p.yaw);
+      const s = show && !show(p) ? 0 : p.s;
+      sc.set(s, s, s);
+      pos.set(p.x, p.y + (p.lift || 0), p.z);
       m4.compose(pos, q, sc);
       entry.m.setMatrixAt(i, m4);
     });
     entry.m.instanceMatrix.needsUpdate = true;
   };
-  for (const e of [...parts, armsDown, handsDown, armsUp, handsUp]) write(e);
-  armsUp.m.visible = handsUp.m.visible = false;
-  let cheerT = 0, strength = 0, t = 0;
+  const shut = (p) => Math.sin(t * p.rate + p.ph) > 0;
+  const writeAll = () => {
+    for (const e of parts) write(e);
+    for (const [name, list] of Object.entries(poses)) for (const e of list) write(e, (p) => p.pose === name);
+    write(clapOpen, (p) => p.pose === 'clap' && !shut(p));
+    write(clapShut, (p) => p.pose === 'clap' && shut(p));
+  };
+  writeAll();
+
+  // camera flashes from the gallery
+  const NF = 16;
+  const fpos = new Float32Array(NF * 3), fcol = new Float32Array(NF * 3);
+  const fgeo = new THREE.BufferGeometry();
+  fgeo.setAttribute('position', new THREE.BufferAttribute(fpos, 3));
+  fgeo.setAttribute('color', new THREE.BufferAttribute(fcol, 3));
+  const flashPts = new THREE.Points(fgeo, new THREE.PointsMaterial({ size: 10, sizeAttenuation: false, vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, map: flashTexture() }));
+  flashPts.frustumCulled = false;
+  flashPts.renderOrder = 7;
+  group.add(flashPts);
+  const flashes = [];
+  let queued = [];
+
+  let cheerT = 0, strength = 0, clapT = 0, target = null, pointing = false, wasBusy = true;
+  const tmp = new THREE.Vector3();
   return {
     group,
     cheer(str = 1) { cheerT = 2.6; strength = str; },
+    clap(str = 1) { if (cheerT <= 0) clapT = Math.max(clapT, 1.6 + str * 1.6); },
+    // Face a point in the world (the golfer, then the ball in flight); some point at it
+    watch(v, point = false) {
+      if (!v) { target = null; pointing = false; return; }
+      group.updateWorldMatrix(true, false);
+      target = group.worldToLocal(tmp.copy(v));
+      target = { x: target.x, z: target.z };
+      pointing = point;
+    },
+    flash(n = 4, over = 1.2) {
+      for (let i = 0; i < n; i++) queued.push(t + Math.random() * over);
+    },
     update(dt) {
       t += dt;
-      if (cheerT <= 0) return;
-      cheerT -= dt;
-      const on = cheerT > 0;
-      armsUp.m.visible = handsUp.m.visible = on;
-      armsDown.m.visible = handsDown.m.visible = !on;
-      const lift = on ? (p) => Math.max(0, Math.sin(t * 11 + p.ph)) * 0.12 * strength * p.s : null;
-      for (const e of [...parts, armsUp, handsUp, armsDown, handsDown]) write(e, lift);
+      let moving = false;
+      if (target) {
+        for (const p of people) {
+          // turn head and shoulders to follow, but never right round
+          const rel = Math.max(-1.7, Math.min(1.7, wrapA(Math.atan2(target.x - p.x, target.z - p.z) - p.face)));
+          const d = wrapA(p.face + rel - p.yaw);
+          if (Math.abs(d) > 0.003) { p.yaw += d * Math.min(1, dt * 3.2); moving = true; }
+        }
+      }
+      if (cheerT > 0) cheerT -= dt;
+      if (clapT > 0) clapT -= dt;
+      // flashes: a bright pop at a random spectator's face
+      if (queued.length) {
+        const due = queued.filter((q0) => q0 <= t);
+        queued = queued.filter((q0) => q0 > t);
+        for (const _ of due) {
+          if (flashes.length >= NF) break;
+          const p = people[Math.floor(Math.random() * n)];
+          flashes.push({ x: p.x + Math.sin(p.yaw) * 0.25 * p.s, y: p.y + 1.62 * p.s, z: p.z + Math.cos(p.yaw) * 0.25 * p.s, life: 0.11 });
+        }
+      }
+      for (let i = flashes.length - 1; i >= 0; i--) { flashes[i].life -= dt; if (flashes[i].life <= 0) flashes.splice(i, 1); }
+      flashes.forEach((f, i) => {
+        fpos[i * 3] = f.x; fpos[i * 3 + 1] = f.y; fpos[i * 3 + 2] = f.z;
+        const k = Math.min(1, f.life / 0.06);
+        fcol[i * 3] = k; fcol[i * 3 + 1] = k; fcol[i * 3 + 2] = k;
+      });
+      fgeo.attributes.position.needsUpdate = true;
+      fgeo.attributes.color.needsUpdate = true;
+      fgeo.setDrawRange(0, flashes.length);
+      const busy = cheerT > 0 || clapT > 0 || (pointing && target);
+      if (!busy && !moving && !wasBusy) return;
+      wasBusy = busy;
+      for (const p of people) {
+        p.pose = cheerT > 0 ? 'up' : clapT > 0 ? (p.clapper ? 'clap' : 'down') : pointing && p.pointer ? 'point' : 'down';
+        p.lift = cheerT > 0 ? Math.max(0, Math.sin(t * 11 + p.ph)) * 0.12 * strength * p.s : 0;
+      }
+      writeAll();
     },
   };
+}
+
+function wrapA(a) { return Math.atan2(Math.sin(a), Math.cos(a)); }
+
+let flashTex = null;
+function flashTexture() {
+  if (flashTex) return flashTex;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 32;
+  const g = cv.getContext('2d');
+  const gr = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+  gr.addColorStop(0, 'rgba(255,255,255,1)');
+  gr.addColorStop(0.25, 'rgba(235,245,255,0.8)');
+  gr.addColorStop(1, 'rgba(200,220,255,0)');
+  g.fillStyle = gr;
+  g.fillRect(0, 0, 32, 32);
+  flashTex = new THREE.CanvasTexture(cv);
+  return flashTex;
 }
 
 // ---------------------------------------------------------------- marshals

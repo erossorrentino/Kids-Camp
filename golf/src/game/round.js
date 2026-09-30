@@ -15,9 +15,13 @@ import { ReplayDirector, rateShot } from './replay.js';
 import { buildPrizeCar } from '../render/prizes.js';
 import { caddieTip } from './caddieTips.js';
 import { commentLine, speak } from './commentary.js';
+import { TRAIL_BY_ID, BALL_COLOR_BY_ID } from '../data/cosmetics.js';
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const fwdOf = (h) => ({ x: Math.sin(h), z: -Math.cos(h) });
+const TMP = new THREE.Vector3();
+// the colour of a golfer's ball (a cosmetic bought in the pro shop)
+const ballColorOf = (g) => (BALL_COLOR_BY_ID[g && g.ballColor] || BALL_COLOR_BY_ID.white).color;
 const rightOf = (h) => ({ x: Math.cos(h), z: Math.sin(h) });
 
 export const SCORE_NAMES = { '-4': 'Condor', '-3': 'Albatross', '-2': 'Eagle', '-1': 'Birdie', 0: 'Par', 1: 'Bogey', 2: 'Double Bogey', 3: 'Triple Bogey' };
@@ -64,7 +68,11 @@ export class RoundController {
     // friends taking turns on one device
     this.party = opts.party || null;
     if (this.party) this.setupParty();
-    else this.world.setGolfer({ ...this.golfer.look, gender: this.golfer.gender }, this.golfer.name);
+    else {
+      this.world.setGolfer({ ...this.golfer.look, gender: this.golfer.gender }, this.golfer.name);
+      this.world.setTrail(TRAIL_BY_ID[this.golfer.trail], ballColorOf(this.golfer));
+    }
+    this.world.sparks.clear();
   }
 
   // ---------------- multiplayer ----------------
@@ -117,6 +125,8 @@ export class RoundController {
     Object.assign(this, p.kit);
     this.loadState(p);
     this.world.useGolfer(`party${i}`, { ...p.golfer.look, gender: p.golfer.gender }, p.name);
+    // each friend's shots trace in their own colour (or their own bought trail)
+    this.world.setTrail(TRAIL_BY_ID[p.golfer.trail], ballColorOf(p.golfer), p.color);
     this.hud.setPlayer(p, this.party, this.scoreToPar());
     this.showOtherBalls();
   }
@@ -340,6 +350,17 @@ export class RoundController {
     this.forceClub = false;
     if (this.mode && this.mode.prepare) this.mode.prepare(this);
     this.aimDefault();
+    // the caddie rakes the bunker you just played from; then, if you're in
+    // the sand, walk in and dig your feet in
+    this.world.sand.rakeAll(h);
+    if (this.lie === 'bunker' && !this.putting) {
+      const from = this.prevPos && Math.hypot(this.prevPos.x - b.x, this.prevPos.z - b.z) > 2 ? this.prevPos : { x: b.x - Math.sin(this.heading) * 10, z: b.z + Math.cos(this.heading) * 10 };
+      this.world.sand.walkIn(h, b, from, this.heading);
+    }
+    // animals right beside the ball move off as you walk up
+    this.world.scare(b.x, b.z, 9, true);
+    // the gallery turns to watch you play
+    if (this.opts.crowd) this.world.crowdWatch(b.x, b.y + 1, b.z, false);
     this.phase = 'aim';
     this.viewMode = 'address';
     this.world.ball.setVisible(true);
@@ -742,7 +763,10 @@ export class RoundController {
     if (club.kind !== 'putter' && ['fairway', 'rough', 'first', 'deep', 'fescue', 'heather'].includes(this.lie)) {
       this.world.particles.burst(b.x, b.y + 0.05, b.z, 'grass', 0.6 + power * 0.4);
     }
-    if (this.lie === 'bunker') this.world.particles.burst(b.x, b.y + 0.05, b.z, 'sand', 1.3);
+    if (this.lie === 'bunker') {
+      this.world.particles.burst(b.x, b.y + 0.05, b.z, 'sand', 1.3);
+      if (!this.putting) this.world.sand.splash(this.hole, b, this.heading);
+    }
     // irons and wedges off turf take a divot just past the ball
     if (!this.putting && club.kind !== 'wood' && power > 0.35 && ['fairway', 'first', 'rough', 'tee'].includes(this.lie)) {
       const f = fwdOf(this.heading);
@@ -782,10 +806,18 @@ export class RoundController {
     const p = this.sampleAt(fl.t, fl.p || (fl.p = {}));
     const gy = this.hole.heightAt(p.x, p.z);
     this.world.ball.set(p.x, p.y, p.z, gy, this.world.camera.position);
-    if (!this.putting) this.world.tracer.push(p.x, p.y, p.z);
+    if (!this.putting) {
+      this.world.tracer.push(p.x, p.y, p.z);
+      if (!p.rolling && p.y - gy > 0.25) this.world.sparks.emit(p.x, p.y, p.z, dt * speed, this.world.camera.position.distanceTo(TMP.set(p.x, p.y, p.z)));
+    }
     // events
     while (fl.ev < res.events.length && res.events[fl.ev].t <= fl.t) {
       const e = res.events[fl.ev++];
+      // wildlife scatters where the ball comes down (or splashes, or rattles a tree)
+      if (!this.putting && ((e.type === 'bounce' && !fl.scared) || e.type === 'water' || e.type === 'tree') && e.x != null) {
+        fl.scared = fl.scared || e.type === 'bounce';
+        this.world.scare(e.x, e.z, e.type === 'water' ? 30 : e.type === 'tree' ? 10 : 16);
+      }
       if (e.type === 'bounce') {
         if (e.surface === 'bunker') { sfx.sand(); this.world.particles.burst(e.x, e.y, e.z, 'sand', 1); }
         else sfx.bounce(e.speed);
@@ -795,6 +827,8 @@ export class RoundController {
       else if (e.type === 'water') { sfx.splash(); this.world.particles.burst(e.x, e.y, e.z, 'water', 1.2); this.world.ball.setVisible(false); }
       else if (e.type === 'holed') { sfx.cup(); }
     }
+    // spectators follow the ball, and point while it's up in the air
+    if (this.opts.crowd) this.world.crowdWatch(p.x, p.y, p.z, !this.putting && p.y - gy > 4);
     this.flightCamera(p, gy);
     if (!fl.aah && !this.putting && this.opts.crowd && fl.landT && fl.t > fl.landT - 0.7 && fl.t < fl.landT) {
       const L = res.land;
@@ -875,6 +909,7 @@ export class RoundController {
         else {
           sfx.applause(1.3);
           this.world.cheer(1.3);
+          this.world.flashes(9, 2);
           this.hud.message(rate.kind === 'putt' ? 'What a putt!' : 'It\'s in!', rate.label, 'good');
         }
         this.queueReplay(rate, () => this.holeOut(true));
@@ -925,11 +960,12 @@ export class RoundController {
       else if (crowd && d < 0.6 && this.distToPin > 3) sfx.ooh(0.6);
     } else if (surf === 'green') {
       title = d < 3 ? 'Stiff!' : 'On the green'; tone = 'good';
-      if (d < 3) { sfx.applause(0.5); this.commentate('stiff', 0.9); } else this.commentate('green', 0.25);
+      if (d < 3) { sfx.applause(0.5); this.world.clap(1.2); this.world.flashes(3, 1.5); this.commentate('stiff', 0.9); } else { this.world.clap(0.4); this.commentate('green', 0.25); }
     } else if (surf === 'bunker') { title = this.plugged ? 'Plugged in the bunker' : 'In the bunker'; tone = 'bad'; this.commentate('sand', 0.5); }
     else if (surf === 'fairway') {
       tone = 'good';
       if (wasTee && par > 3) this.commentate(res.total > 255 ? 'bomb' : 'fairway', res.total > 255 ? 0.8 : 0.3);
+      if (wasTee && par > 3 && res.total > 255) this.world.clap(0.8);
     } else if (wasTee && par > 3 && (surf === 'rough' || surf === 'first')) this.commentate('rough', 0.3);
     this.hud.message(title, sub, tone);
     // Tap-in
@@ -979,6 +1015,7 @@ export class RoundController {
       res: fl.res, start: { ...fl.start }, heading: this.heading, putt: this.putting,
       holeIndex: this.holeIndex, courseId: this.course.id, course: this.course, holeOpts: this.opts.holeOpts || null,
       cond: { ...this.cond }, look: { ...this.golfer.look, gender: this.golfer.gender }, club: { kind: c.kind, length: c.length },
+      trail: this.golfer.trail || null, ballColor: ballColorOf(this.golfer), tint: who ? who.color : null,
       crowd: !!this.opts.crowd,
     };
   }
@@ -1015,6 +1052,7 @@ export class RoundController {
     const pin = this.hole.pin;
     this.world.celebrate(pin, '#f2c230', true);
     this.world.cheer(2);
+    this.world.flashes(14, 3);
     sfx.applause(2);
     const car = this.opts.prizeCar;
     if (car && car.hole === this.holeIndex && !car.won) {
@@ -1095,6 +1133,10 @@ export class RoundController {
     const rel = this.strokes - par;
     if (rel <= -1) sfx.applause(rel <= -2 ? 1.3 : 0.9);
     else if (rel === 0) sfx.applause(0.4);
+    // arms up for a birdie or better (and the cameras come out), a clap for par
+    if (rel <= -1) { this.world.cheer(rel <= -2 ? 1.5 : 1); this.world.flashes(rel <= -2 ? 9 : 5, 1.6); }
+    else if (rel === 0) this.world.clap(0.7);
+    else if (rel === 1) this.world.clap(0.2);
     this.reactionShot(rel <= -2 ? 'arms' : rel === -1 ? 'fist' : rel === 0 ? 'tip' : 'sad');
     if (rel <= -2 && this.strokes > 1) this.commentate('eagle', 1);
     else if (rel === -1) this.commentate('birdie', 0.6);
