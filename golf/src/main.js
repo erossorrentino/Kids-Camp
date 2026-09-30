@@ -21,7 +21,8 @@ import { YD } from './sim/hole.js';
 import { dailyChallenge, dayKey, loadDaily, saveDaily, recordDaily, liveStreak, dailyReward, beatsTarget } from './game/daily.js';
 import { dailyScreen, cupScreen, cupResults } from './ui/modeScreens.js';
 import { cupTeams, cupCourse, simMatch, matchText, opponentScores, CUP_HOLES, CUP_PRIZE } from './game/cup.js';
-import { initAudio, setSound, sfx, setAmbience } from './audio.js';
+import { initAudio, setSound, sfx, setAmbience, startMusic, stopMusic } from './audio.js';
+import { quiet } from './game/commentary.js';
 import { applyWeather, rollWeather } from './game/weather.js';
 import { proById, generatePros } from './data/players.js';
 import { generateCourses, courseById } from './data/courses.js';
@@ -274,6 +275,9 @@ function loop(now) {
     } else {
       menuCamera(dt);
     }
+    // music on the menus only
+    if (!app.round && !app.replay && app.settings.music && app.settings.sound) startMusic();
+    else stopMusic();
     app.world.perf.active = !!app.round;
     app.world.frame(dt, real);
   } catch (e) {
@@ -378,6 +382,7 @@ function pauseMenu() {
 
 function endRound() {
   setAmbience({ rain: 0, night: false });
+  quiet();
   if (app.round) app.round.destroy();
   app.round = null;
   app.hud.detach();
@@ -721,6 +726,7 @@ function startTournamentRound() {
       }
     },
     prizeCar: prizeCarFor(t, course, c),
+    nickname: c.golfer.nickname || '',
     onShot: (sh) => trackShot(c, sh),
     onAceCar: (car) => {
       c.golfer.money += car.value;
@@ -984,7 +990,7 @@ function startQuick() {
   }
   app.screens.hide();
   const round = new RoundController(app, {
-    course, holeList, golfer, cond, crowd: false, versus,
+    course, holeList, golfer, cond, crowd: false, versus, nickname: !q.proId && app.career ? app.career.golfer.nickname || '' : '',
     onRoundDone: (scores, hstats) => {
       app.lastBestShot = round.bestShot || null;
       const vs = round.versus ? { name: round.versus.name, text: round.versusText(round.versus.decided ? round.versus.decided.left : 0), up: round.versus.up } : null;

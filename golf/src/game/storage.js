@@ -217,6 +217,10 @@ export const DEFAULT_SETTINGS = {
   tapIn: true,
   flyover: true,
   replays: true,
+  commentary: true,
+  voice: true,
+  caddieTips: true,
+  music: true,
 };
 
 export function loadSettings() {

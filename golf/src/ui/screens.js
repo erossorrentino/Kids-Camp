@@ -801,6 +801,10 @@ export class Screens {
           <div class="set"><label for="s-tapIn">Auto tap-in under 18 in.</label>${chk('tapIn')}</div>
           <div class="set"><label for="s-flyover">Hole flyover</label>${chk('flyover')}</div>
           <div class="set"><label for="s-replays">Replays of great shots</label>${chk('replays')}</div>
+          <div class="set"><label for="s-commentary">TV commentary captions</label>${chk('commentary')}</div>
+          <div class="set"><label for="s-voice">Commentator speaks aloud</label>${chk('voice')}</div>
+          <div class="set"><label for="s-caddieTips">Caddie tips</label>${chk('caddieTips')}</div>
+          <div class="set"><label for="s-music">Menu music</label>${chk('music')}</div>
           <p class="muted small">Graphics changes apply the next time a hole loads.</p>
         </section>
         ${hasCareer ? `<section class="card"><h3>Career save</h3><p class="muted small">${this.app.cloudSave ? 'Saved to your account and this browser.' : 'Saved in this browser.'}</p><button class="btn danger" data-a="resetCareer">Delete career…</button></section>` : ''}

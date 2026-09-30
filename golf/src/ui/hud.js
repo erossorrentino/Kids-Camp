@@ -71,6 +71,8 @@ export class HUD {
       <svg class="swing-trail" id="swingTrail"><polyline id="trailLine" points=""/></svg>
       <div class="strike" id="strike" hidden></div>
       <div class="turn" id="turn" hidden></div>
+      <div class="caddietip" id="caddieTip" hidden><i class="ct-face" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="16" cy="18" r="9" fill="#e8b996"/><path d="M6 15 Q16 3 26 15 L29 16 L6 16z" fill="#fbfbf6"/><rect x="5" y="15" width="24" height="2.5" rx="1" fill="#c8322c"/><circle cx="13" cy="19" r="1.2" fill="#1b1b1b"/><circle cx="19" cy="19" r="1.2" fill="#1b1b1b"/><path d="M13 23 Q16 25.5 19 23" stroke="#8a4a3a" stroke-width="1.3" fill="none"/></svg></i><span id="caddieTxt"></span></div>
+      <div class="caption" id="caption" hidden><small>Commentary</small><span id="captionTxt"></span></div>
       <div class="replaytag" id="replayTag" hidden><span class="rt-live"><i></i>Replay</span><span class="rt-label" id="replayLabel"></span><span class="rt-skip">Tap to skip</span></div>
       <div class="msg" id="msg" hidden><div class="msg-title" id="msgTitle"></div><div class="msg-sub" id="msgSub"></div></div>
       <div class="stats panel" id="shotStats" hidden></div>
@@ -151,6 +153,31 @@ export class HUD {
     }
     this.$('ballName').textContent = round.ball.name;
     this.root.classList.toggle('party', !!round.party);
+  }
+
+  // The caddie's advice before a shot
+  caddieSay(text) {
+    const el = this.$('caddieTip');
+    if (!text) { el.hidden = true; return; }
+    this.$('caddieTxt').textContent = text;
+    el.hidden = false;
+    el.classList.remove('pop');
+    void el.offsetWidth;
+    el.classList.add('pop');
+    clearTimeout(this._ctT);
+    this._ctT = setTimeout(() => { el.hidden = true; }, 7000);
+  }
+
+  // What the commentator just said
+  caption(text) {
+    const el = this.$('caption');
+    this.$('captionTxt').textContent = text;
+    el.hidden = false;
+    el.classList.remove('pop');
+    void el.offsetWidth;
+    el.classList.add('pop');
+    clearTimeout(this._capT);
+    this._capT = setTimeout(() => { el.hidden = true; }, 3800);
   }
 
   replayTag(on, label = '') {
@@ -297,6 +324,7 @@ export class HUD {
 
   // Swing meter
   meterShow(x, y) {
+    this.$('caddieTip').hidden = true;
     const m = this.$('meter');
     m.hidden = false;
     const W = window.innerWidth, H = window.innerHeight;

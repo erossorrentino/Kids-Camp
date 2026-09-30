@@ -51,6 +51,7 @@ export function initAudio() {
 export function setSound(on) {
   enabled = on;
   if (master) master.gain.value = on ? 0.8 : 0;
+  if (!on) stopMusic();
 }
 
 // Rain (0..1) and night (crickets instead of birds)
@@ -138,6 +139,9 @@ export const sfx = {
   },
   groan() { noise(0.9, { type: 'lowpass', freq: 380, gain: 0.25, attack: 0.15, decay: 0.8 }); },
   click() { tone(900, 0.03, { type: 'square', gain: 0.05 }); },
+  // the crowd: a hopeful rising "ooooh" and a disappointed falling one
+  ooh(strength = 1) { crowdVowel(strength, 1.25, -0.35); },
+  aah(strength = 1) { crowdVowel(strength, 1.1, 0.25); },
   thunder() {
     if (!ctx) return;
     noise(3.2, { type: 'lowpass', freq: 160, gain: 0.5, attack: 0.25, decay: 3 });
@@ -164,4 +168,120 @@ function scheduleBirds() {
     setTimeout(chirp, ambience.night ? 900 + Math.random() * 1800 : 3000 + Math.random() * 7000);
   };
   setTimeout(chirp, 2000);
+}
+
+// A crowd vowel: many voices through two formant filters, gliding in pitch
+function crowdVowel(strength, dur, glide) {
+  if (!ctx) return;
+  const t = ctx.currentTime;
+  const src = ctx.createBufferSource();
+  src.buffer = noiseBuf;
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0, t);
+  g.gain.linearRampToValueAtTime(0.35 * strength, t + 0.25);
+  g.gain.exponentialRampToValueAtTime(0.001, t + dur);
+  const f1 = ctx.createBiquadFilter();
+  f1.type = 'bandpass'; f1.Q.value = 5;
+  f1.frequency.setValueAtTime(420, t);
+  f1.frequency.linearRampToValueAtTime(420 * (1 + glide), t + dur);
+  const f2 = ctx.createBiquadFilter();
+  f2.type = 'bandpass'; f2.Q.value = 7;
+  f2.frequency.setValueAtTime(900, t);
+  f2.frequency.linearRampToValueAtTime(900 * (1 + glide * 0.6), t + dur);
+  src.connect(f1).connect(g);
+  src.connect(f2).connect(g);
+  g.connect(master);
+  src.start(t, Math.random());
+  src.stop(t + dur + 0.1);
+}
+
+// ------------------------------------------------------------ menu music
+// A gentle looping tune made on the fly: soft chords, a plucked arpeggio
+// and a light shaker. Only plays on the menus.
+let music = null;
+const CHORDS = [[60, 64, 67, 71], [57, 60, 64, 67], [53, 57, 60, 64], [55, 59, 62, 65]];
+const midi = (n) => 440 * Math.pow(2, (n - 69) / 12);
+
+export function startMusic() {
+  if (!ctx || !enabled || music) return;
+  const out = ctx.createGain();
+  out.gain.value = 0;
+  out.gain.setTargetAtTime(0.16, ctx.currentTime, 1.2);
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 1800;
+  out.connect(lp).connect(master);
+  music = { out, next: ctx.currentTime + 0.1, step: 0, timer: 0 };
+  const beat = 60 / 88;
+  const schedule = () => {
+    if (!music) return;
+    while (music.next < ctx.currentTime + 1.2) {
+      const bar = Math.floor(music.step / 8) % CHORDS.length;
+      const chord = CHORDS[bar];
+      const i = music.step % 8;
+      const t = music.next;
+      if (i === 0) {
+        // pad: the whole chord for a bar
+        for (const n of chord) {
+          for (const det of [-6, 6]) {
+            const o = ctx.createOscillator();
+            o.type = 'sawtooth';
+            o.frequency.value = midi(n - 12);
+            o.detune.value = det;
+            const g = ctx.createGain();
+            g.gain.setValueAtTime(0, t);
+            g.gain.linearRampToValueAtTime(0.05, t + 0.6);
+            g.gain.linearRampToValueAtTime(0.0001, t + beat * 8);
+            o.connect(g).connect(music.out);
+            o.start(t);
+            o.stop(t + beat * 8 + 0.05);
+          }
+        }
+        // bass note
+        const b = ctx.createOscillator();
+        b.type = 'triangle';
+        b.frequency.value = midi(chord[0] - 24);
+        const bg = ctx.createGain();
+        bg.gain.setValueAtTime(0.28, t);
+        bg.gain.exponentialRampToValueAtTime(0.001, t + beat * 3.5);
+        b.connect(bg).connect(music.out);
+        b.start(t); b.stop(t + beat * 4);
+      }
+      // arpeggio pluck on every beat
+      const note = chord[[0, 1, 2, 3, 2, 1, 3, 2][i]] + (i >= 4 ? 12 : 0);
+      const o = ctx.createOscillator();
+      o.type = 'triangle';
+      o.frequency.value = midi(note);
+      const g = ctx.createGain();
+      g.gain.setValueAtTime(0.12, t);
+      g.gain.exponentialRampToValueAtTime(0.001, t + beat * 0.9);
+      o.connect(g).connect(music.out);
+      o.start(t); o.stop(t + beat);
+      // shaker on the off-beats
+      if (i % 2 === 1) {
+        const n = ctx.createBufferSource();
+        n.buffer = noiseBuf;
+        const hp = ctx.createBiquadFilter();
+        hp.type = 'highpass'; hp.frequency.value = 6000;
+        const ng = ctx.createGain();
+        ng.gain.setValueAtTime(0.05, t);
+        ng.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+        n.connect(hp).connect(ng).connect(music.out);
+        n.start(t, Math.random()); n.stop(t + 0.1);
+      }
+      music.next += beat;
+      music.step++;
+    }
+    music.timer = setTimeout(schedule, 300);
+  };
+  schedule();
+}
+
+export function stopMusic() {
+  if (!music || !ctx) { music = null; return; }
+  const m = music;
+  music = null;
+  clearTimeout(m.timer);
+  m.out.gain.setTargetAtTime(0, ctx.currentTime, 0.4);
+  setTimeout(() => { try { m.out.disconnect(); } catch (e) { /* ignore */ } }, 2500);
 }

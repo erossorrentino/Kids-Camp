@@ -13,6 +13,8 @@ import { sfx, setWind, setAmbience } from '../audio.js';
 import { simHole, courseProfile, effectiveStats } from '../sim/aisim.js';
 import { ReplayDirector, rateShot } from './replay.js';
 import { buildPrizeCar } from '../render/prizes.js';
+import { caddieTip } from './caddieTips.js';
+import { commentLine, speak } from './commentary.js';
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const fwdOf = (h) => ({ x: Math.sin(h), z: -Math.cos(h) });
@@ -353,6 +355,9 @@ export class RoundController {
     this.hud.setStrokes(this.strokes);
     this.hud.showSwingHint(true);
     if (this.mode) this.hud.setMode(this.mode.hud(this));
+    if (this.app.settings.caddieTips !== false && (!this.mode || this.mode.kind !== 'range')) {
+      try { this.hud.caddieSay(caddieTip(this)); } catch (e) { /* a tip is never worth an error */ }
+    }
     if (this.strokes > 0 && this.opts.onShotState) this.opts.onShotState(this.shotState());
   }
 
@@ -542,6 +547,15 @@ export class RoundController {
     }
     w.puttLine.set(pts);
     this.predTotal = r.total;
+    // how far a putt aimed this way drifts sideways by the time it reaches the hole
+    const rt = rightOf(this.heading), ft = fwdOf(this.heading);
+    let lat = 0;
+    for (let i = 0; i < S.length; i += 5) {
+      const along = (S[i + 1] - b.x) * ft.x + (S[i + 3] - b.z) * ft.z;
+      lat = (S[i + 1] - b.x) * rt.x + (S[i + 3] - b.z) * rt.z;
+      if (along >= dist) break;
+    }
+    this.puttBreak = lat;
   }
 
   addressCamera(fast = false) {
@@ -782,6 +796,10 @@ export class RoundController {
       else if (e.type === 'holed') { sfx.cup(); }
     }
     this.flightCamera(p, gy);
+    if (!fl.aah && !this.putting && this.opts.crowd && fl.landT && fl.t > fl.landT - 0.7 && fl.t < fl.landT) {
+      const L = res.land;
+      if (Math.hypot(L.x - this.hole.pin.x, L.z - this.hole.pin.z) < 6) { fl.aah = true; sfx.aah(1); }
+    }
     if (fl.t >= res.duration) this.finishShot();
   }
 
@@ -848,6 +866,8 @@ export class RoundController {
     }
     const great = !!(rate && rate.great && this.app.settings.replays !== false);
     if (res.outcome === 'holed') {
+      const from = Math.hypot(h.pin.x - fl.start.x, h.pin.z - fl.start.z);
+      this.commentate(this.strokes === 1 ? 'ace' : !this.putting ? 'holeout' : from > 6 ? 'longputt' : 'birdie', this.putting && from <= 6 ? 0 : 1, true);
       if (great) {
         this.world.ball.setVisible(false);
         sfx.cup();
@@ -864,6 +884,7 @@ export class RoundController {
       return;
     }
     if (res.outcome === 'water') {
+      this.commentate('water', 0.8);
       this.strokes++;
       this.penalties++;
       const drop = this.findDrop(res);
@@ -875,6 +896,7 @@ export class RoundController {
       return;
     }
     if (res.outcome === 'ob') {
+      this.commentate('ob', 0.8);
       this.strokes++;
       this.penalties++;
       this.hud.message('Out of bounds', `Stroke and distance — hitting ${this.strokes + 1} from the same spot`, 'bad');
@@ -895,12 +917,20 @@ export class RoundController {
     let title = SURFACES[surf] ? SURFACES[surf].label : surf;
     let sub = `${this.fmtDist(d, true)} to the pin`;
     let tone = 'neutral';
+    const crowd = !!this.opts.crowd;
     if (this.putting) {
-      title = d < 1 ? 'Close!' : fl.res.events.some((e) => e.type === 'lip') ? 'Lipped out!' : 'Putt missed';
-      if (fl.res.events.some((e) => e.type === 'lip')) sfx.groan();
-    } else if (surf === 'green') { title = d < 3 ? 'Stiff!' : 'On the green'; tone = 'good'; if (d < 3) sfx.applause(0.5); }
-    else if (surf === 'bunker') { title = this.plugged ? 'Plugged in the bunker' : 'In the bunker'; tone = 'bad'; }
-    else if (surf === 'fairway') tone = 'good';
+      const lip = fl.res.events.some((e) => e.type === 'lip');
+      title = d < 1 ? 'Close!' : lip ? 'Lipped out!' : 'Putt missed';
+      if (lip) { sfx.groan(); if (crowd) sfx.ooh(1); this.commentate('lip', 0.8); }
+      else if (crowd && d < 0.6 && this.distToPin > 3) sfx.ooh(0.6);
+    } else if (surf === 'green') {
+      title = d < 3 ? 'Stiff!' : 'On the green'; tone = 'good';
+      if (d < 3) { sfx.applause(0.5); this.commentate('stiff', 0.9); } else this.commentate('green', 0.25);
+    } else if (surf === 'bunker') { title = this.plugged ? 'Plugged in the bunker' : 'In the bunker'; tone = 'bad'; this.commentate('sand', 0.5); }
+    else if (surf === 'fairway') {
+      tone = 'good';
+      if (wasTee && par > 3) this.commentate(res.total > 255 ? 'bomb' : 'fairway', res.total > 255 ? 0.8 : 0.3);
+    } else if (wasTee && par > 3 && (surf === 'rough' || surf === 'first')) this.commentate('rough', 0.3);
     this.hud.message(title, sub, tone);
     // Tap-in
     if (this.app.settings.tapIn && surf === 'green' && d < 0.45) {
@@ -927,6 +957,16 @@ export class RoundController {
     }
     if (great) { this.queueReplay(rate, () => this.afterPause(0.6)); return; }
     this.afterPause(this.putting ? 1.2 : 2.2);
+  }
+
+  // ---------------- commentary ----------------
+  commentate(kind, chance = 1, force = false) {
+    const st = this.app.settings;
+    if (st.commentary === false || Math.random() > chance) return;
+    const who = this.party ? this.party.players[this.cur].name : this.opts.nickname || (this.golfer.name || '').split(' ')[0];
+    const line = commentLine(kind, who, Math.random());
+    if (!line) return;
+    if (speak(line, { voiceOn: st.sound && st.voice !== false, force })) this.hud.caption(line);
   }
 
   // ---------------- highlights ----------------
@@ -1056,6 +1096,9 @@ export class RoundController {
     if (rel <= -1) sfx.applause(rel <= -2 ? 1.3 : 0.9);
     else if (rel === 0) sfx.applause(0.4);
     this.reactionShot(rel <= -2 ? 'arms' : rel === -1 ? 'fist' : rel === 0 ? 'tip' : 'sad');
+    if (rel <= -2 && this.strokes > 1) this.commentate('eagle', 1);
+    else if (rel === -1) this.commentate('birdie', 0.6);
+    else if (rel === 1) this.commentate('bogey', 0.25);
     this.completeHole(false);
   }
 
