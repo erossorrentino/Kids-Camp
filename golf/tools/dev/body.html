@@ -35,6 +35,7 @@ const looks = [
   { shirt: '#2a9d8f', pants: '#2b2d42', cap: '#f1faee', skin: '#8d5a3b', hat: 'none', hairStyle: 'curly', hair: '#1e1a18' },
   { shirt: '#ffd23f', pants: '#1d3557', gender: 'f', hat: 'cap', hairStyle: 'long', hair: '#3b2a1f', skin: '#d49a73' },
 ];
+if (q.get('logo')) looks.forEach((l, i) => { l.logo = [{ text: 'THUNDER', bg: '#ffca3a', fg: '#1b1b1b' }, { text: 'ROCKET', bg: '#e63946', fg: '#fff' }, { text: 'GALAXY', bg: '#6a4c93', fg: '#fff' }][i % 3]; l.hat = ['cap', 'visor', 'cap', 'bucket', 'flat'][i]; });
 const poses = q.get('poses') ? q.get('poses').split(',') : ['stand', 'address', 'top', 'finish', 'stand'];
 const golfers = [];
 poses.forEach((pose, i) => {

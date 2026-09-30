@@ -6,6 +6,8 @@ import { RNG, mixSeed } from '../util/rng.js';
 import { STARTER_BAG, normBag } from '../data/clubsets.js';
 import { HUMAN_ID, simulateWholeEvent, createTournament, results as tourneyResults } from './tournament.js';
 import { playAs } from '../data/characters.js';
+import { pickRival, rivalResult } from './rival.js';
+import { sponsorPay } from './sponsors.js';
 
 export const START_YEAR = 2026;
 export const DECAY = 0.984; // weekly ranking-points decay
@@ -31,6 +33,11 @@ export const ACHIEVEMENTS = {
   world_no1: { name: 'World No. 1', desc: 'Become the best golfer in the world' },
   million: { name: 'Millionaire', desc: 'Earn $1,000,000 in career prize money' },
   ten_million: { name: 'Big Money', desc: 'Earn $10,000,000 in career prize money' },
+  rival_beat: { name: 'Bragging Rights', desc: 'Finish ahead of your rival' },
+  rival_major: { name: 'Settled It', desc: 'Beat your rival at a major' },
+  sponsor: { name: 'Signed!', desc: 'Sign your first sponsor deal' },
+  car: { name: 'New Wheels', desc: 'Win a car with a hole-in-one' },
+  cup: { name: 'Cup Winner', desc: 'Win the Legends Cup with your team' },
 };
 
 export function xpForLevel(level) {
@@ -79,8 +86,11 @@ export function newCareer({ name, country, gender, look }) {
     active: null,
     news: [],
     stats: { rounds: 0, holes: 0, strokes: 0, par: 0, birdies: 0, eagles: 0, aces: 0, best: null, fairways: 0, fairwayChances: 0, gir: 0, putts: 0 },
+    sponsors: {},
+    garage: [],
   };
   c.prevRank = rankMap(c);
+  c.rival = pickRival(c, rankings(c), HUMAN_ID);
   return c;
 }
 
@@ -189,6 +199,15 @@ export function buildFields(c, week, humanEventId) {
     pick.forEach((id) => used.add(id));
     fields[ev.id] = pick;
   }
+  // your rival always turns up where you play (swapping places with someone)
+  const rv = c.rival && c.rival.id;
+  if (humanEventId && rv && rv !== c.golfer.char && fields[humanEventId] && !fields[humanEventId].includes(rv)) {
+    const mine = fields[humanEventId];
+    const out = mine.pop();
+    const from = Object.keys(fields).find((k) => fields[k].includes(rv));
+    if (from) fields[from] = fields[from].map((id) => (id === rv ? out : id));
+    mine.push(rv);
+  }
   return fields;
 }
 
@@ -253,6 +272,16 @@ export function completeWeek(c, humanSummary = null) {
       c.golfer.money += me.money + bonus.total;
       c.golfer.careerMoney += me.money + bonus.total;
       if (ev.tour === 'MAJ' && me.pos === 1) c.golfer.majorsWon.push(ev.name);
+      // sponsors pay for turning up, and more for a good week
+      const sp = sponsorPay(c, me.made ? me.pos : null);
+      humanResult.sponsor = sp;
+      c.golfer.money += sp.total;
+      // how did your rival do?
+      humanResult.rival = rivalResult(c, res, HUMAN_ID);
+      if (humanResult.rival && humanResult.rival.beat > 0 && ev.tour === 'MAJ') {
+        humanResult.rival.bonus = 50000;
+        c.golfer.money += 50000;
+      }
     } else {
       const ids = fields[ev.id] || [];
       if (!ids.length) continue;
@@ -270,6 +299,16 @@ export function completeWeek(c, humanSummary = null) {
     summary.levelCash = lv.cash;
   }
   summary.newAchievements = checkAchievements(c, humanResult, humanSummary);
+  // outgrown your rival? someone better steps up
+  if (c.rival) {
+    const ranks = rankMap(c);
+    c.rival.weeks = (c.rival.weeks || 0) + 1;
+    if ((ranks[HUMAN_ID] + 25 < ranks[c.rival.id] && c.rival.weeks >= 4) || c.golfer.char === c.rival.id) {
+      const old = c.rival.id;
+      c.rival = pickRival(c, rankings(c), HUMAN_ID, 1);
+      summary.newRival = { old, id: c.rival.id };
+    }
+  }
   c.active = null;
   // advance
   c.week++;
@@ -320,6 +359,8 @@ export function checkAchievements(c, hr, hs) {
     if (hs.bestRound != null && hs.bestRound < 60) give('low_59');
   }
   if (hr) {
+    if (hr.rival && hr.rival.beat > 0) give('rival_beat');
+    if (hr.rival && hr.rival.beat > 0 && hr.event.tour === 'MAJ') give('rival_major');
     if (hr.made) give('first_cut');
     if (hr.pos && hr.pos <= 10) give('top10');
     if (hr.pos === 1) {
@@ -358,6 +399,9 @@ function endSeason(c) {
   c.week = 1;
   c.invites = 2;
   c._season = null;
+  // sponsor deals run to the end of the season
+  out.sponsorsEnded = Object.values(c.sponsors || {}).filter(Boolean).length;
+  c.sponsors = {};
   return out;
 }
 
@@ -395,5 +439,8 @@ export function upgradeSave(c) {
   if (!Array.isArray(c.golfer.clubs)) c.golfer.clubs = Object.values(c.golfer.bag);
   if (!Array.isArray(c.golfer.chars)) c.golfer.chars = [];
   if (c.golfer.char && !c.golfer.chars.includes(c.golfer.char)) c.golfer.char = null;
+  if (!c.sponsors) c.sponsors = {};
+  if (!Array.isArray(c.garage)) c.garage = [];
+  if (!c.rival) c.rival = pickRival(c, rankings(c), HUMAN_ID);
   return c;
 }

@@ -145,6 +145,7 @@ export class Golfer {
       beard: look.beard || 'none', pattern: look.pattern || 'solid', accent: look.accent || '#ffffff',
       vest: look.vest || null, shorts: !!look.shorts, socks: look.socks || '#ffffff',
       glove: look.glove || '#f4f4f4', shoe: look.shoe || '#1b1b1b', shades: !!look.shades, belt: look.belt || '#1b1b1b',
+      logo: look.logo || null,
     };
     const L = this.look;
     const shirtMap = shirtTexture(L.shirt, L.accent, L.pattern);
@@ -246,6 +247,8 @@ export class Golfer {
     const logo = new THREE.Mesh(new THREE.BoxGeometry(0.01, 0.036, 0.046), lam(L.cap));
     logo.position.set(frontX(0.43, -0.09) + 0.002, 0.43, -0.09);
     this.chest.add(collar, placket, logo);
+    this.chestLogo = logo;
+    this.chestLogoPos = logo.position.clone();
     this.headGroup = new THREE.Group();
     this.headGroup.position.y = 0.73;
     this.chest.add(this.headGroup);
@@ -295,6 +298,7 @@ export class Golfer {
     this.buildHair(L, hairMat);
     this.buildBeard(L, hairMat);
     this.buildHat(L, capMat);
+    if (L.logo) this.buildSponsor(L.logo, L.hat);
     // anchors
     this.hubAnchor = new THREE.Object3D();
     this.hubAnchor.position.set(0.02, 0.5, 0);
@@ -461,6 +465,40 @@ export class Golfer {
         capLogo.rotation.z = -0.5;
         add(capLogo, 0.105, 0.07, 0);
       }
+    }
+  }
+
+  // A sponsor's name on the front of the cap and on the chest
+  buildSponsor(logo, hat) {
+    const cv = document.createElement('canvas');
+    cv.width = 128; cv.height = 48;
+    const g = cv.getContext('2d');
+    g.fillStyle = logo.bg;
+    g.fillRect(0, 0, 128, 48);
+    g.fillStyle = logo.fg;
+    g.font = '800 30px "Barlow Condensed", Arial, sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(logo.text, 64, 26, 120);
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    const mat = new THREE.MeshLambertMaterial({ map: tex });
+    // chest patch replaces the little logo
+    const chest = new THREE.Mesh(new THREE.PlaneGeometry(0.1, 0.037), mat);
+    chest.position.copy(this.chestLogoPos).add(new THREE.Vector3(0.004, 0, 0));
+    chest.rotation.y = Math.PI / 2;
+    this.chest.add(chest);
+    this.chestLogo.visible = false;
+    if (hat === 'cap' || hat === 'visor' || hat === 'flat' || hat === 'bucket') {
+      const holder = new THREE.Group();
+      const front = new THREE.Mesh(new THREE.PlaneGeometry(0.07, 0.026), mat);
+      front.rotation.y = Math.PI / 2;
+      holder.add(front);
+      const y = hat === 'visor' ? 0.05 : hat === 'bucket' ? 0.09 : 0.072;
+      const x = hat === 'visor' ? 0.111 : hat === 'bucket' ? 0.104 : 0.108;
+      holder.position.set(x, y, 0);
+      holder.rotation.z = hat === 'visor' || hat === 'bucket' ? -0.1 : -0.5;
+      this.headGroup.add(holder);
     }
   }
 

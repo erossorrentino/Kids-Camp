@@ -248,6 +248,23 @@ export class Caddie {
       head.position.set(shaft.position.x, 1.18, shaft.position.z);
       bag.add(shaft, head);
     }
+    if (golferLook.bagLogo) {
+      // the bag sponsor's name down the front of the bag
+      const lg = golferLook.bagLogo;
+      const cv = document.createElement('canvas');
+      cv.width = 64; cv.height = 160;
+      const g = cv.getContext('2d');
+      g.fillStyle = lg.bg; g.fillRect(0, 0, 64, 160);
+      g.fillStyle = lg.fg;
+      g.font = '800 30px "Barlow Condensed", Arial, sans-serif';
+      g.textAlign = 'center'; g.textBaseline = 'middle';
+      g.save(); g.translate(32, 80); g.rotate(-Math.PI / 2); g.fillText(lg.text, 0, 2, 150); g.restore();
+      const t = new THREE.CanvasTexture(cv);
+      t.colorSpace = THREE.SRGBColorSpace;
+      const panel = new THREE.Mesh(new THREE.PlaneGeometry(0.12, 0.34), new THREE.MeshLambertMaterial({ map: t }));
+      panel.position.set(0, 0.5, 0.152);
+      bag.add(panel);
+    }
     bag.position.set(0.35, 0, 0.05);
     bag.rotation.z = -0.12;
     this.group.add(bag);

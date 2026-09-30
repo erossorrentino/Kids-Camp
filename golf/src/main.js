@@ -9,6 +9,7 @@ import { modal, toast, esc, fmtToPar, money } from './ui/dom.js';
 import { eventIntro, roundSummary, eventResults, scorecardModal, boardModal, scorecardHtml, bestShotCard } from './ui/eventScreens.js';
 import { ReplayDirector } from './game/replay.js';
 import { PRIZE_CARS, CAR_COLORS } from './render/prizes.js';
+import { sponsorOffers, sponsorLook, BRAND_BY_ID } from './game/sponsors.js';
 import { RoundController } from './game/round.js';
 import * as career from './game/career.js';
 import * as tourn from './game/tournament.js';
@@ -17,6 +18,9 @@ import { MiniGame, MINI_PRIZES, betterScore, GAMES } from './game/minigames.js';
 import { miniMenu, miniResults, partySetup, partyResults, partyCardModal, PARTY_TIERS } from './ui/modeScreens.js';
 import { Party, PARTY_COLORS } from './game/party.js';
 import { YD } from './sim/hole.js';
+import { dailyChallenge, dayKey, loadDaily, saveDaily, recordDaily, liveStreak, dailyReward, beatsTarget } from './game/daily.js';
+import { dailyScreen, cupScreen, cupResults } from './ui/modeScreens.js';
+import { cupTeams, cupCourse, simMatch, matchText, opponentScores, CUP_HOLES, CUP_PRIZE } from './game/cup.js';
 import { initAudio, setSound, sfx, setAmbience } from './audio.js';
 import { applyWeather, rollWeather } from './game/weather.js';
 import { proById, generatePros } from './data/players.js';
@@ -496,7 +500,24 @@ app.onAction = (a, d, elx) => {
     case 'miniUseMine': app.miniOpts.proId = null; openMini({}); break;
     case 'miniSky': app.miniOpts.sky = d.s; openMini({}); break;
     case 'playMini': startMini(d.g); break;
+    case 'daily': openDaily(); break;
+    case 'cup': openCup(); break;
+    case 'cupPlay': playCup(false); break;
+    case 'cupSim': playCup(true); break;
+    case 'playDaily': { const ch = dailyChallenge(dayKey()); startMini(ch.kind, ch); break; }
     case 'watchBest': if (app.lastBestShot) watchReplay(app.lastBestShot); break;
+    case 'signSponsor': {
+      const off = sponsorOffers(c, career.rankOf(c)).find((o) => o.key === d.k);
+      if (off) {
+        c.sponsors[off.slot] = off;
+        if (!c.achievements.sponsor) c.achievements.sponsor = { year: c.year, week: c.week };
+        saveCareer(c);
+        sfx.applause(0.6);
+        toast(`You signed with ${BRAND_BY_ID[off.brand].name}! Their name is on your ${off.slot === 'hat' ? 'cap and shirt' : 'bag'}.`, 3600);
+      }
+      app.screens.hub(c, 'sponsors');
+      break;
+    }
     case 'party': openParty({}); break;
     case 'partyPickCourse': app.pickFor = 'party'; app.screens.courses({ ...app.coursesOpts, pick: true }); break;
     case 'partyAdd': if (app.partyOpts.players.length < 4) { const n = app.partyOpts.players.length; app.partyOpts.players.push({ name: `Player ${n + 1}`, who: 'club' }); } openParty({}); break;
@@ -650,7 +671,7 @@ function startTournamentRound() {
     holeList: [...Array(18).keys()],
     startPos: done,
     scores: hp.scores[t.round] || [],
-    golfer: { name: g.name, stats: g.stats, traits: g.traits, ball: g.ball, bag: g.bag, look: g.look, gender: g.gender },
+    golfer: { name: g.name, stats: g.stats, traits: g.traits, ball: g.ball, bag: g.bag, look: { ...g.look, ...sponsorLook(c) }, gender: g.gender },
     cond: roundCond(t),
     tournament: t,
     crowd: true,
@@ -679,6 +700,7 @@ function startTournamentRound() {
       c.garage = c.garage || [];
       c.garage.push({ name: car.name, color: car.color, value: car.value, event: t.name, year: c.year, hole: car.hole + 1 });
       c.active.carWon = true;
+      if (!c.achievements.car) c.achievements.car = { year: c.year, week: c.week };
       saveCareer(c, { now: true });
       setTimeout(() => toast(`You won the ${car.name}! It's in your trophy room (worth ${money(car.value)}).`, 5000), 1800);
     },
@@ -851,7 +873,7 @@ function startPlayoff(tied, scores = []) {
     app.screens.hide();
     const g = playAs(c.golfer);
     const round = new RoundController(app, {
-      course, holeList: [17], golfer: { name: g.name, stats: g.stats, traits: g.traits, ball: g.ball, bag: g.bag, look: g.look, gender: g.gender },
+      course, holeList: [17], golfer: { name: g.name, stats: g.stats, traits: g.traits, ball: g.ball, bag: g.bag, look: { ...g.look, ...sponsorLook(c) }, gender: g.gender },
       cond: { ...t.cond[t.rounds - 1], seed: mixSeed(t.seed, 'po', scores.length) }, crowd: true,
       onRoundDone: (sc) => { endRound(); startPlayoff(tied, [...scores, sc[17]]); },
     });
@@ -894,7 +916,7 @@ function golferFor(proId, ball) {
   }
   if (app.career) {
     const g = playAs(app.career.golfer);
-    return { name: g.name, stats: g.stats, traits: g.traits, ball: ball || g.ball, bag: g.bag, look: g.look, gender: g.gender };
+    return { name: g.name, stats: g.stats, traits: g.traits, ball: ball || g.ball, bag: g.bag, look: { ...g.look, ...sponsorLook(app.career) }, gender: g.gender };
   }
   const s = { power: 70, accuracy: 70, irons: 70, shortGame: 70, putting: 70, recovery: 70, mental: 70, wind: 70, consistency: 70 };
   return { name: 'Club Pro', stats: s, traits: [], ball: ball || 'tourbal', look: { shirt: '#2a9d8f', pants: '#2b2d42', cap: '#ffffff', skin: '#e8b996' }, gender: 'm' };
@@ -914,13 +936,20 @@ function startQuick() {
   };
   applyWeather(cond, !q.weather || q.weather === 'course' ? rollWeather(course.style, rng) : q.weather, q.time, rng);
   const holeList = q.holes === 'front' ? [...Array(9).keys()] : q.holes === 'back' ? [...Array(9).keys()].map((i) => i + 9) : q.holes === 'sig' ? [course.signature - 1] : [...Array(18).keys()];
+  // match play against a pro, if chosen
+  let versus = null;
+  if (q.vs) {
+    const pro = q.vs === 'rival' && app.career && app.career.rival ? proById(app.career.rival.id) : generatePros()[rng.int(0, 49)];
+    versus = { name: pro.name, id: pro.id, scores: opponentScores(pro, course, holeList, cond, cond.seed) };
+  }
   app.screens.hide();
   const round = new RoundController(app, {
-    course, holeList, golfer, cond, crowd: false,
+    course, holeList, golfer, cond, crowd: false, versus,
     onRoundDone: (scores, hstats) => {
       app.lastBestShot = round.bestShot || null;
+      const vs = round.versus ? { name: round.versus.name, text: round.versusText(round.versus.decided ? round.versus.decided.left : 0), up: round.versus.up } : null;
       endRound();
-      quickSummary(course, scores, hstats, golfer, holeList);
+      quickSummary(course, scores, hstats, golfer, holeList, vs);
     },
   });
   app.round = round;
@@ -938,20 +967,22 @@ function openMini(pre) {
   miniMenu(app.screens, app, app.miniOpts);
 }
 
-function startMini(kind) {
+function startMini(kind, daily = null) {
   if (!app.miniOpts) openMini({});
   const o = app.miniOpts;
-  const course = courseById(o.courseId);
-  const rng = new RNG(Date.now() & 0xffffff);
-  const golfer = golferFor(o.proId);
+  const course = courseById(daily ? daily.courseId : o.courseId);
+  const rng = new RNG(daily ? daily.seed : Date.now() & 0xffffff);
+  const golfer = golferFor(daily ? null : o.proId);
   // mini-games are played in pleasant conditions: a light, steady breeze
   const cond = {
     windMph: kind === 'putt' ? 0 : rng.float(2, kind === 'range' ? 6 : 9), windDir: rng.float(0, Math.PI * 2), gust: 0.08,
     stimp: course.stimp, firm: course.firm, timeOfDay: rng.float(0.35, 0.7), pinDay: 1, seed: rng.int(1, 1e9),
   };
-  const sky = o.sky || 'day';
+  if (daily) { cond.windMph = daily.windMph; cond.windDir = daily.windDir; cond.seed = daily.seed; }
+  const sky = daily ? daily.sky : o.sky || 'day';
   applyWeather(cond, sky === 'rain' ? 'rain' : 'sunny', sky === 'night' ? 'night' : sky === 'sunset' ? '0.93' : String(cond.timeOfDay), rng);
   const mode = new MiniGame(kind, { course, golfer, seed: cond.seed, units: app.settings.units, cond });
+  mode.daily = daily;
   app.screens.hide();
   const round = new RoundController(app, {
     course: mode.course, holeList: [mode.holeIndex], golfer, cond, crowd: kind === 'ctp' || kind === 'putt',
@@ -977,6 +1008,7 @@ function miniDone(mode) {
   const res = mode.result();
   const recs = app.records;
   const extra = { fmt: fmtLong, fmtSmall: fmtShort };
+  if (mode.daily) { dailyDone(mode, res, extra); return; }
   if (res.kind === 'range') {
     if (res.best && betterScore('drive', res.best, recs.rangeDrive && recs.rangeDrive.score)) {
       recs.rangeDrive = { score: res.best, text: fmtLong(res.best), name: res.course.name, date: Date.now() };
@@ -1076,18 +1108,128 @@ function startParty() {
   round.start();
 }
 
+// ---------------- the Legends Cup ----------------
+function openCup() {
+  const c = app.career;
+  if (!c) return;
+  const teams = cupTeams(c, career.rankings(c), tourn.HUMAN_ID);
+  const course = cupCourse(c);
+  app.cupInfo = { teams, courseId: course.id };
+  app.fromHub = true;
+  cupScreen(app.screens, app, c, app.cupInfo, career.golferOVR(c.golfer));
+}
+
+function cupCond(c, course) {
+  const rng = new RNG(mixSeed('cupcond', c.year));
+  const cond = { windMph: rng.float(3, 12), windDir: rng.float(0, Math.PI * 2), gust: 0.12, stimp: course.stimp + 0.5, firm: course.firm, timeOfDay: 0.8, pinDay: 2, seed: mixSeed('cupseed', c.year) };
+  return applyWeather(cond, rng.chance(0.15) ? 'cloudy' : 'sunny', '0.8', rng);
+}
+
+function playCup(sim) {
+  const c = app.career;
+  const info = app.cupInfo;
+  if (!c || !info) return;
+  const course = courseById(info.courseId);
+  const holes = [...Array(CUP_HOLES).keys()];
+  const cond = cupCond(c, course);
+  const rival = info.teams.rival;
+  const g = playAs(c.golfer);
+  if (sim) {
+    const me = { stats: g.stats, traits: g.traits, bag: g.bag };
+    const r = simMatch(me, rival, course, holes, cond, mixSeed('cupme', c.year, Date.now() & 0xffff));
+    finishCup(r.up, r.left);
+    return;
+  }
+  const scores = opponentScores(rival, course, holes, cond, mixSeed('cupme', c.year));
+  app.screens.hide();
+  const round = new RoundController(app, {
+    course, holeList: holes, cond, crowd: true,
+    golfer: { name: g.name, stats: g.stats, traits: g.traits, ball: g.ball, bag: g.bag, look: { ...g.look, ...sponsorLook(c) }, gender: g.gender },
+    versus: { name: rival.name, id: rival.id, scores },
+    onRoundDone: () => {
+      const v = round.versus;
+      app.lastBestShot = round.bestShot || null;
+      endRound();
+      finishCup(v.up, v.decided ? v.decided.left : 0);
+    },
+  });
+  app.round = round;
+  app.hud.attach(round);
+  round.start();
+}
+
+function finishCup(myUp, myLeft) {
+  const c = app.career;
+  const info = app.cupInfo;
+  const course = courseById(info.courseId);
+  const holes = [...Array(CUP_HOLES).keys()];
+  const cond = cupCond(c, course);
+  const t = info.teams;
+  const matches = [{ aName: c.golfer.name, bName: t.rival.name, up: myUp, text: matchText(myUp, myLeft, 'You', t.rival.name.split(' ').slice(-1)[0]), mine: true }];
+  t.mates.forEach((m, k) => {
+    const w = t.world[k];
+    if (!w) return;
+    const r = simMatch(m, w, course, holes, cond, mixSeed('cupmatch', c.year, k));
+    matches.push({ aName: m.name, bName: w.name, up: r.up, text: matchText(r.up, r.left, m.last, w.last) });
+  });
+  const pts = [0, 0];
+  for (const m of matches) {
+    if (m.up > 0) pts[0] += 1; else if (m.up < 0) pts[1] += 1; else { pts[0] += 0.5; pts[1] += 0.5; }
+  }
+  const won = pts[0] > pts[1], tied = pts[0] === pts[1];
+  const prize = won ? CUP_PRIZE.win : tied ? Math.round((CUP_PRIZE.win + CUP_PRIZE.lose) / 2) : CUP_PRIZE.lose;
+  c.golfer.money += prize;
+  c.cup = { year: c.year, done: true, won, pts };
+  c.cups = c.cups || [];
+  if (won) {
+    c.cups.push({ year: c.year, score: `${pts[0]}-${pts[1]}`, course: course.name });
+    if (!c.achievements.cup) c.achievements.cup = { year: c.year, week: c.week };
+    sfx.applause(1.6);
+  }
+  if (c.rival) { if (myUp > 0) c.rival.w++; else if (myUp < 0) c.rival.l++; else c.rival.t++; }
+  saveCareer(c, { now: true });
+  cupResults(app.screens, app, c, { matches, pts, won, tied, prize });
+}
+
+// ---------------- daily challenge ----------------
+function openDaily() {
+  app.fromHub = false;
+  const ch = dailyChallenge(dayKey());
+  dailyScreen(app.screens, app, ch, loadDaily());
+}
+
+function dailyDone(mode, res, extra) {
+  const ch = mode.daily;
+  const d = loadDaily();
+  const better = (a, b) => betterScore(ch.kind, a, b);
+  const scored = ch.kind === 'ctp' ? res.score < Infinity : res.score > 0;
+  const rec = recordDaily(d, ch, scored ? res.score : (ch.kind === 'ctp' ? Infinity : 0), better);
+  extra.daily = { ch, beat: beatsTarget(ch, res.score), newlyBeat: rec.newlyBeat, streak: rec.streak, best: rec.day.best, improved: rec.improved };
+  const c = app.career;
+  if (c && rec.newlyBeat && !rec.day.paid) {
+    const pay = dailyReward(rec.streak);
+    rec.day.paid = true;
+    c.golfer.money += pay;
+    extra.prize = pay;
+    saveCareer(c, { now: true });
+  }
+  if (rec.newlyBeat) sfx.applause(1.2);
+  saveDaily(d);
+  miniResults(app.screens, app, res, extra);
+}
+
 function modeBoardModal(mode) {
   const rows = mode.board();
   modal(`<h3>${esc(GAMES[mode.kind].name)}</h3><div class="table-wrap"><table class="tbl"><thead><tr><th>Pos</th><th>Player</th><th>Score</th></tr></thead><tbody>${rows.map((r) => `<tr class="${r.you ? 'me' : ''}"><td>${r.pos}</td><td>${esc(r.you ? 'You' : r.name)}</td><td><b>${esc(r.text)}</b>${r.you && r.partial ? ' <span class="muted small">(so far)</span>' : ''}</td></tr>`).join('')}</tbody></table></div><div class="actions"><button class="btn" data-close>Close</button></div>`);
 }
 
-function quickSummary(course, scores, hstats, golfer, holeList) {
+function quickSummary(course, scores, hstats, golfer, holeList, vs = null) {
   let s = 0, p = 0;
   for (const i of holeList) { if (scores[i] != null) { s += scores[i]; p += course.holes[i].par; } }
   app.screens.show(`
     <div class="page narrow">
       <header class="page-head"><h2>${esc(course.name)}</h2><span class="pill">${esc(golfer.name)}</span></header>
-      <section class="card result-hero ${s < p ? 'good' : ''}"><div class="rh-score"><b>${s}</b><span class="${s - p < 0 ? 'tp-under' : s - p > 0 ? 'tp-over' : 'tp-even'}">${fmtToPar(s - p)}</span></div><div><div class="rh-pos">Round complete</div><div class="muted">${holeList.length} hole${holeList.length > 1 ? 's' : ''} · par ${p}</div></div></section>
+      <section class="card result-hero ${s < p || (vs && vs.up > 0) ? 'good' : ''} ${vs && vs.up > 0 ? 'win' : ''}"><div class="rh-score"><b>${s}</b><span class="${s - p < 0 ? 'tp-under' : s - p > 0 ? 'tp-over' : 'tp-even'}">${fmtToPar(s - p)}</span></div><div><div class="rh-pos">${vs ? esc(vs.up > 0 ? `You beat ${vs.name}!` : vs.up < 0 ? `${vs.name} wins the match` : 'Match halved') : 'Round complete'}</div><div class="muted">${vs ? `${esc(vs.text)} · ` : ''}${holeList.filter((i) => scores[i] != null).length} hole${holeList.length > 1 ? 's' : ''} · par ${p}</div></div></section>
       ${bestShotCard(app.lastBestShot)}
       ${scorecardHtml(course, scores, hstats)}
       <div class="actions"><button class="btn primary big" data-a="startQuick">Play again</button><button class="btn" data-a="quick">Change setup</button><button class="btn" data-a="title">Main menu</button></div>

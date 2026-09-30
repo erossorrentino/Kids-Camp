@@ -704,3 +704,63 @@ tr.me td { color: var(--flag); }
 .bestshot b { font: 700 20px/1.15 var(--display); text-transform: uppercase; letter-spacing: .02em; }
 .bs-icon { width: 44px; height: 44px; border-radius: 50%; background: #c8322c; display: grid; place-items: center; font-size: 18px; flex: none; }
 @media (max-width: 560px) { .bestshot { flex-wrap: wrap; } .bestshot .btn { width: 100%; } }
+
+/* ---------------- rival & sponsors ---------------- */
+.rivalcard { display: flex; gap: 14px; align-items: flex-start; border-left: 4px solid #ff5a4e; }
+.rivalcard.won { border-left-color: var(--good); }
+.rivalcard.lost { border-left-color: #ff5a4e; }
+.rv-pic { flex: none; width: 96px; height: 120px; border-radius: 6px; overflow: hidden; background: linear-gradient(180deg, #5b2a2a, #1c1414); border: 0; padding: 0; cursor: pointer; }
+.rv-pic img { width: 100%; height: 100%; object-fit: cover; }
+.rv-body { flex: 1; display: grid; gap: 4px; }
+.rv-body small { font: 700 12px/1 var(--display); letter-spacing: .12em; text-transform: uppercase; color: #ff8a80; }
+.rv-body h3 { margin: 0; }
+.rivalcard blockquote { margin: 4px 0 0; padding: 8px 12px; border-radius: 12px 12px 12px 2px; background: rgba(255,255,255,.07); font: italic 600 16px/1.35 var(--body); color: #f3e9e8; }
+.rivalcard.small blockquote { font-size: 14px; }
+.lb-row.rival .lb-name em { font: 800 9px/1 var(--display); letter-spacing: .08em; font-style: normal; color: #fff; background: #c8322c; padding: 2px 4px; border-radius: 3px; vertical-align: 2px; }
+.sponsors { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 10px; }
+.sponsorcard { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border-radius: var(--r); background: rgba(14,33,24,.92); border: 1px solid var(--line); }
+.sponsorcard.on { border-color: var(--flag); }
+.sp-logo { flex: none; width: 92px; height: 54px; border-radius: 6px; display: grid; place-items: center; font: 800 17px/1 var(--display); letter-spacing: .04em; text-align: center; padding: 0 4px; box-shadow: inset 0 0 0 2px rgba(255,255,255,.25); }
+.sp-body { flex: 1; display: grid; gap: 3px; min-width: 0; }
+.sp-body small { font: 600 11px/1 var(--display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.sp-body h4 { margin: 0; font: 700 18px/1.1 var(--display); text-transform: uppercase; }
+.sp-terms { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 13px; color: #d1ddd5; }
+.sp-terms b { color: var(--good); }
+@media (max-width: 560px) { .rv-pic { width: 70px; height: 88px; } .sponsorcard { flex-wrap: wrap; } }
+
+/* ---------------- daily challenge ---------------- */
+.mbtn.daily { border-color: rgba(255,138,80,.55); background: linear-gradient(90deg, rgba(255,120,60,.22), rgba(255,255,255,.04)); }
+.daily-card { display: grid; grid-template-columns: 240px 1fr; gap: 0; padding: 0; overflow: hidden; }
+.daily-card .gc-art { height: 100%; min-height: 160px; }
+.daily-card .gc-art svg { height: 150px; }
+.daily-kicker { font: 700 12px/1 var(--display); letter-spacing: .12em; text-transform: uppercase; color: #ff9a62; }
+.daily-target { font: 700 18px/1.2 var(--display); text-transform: uppercase; letter-spacing: .03em; }
+.daily-target b { color: var(--flag); }
+.daily-beat { font: 700 18px/1.3 var(--display); color: #ffb37a; margin-top: 4px; }
+.dweek { display: grid; grid-template-columns: repeat(7, 1fr); gap: 6px; }
+.dw { display: grid; justify-items: center; gap: 4px; padding: 8px 0; border-radius: 6px; background: rgba(255,255,255,.04); }
+.dw small { font: 600 11px/1 var(--display); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.dw i { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-style: normal; font-weight: 800; background: rgba(255,255,255,.07); }
+.dw.beat i { background: #ff7a3c; color: #1b0c05; }
+.dw.tried i { background: rgba(255,255,255,.18); }
+.dw.today { outline: 2px solid var(--flag); }
+@media (max-width: 560px) { .daily-card { grid-template-columns: 1fr; } }
+.hr-vs { font: 700 16px/1.3 var(--display); letter-spacing: .04em; text-transform: uppercase; color: #ffb09f; margin-top: 6px; }
+
+/* ---------------- Legends Cup ---------------- */
+.cupcard, .cup-hero { display: flex; align-items: center; gap: 16px; }
+.cup-trophy { font-size: 46px; line-height: 1; filter: drop-shadow(0 3px 8px rgba(0,0,0,.4)); }
+.cupcard > div:nth-child(2) { flex: 1; }
+.cupcard h3 { margin-bottom: 4px; }
+.cupcard p { margin: 0; }
+.team.legends { border-top: 4px solid var(--flag); }
+.team.world { border-top: 4px solid #ff5a4e; }
+.teamlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.teamlist li { display: flex; align-items: center; gap: 10px; padding: 4px; border-radius: 6px; cursor: pointer; }
+.teamlist li:hover { background: rgba(255,255,255,.05); }
+.teamlist img { width: 44px; height: 54px; object-fit: cover; border-radius: 4px; background: rgba(255,255,255,.06); }
+.teamlist span { display: grid; }
+.teamlist small { color: var(--muted); }
+.teamlist .captain b { color: var(--flag); }
+.cupmatches td.win { color: var(--good); font-weight: 700; }
+.cupmatches td:nth-child(2) { text-align: center; }

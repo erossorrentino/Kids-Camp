@@ -6,6 +6,8 @@ import { proById, generatePros } from '../data/players.js';
 import { FORMATS, PARTY_COLORS } from '../game/party.js';
 import { WEATHERS, TIMES } from '../game/weather.js';
 import { bestShotCard } from './eventScreens.js';
+import { targetText, liveStreak, dailyReward, dayKey } from '../game/daily.js';
+import { CUP_HOLES, CUP_PRIZE } from '../game/cup.js';
 import { TRAITS } from '../data/traits.js';
 import { GAMES, GAME_ORDER, MINI_PRIZES } from '../game/minigames.js';
 
@@ -93,14 +95,71 @@ export function miniResults(screens, app, res, extra = {}) {
           <div class="rh-pos">${win ? 'You win!' : res.pos <= 3 ? 'On the podium' : res.pos <= n / 2 ? 'In the mix' : 'Keep practising'}</div>
           <div class="muted">Finished ${ordinal(res.pos)} of ${n} · Your score: <b>${esc(res.scoreText)}</b>${extra.record ? ' <span class="pill gold">New personal best</span>' : ''}</div>
           ${detail ? `<div class="muted small">${esc(detail)}</div>` : ''}
-          ${extra.prize ? `<div class="prize-line">+${money(extra.prize)} prize money</div>` : extra.prizeNote ? `<div class="muted small">${esc(extra.prizeNote)}</div>` : ''}
+          ${extra.daily ? dailyLine(extra.daily, app.settings.units) : ''}
+          ${extra.prize ? `<div class="prize-line">+${money(extra.prize)} ${extra.daily ? 'daily reward' : 'prize money'}</div>` : extra.prizeNote ? `<div class="muted small">${esc(extra.prizeNote)}</div>` : ''}
         </div>
       </section>
       <section class="card"><h3>Standings</h3><div class="table-wrap"><table class="tbl"><thead><tr><th>Pos</th><th>Player</th><th>Score</th>${extra.prizeOn ? '<th>Prize</th>' : ''}</tr></thead><tbody>
         ${res.rows.map((r) => `<tr class="${r.you ? 'me' : ''}" ${r.you ? '' : `data-a="pro" data-id="${r.id}"`}><td>${r.pos}</td><td>${esc(r.you ? 'You' : r.name)}</td><td><b>${esc(r.text)}</b></td>${extra.prizeOn ? `<td>${money(MINI_PRIZES[r.pos - 1] || 1000, true)}</td>` : ''}</tr>`).join('')}
       </tbody></table></div></section>
-      <div class="actions"><button class="btn primary big" data-a="playMini" data-g="${res.kind}">Play again</button><button class="btn" data-a="minigames">Other mini-games</button><button class="btn" data-a="title">Main menu</button></div>
+      <div class="actions">${extra.daily ? '<button class="btn primary big" data-a="playDaily">Try again</button><button class="btn" data-a="daily">Daily challenge</button>' : `<button class="btn primary big" data-a="playMini" data-g="${res.kind}">Play again</button><button class="btn" data-a="minigames">Other mini-games</button>`}<button class="btn" data-a="title">Main menu</button></div>
     </div>`);
+}
+
+function dailyLine(dd, units) {
+  const t = targetText(dd.ch, units);
+  if (dd.newlyBeat) return `<div class="daily-beat">🔥 Target beaten (${esc(t)})! Streak: <b>${dd.streak} day${dd.streak === 1 ? '' : 's'}</b></div>`;
+  if (dd.beat) return `<div class="muted small">Target beaten again · streak ${dd.streak}</div>`;
+  return `<div class="muted small">Target: ${esc(t)}. Not this time. Try again as often as you like today.</div>`;
+}
+
+// Today's challenge
+export function dailyScreen(screens, app, ch, d) {
+  const course = courseById(ch.courseId);
+  const m = GAMES[ch.kind];
+  const day = d.days[ch.key];
+  const streak = liveStreak(d, ch.key);
+  const skyTxt = { day: 'Daytime', sunset: 'Sunset', night: 'Night under lights', rain: 'Rain' }[ch.sky];
+  const wind = ch.kind === 'putt' ? 'No wind on the green' : app.settings.units === 'meters' ? `${(ch.windMph * 0.447).toFixed(1)} m/s wind` : `${ch.windMph} mph wind`;
+  const best = day && day.best != null ? (ch.kind === 'ctp' ? (day.best === Infinity ? 'No score' : fmtBest(day.best, app.settings.units)) : ch.kind === 'drive' ? fmtLongU(day.best, app.settings.units) : `${day.best} pts`) : '—';
+  const [y, mo, dd] = ch.key.split('-').map(Number);
+  const date = new Date(y, mo - 1, dd).toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric' });
+  const week = [];
+  for (let k = 6; k >= 0; k--) {
+    const dt = new Date(y, mo - 1, dd - k);
+    const key = dayKey(dt);
+    const e = d.days[key];
+    week.push(`<div class="dw ${e && e.beat ? 'beat' : e ? 'tried' : ''} ${key === ch.key ? 'today' : ''}"><small>${dt.toLocaleDateString(undefined, { weekday: 'short' })}</small><i>${e && e.beat ? '✓' : e ? '·' : ''}</i></div>`);
+  }
+  screens.show(`
+    <div class="page narrow">
+      <header class="page-head"><button class="back" data-a="title">← Back</button><h2>Daily challenge</h2><span class="muted">${esc(date)}</span></header>
+      <section class="card daily-card">
+        <div class="gc-art">${ICONS[ch.kind]}</div>
+        <div class="gc-body">
+          <small class="daily-kicker">Today's challenge</small>
+          <h3>${esc(m.name)}</h3>
+          <p>${esc(course.name)} · ${esc(skyTxt)} · ${esc(wind)}</p>
+          <div class="daily-target">Beat: <b>${esc(targetText(ch, app.settings.units))}</b></div>
+          <div class="chips">${m.rules.map((r) => `<span class="pill">${esc(r)}</span>`).join('')}</div>
+          <div class="gc-foot"><div class="gc-rec"><small>Your best today</small><b>${esc(best)}</b>${day ? `<span class="muted small">${day.tries} tr${day.tries === 1 ? 'y' : 'ies'}${day.beat ? ' · target beaten' : ''}</span>` : ''}</div><button class="btn primary big" data-a="playDaily">${day ? 'Try again' : 'Play'}</button></div>
+        </div>
+      </section>
+      <section class="card"><div class="card-head"><h3>Streak</h3><span class="pill ${streak ? 'gold' : ''}">🔥 ${streak} day${streak === 1 ? '' : 's'}</span></div>
+        <div class="dweek">${week.join('')}</div>
+        <p class="muted small">Beat the target to keep your streak going: miss a day and it starts again. ${app.career ? `Your career golfer earns ${money(dailyReward(1), true)} for beating it, plus ${money(5000, true)} more for every day of your streak (up to ${money(dailyReward(9), true)}).` : 'Start a career to earn prize money for daily wins.'}</p>
+      </section>
+    </div>`);
+}
+
+function fmtBest(m, units) {
+  if (units === 'meters') return `${m.toFixed(1)} m`;
+  const ft = m / 0.3048;
+  const f = Math.floor(ft), inch = Math.round((ft - f) * 12);
+  return inch === 12 ? `${f + 1} ft` : `${f} ft ${inch} in`;
+}
+function fmtLongU(m, units) {
+  return units === 'meters' ? `${Math.round(m)} m` : `${Math.round(m / 0.9144)} yds`;
 }
 
 // ---------------------------------------------------------------- friends
@@ -206,4 +265,51 @@ export function partyResults(screens, app, party) {
       <section class="card scorecard"><h3>Scorecard</h3>${partyCardHtml(course, party)}</section>
       <div class="actions"><button class="btn primary big" data-a="startParty">Play again</button><button class="btn" data-a="party">Change setup</button><button class="btn" data-a="title">Main menu</button></div>
     </div>`);
+}
+
+// ---------------------------------------------------------------- Legends Cup
+export function cupScreen(screens, app, c, info, meOvr) {
+  const course = courseById(info.courseId);
+  const t = info.teams;
+  const row = (p, side) => `<li data-a="pro" data-id="${p.id}"><img data-portrait="${p.id}" alt=""><span><b>${esc(p.name)}</b><small>${esc(p.country)} · OVR ${p.ovr}</small></span></li>`;
+  screens.show(`
+    <div class="page narrow">
+      <header class="page-head"><button class="back" data-a="hub">← Hub</button><h2>The Legends Cup</h2><span class="pill gold">Season ${c.year}</span></header>
+      <section class="card cup-hero">
+        <div class="cup-trophy" aria-hidden="true">🏆</div>
+        <div><h3>Team Legends vs Team World</h3><p>Five singles matches over ${CUP_HOLES} holes at <b>${esc(course.name)}</b>. You captain Team Legends and play the first match against Team World's captain, your rival <b>${esc(t.rival.name)}</b>. Every match won is a point; a halved match is half a point each.</p>
+        <p class="muted small">Winning team: ${money(CUP_PRIZE.win)} each and the Cup in your trophy room. Losing team: ${money(CUP_PRIZE.lose)} each. Pros you own join your team first.</p></div>
+      </section>
+      <div class="cols cup-teams">
+        <section class="card team legends"><h3>Team Legends</h3><ul class="teamlist">
+          <li class="captain"><img data-portrait="me" alt=""><span><b>${esc(c.golfer.name)} (C)</b><small>You · OVR ${meOvr}</small></span></li>
+          ${t.mates.map((p) => row(p)).join('')}</ul></section>
+        <section class="card team world"><h3>Team World</h3><ul class="teamlist">
+          <li class="captain" data-a="pro" data-id="${t.rival.id}"><img data-portrait="${t.rival.id}" alt=""><span><b>${esc(t.rival.name)} (C)</b><small>Your rival · OVR ${t.rival.ovr}</small></span></li>
+          ${t.world.map((p) => row(p)).join('')}</ul></section>
+      </div>
+      <div class="actions"><button class="btn primary big" data-a="cupPlay">Play your match</button><button class="btn" data-a="cupSim">Simulate it</button></div>
+    </div>`);
+  screens.fillCharPortraits(c);
+}
+
+export function cupResults(screens, app, c, res) {
+  const head = res.won ? 'Team Legends win the Cup!' : res.tied ? 'The Cup is shared' : 'Team World win the Cup';
+  screens.show(`
+    <div class="page narrow">
+      <header class="page-head"><h2>The Legends Cup</h2><span class="pill gold">Season ${c.year}</span></header>
+      <section class="card result-hero ${res.won ? 'win' : ''}">
+        <div class="rh-score"><b>${fmtHalf(res.pts[0])}</b><span>–${fmtHalf(res.pts[1])}</span></div>
+        <div><div class="rh-pos">${esc(head)}</div><div class="muted">You earned ${money(res.prize)}${res.won ? ' and the Cup goes in your trophy room' : ''}.</div></div>
+      </section>
+      <section class="card"><h3>Matches</h3><div class="table-wrap"><table class="tbl cupmatches"><thead><tr><th>Team Legends</th><th>Result</th><th>Team World</th></tr></thead><tbody>
+        ${res.matches.map((m) => `<tr class="${m.mine ? 'me' : ''}"><td class="${m.up > 0 ? 'win' : ''}">${esc(m.aName)}</td><td><b>${esc(m.text)}</b></td><td class="${m.up < 0 ? 'win' : ''}">${esc(m.bName)}</td></tr>`).join('')}
+      </tbody></table></div></section>
+      ${bestShotCard(app.lastBestShot)}
+      <div class="actions"><button class="btn primary big" data-a="hub">Back to the hub</button></div>
+    </div>`);
+}
+
+function fmtHalf(v) {
+  return Number.isInteger(v) ? String(v) : `${Math.floor(v)}½`;
 }

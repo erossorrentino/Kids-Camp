@@ -57,10 +57,12 @@ export class RoundController {
     this.destroyed = false;
     this.bag = normBag(this.golfer.bag);
     this.table = clubTable(this.golfer.stats, this.fx, this.ball, this.aero, 1.225 * Math.exp(-this.altitude / 8500), this.bag);
+    // match play against a pro whose hole scores are known in advance
+    this.versus = opts.versus ? { ...opts.versus, up: 0, decided: null, short: opts.versus.name.split(' ').slice(-1)[0] } : null;
     // friends taking turns on one device
     this.party = opts.party || null;
     if (this.party) this.setupParty();
-    else this.world.setGolfer({ ...this.golfer.look, gender: this.golfer.gender });
+    else this.world.setGolfer({ ...this.golfer.look, gender: this.golfer.gender }, this.golfer.name);
   }
 
   // ---------------- multiplayer ----------------
@@ -1097,9 +1099,32 @@ export class RoundController {
       this.resumeAt = performance.now() + 5600;
       return;
     }
-    this.hud.holeResult(this.strokes, par, scoreName(this.strokes, par), this.scoreToPar());
+    const vs = this.applyVersus(i, this.strokes);
+    this.hud.holeResult(this.strokes, par, scoreName(this.strokes, par), this.scoreToPar(), vs);
     if (this.opts.onHoleDone) this.opts.onHoleDone(i, this.strokes, hs);
-    this.resumeAt = performance.now() + 2600;
+    this.resumeAt = performance.now() + (vs ? 3400 : 2600);
+  }
+
+  // Match play: compare this hole with the opponent's score
+  applyVersus(i, strokes) {
+    const v = this.versus;
+    if (!v) return '';
+    const them = v.scores[i];
+    v.up += strokes < them ? 1 : strokes > them ? -1 : 0;
+    const left = this.holeList.length - this.pos - 1;
+    const res = strokes < them ? 'you win the hole' : strokes > them ? `${v.short} wins the hole` : 'hole halved';
+    if (Math.abs(v.up) > left) v.decided = { up: v.up, left };
+    v.thru = (v.thru || 0) + 1;
+    this.hud.setVersus(v, left);
+    return `${v.short} made ${them}: ${res} · ${this.versusText(left)}`;
+  }
+
+  versusText(left = this.holeList.length - this.pos - 1) {
+    const v = this.versus;
+    if (!v) return '';
+    if (v.decided) return v.up > 0 ? `You win ${v.up}${left ? `&${left}` : ' up'}` : `${v.short} wins ${-v.up}${left ? `&${left}` : ' up'}`;
+    if (v.up === 0) return 'All square';
+    return v.up > 0 ? `You're ${v.up} up` : `${v.short} ${-v.up} up`;
   }
 
   simCurrentHole() {
@@ -1121,14 +1146,15 @@ export class RoundController {
     this.lastHoleRel = strokes - par;
     const hs = { strokes, par, putts: null, penalties: 0, fairway: null, gir: null, simmed: true };
     this.holeStats[i] = hs;
-    this.hud.holeResult(strokes, par, `${scoreName(strokes, par)} (simulated)`, this.scoreToPar());
+    const vs = this.applyVersus(i, strokes);
+    this.hud.holeResult(strokes, par, `${scoreName(strokes, par)} (simulated)`, this.scoreToPar(), vs);
     if (this.opts.onHoleDone) this.opts.onHoleDone(i, strokes, hs);
-    this.resumeAt = performance.now() + 1800;
+    this.resumeAt = performance.now() + (vs ? 3000 : 1800);
   }
 
   nextHole() {
     this.pos++;
-    if (this.pos >= this.holeList.length || (this.party && this.party.over())) {
+    if (this.pos >= this.holeList.length || (this.party && this.party.over()) || (this.versus && this.versus.decided)) {
       this.phase = 'done';
       if (this.opts.onRoundDone) this.opts.onRoundDone(this.scores, this.holeStats);
       return;

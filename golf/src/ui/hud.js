@@ -124,6 +124,15 @@ export class HUD {
     pad.addEventListener('pointermove', (e) => { if (e.buttons) setFrom(e); });
   }
 
+  // Match play against a pro: the status next to the scorecard
+  setVersus(v, left) {
+    const el = this.$('playerTag');
+    const txt = this.round ? this.round.versusText(left) : '';
+    el.innerHTML = `<i style="background:#ff5a4e"></i><b>vs ${esc(v.short)}</b><span>${esc(txt)}${v.thru ? ` · thru ${v.thru}` : ''}</span>`;
+    el.style.setProperty('--pc', '#ff5a4e');
+    el.hidden = false;
+  }
+
   attach(round) {
     this.round = round;
     this.root.hidden = false;
@@ -135,7 +144,11 @@ export class HUD {
     this.$('hc').hidden = !!mode;
     this.$('btnCard').hidden = !!mode;
     this.$('btnSim').hidden = !!mode || !!round.party;
-    this.$('playerTag').hidden = !round.party;
+    this.$('playerTag').hidden = !round.party && !round.versus;
+    if (round.versus) {
+      const v = round.versus;
+      this.$('playerTag').innerHTML = `<i style="background:#ff5a4e"></i><b>vs ${esc(v.short)}</b><span>Match play · all square</span>`;
+    }
     this.$('ballName').textContent = round.ball.name;
     this.root.classList.toggle('party', !!round.party);
   }
@@ -400,12 +413,12 @@ export class HUD {
   }
   hideIntro() { this.$('intro').hidden = true; }
 
-  holeResult(strokes, par, name, toPar) {
+  holeResult(strokes, par, name, toPar, extra = '') {
     const el = this.$('holeRes');
     const rel = strokes - par;
     const cls = rel <= -2 ? 'eagle' : rel === -1 ? 'birdie' : rel === 0 ? 'par' : rel === 1 ? 'bogey' : 'double';
     el.className = `holeres ${cls}`;
-    el.innerHTML = `<div class="hr-name">${esc(name)}</div><div class="hr-sub">${strokes} on a par ${par} · Today ${fmtToPar(toPar)}</div>`;
+    el.innerHTML = `<div class="hr-name">${esc(name)}</div><div class="hr-sub">${strokes} on a par ${par} · Today ${fmtToPar(toPar)}</div>${extra ? `<div class="hr-vs">${esc(extra)}</div>` : ''}`;
     el.hidden = false;
     this.$('msg').hidden = true;
     this.setToday(toPar);
@@ -444,8 +457,13 @@ export class HUD {
     const nameOf = this.app.nameOf;
     const top = lb.slice(0, 5);
     if (me && !top.includes(me)) top.push(me);
+    // keep an eye on your rival
+    const rid = this.app.career && this.app.career.rival && this.app.career.rival.id;
+    const rv = rid ? lb.find((x) => x.id === rid) : null;
+    if (rv && !top.includes(rv)) top.push(rv);
+    top.sort((a, b) => lb.indexOf(a) - lb.indexOf(b));
     el.innerHTML = `<div class="lb-title">${esc(r.opts.tournament.name)} · R${r.opts.tournament.round + 1}</div>` + top.map((x) => `
-      <div class="lb-row${x.human ? ' me' : ''}"><span class="lb-pos">${x.pos}</span><span class="lb-name">${esc(x.human ? 'You' : nameOf(x.id, true))}</span><span class="lb-tp ${toParClass(x.toPar)}">${fmtToPar(x.toPar)}</span><span class="lb-thru">${x.thru === 18 ? 'F' : x.thru || '-'}</span></div>`).join('');
+      <div class="lb-row${x.human ? ' me' : ''}${x === rv ? ' rival' : ''}"><span class="lb-pos">${x.pos}</span><span class="lb-name">${esc(x.human ? 'You' : nameOf(x.id, true))}${x === rv ? ' <em>RIVAL</em>' : ''}</span><span class="lb-tp ${toParClass(x.toPar)}">${fmtToPar(x.toPar)}</span><span class="lb-thru">${x.thru === 18 ? 'F' : x.thru || '-'}</span></div>`).join('');
     const pos = me ? me.pos : '';
     this.$('hcPos').textContent = pos ? `Pos ${pos}` : '';
   }

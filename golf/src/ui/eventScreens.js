@@ -7,6 +7,7 @@ import { TOURS, scoringBonuses, bonusTotal, MISSED_CUT_PAY } from '../data/tour.
 import { leaderboard, coursePar, humanPlayer, CUT_SIZE } from '../game/tournament.js';
 import { ACHIEVEMENTS } from '../game/career.js';
 import { weatherText, timeText } from '../game/weather.js';
+import { rivalTaunt as rivalTauntFn } from '../game/rival.js';
 
 function windWords(mph) {
   return mph < 4 ? 'Calm' : mph < 10 ? 'Light breeze' : mph < 16 ? 'Breezy' : mph < 22 ? 'Windy' : 'Blowing a gale';
@@ -54,6 +55,7 @@ export function eventIntro(screens, app, c, t) {
         ${payInfo(t)}
         <div class="actions left"><button class="btn primary big" data-a="playRound">${shot ? `Resume hole ${shot.hole + 1}, shot ${shot.strokes + 1}` : played ? `Resume at hole ${played + 1}` : `Tee off round ${r + 1}`}</button><button class="btn" data-a="simRound">Simulate this round</button></div>
       </section>
+      ${rivalTaunt(c, t)}
       ${r === 0 ? `<section class="card"><h3>Players to watch</h3><ul class="favs">${favs.map((p) => `<li data-a="pro" data-id="${p.id}"><b>${esc(p.name)}</b> <span class="muted">${esc(p.country)} · OVR ${p.ovr}</span></li>`).join('')}</ul></section>` : `<section class="card"><h3>Leaderboard</h3>${boardTable(t, app.nameOf, { limit: 10, full: true })}</section>`}
     </div>`);
 }
@@ -81,6 +83,18 @@ export function roundSummary(screens, app, c, t, info) {
     </div>`);
 }
 
+function rivalTaunt(c, t) {
+  const rv = c.rival;
+  if (!rv || !t.players.some((p) => p.id === rv.id)) return '';
+  const p = proById(rv.id);
+  const row = t.round > 0 ? leaderboard(t, { full: true }).find((x) => x.id === rv.id) : null;
+  return `<section class="card rivalcard small"><div class="rv-body"><small>Your rival is here</small><h3>${esc(p.name)}${row ? ` <span class="muted">${esc(row.pos)} (${fmtToPar(row.toPar)})</span>` : ''}</h3><blockquote>“${esc(rivalTauntText(c, t))}”</blockquote></div></section>`;
+}
+
+function rivalTauntText(c, t) {
+  return rivalTauntFn(c, `${t.id}-${t.round}`);
+}
+
 // The round's highlight, with a button to watch it again
 export function bestShotCard(shot) {
   if (!shot) return '';
@@ -103,10 +117,12 @@ function bonusSoFar(c, t) {
 
 function paycheck(hr) {
   const b = hr.bonus || { total: 0, lines: [] };
-  const rows = [[hr.made ? `Prize money (${hr.posText})` : 'Missed-cut paycheck', hr.money], ...b.lines.map((l) => [`${l.name} bonus × ${l.n}`, l.amount])];
+  const sp = hr.sponsor || { total: 0, lines: [] };
+  const rv = hr.rival && hr.rival.bonus ? [['Beat your rival at a major', hr.rival.bonus]] : [];
+  const rows = [[hr.made ? `Prize money (${hr.posText})` : 'Missed-cut paycheck', hr.money], ...b.lines.map((l) => [`${l.name} bonus × ${l.n}`, l.amount]), ...sp.lines.map((l) => [`${l.name} (${l.what})`, l.amount]), ...rv];
   return `<section class="card paycheck"><h3>Your paycheck</h3>
     <table class="tbl"><tbody>${rows.map(([k, v]) => `<tr><td>${esc(k)}</td><td class="num">${money(v)}</td></tr>`).join('')}
-    <tr class="me"><td><b>Total</b></td><td class="num"><b>${money(hr.money + b.total)}</b></td></tr></tbody></table>
+    <tr class="me"><td><b>Total</b></td><td class="num"><b>${money(hr.money + b.total + sp.total + (hr.rival && hr.rival.bonus || 0))}</b></td></tr></tbody></table>
     <p class="muted small">Spend it on better players in the Players tab.</p></section>`;
 }
 
@@ -128,12 +144,24 @@ export function eventResults(screens, app, c, t, summary) {
         <div class="muted">${money(hr ? hr.money + ((hr.bonus && hr.bonus.total) || 0) : 0)} earned · ${hr ? hr.pts.toFixed(1) : 0} ranking points · World rank #${summary.rankAfter} (${rankMove})</div></div>
       </section>
       ${pay}
+      ${rivalBattle(hr, summary)}
       <div class="rewards"><div class="reward"><b>+${summary.xp} XP</b></div>${lvl}${ach}</div>
       ${po}
       <section class="card"><h3>Final leaderboard</h3>${boardTable(t, app.nameOf, { limit: 15, full: true })}</section>
       ${se ? `<section class="card highlight"><h3>Season ${se.year} complete</h3><p>Season champion: <b>${esc(app.nameOf(se.champion))}</b>. Money leader: <b>${esc(app.nameOf(se.moneyLeader))}</b>. You finish the season ranked #${se.yourRank} with ${money(se.yourSeasonMoney)} earned.</p></section>` : ''}
       <div class="actions"><button class="btn primary big" data-a="hub">Continue</button></div>
     </div>`);
+}
+
+function rivalBattle(hr, summary) {
+  const rv = hr && hr.rival;
+  let html = '';
+  if (rv) {
+    const head = rv.beat > 0 ? `You beat ${esc(rv.name)}!` : rv.beat < 0 ? `${esc(rv.name)} beat you this time` : `You tied with ${esc(rv.name)}`;
+    html += `<section class="card rivalcard ${rv.beat > 0 ? 'won' : rv.beat < 0 ? 'lost' : ''}"><div class="rv-body"><small>Rival battle</small><h3>${head}</h3><div class="muted">You ${esc(String(rv.me))} · ${esc(rv.name.split(' ').slice(-1)[0])} ${esc(String(rv.them))} · Head to head ${rv.w}–${rv.l}${rv.t ? `–${rv.t}` : ''}</div><blockquote>“${esc(rv.quote)}”</blockquote></div></section>`;
+  }
+  if (summary.newRival) html += `<section class="card highlight"><h3>A new rival!</h3><p>You've left ${esc(proById(summary.newRival.old).name)} behind. <b>${esc(proById(summary.newRival.id).name)}</b> has noticed you, and says you won't be ahead for long.</p></section>`;
+  return html;
 }
 
 export function scorecardHtml(course, scores, holeStats = []) {

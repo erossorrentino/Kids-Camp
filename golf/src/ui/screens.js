@@ -19,6 +19,8 @@ import { HUMAN_ID } from '../game/tournament.js';
 import { CHARACTERS, CHAR_BY_ID, CHAR_TIERS, playAs, abilityList, charBoostOf, marketItem, proPrice } from '../data/characters.js';
 import { fillPortraits } from '../render/portrait.js';
 import { WEATHERS, TIMES } from '../game/weather.js';
+import { BRAND_BY_ID, SLOTS, sponsorOffers, SPONSOR_TIERS } from '../game/sponsors.js';
+import { cupAvailable, CUP_WEEK } from '../game/cup.js';
 
 const TOUR_TAG = { CH: 'Challenger', WT: 'World Tour', MAJ: 'Major', FIN: 'Finale' };
 
@@ -85,6 +87,7 @@ export class Screens {
           <button class="mbtn" data-a="quick"><span>Quick round</span><small>Any course, any pro, any conditions</small></button>
           <button class="mbtn" data-a="party"><span>Play with friends</span><small>2 to 4 players · stroke play, match play or skins</small></button>
           <button class="mbtn" data-a="minigames"><span>Mini-games</span><small>Range, closest to the pin, long drive, putting, targets</small></button>
+          <button class="mbtn daily" data-a="daily"><span>Daily challenge</span><small>A new challenge every day · keep your streak alive</small></button>
           <button class="mbtn" data-a="players"><span>Tour players</span><small>All 500 pros, their strengths and weaknesses</small></button>
           <button class="mbtn" data-a="courses"><span>Courses</span><small>100 championship courses in 8 styles</small></button>
           <button class="mbtn" data-a="howto"><span>How to play</span><small>Swing, aim, spin and reading greens</small></button>
@@ -155,7 +158,7 @@ export class Screens {
     const prev = c.prevRank[HUMAN_ID];
     const move = prev && prev !== r ? `<span class="${prev > r ? 'up' : 'down'}">${prev > r ? '▲' : '▼'}${Math.abs(prev - r)}</span>` : '';
     const lvlPct = Math.round((g.xp / xpForLevel(g.level)) * 100);
-    const tabs = [['week', 'This week'], ['schedule', 'Schedule'], ['rankings', 'World ranking'], ['race', 'Season race'], ['players', 'Players'], ['golfer', 'Golfer'], ['shop', 'Pro shop'], ['trophies', 'Trophy room']];
+    const tabs = [['week', 'This week'], ['schedule', 'Schedule'], ['rankings', 'World ranking'], ['race', 'Season race'], ['players', 'Players'], ['golfer', 'Golfer'], ['sponsors', 'Sponsors'], ['shop', 'Pro shop'], ['trophies', 'Trophy room']];
     let body = '';
     if (tab === 'week') body = this.hubWeek(c);
     else if (tab === 'schedule') body = this.hubSchedule(c);
@@ -165,6 +168,7 @@ export class Screens {
     else if (tab === 'players') body = this.charShop(c);
     else if (tab === 'shop') body = this.hubShop(c);
     else if (tab === 'trophies') body = this.hubTrophies(c);
+    else if (tab === 'sponsors') body = this.hubSponsors(c);
     this.show(`
       <div class="page">
         <header class="hub-head">
@@ -220,11 +224,56 @@ export class Screens {
       ${activeHtml}
       ${act ? '' : `<div class="events">${wk.events.map((ev) => this.eventCard(c, ev, ev.tour !== 'CH')).join('')}</div>
       <div class="actions left"><button class="btn ghost" data-a="skipWeek">Skip this week</button></div>`}
+      ${cupAvailable(c) ? `<section class="card highlight cupcard"><div class="cup-trophy" aria-hidden="true">🏆</div><div><h3>The Legends Cup is here</h3><p>Captain Team Legends against your rival's Team World: five 9-hole matches. It doesn't use up a week.</p></div><button class="btn primary" data-a="cup">Play the Cup</button></section>` : c.week < CUP_WEEK && !(c.cup && c.cup.year === c.year) ? `<p class="muted small">The Legends Cup team match opens in week ${CUP_WEEK}.</p>` : ''}
+      ${this.rivalCard(c)}
       <div class="cols">
         <section class="card"><h3>Goals</h3>${this.goals(c)}</section>
         <section class="card"><h3>Around the tour</h3>${news ? `<ul class="news">${news}</ul>` : '<p class="muted">The season is just getting started.</p>'}
           ${last ? `<p class="muted small">Your last event: ${esc(last.name)}, ${last.posText === 'CUT' ? 'missed the cut' : `finished ${last.posText}`} (${fmtToPar(last.toPar)})</p>` : ''}</section>
       </div>`;
+  }
+
+  rivalCard(c) {
+    const r = c.rival;
+    if (!r) return '';
+    const p = proById(r.id);
+    const rank = rankOf(c, r.id);
+    const last = r.last;
+    return `<section class="card rivalcard">
+      <button class="rv-pic" data-a="pro" data-id="${r.id}" aria-label="${esc(p.name)}"><img data-portrait="${r.id}" data-pose="fist" alt=""></button>
+      <div class="rv-body">
+        <small>Your rival</small>
+        <h3>${esc(p.name)} <span class="cc">${esc(p.country)}</span></h3>
+        <div class="muted small">World #${rank} · Overall ${p.ovr} · Head to head <b>${r.w}–${r.l}${r.t ? `–${r.t}` : ''}</b></div>
+        <blockquote>“${esc(last ? last.quote : r.taunt)}”</blockquote>
+        <p class="muted small">${esc(p.first)} turns up at every event you play. Finish ahead of them for bragging rights, and a ${money(50000, true)} bonus at a major.</p>
+      </div>
+    </section>`;
+  }
+
+  hubSponsors(c) {
+    const g = c.golfer;
+    const rank = rankOf(c);
+    const cur = c.sponsors || {};
+    const offers = sponsorOffers(c, rank);
+    const deal = (d, slot, current) => {
+      const b = BRAND_BY_ID[d.brand];
+      return `<article class="sponsorcard ${current ? 'on' : ''}">
+        <div class="sp-logo" style="background:${b.bg};color:${b.fg}">${esc(b.short)}</div>
+        <div class="sp-body">
+          <small>${esc(SLOTS[slot])} · ${esc(d.tierName)} deal</small>
+          <h4>${esc(b.name)}</h4>
+          <div class="sp-terms"><span><b>${money(d.perEvent, true)}</b> every event</span><span><b>${money(d.top10, true)}</b> top 10</span><span><b>${money(d.win, true)}</b> win</span></div>
+        </div>
+        <div class="sp-act">${current ? '<span class="pill gold">Signed</span>' : `<button class="btn primary" data-a="signSponsor" data-k="${d.key}">Sign</button>`}</div>
+      </article>`;
+    };
+    const next = SPONSOR_TIERS.slice().reverse().find((t) => t.need < rank);
+    return `<p class="muted">Companies pay you to show their name: on your <b>cap and shirt</b>, and on your <b>golf bag</b>. They pay for every event you play, plus bonuses for top-10 finishes and wins, until the end of the season. Climb the world ranking and bigger brands come calling.</p>
+      <div class="cols">${Object.keys(SLOTS).map((slot) => `<section class="card"><h3>${esc(SLOTS[slot])}</h3>${cur[slot] ? deal(cur[slot], slot, true) : '<p class="muted">No sponsor yet. Sign one below.</p>'}</section>`).join('')}</div>
+      <h3 class="shop-cat">Offers for you</h3>
+      <div class="sponsors">${offers.filter((o) => !cur[o.slot] || cur[o.slot].key !== o.key).map((o) => deal(o, o.slot, false)).join('')}</div>
+      ${next ? `<p class="muted small">Reach world #${next.need} for ${esc(next.name)} deals.</p>` : ''}`;
   }
 
   goals(c) {
@@ -648,6 +697,9 @@ export class Screens {
           <div class="row2">
             <div><label for="q-time">Time of day</label><select id="q-time" data-field="q.time">${TIMES.map(([v, l]) => `<option value="${v}" ${q.time === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
             <div><label for="q-weather">Weather</label><select id="q-weather" data-field="q.weather"><option value="course" ${!q.weather || q.weather === 'course' ? 'selected' : ''}>Typical for the course</option>${Object.entries(WEATHERS).map(([v, l]) => `<option value="${v}" ${q.weather === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+          </div>
+          <div class="row2">
+            <div><label for="q-vs">Opponent</label><select id="q-vs" data-field="q.vs"><option value="" ${!q.vs ? 'selected' : ''}>None (stroke play)</option>${this.app.career && this.app.career.rival ? `<option value="rival" ${q.vs === 'rival' ? 'selected' : ''}>Match play vs your rival</option>` : ''}<option value="random" ${q.vs === 'random' ? 'selected' : ''}>Match play vs a tour star</option></select></div>
           </div>
           <div class="row2">
             <div><label for="q-pin">Pins</label><select id="q-pin" data-field="q.pin"><option value="0" ${q.pin === '0' ? 'selected' : ''}>Friendly</option><option value="1" ${q.pin === '1' ? 'selected' : ''}>Tournament</option><option value="3" ${q.pin === '3' ? 'selected' : ''}>Sunday tucked</option></select></div>
