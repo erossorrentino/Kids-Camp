@@ -255,3 +255,217 @@ export class Marks {
     m.instanceMatrix.needsUpdate = true;
   }
 }
+
+// ---------------------------------------------------------------- markers
+// Balls left where they finished, with a floating label (mini-games, other
+// players' balls). Labels keep a steady size on screen.
+function pillTexture(text, color) {
+  const cv = document.createElement('canvas');
+  cv.width = 256; cv.height = 72;
+  const g = cv.getContext('2d');
+  const r = 30;
+  g.fillStyle = 'rgba(12,30,21,0.88)';
+  g.beginPath();
+  g.moveTo(r, 4); g.lineTo(256 - r, 4); g.arc(256 - r, 36, 32, -Math.PI / 2, Math.PI / 2); g.lineTo(r, 68); g.arc(r, 36, 32, Math.PI / 2, -Math.PI / 2);
+  g.fill();
+  g.lineWidth = 4;
+  g.strokeStyle = color;
+  g.stroke();
+  g.fillStyle = color;
+  g.beginPath(); g.arc(34, 36, 13, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#ffffff';
+  g.font = '700 38px "Barlow Condensed", Arial, sans-serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(text, 142, 38, 180);
+  const t = new THREE.CanvasTexture(cv);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+export class BallMarkers {
+  constructor(max = 14) {
+    this.group = new THREE.Group();
+    this.items = [];
+    this.max = max;
+    this.ballGeo = new THREE.SphereGeometry(BALL_R, 12, 8);
+    this.ballMat = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x222222 });
+    this.tmp = new THREE.Vector3();
+  }
+  addTo(scene) { scene.add(this.group); }
+  disposeItem(it) {
+    this.group.remove(it.grp);
+    if (it.sprite) { it.sprite.material.map.dispose(); it.sprite.material.dispose(); }
+  }
+  reset() {
+    for (const it of this.items) this.disposeItem(it);
+    this.items = [];
+  }
+  add(x, y, z, { label = '', color = '#ffffff', flag = false, fade = 0, ball = true } = {}) {
+    if (this.items.length >= this.max) this.disposeItem(this.items.shift());
+    const it = { x, y, z, t: 0, fade, grp: new THREE.Group() };
+    it.grp.position.set(x, y, z);
+    if (ball) {
+      it.ball = new THREE.Mesh(this.ballGeo, this.ballMat);
+      it.ball.position.y = BALL_R;
+      it.grp.add(it.ball);
+    }
+    if (label) {
+      it.sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: pillTexture(label, color), depthTest: false, transparent: true }));
+      it.sprite.center.set(0.5, 0);
+      it.sprite.renderOrder = 9;
+      it.grp.add(it.sprite);
+    }
+    // a small leader flag
+    const fg = new THREE.Group();
+    const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.015, 0.015, 1.4, 6), new THREE.MeshLambertMaterial({ color: '#f5f5f0' }));
+    pole.position.y = 0.7;
+    const fl = new THREE.Mesh(new THREE.PlaneGeometry(0.5, 0.32), new THREE.MeshLambertMaterial({ color: '#f2c230', side: THREE.DoubleSide }));
+    fl.position.set(0.25, 1.24, 0);
+    fg.add(pole, fl);
+    fg.position.set(0.12, 0, 0.12);
+    fg.visible = flag;
+    it.flag = fg;
+    it.grp.add(fg);
+    this.group.add(it.grp);
+    this.items.push(it);
+    return it;
+  }
+  setLeader(i) { this.items.forEach((it, k) => { it.flag.visible = k === i; }); }
+  update(dt, camera) {
+    for (let i = this.items.length - 1; i >= 0; i--) {
+      const it = this.items[i];
+      it.t += dt;
+      if (it.fade && it.t > it.fade) { this.disposeItem(it); this.items.splice(i, 1); continue; }
+      const d = camera.position.distanceTo(this.tmp.set(it.x, it.y, it.z));
+      if (it.ball) it.ball.scale.setScalar(Math.max(1, d / 45));
+      if (it.sprite) {
+        const hgt = Math.max(0.12, d * 0.036);
+        it.sprite.scale.set(hgt * 3.55, hgt, 1);
+        it.sprite.position.y = 0.12 + Math.min(1.2, d * 0.01);
+        it.sprite.material.opacity = it.fade ? Math.min(1, (it.fade - it.t) / 1.5) : 1;
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------- celebrations
+// Confetti and fireworks for aces, bullseyes and wins
+export class Celebration {
+  constructor() {
+    this.max = 1400;
+    const geo = new THREE.BufferGeometry();
+    this.pos = new Float32Array(this.max * 3);
+    this.col = new Float32Array(this.max * 3);
+    geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
+    geo.setAttribute('color', new THREE.BufferAttribute(this.col, 3));
+    this.points = new THREE.Points(geo, new THREE.PointsMaterial({ size: 0.28, vertexColors: true, transparent: true, depthWrite: false, map: dotTexture(), alphaTest: 0.05, blending: THREE.AdditiveBlending }));
+    this.points.frustumCulled = false;
+    this.points.renderOrder = 7;
+    this.live = [];
+    this.rockets = [];
+    this.palette = ['#f2c230', '#ff5fa2', '#3a86ff', '#7fd05a', '#ffffff', '#ff7b39', '#c792ff'].map((c) => new THREE.Color(c));
+  }
+  burst(x, y, z, n, speed, colors, life = 1.6, drag = 0.9, grav = 4) {
+    for (let i = 0; i < n && this.live.length < this.max; i++) {
+      const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, s = Math.sqrt(1 - u * u);
+      const v = speed * (0.6 + Math.random() * 0.4);
+      this.live.push({ x, y, z, vx: Math.cos(a) * s * v, vy: u * v, vz: Math.sin(a) * s * v, life: life * (0.7 + Math.random() * 0.5), max: life, color: colors[i % colors.length], drag, grav });
+    }
+  }
+  // Confetti around a spot plus a few fireworks overhead
+  celebrate(p, color = null, big = true) {
+    const cols = color ? [new THREE.Color(color), new THREE.Color('#ffffff'), ...this.palette.slice(0, 3)] : this.palette;
+    this.burst(p.x, p.y + 1.2, p.z, 220, 7, cols, 2.4, 0.97, 3);
+    if (!big) return;
+    for (let k = 0; k < 4; k++) {
+      this.rockets.push({ x: p.x + (Math.random() - 0.5) * 16, y: p.y + 1, z: p.z + (Math.random() - 0.5) * 16, vy: 24 + Math.random() * 8, t: 0.9 + k * 0.45 + Math.random() * 0.3, color: this.palette[(k * 2 + 1) % this.palette.length] });
+    }
+  }
+  update(dt) {
+    for (let i = this.rockets.length - 1; i >= 0; i--) {
+      const r = this.rockets[i];
+      r.t -= dt;
+      r.y += r.vy * dt;
+      r.vy -= 9.8 * dt;
+      this.burst(r.x, r.y, r.z, 2, 0.6, [new THREE.Color('#ffd27a')], 0.35, 0.9, 2);
+      if (r.t <= 0 || r.vy < 2) {
+        this.burst(r.x, r.y, r.z, 160, 14, [r.color, r.color, new THREE.Color('#ffffff')], 1.8, 0.94, 3);
+        this.rockets.splice(i, 1);
+      }
+    }
+    const L = this.live;
+    for (let i = L.length - 1; i >= 0; i--) {
+      const p = L[i];
+      p.life -= dt;
+      if (p.life <= 0) { L.splice(i, 1); continue; }
+      const d = Math.pow(p.drag, dt * 60);
+      p.vx *= d; p.vy *= d; p.vz *= d;
+      p.vy -= p.grav * dt;
+      p.x += p.vx * dt; p.y += p.vy * dt; p.z += p.vz * dt;
+    }
+    for (let i = 0; i < L.length; i++) {
+      const p = L[i];
+      const f = Math.min(1, p.life / (p.max * 0.4));
+      this.pos[i * 3] = p.x; this.pos[i * 3 + 1] = p.y; this.pos[i * 3 + 2] = p.z;
+      this.col[i * 3] = p.color.r * f; this.col[i * 3 + 1] = p.color.g * f; this.col[i * 3 + 2] = p.color.b * f;
+    }
+    const g = this.points.geometry;
+    g.attributes.position.needsUpdate = true;
+    g.attributes.color.needsUpdate = true;
+    g.setDrawRange(0, L.length);
+  }
+}
+
+// ---------------------------------------------------------------- rain
+// Streaks falling in a box that follows the camera, slanted by the wind
+export class Rain {
+  constructor(n = 2200) {
+    this.n = n;
+    this.pos = new Float32Array(n * 6);
+    this.drops = [];
+    for (let i = 0; i < n; i++) this.drops.push({ x: 0, y: 0, z: 0, v: 0, init: false });
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
+    this.mat = new THREE.LineBasicMaterial({ color: 0xd4dde6, transparent: true, opacity: 0.38, depthWrite: false });
+    this.mesh = new THREE.LineSegments(geo, this.mat);
+    this.mesh.frustumCulled = false;
+    this.mesh.visible = false;
+    this.mesh.renderOrder = 8;
+    this.level = 0;
+  }
+  setLevel(l) {
+    this.level = l;
+    this.mesh.visible = l > 0;
+    this.mat.opacity = 0.22 + 0.25 * l;
+  }
+  spawn(d, cam, top = true) {
+    const R = 34;
+    d.x = cam.x + (Math.random() * 2 - 1) * R;
+    d.z = cam.z + (Math.random() * 2 - 1) * R;
+    d.y = top ? cam.y + 14 + Math.random() * 10 : cam.y + (Math.random() * 2 - 1) * 16;
+    d.v = 11 + Math.random() * 4;
+    d.init = true;
+  }
+  update(dt, camera, wind) {
+    if (!this.mesh.visible) return;
+    const cam = camera.position;
+    const wx = (wind ? wind.x : 0) * 0.6, wz = (wind ? wind.z : 0) * 0.6;
+    const active = Math.round(this.n * Math.min(1, 0.35 + this.level * 0.65));
+    const p = this.pos;
+    for (let i = 0; i < this.n; i++) {
+      const d = this.drops[i];
+      const o = i * 6;
+      if (i >= active) { p[o] = p[o + 3] = cam.x; p[o + 1] = p[o + 4] = cam.y - 999; p[o + 2] = p[o + 5] = cam.z; continue; }
+      if (!d.init) this.spawn(d, cam, false);
+      d.y -= d.v * dt;
+      d.x += wx * dt;
+      d.z += wz * dt;
+      if (d.y < cam.y - 16 || Math.abs(d.x - cam.x) > 40 || Math.abs(d.z - cam.z) > 40) this.spawn(d, cam, true);
+      const k = 0.045;
+      p[o] = d.x; p[o + 1] = d.y; p[o + 2] = d.z;
+      p[o + 3] = d.x - wx * k; p[o + 4] = d.y + d.v * k; p[o + 5] = d.z - wz * k;
+    }
+    this.mesh.geometry.attributes.position.needsUpdate = true;
+  }
+}

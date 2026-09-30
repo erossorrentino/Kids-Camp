@@ -29,6 +29,8 @@ export class RoundController {
     this.world = app.world;
     this.hud = app.hud;
     this.opts = opts;
+    // a mini-game (or other special format) that decides what each shot means
+    this.mode = opts.mode || null;
     this.course = opts.course;
     this.holeList = opts.holeList;
     this.golfer = opts.golfer;
@@ -53,7 +55,98 @@ export class RoundController {
     this.destroyed = false;
     this.bag = normBag(this.golfer.bag);
     this.table = clubTable(this.golfer.stats, this.fx, this.ball, this.aero, 1.225 * Math.exp(-this.altitude / 8500), this.bag);
-    this.world.setGolfer({ ...this.golfer.look, gender: this.golfer.gender });
+    // friends taking turns on one device
+    this.party = opts.party || null;
+    if (this.party) this.setupParty();
+    else this.world.setGolfer({ ...this.golfer.look, gender: this.golfer.gender });
+  }
+
+  // ---------------- multiplayer ----------------
+  setupParty() {
+    const rho = 1.225 * Math.exp(-this.altitude / 8500);
+    for (const p of this.party.players) {
+      const g = p.golfer;
+      const fx = traitEffects(g.traits || []);
+      const ball = BALL_BY_ID[g.ball] || BALL_BY_ID.tourbal;
+      const aero = ballAero(ball, g.stats, fx);
+      const bag = normBag(g.bag);
+      p.kit = { golfer: g, fx, ball, aero, bag, table: clubTable(g.stats, fx, ball, aero, rho, bag) };
+      p.lastRel = 0;
+    }
+    this.world.clearGolfers();
+    this.cur = 0;
+    Object.assign(this, this.party.players[0].kit);
+    this.scores = this.party.players[0].scores;
+    this.holeStats = this.party.players[0].holeStats;
+  }
+
+  // Everything about the current player's ball on this hole
+  saveState(p) {
+    p.st = {
+      ...p.st, ballPos: { ...this.ballPos }, prevPos: this.prevPos ? { ...this.prevPos } : null, lie: this.lie, plugged: this.plugged,
+      strokes: this.strokes, putts: this.putts, penalties: this.penalties, hitFairway: this.hitFairway, girHit: this.girHit, dispMult: this.dispMult,
+    };
+  }
+
+  loadState(p) {
+    const s = p.st;
+    this.ballPos = { ...s.ballPos };
+    this.prevPos = s.prevPos ? { ...s.prevPos } : null;
+    this.lie = s.lie;
+    this.plugged = s.plugged;
+    this.strokes = s.strokes;
+    this.putts = s.putts;
+    this.penalties = s.penalties;
+    this.hitFairway = s.hitFairway;
+    this.girHit = s.girHit;
+    this.dispMult = s.dispMult ?? 1;
+    this.scores = p.scores;
+    this.holeStats = p.holeStats;
+  }
+
+  // Hand the round to player i: their golfer, clubs, ball and position
+  switchTo(i) {
+    const p = this.party.players[i];
+    this.cur = i;
+    Object.assign(this, p.kit);
+    this.loadState(p);
+    this.world.useGolfer(`party${i}`, { ...p.golfer.look, gender: p.golfer.gender }, p.name);
+    this.hud.setPlayer(p, this.party, this.scoreToPar());
+    this.showOtherBalls();
+  }
+
+  // The other players' balls, each labelled with its owner
+  showOtherBalls() {
+    const m = this.world.markers;
+    m.reset();
+    for (const p of this.party.players) {
+      if (p.i === this.cur || !p.st || p.st.done || !p.st.strokes) continue;
+      const b = p.st.ballPos;
+      m.add(b.x, b.y, b.z, { label: p.name, color: p.color });
+    }
+  }
+
+  // Whoever is away plays next
+  nextTurn() {
+    const party = this.party;
+    this.saveState(party.players[this.cur]);
+    const next = party.next((p) => this.hole.distToPin(p.st.ballPos.x, p.st.ballPos.z));
+    if (next < 0) return;
+    const changed = next !== this.cur;
+    this.switchTo(next);
+    const p = party.players[next];
+    if (changed || p.st.strokes === 0) {
+      const d = this.hole.distToPin(p.st.ballPos.x, p.st.ballPos.z);
+      const sub = p.st.strokes === 0 ? (party.teed.size === 0 ? 'Has the honor' : 'On the tee') : `${this.fmtDist(d, true)} to the pin · shot ${p.st.strokes + 1}`;
+      this.hud.turnBanner(p.name, p.color, sub);
+    }
+    this.prepareShot();
+  }
+
+  // What happens after a shot comes to rest: same player, or the next one
+  resumePlay() {
+    if (this.party) this.nextTurn();
+    else this.prepareShot();
   }
 
   // ---------------- hole setup ----------------
@@ -89,7 +182,7 @@ export class RoundController {
 
   buildHole(i) {
     {
-      this.hole = new HoleModel(this.course, i, { pinDay: this.cond.pinDay || 0 });
+      this.hole = new HoleModel(this.course, i, { pinDay: this.cond.pinDay || 0, ...(this.opts.holeOpts || {}) });
       this.wind = this.windForHole(i);
       this.env = makeEnv(this.hole, { wind: this.wind.vec, firmness: this.cond.firm, stimp: this.cond.stimp, altitude: this.altitude });
       this.world.setConditions(this.cond, this.hole.style, this.hole.teeHeading);
@@ -119,6 +212,34 @@ export class RoundController {
       if (this.fx.hotHead && this.lastHoleRel > 0) this.dispMult *= 1.35;
       if (this.fx.slowStart && i < 3) this.dispMult *= 1.2;
       if (this.fx.lateFade > 0 && i >= 13) this.dispMult *= 1.15;
+      if (this.party) {
+        const party = this.party;
+        party.startHole(i);
+        for (const p of party.players) {
+          const fx = p.kit.fx;
+          let dm = 1;
+          if (fx.hotHead && p.lastRel > 0) dm *= 1.35;
+          if (fx.slowStart && i < 3) dm *= 1.2;
+          if (fx.lateFade > 0 && i >= 13) dm *= 1.15;
+          p.st = { ballPos: { ...this.ballPos }, prevPos: { ...this.ballPos, lie: 'tee' }, lie: 'tee', plugged: false, strokes: 0, putts: 0, penalties: 0, hitFairway: null, girHit: false, dispMult: dm, done: false };
+        }
+        const first = party.next(() => 0);
+        this.switchTo(first);
+        this.hud.setHole(this.hole, this.course, this.strokes, this.scoreToPar());
+        this.hud.updateBoard();
+        this.hud.turnBanner(party.players[first].name, party.players[first].color, i === this.holeList[0] ? 'Tees off first' : 'Has the honor');
+        if (this.app.settings.flyover) this.startIntro(); else this.prepareShot(true);
+        return;
+      }
+      if (this.mode) {
+        this.mode.onHoleLoaded(this);
+        const sp = this.mode.startPos(this);
+        if (sp) { this.ballPos = { ...sp }; this.prevPos = { ...sp, lie: this.hole.surfaceAt(sp.x, sp.z) }; }
+        this.hud.setMode(this.mode.hud(this));
+        this.hud.updateBoard();
+        if (this.app.settings.flyover && this.mode.flyover) this.startIntro(); else this.prepareShot(true);
+        return;
+      }
       // Pick up a saved hole in progress where the last shot finished
       const rs = this.opts.resume;
       if (rs && rs.hole === i && rs.ball) {
@@ -208,6 +329,7 @@ export class RoundController {
       this.club = sug.clubId;
     }
     this.forceClub = false;
+    if (this.mode && this.mode.prepare) this.mode.prepare(this);
     this.aimDefault();
     this.phase = 'aim';
     this.viewMode = 'address';
@@ -223,6 +345,7 @@ export class RoundController {
     this.hud.setLie(this.lieInfo());
     this.hud.setStrokes(this.strokes);
     this.hud.showSwingHint(true);
+    if (this.mode) this.hud.setMode(this.mode.hud(this));
     if (this.strokes > 0 && this.opts.onShotState) this.opts.onShotState(this.shotState());
   }
 
@@ -243,7 +366,9 @@ export class RoundController {
     const h = this.hole;
     const b = this.ballPos;
     let target;
-    if (this.putting) target = h.pin;
+    const mt = this.mode && this.mode.aimPoint ? this.mode.aimPoint(this) : null;
+    if (mt) target = mt;
+    else if (this.putting) target = h.pin;
     else {
       const carry = this.table[this.club] ? this.table[this.club].carry : 100;
       target = h.suggestAim(b.x, b.z, carry);
@@ -272,6 +397,7 @@ export class RoundController {
       // driver off the deck is allowed (with a penalty in the launch model)
     }
     this.club = id;
+    if (this.mode && this.mode.onClubChange) this.mode.onClubChange(this);
     if (!this.aimManual) this.aimDefault();
     this.updateGolfer();
     this.updatePrediction();
@@ -429,8 +555,9 @@ export class RoundController {
     } else if (this.putting) {
       const pin = this.hole.pin;
       const d = this.distToPin;
-      const back = clamp(1.6 + d * 0.12, 1.8, 4.5);
-      w.setCamera(V(b.x - f.x * back + r.x * 0.25, gy + clamp(0.9 + d * 0.06, 1, 2.6), b.z - f.z * back + r.z * 0.25), V(b.x + f.x * Math.min(d, 12) * 0.7, (gy + pin.y) / 2, b.z + f.z * Math.min(d, 12) * 0.7), 46, fast ? 10 : 3.5);
+      // behind the ball and a little to the right, clear of the golfer
+      const back = clamp(2.2 + d * 0.12, 2.7, 5);
+      w.setCamera(V(b.x - f.x * back + r.x * 0.55, gy + clamp(1.2 + d * 0.06, 1.35, 2.8), b.z - f.z * back + r.z * 0.55), V(b.x + f.x * Math.min(d, 12) * 0.7, (gy + pin.y) / 2, b.z + f.z * Math.min(d, 12) * 0.7), 46, fast ? 10 : 3.5);
     } else {
       const land = this.pred ? this.pred.land : { x: b.x + f.x * 100, z: b.z + f.z * 100 };
       const ld = Math.hypot(land.x - b.x, land.z - b.z);
@@ -442,8 +569,10 @@ export class RoundController {
       const tall = w.camera.aspect < 0.8;
       // a short landscape phone: tilt down a little so the ball clears the HUD
       const short = !tall && window.innerHeight < 540;
-      const back = tall ? 5 : 3.7, side = tall ? -0.2 : 0.55;
-      w.setCamera(V(b.x - f.x * back + r.x * side, gy + (tall ? 2.1 : 1.75), b.z - f.z * back + r.z * side), V(b.x + f.x * lookD, lookY - (short ? 0.12 * lookD : 0), b.z + f.z * lookD), short ? 54 : 50, fast ? 10 : 3.5);
+      const mc = this.mode && this.mode.cam;
+      const back = mc ? mc.back + (tall ? 1.5 : 0) : tall ? 5 : 3.7, side = mc ? mc.side : tall ? -0.2 : 0.55;
+      const up = mc ? mc.up + (tall ? 0.5 : 0) : tall ? 2.1 : 1.75;
+      w.setCamera(V(b.x - f.x * back + r.x * side, gy + up, b.z - f.z * back + r.z * side), V(b.x + f.x * lookD, lookY - (short ? 0.12 * lookD : 0), b.z + f.z * lookD), short ? 54 : 50, fast ? 10 : 3.5);
     }
     w.focus.set(b.x, gy, b.z);
   }
@@ -476,8 +605,9 @@ export class RoundController {
   shotInfo() {
     const b = this.ballPos;
     const h = this.hole;
-    const d = this.distToPin;
-    const elev = h.pin.y - b.y;
+    const mt = this.mode && this.mode.distTarget ? this.mode.distTarget(this) : null;
+    const d = mt ? Math.hypot(mt.x - b.x, mt.z - b.z) : this.distToPin;
+    const elev = (mt ? mt.y : h.pin.y) - b.y;
     // wind component along the aim line (+ = helping)
     const f = fwdOf(this.heading);
     const along = (this.wind.vec.x * f.x + this.wind.vec.z * f.z);
@@ -499,6 +629,7 @@ export class RoundController {
       heading: this.heading,
       ball: this.ball,
       pressure: this.pressure(),
+      distLabel: mt ? mt.label : 'to pin',
     };
   }
 
@@ -569,6 +700,7 @@ export class RoundController {
     const b = this.ballPos;
     this.prevPos = { x: b.x, y: b.y, z: b.z, lie: this.lie, plugged: this.plugged };
     this.strokes++;
+    if (this.party) this.party.teed.add(this.cur);
     let res;
     let launchInfo = null;
     const pressure = this.pressure();
@@ -693,6 +825,11 @@ export class RoundController {
     this.fast = false;
     const shotStats = this.shotStats(fl);
     this.hud.showShotStats(shotStats);
+    if (this.mode) {
+      this.mode.shotDone(this, fl);
+      this.hud.setMode(this.mode.hud(this));
+      return;
+    }
     const par = h.par;
     const wasTee = fl.start && this.prevPos.lie === 'tee';
     if (res.outcome === 'holed') {
@@ -765,6 +902,19 @@ export class RoundController {
 
   afterPause(sec) {
     this.phase = 'result';
+    this.resumeAt = performance.now() + sec * 1000;
+  }
+
+  // Mini-games: play the next ball from `pos` after a pause
+  modeNext(pos, sec) {
+    this.ballPos = { x: pos.x, y: this.hole.heightAt(pos.x, pos.z), z: pos.z };
+    this.plugged = false;
+    this.afterPause(sec);
+  }
+
+  // Mini-games: the game is over; hand back after a pause
+  modeEnd(sec) {
+    this.phase = 'modeEnd';
     this.resumeAt = performance.now() + sec * 1000;
   }
 
@@ -849,6 +999,26 @@ export class RoundController {
       fairway: this.hitFairway, gir: this.girHit, pickedUp, simmed: false,
     };
     this.holeStats[i] = hs;
+    if (this.party) {
+      const party = this.party;
+      const p = party.players[this.cur];
+      this.saveState(p);
+      p.st.done = true;
+      p.lastRel = this.strokes - par;
+      this.hud.holeResult(this.strokes, par, `${p.name}: ${scoreName(this.strokes, par)}`, this.scoreToPar());
+      this.hud.updateBoard();
+      if (!party.allDone()) {
+        // the others still have to finish the hole
+        this.phase = 'result';
+        this.resumeAt = performance.now() + 2600;
+        return;
+      }
+      const line = party.holeFinished(i, par);
+      setTimeout(() => { if (!this.destroyed) this.hud.partyHole(party, i, par, line); }, 1900);
+      this.hud.updateBoard();
+      this.resumeAt = performance.now() + 5600;
+      return;
+    }
     this.hud.holeResult(this.strokes, par, scoreName(this.strokes, par), this.scoreToPar());
     if (this.opts.onHoleDone) this.opts.onHoleDone(i, this.strokes, hs);
     this.resumeAt = performance.now() + 2600;
@@ -880,7 +1050,7 @@ export class RoundController {
 
   nextHole() {
     this.pos++;
-    if (this.pos >= this.holeList.length) {
+    if (this.pos >= this.holeList.length || (this.party && this.party.over())) {
       this.phase = 'done';
       if (this.opts.onRoundDone) this.opts.onRoundDone(this.scores, this.holeStats);
       return;
@@ -911,10 +1081,14 @@ export class RoundController {
     } else if (this.phase === 'result' && this.resumeAt && performance.now() > this.resumeAt) {
       this.resumeAt = 0;
       this.world.tracer.reset();
-      this.prepareShot();
+      this.resumePlay();
     } else if (this.phase === 'holedone' && this.resumeAt && performance.now() > this.resumeAt) {
       this.resumeAt = 0;
       this.nextHole();
+    } else if (this.phase === 'modeEnd' && this.resumeAt && performance.now() > this.resumeAt) {
+      this.resumeAt = 0;
+      this.phase = 'done';
+      if (this.opts.onRoundDone) this.opts.onRoundDone(this.scores, this.holeStats);
     }
     if (this.phase === 'aim' || this.phase === 'swing') {
       const b = this.ballPos;

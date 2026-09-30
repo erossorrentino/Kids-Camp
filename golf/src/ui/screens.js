@@ -82,6 +82,8 @@ export class Screens {
           ${hasCareer ? `<button class="mbtn primary" data-a="continue"><span>Continue career</span><small>${esc(careerInfo)}</small></button>` : ''}
           ${loading ? '' : `<button class="mbtn ${hasCareer ? '' : 'primary'}" data-a="newCareer"><span>${hasCareer ? 'New career' : 'Start career'}</span><small>Create your golfer and turn pro</small></button>`}
           <button class="mbtn" data-a="quick"><span>Quick round</span><small>Any course, any pro, any conditions</small></button>
+          <button class="mbtn" data-a="party"><span>Play with friends</span><small>2 to 4 players · stroke play, match play or skins</small></button>
+          <button class="mbtn" data-a="minigames"><span>Mini-games</span><small>Range, closest to the pin, long drive, putting, targets</small></button>
           <button class="mbtn" data-a="players"><span>Tour players</span><small>All 500 pros, their strengths and weaknesses</small></button>
           <button class="mbtn" data-a="courses"><span>Courses</span><small>100 championship courses in 8 styles</small></button>
           <button class="mbtn" data-a="howto"><span>How to play</span><small>Swing, aim, spin and reading greens</small></button>
@@ -510,7 +512,7 @@ export class Screens {
     const sorts = [['rank', 'World rank'], ['ovr', 'Overall'], ...STAT_KEYS.map((k) => [k, STAT_LABELS[k]]), ['name', 'Name']];
     this.show(`
       <div class="page">
-        <header class="page-head"><button class="back" data-a="${opts.pick ? 'quick' : c && this.app.fromHub ? 'hub' : 'title'}">← Back</button><h2>${opts.pick ? 'Choose a pro to play as' : 'Tour players'}</h2><span class="muted">${total} of 500</span></header>
+        <header class="page-head"><button class="back" data-a="${opts.pick ? 'pickBack' : c && this.app.fromHub ? 'hub' : 'title'}">← Back</button><h2>${opts.pick ? 'Choose a pro to play as' : 'Tour players'}</h2><span class="muted">${total} of 500</span></header>
         <div class="toolbar">
           <input type="search" placeholder="Search name, country or trait (e.g. Bomber)" data-filter="players" value="${esc(opts.q || '')}" aria-label="Search players">
           <label class="inline">Sort <select data-filter="playersSort">${sorts.map(([k, v]) => `<option value="${k}" ${k === key ? 'selected' : ''}>${esc(v)}</option>`).join('')}</select></label>
@@ -557,7 +559,7 @@ export class Screens {
     const styles = Object.keys(STYLES);
     this.show(`
       <div class="page">
-        <header class="page-head"><button class="back" data-a="${opts.pick ? 'quick' : 'title'}">← Back</button><h2>${opts.pick ? 'Choose a course' : 'Courses'}</h2><span class="muted">${list.length} of 100</span></header>
+        <header class="page-head"><button class="back" data-a="${opts.pick ? 'pickBack' : 'title'}">← Back</button><h2>${opts.pick ? 'Choose a course' : 'Courses'}</h2><span class="muted">${list.length} of 100</span></header>
         <div class="toolbar">
           <input type="search" placeholder="Search course, region or country" data-filter="courses" value="${esc(opts.q || '')}" aria-label="Search courses">
           <div class="chips">${['', ...styles].map((s) => `<button class="chipbtn ${opts.style === s || (!opts.style && !s) ? 'on' : ''}" data-a="courseStyle" data-s="${s}">${s || 'All'}</button>`).join('')}</div>

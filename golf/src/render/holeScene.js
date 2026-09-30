@@ -85,6 +85,20 @@ function blobOutline(b, k = 1.25, n = 48) {
   return shape;
 }
 
+// (made per hole: the hole scene disposes its textures when it goes)
+function glowTexture() {
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = 64;
+  const g = cv.getContext('2d');
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,1)');
+  gr.addColorStop(0.25, 'rgba(255,240,200,0.55)');
+  gr.addColorStop(1, 'rgba(255,230,180,0)');
+  g.fillStyle = gr;
+  g.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(cv);
+}
+
 function flagTexture(n) {
   const cv = document.createElement('canvas');
   cv.width = 128; cv.height = 88;
@@ -219,6 +233,7 @@ export class HoleScene {
     this.buildMarkers();
 
     if (this.opts.crowd) this.buildCrowd();
+    if (this.opts.night) this.buildFloodlights();
 
     // --- surroundings ---
     this.group.add(buildGroundCover(hole, this.quality));
@@ -561,6 +576,80 @@ export class HoleScene {
         this.group.add(buildCameraTower(x, hole.heightAt(x, z), z, Math.atan2(g2.x - x, g2.z - z)));
       }
     }
+  }
+
+  // Night golf: floodlight towers down the hole, a few of them real lights
+  buildFloodlights() {
+    const hole = this.hole;
+    const grp = new THREE.Group();
+    const steel = new THREE.MeshLambertMaterial({ color: '#6f7780' });
+    const lampMat = new THREE.MeshBasicMaterial({ color: '#fff7de' });
+    const glowMat = new THREE.SpriteMaterial({ map: glowTexture(), color: '#ffe9b0', transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false });
+    const L = hole.length;
+    const n = Math.max(3, Math.round(L / 105));
+    const spots = [];
+    for (let k = 0; k <= n; k++) {
+      const s = -10 + ((L + 20) * k) / n;
+      const p = hole.pointAtS(s);
+      const r = { x: Math.cos(p.heading), z: Math.sin(p.heading) };
+      let side = k % 2 ? 1 : -1;
+      let lat = side * (hole.fwHalf + hole.roughW * 0.75 + 5);
+      let x = p.x + r.x * lat, z = p.z + r.z * lat;
+      let f = hole.fields(x, z);
+      if (f.dW < 5 || f.dO < 5 || f.dB < 3 || !hole.inBounds(x, z)) {
+        side = -side; lat = -lat;
+        x = p.x + r.x * lat; z = p.z + r.z * lat;
+        f = hole.fields(x, z);
+        if (f.dW < 5 || f.dO < 5 || f.dB < 3 || !hole.inBounds(x, z)) continue;
+      }
+      const a = hole.pointAtS(Math.min(L, s + 25));
+      spots.push({ x, z, ax: a.x, az: a.z });
+    }
+    const H = 17;
+    for (const sp of spots) {
+      const y = hole.heightAt(sp.x, sp.z);
+      const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.3, H, 8), steel);
+      pole.position.set(sp.x, y + H / 2, sp.z);
+      pole.castShadow = true;
+      const head = new THREE.Group();
+      head.position.set(sp.x, y + H + 0.6, sp.z);
+      head.lookAt(sp.ax, y + H * 0.2, sp.az);
+      const frame = new THREE.Mesh(new THREE.BoxGeometry(3.4, 1.6, 0.25), steel);
+      head.add(frame);
+      for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++) {
+        const lamp = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.52, 0.08), lampMat);
+        lamp.position.set(-1.2 + i * 0.8, -0.35 + j * 0.7, 0.16);
+        head.add(lamp);
+      }
+      const glow = new THREE.Sprite(glowMat);
+      glow.scale.set(9, 9, 1);
+      glow.position.set(0, 0, 0.8);
+      head.add(glow);
+      grp.add(pole, head);
+    }
+    // real light from a few towers: tee, green, and between
+    const max = this.quality === 'low' ? 2 : this.quality === 'medium' ? 4 : 6;
+    const pick = [0, spots.length - 1];
+    for (let k = 1; pick.length < Math.min(max, spots.length); k++) {
+      const i = Math.round((k * (spots.length - 1)) / (Math.min(max, spots.length) - 1));
+      if (!pick.includes(i)) pick.push(i); else if (k > 20) break;
+    }
+    for (const i of pick) {
+      const sp = spots[i];
+      if (!sp) continue;
+      const y = hole.heightAt(sp.x, sp.z);
+      const light = new THREE.SpotLight('#fff0d4', 2.6, 0, 0.72, 0.6, 0);
+      light.position.set(sp.x, y + H, sp.z);
+      light.target.position.set(sp.ax, hole.heightAt(sp.ax, sp.az), sp.az);
+      grp.add(light, light.target);
+    }
+    // the green gets its own pool of light
+    const g = hole.green;
+    const gl = new THREE.SpotLight('#fff4de', 2.2, 0, 0.5, 0.7, 0);
+    gl.position.set(g.x, hole.heightAt(g.x, g.z) + 30, g.z + 8);
+    gl.target.position.set(g.x, hole.heightAt(g.x, g.z), g.z);
+    grp.add(gl, gl.target);
+    this.group.add(grp);
   }
 
   cheer(strength = 1) {

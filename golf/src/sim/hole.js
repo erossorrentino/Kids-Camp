@@ -54,6 +54,8 @@ export class HoleModel {
   constructor(course, holeIndex, opts = {}) {
     this.course = course;
     this.index = holeIndex;
+    // range: a straight, wide, hazard-free practice ground
+    this.range = !!opts.range;
     this.info = course.holes[holeIndex];
     this.par = this.info.par;
     this.yards = this.info.yards;
@@ -84,7 +86,8 @@ export class HoleModel {
       pts.push({ x: last.x + f.x * dist, z: last.z + f.z * dist });
     };
     this.doglegs = [];
-    if (par === 3) {
+    if (this.range) h = 0;
+    if (par === 3 || this.range) {
       add(L);
     } else if (par === 4) {
       const s1 = clamp(rng.float(232, 262), L * 0.52, L - 105);
@@ -412,6 +415,30 @@ export class HoleModel {
     if (this.ocean) {
       if (this.ocean.side > 0) this.ob.right = false; else this.ob.left = false;
     }
+    if (this.range) this.makeRange();
+  }
+
+  // Practice ground: one broad fairway from a wide hitting area, gently
+  // rising toward the back so every ball stays in view
+  makeRange() {
+    this.elevDelta = 4;
+    this.macroAmp *= 0.3;
+    this.microAmp *= 0.4;
+    this.fairwayMicro = 0.1;
+    this.corridorRise = 2;
+    this.fwStart = 18;
+    this.fwEnd = this.length - 6;
+    this.fwHalf = 34;
+    this.fwWob = 0.03;
+    this.roughW = 26;
+    this.tee = { x: 0, z: 0, heading: this.teeHeading, halfW: 14, back: 8, front: 4 };
+    this.bunkers = [];
+    this.waters = [];
+    this.ocean = null;
+    this.cartPath = null;
+    this.greenTier = null;
+    this.ob = { left: false, right: false, dist: 999 };
+    this.doglegs = [];
   }
 
   // Field values: signed distances to every feature. Negative = inside.

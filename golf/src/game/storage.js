@@ -12,6 +12,7 @@
 const LOCAL_KEY = 'fairway-legends.career.v1';
 const BACKUP_KEY = 'fairway-legends.career.v1.bak';
 const SETTINGS_KEY = 'fairway-legends.settings.v1';
+const RECORDS_KEY = 'fairway-legends.records.v1';
 const CLOUD_LIMIT = 200000; // the account copy must stay well under 256 KiB
 
 let cloud = null; // { doc } once available
@@ -228,4 +229,17 @@ export function loadSettings() {
 
 export function saveSettings(s) {
   try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch (e) { /* ignore */ }
+}
+
+// Personal bests in the mini-games (kept on this device, career or not)
+export function loadRecords() {
+  try {
+    return JSON.parse(localStorage.getItem(RECORDS_KEY) || '{}') || {};
+  } catch (e) {
+    return {};
+  }
+}
+
+export function saveRecords(r) {
+  try { localStorage.setItem(RECORDS_KEY, JSON.stringify(r)); } catch (e) { /* ignore */ }
 }

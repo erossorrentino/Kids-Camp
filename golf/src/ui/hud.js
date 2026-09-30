@@ -13,6 +13,8 @@ export class HUD {
     this.round = null;
     root.innerHTML = `
       <div class="hud-top">
+        <div class="playertag panel" id="playerTag" hidden></div>
+        <div class="modecard panel" id="modeCard" hidden></div>
         <div class="holecard panel" id="hc">
           <div class="hc-row1"><span class="hc-hole" id="hcHole">HOLE 1</span><span class="hc-par" id="hcPar">PAR 4</span><span class="hc-yds" id="hcYds">400 YDS</span></div>
           <div class="hc-row2"><span>Shot <b id="hcShot">1</b></span><span>Today <b id="hcToday" class="tp-even">E</b></span><span id="hcPos"></span><span id="hcPressure" class="pressure" hidden>Pressure</span></div>
@@ -46,9 +48,9 @@ export class HUD {
           <button class="hbtn" data-h="view" id="btnView" title="Camera view (V)">View</button>
           <button class="hbtn" data-h="grid" id="btnGrid" title="Green slope grid (G)" hidden>Grid</button>
           <button class="hbtn" data-h="scale" id="btnScale" title="Putter range (R)" hidden>Range</button>
-          <button class="hbtn" data-h="card" title="Scorecard (C)">Card</button>
+          <button class="hbtn" data-h="card" id="btnCard" title="Scorecard (C)">Card</button>
           <button class="hbtn" data-h="board" id="btnBoard" title="Leaderboard (L)" hidden>Board</button>
-          <button class="hbtn" data-h="sim" title="Simulate this hole with your stats">Sim hole</button>
+          <button class="hbtn" data-h="sim" id="btnSim" title="Simulate this hole with your stats">Sim hole</button>
           <button class="hbtn" data-h="pause" title="Menu (Esc)">Menu</button>
         </div>
       </div>
@@ -68,6 +70,7 @@ export class HUD {
       </div>
       <svg class="swing-trail" id="swingTrail"><polyline id="trailLine" points=""/></svg>
       <div class="strike" id="strike" hidden></div>
+      <div class="turn" id="turn" hidden></div>
       <div class="msg" id="msg" hidden><div class="msg-title" id="msgTitle"></div><div class="msg-sub" id="msgSub"></div></div>
       <div class="stats panel" id="shotStats" hidden></div>
       <div class="intro panel" id="intro" hidden></div>
@@ -85,7 +88,7 @@ export class HUD {
     root.addEventListener('click', (e) => {
       const b = e.target.closest('[data-h]');
       if (!b || !this.round) return;
-      this.app.onHudAction(b.dataset.h);
+      this.app.onHudAction(b.dataset.h, b.dataset);
     });
     // Hold-to-aim buttons
     root.querySelectorAll('[data-hold]').forEach((btn) => {
@@ -123,9 +126,68 @@ export class HUD {
   attach(round) {
     this.round = round;
     this.root.hidden = false;
-    this.$('btnBoard').hidden = !round.opts.tournament;
-    this.$('lbStrip').hidden = !round.opts.tournament;
+    const mode = round.mode;
+    const board = !!round.opts.tournament || !!(mode && mode.board().length) || !!round.party;
+    this.$('btnBoard').hidden = !board;
+    this.$('lbStrip').hidden = !board;
+    this.$('modeCard').hidden = !mode;
+    this.$('hc').hidden = !!mode;
+    this.$('btnCard').hidden = !!mode;
+    this.$('btnSim').hidden = !!mode || !!round.party;
+    this.$('playerTag').hidden = !round.party;
     this.$('ballName').textContent = round.ball.name;
+    this.root.classList.toggle('party', !!round.party);
+  }
+
+  // Multiplayer: whose turn it is
+  setPlayer(p, party, toPar) {
+    const el = this.$('playerTag');
+    const extra = party.format === 'match' ? party.matchText() : party.format === 'skins' ? `${p.skins} skin${p.skins === 1 ? '' : 's'}${party.carry ? ` · ${party.carry + 1} on this hole` : ''}` : '';
+    el.innerHTML = `<i style="background:${p.color}"></i><b>${esc(p.name)}</b>${extra ? `<span>${esc(extra)}</span>` : ''}`;
+    el.style.setProperty('--pc', p.color);
+    el.hidden = false;
+    this.$('ballName').textContent = p.kit.ball.name;
+    this.setToday(toPar);
+    this.updateBoard();
+  }
+
+  turnBanner(name, color, sub = '') {
+    const el = this.$('turn');
+    el.innerHTML = `<b>${esc(name)}</b><span>${esc(sub || 'to play')}</span>`;
+    el.style.setProperty('--pc', color);
+    el.hidden = false;
+    el.classList.remove('pop');
+    void el.offsetWidth;
+    el.classList.add('pop');
+    clearTimeout(this._turnT);
+    this._turnT = setTimeout(() => { el.hidden = true; }, 2300);
+  }
+
+  // Everyone's score on the hole just finished, and what it meant
+  partyHole(party, i, par, line) {
+    const el = this.$('holeRes');
+    const rows = party.players.map((p) => {
+      const s = p.scores[i];
+      const rel = s - par;
+      const cls = rel <= -2 ? 'eagle' : rel === -1 ? 'birdie' : rel === 0 ? 'par' : rel === 1 ? 'bogey' : 'double';
+      return `<div class="ph-row"><i style="background:${p.color}"></i><span>${esc(p.name)}</span><b class="${cls}">${s}</b></div>`;
+    }).join('');
+    el.className = 'holeres party-hole';
+    el.innerHTML = `<div class="hr-name">Hole ${i + 1}</div>${rows}<div class="hr-sub">${esc(line)}</div>`;
+    el.hidden = false;
+    clearTimeout(this._hrT);
+    this._hrT = setTimeout(() => { el.hidden = true; }, 3600);
+  }
+
+  // Mini-game panel: title, progress, standings and target chips
+  setMode(info) {
+    const el = this.$('modeCard');
+    if (!info) { el.hidden = true; return; }
+    el.innerHTML = `<div class="mc-title">${esc(info.title)}</div>${info.sub ? `<div class="mc-sub">${esc(info.sub)}</div>` : ''}
+      ${(info.lines || []).map((l) => `<div class="mc-line">${esc(l)}</div>`).join('')}
+      ${info.chips && info.chips.length ? `<div class="mc-chips">${info.chips.map((c) => `<button class="mc-chip${c.on ? ' on' : ''}" data-h="${c.h}" data-i="${c.i}" style="--c:${c.color || '#fff'}">${esc(c.label)}</button>`).join('')}</div>` : ''}
+      ${info.buttons && info.buttons.length ? `<div class="mc-btns">${info.buttons.map((b) => `<button class="hbtn" data-h="${b.h}">${esc(b.label)}</button>`).join('')}</div>` : ''}`;
+    el.hidden = false;
   }
 
   detach() {
@@ -200,7 +262,7 @@ export class HUD {
     else this.$('clubCarry').textContent = info.carry ? `Full carry ${this.d(info.carry)} ${this.u(info.carry)}` : '';
     const small = info.putting;
     this.$('distPin').textContent = this.d(info.dist, small);
-    this.$('distUnit').textContent = ` ${this.u(info.dist, small)} to pin`;
+    this.$('distUnit').textContent = ` ${this.u(info.dist, small)} ${info.distLabel || 'to pin'}`;
     const elevTxt = Math.abs(info.elev) >= 0.3 ? `${info.elev > 0 ? 'Up' : 'Down'} ${this.units() === 'meters' ? Math.abs(info.elev).toFixed(1) + ' m' : Math.round(Math.abs(info.elev) / 0.3048) + ' ft'}` : 'Level';
     this.$('distSub').textContent = info.putting ? elevTxt : `Plays ${this.d(info.playsLike)} · ${elevTxt}`;
     this.$('windTxt').textContent = this.units() === 'meters' ? `${(info.windMph * 0.447).toFixed(1)} m/s` : `${Math.round(info.windMph)} mph`;
@@ -348,6 +410,27 @@ export class HUD {
   updateBoard() {
     const r = this.round;
     const el = this.$('lbStrip');
+    if (r && r.mode) {
+      const rows = r.mode.board();
+      if (!rows.length) return;
+      const me = rows.find((x) => x.you);
+      const top = rows.slice(0, 5);
+      if (me && !top.includes(me)) top.push(me);
+      el.innerHTML = `<div class="lb-title">${esc(r.mode.meta.name)}</div>` + top.map((x) => `
+        <div class="lb-row mode${x.you ? ' me' : ''}"><span class="lb-pos">${x.pos}</span><span class="lb-name">${esc(x.you ? 'You' : this.app.nameOf(x.id, true))}</span><span class="lb-tp">${esc(x.text)}</span></div>`).join('');
+      return;
+    }
+    if (r && r.party) {
+      const party = r.party;
+      const rows = party.standings();
+      const title = party.format === 'match' ? `Match play · ${party.matchText()}` : party.format === 'skins' ? `Skins${party.carry ? ` · ${party.carry + 1} on this hole` : ''}` : 'Stroke play';
+      el.innerHTML = `<div class="lb-title">${esc(title)}</div>` + rows.map((x) => {
+        const val = party.format === 'skins' ? `${x.skins}` : fmtToPar(x.toPar);
+        const cls = party.format === 'skins' ? '' : toParClass(x.toPar);
+        return `<div class="lb-row${x.i === r.cur ? ' me' : ''}"><span class="lb-pos"><i class="pdot" style="background:${x.color}"></i>${x.pos}</span><span class="lb-name">${esc(x.name)}</span><span class="lb-tp ${cls}">${val}</span><span class="lb-thru">${x.thru || '-'}</span></div>`;
+      }).join('');
+      return;
+    }
     if (!r || !r.opts.tournament || !r.opts.leaderboardFn) return;
     const lb = r.opts.leaderboardFn();
     const me = lb.find((x) => x.human);

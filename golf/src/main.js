@@ -10,7 +10,11 @@ import { eventIntro, roundSummary, eventResults, scorecardModal, boardModal, sco
 import { RoundController } from './game/round.js';
 import * as career from './game/career.js';
 import * as tourn from './game/tournament.js';
-import { loadCareer, saveCareer, deleteCareer, loadSettings, saveSettings, initCloud, hasCloud, flushSaves, onSaveStatus, saveStatus, setRemoteHandler } from './game/storage.js';
+import { loadCareer, saveCareer, deleteCareer, loadSettings, saveSettings, initCloud, hasCloud, flushSaves, onSaveStatus, saveStatus, setRemoteHandler, loadRecords, saveRecords } from './game/storage.js';
+import { MiniGame, MINI_PRIZES, betterScore, GAMES } from './game/minigames.js';
+import { miniMenu, miniResults, partySetup, partyResults, partyCardModal, PARTY_TIERS } from './ui/modeScreens.js';
+import { Party, PARTY_COLORS } from './game/party.js';
+import { YD } from './sim/hole.js';
 import { initAudio, setSound, sfx } from './audio.js';
 import { proById, generatePros } from './data/players.js';
 import { generateCourses, courseById } from './data/courses.js';
@@ -26,6 +30,9 @@ const $ = (id) => document.getElementById(id);
 
 const app = {
   settings: loadSettings(),
+  records: loadRecords(),
+  miniOpts: null,
+  pickFor: 'quick',
   career: null,
   round: null,
   aimHold: 0,
@@ -279,7 +286,7 @@ function setupKeys() {
 }
 
 // ---------------- HUD actions ----------------
-app.onHudAction = (a) => {
+app.onHudAction = (a, d = {}) => {
   const r = app.round;
   if (!r) return;
   sfx.click();
@@ -291,10 +298,12 @@ app.onHudAction = (a) => {
     case 'scale': r.cyclePuttScale(1); break;
     case 'shape': app.hud.toggleShape(); break;
     case 'shapeReset': r.setShape({ x: 0, y: 0 }); break;
-    case 'card': scorecardModal(r.course, r.scores, r.holeStats); break;
-    case 'board': if (r.opts.tournament) boardModal(r.opts.tournament, app.nameOf); break;
+    case 'card': if (r.party) partyCardModal(r.course, r.party); else scorecardModal(r.course, r.scores, r.holeStats); break;
+    case 'board': if (r.opts.tournament) boardModal(r.opts.tournament, app.nameOf); else if (r.mode) modeBoardModal(r.mode); else if (r.party) partyCardModal(r.course, r.party); break;
     case 'sim': confirmSim(); break;
     case 'pause': pauseMenu(); break;
+    case 'modeTarget': if (r.mode && r.mode.pickTarget) r.mode.pickTarget(r, parseInt(d.i, 10)); break;
+    case 'modeQuit': quitRound(); break;
     default: break;
   }
 };
@@ -325,7 +334,7 @@ function pauseMenu() {
     const p = b.dataset.p;
     if (p === 'sound') { app.settings.sound = b.checked; setSound(b.checked); saveSettings(app.settings); return; }
     m.close();
-    if (p === 'card') scorecardModal(r.course, r.scores, r.holeStats);
+    if (p === 'card') { if (r.party) partyCardModal(r.course, r.party); else scorecardModal(r.course, r.scores, r.holeStats); }
     else if (p === 'board') boardModal(t, app.nameOf);
     else if (p === 'howto') app.screens.howto();
     else if (p === 'quit') quitRound();
@@ -343,9 +352,14 @@ function endRound() {
 }
 
 function quitRound() {
-  const t = app.round && app.round.opts.tournament;
+  const r = app.round;
+  const t = r && r.opts.tournament;
+  const mode = r && r.mode;
   endRound();
   if (t) { saveCareer(app.career, { now: true }); goHub(); }
+  else if (mode && mode.kind === 'range') miniDone(mode);
+  else if (mode) openMini({});
+  else if (r && r.party) openParty({});
   else showTitle();
 }
 
@@ -450,7 +464,9 @@ app.onAction = (a, d, elx) => {
     case 'players': app.fromHub = false; app.playersOpts = { q: '', sort: 'rank', limit: 120 }; app.screens.players(app.playersOpts); break;
     case 'morePlayers': app.playersOpts.limit += 150; app.screens.players(app.playersOpts); break;
     case 'pro': app.screens.proCard(d.id); break;
-    case 'pickPro': app.quickOpts.proId = d.id; app.quickOpts.ball = proById(d.id).ball; app.screens.quick(app.quickOpts); break;
+    case 'pickPro':
+      if (app.pickFor === 'mini') { app.miniOpts.proId = d.id; openMini({}); break; }
+      app.quickOpts.proId = d.id; app.quickOpts.ball = proById(d.id).ball; app.screens.quick(app.quickOpts); break;
     case 'playAsPro': {
       document.querySelectorAll('.modal-wrap').forEach((m) => m.remove());
       openQuick({ proId: d.id });
@@ -459,11 +475,26 @@ app.onAction = (a, d, elx) => {
     case 'courses': app.coursesOpts = { q: '', style: '' }; app.screens.courses(app.coursesOpts); break;
     case 'courseStyle': app.coursesOpts.style = d.s; app.screens.courses(app.coursesOpts); break;
     case 'course': app.screens.courseCard(d.id); break;
-    case 'pickCourse': app.quickOpts.courseId = d.id; app.screens.quick(app.quickOpts); break;
+    case 'pickCourse':
+      if (app.pickFor === 'mini') { app.miniOpts.courseId = d.id; openMini({}); break; }
+      if (app.pickFor === 'party') { app.partyOpts.courseId = d.id; openParty({}); break; }
+      app.quickOpts.courseId = d.id; app.screens.quick(app.quickOpts); break;
+    case 'pickBack': if (app.pickFor === 'mini') openMini({}); else if (app.pickFor === 'party') openParty({}); else app.onAction('quick'); break;
+    case 'minigames': openMini({}); break;
+    case 'miniPickCourse': app.pickFor = 'mini'; app.screens.courses({ ...app.coursesOpts, pick: true }); break;
+    case 'miniPickPro': app.pickFor = 'mini'; app.screens.players({ ...app.playersOpts, pick: true }); break;
+    case 'miniUseMine': app.miniOpts.proId = null; openMini({}); break;
+    case 'playMini': startMini(d.g); break;
+    case 'party': openParty({}); break;
+    case 'partyPickCourse': app.pickFor = 'party'; app.screens.courses({ ...app.coursesOpts, pick: true }); break;
+    case 'partyAdd': if (app.partyOpts.players.length < 4) { const n = app.partyOpts.players.length; app.partyOpts.players.push({ name: `Player ${n + 1}`, who: 'club' }); } openParty({}); break;
+    case 'partyRemove': app.partyOpts.players.splice(parseInt(d.i, 10), 1); if (app.partyOpts.players.length !== 2 && app.partyOpts.format === 'match') app.partyOpts.format = 'stroke'; openParty({}); break;
+    case 'partyFormat': app.partyOpts.format = d.f; openParty({}); break;
+    case 'startParty': startParty(); break;
     case 'playCourse': document.querySelectorAll('.modal-wrap').forEach((m) => m.remove()); openQuick({ courseId: d.id }); break;
-    case 'quick': app.quickOpts ? app.screens.quick(app.quickOpts) : openQuick({}); break;
-    case 'pickCourseList': app.screens.courses({ ...app.coursesOpts, pick: true }); break;
-    case 'pickProList': app.screens.players({ ...app.playersOpts, pick: true }); break;
+    case 'quick': app.pickFor = 'quick'; app.quickOpts ? app.screens.quick(app.quickOpts) : openQuick({}); break;
+    case 'pickCourseList': app.pickFor = 'quick'; app.screens.courses({ ...app.coursesOpts, pick: true }); break;
+    case 'pickProList': app.pickFor = 'quick'; app.screens.players({ ...app.playersOpts, pick: true }); break;
     case 'useMyGolfer': app.quickOpts.proId = null; app.quickOpts.ball = c ? c.golfer.ball : 'tourbal'; app.screens.quick(app.quickOpts); break;
     case 'startQuick': startQuick(); break;
     case 'howto': app.screens.howto(); break;
@@ -514,6 +545,13 @@ app.onSetting = (k, v) => {
 
 app.onField = (k, v) => {
   if (k.startsWith('q.')) { app.quickOpts[k.slice(2)] = v; return; }
+  if (k.startsWith('party.')) {
+    const [, key, idx] = k.split('.');
+    if (key === 'name') app.partyOpts.players[+idx].name = v;
+    else if (key === 'who') { app.partyOpts.players[+idx].who = v; openParty({}); }
+    else app.partyOpts[key] = v;
+    return;
+  }
   if (app.draft) {
     if (k === 'name') app.draft.name = v;
     else if (k === 'country') app.draft.country = v;
@@ -773,21 +811,26 @@ function openQuick(pre) {
   app.screens.quick(app.quickOpts);
 }
 
+// The golfer for a quick round or mini-game: a chosen pro, your career
+// golfer (as the player you're playing as), or a club pro
+function golferFor(proId, ball) {
+  if (proId) {
+    const p = proById(proId);
+    return { name: p.name, stats: p.stats, traits: p.traits, ball: ball || p.ball, bag: p.bag, look: p.look, gender: p.gender, proId };
+  }
+  if (app.career) {
+    const g = playAs(app.career.golfer);
+    return { name: g.name, stats: g.stats, traits: g.traits, ball: ball || g.ball, bag: g.bag, look: g.look, gender: g.gender };
+  }
+  const s = { power: 70, accuracy: 70, irons: 70, shortGame: 70, putting: 70, recovery: 70, mental: 70, wind: 70, consistency: 70 };
+  return { name: 'Club Pro', stats: s, traits: [], ball: ball || 'tourbal', look: { shirt: '#2a9d8f', pants: '#2b2d42', cap: '#ffffff', skin: '#e8b996' }, gender: 'm' };
+}
+
 function startQuick() {
   const q = app.quickOpts;
   const course = courseById(q.courseId);
   const rng = new RNG(Date.now() & 0xffffff);
-  let golfer;
-  if (q.proId) {
-    const p = proById(q.proId);
-    golfer = { name: p.name, stats: p.stats, traits: p.traits, ball: q.ball, bag: p.bag, look: p.look, gender: p.gender };
-  } else if (app.career) {
-    const g = playAs(app.career.golfer);
-    golfer = { name: g.name, stats: g.stats, traits: g.traits, ball: q.ball, bag: g.bag, look: g.look, gender: g.gender };
-  } else {
-    const s = { power: 70, accuracy: 70, irons: 70, shortGame: 70, putting: 70, recovery: 70, mental: 70, wind: 70, consistency: 70 };
-    golfer = { name: 'Club Pro', stats: s, traits: [], ball: q.ball, look: { shirt: '#2a9d8f', pants: '#2b2d42', cap: '#ffffff', skin: '#e8b996' }, gender: 'm' };
-  }
+  const golfer = golferFor(q.proId, q.ball);
   const windMph = { calm: rng.float(0, 3), breezy: rng.float(8, 12), windy: rng.float(15, 22), gale: rng.float(25, 32) }[q.wind] ?? rng.float(course.wind[0], course.wind[1]);
   const cond = {
     windMph, windDir: rng.float(0, Math.PI * 2), gust: 0.15,
@@ -807,6 +850,155 @@ function startQuick() {
   app.round = round;
   app.hud.attach(round);
   round.start();
+}
+
+// ---------------- mini-games ----------------
+function openMini(pre) {
+  const courses = generateCourses();
+  const base = app.miniOpts || { courseId: courses[Math.floor(Math.random() * courses.length)].id, proId: null };
+  app.miniOpts = { ...base, ...pre };
+  app.pickFor = 'mini';
+  app.fromHub = false;
+  miniMenu(app.screens, app, app.miniOpts);
+}
+
+function startMini(kind) {
+  if (!app.miniOpts) openMini({});
+  const o = app.miniOpts;
+  const course = courseById(o.courseId);
+  const rng = new RNG(Date.now() & 0xffffff);
+  const golfer = golferFor(o.proId);
+  // mini-games are played in pleasant conditions: a light, steady breeze
+  const cond = {
+    windMph: kind === 'putt' ? 0 : rng.float(2, kind === 'range' ? 6 : 9), windDir: rng.float(0, Math.PI * 2), gust: 0.08,
+    stimp: course.stimp, firm: course.firm, timeOfDay: rng.float(0.35, 0.7), overcast: false, pinDay: 1, seed: rng.int(1, 1e9),
+  };
+  const mode = new MiniGame(kind, { course, golfer, seed: cond.seed, units: app.settings.units, cond });
+  app.screens.hide();
+  const round = new RoundController(app, {
+    course: mode.course, holeList: [mode.holeIndex], golfer, cond, crowd: kind === 'ctp' || kind === 'putt',
+    mode, holeOpts: mode.holeOpts,
+    onRoundDone: () => { endRound(); miniDone(mode); },
+  });
+  app.round = round;
+  app.hud.attach(round);
+  round.start();
+}
+
+function fmtLong(m) {
+  return app.settings.units === 'meters' ? `${Math.round(m)} m` : `${Math.round(m / YD)} yds`;
+}
+function fmtShort(m) {
+  if (app.settings.units === 'meters') return `${m.toFixed(1)} m`;
+  const ft = m / 0.3048;
+  const f = Math.floor(ft), inch = Math.round((ft - f) * 12);
+  return inch === 12 ? `${f + 1} ft` : `${f} ft ${inch} in`;
+}
+
+function miniDone(mode) {
+  const res = mode.result();
+  const recs = app.records;
+  const extra = { fmt: fmtLong, fmtSmall: fmtShort };
+  if (res.kind === 'range') {
+    if (res.best && betterScore('drive', res.best, recs.rangeDrive && recs.rangeDrive.score)) {
+      recs.rangeDrive = { score: res.best, text: fmtLong(res.best), name: res.course.name, date: Date.now() };
+      extra.record = true;
+      saveRecords(recs);
+    }
+    miniResults(app.screens, app, res, extra);
+    return;
+  }
+  const scored = res.kind === 'ctp' ? res.score < Infinity : res.score > 0;
+  if (scored && betterScore(res.kind, res.score, recs[res.kind] && recs[res.kind].score)) {
+    recs[res.kind] = { score: res.score, text: res.scoreText, name: res.course.name, date: Date.now() };
+    extra.record = true;
+    saveRecords(recs);
+  }
+  // weekly prize money for the career golfer
+  const c = app.career;
+  if (c && !mode.golfer.proId) {
+    extra.prizeOn = true;
+    const wk = `${c.year}-${c.week}`;
+    if (!c.mini || c.mini.week !== wk) c.mini = { week: wk, played: {} };
+    if (!c.mini.played[res.kind]) {
+      const prize = MINI_PRIZES[res.pos - 1] || 1000;
+      c.mini.played[res.kind] = true;
+      c.golfer.money += prize;
+      extra.prize = prize;
+      saveCareer(c, { now: true });
+      if (res.pos === 1) sfx.applause(1.2);
+    } else extra.prizeNote = 'You already collected this week\'s prize for this game. Play a career event to move to next week.';
+  }
+  miniResults(app.screens, app, res, extra);
+}
+
+// ---------------- play with friends ----------------
+function openParty(pre) {
+  const courses = generateCourses();
+  const base = app.partyOpts || {
+    courseId: courses[Math.floor(Math.random() * courses.length)].id,
+    format: 'stroke', holes: '3', wind: 'course', time: '0.5',
+    players: [{ name: app.career ? app.career.golfer.name.split(' ')[0] : 'Player 1', who: app.career ? 'career' : 'club' }, { name: 'Player 2', who: 'club' }],
+  };
+  app.partyOpts = { ...base, ...pre };
+  app.pickFor = 'party';
+  app.fromHub = false;
+  partySetup(app.screens, app, app.partyOpts);
+}
+
+// A golfer for one of the friends: the career golfer, a skill tier, or a pro
+const TIER_LOOKS = [
+  { hat: 'cap', hairStyle: 'short', pants: '#2b2d42', skin: '#e8b996' },
+  { hat: 'visor', hairStyle: 'ponytail', pants: '#f1f1f1', skin: '#d49a73', gender: 'f' },
+  { hat: 'bucket', hairStyle: 'curly', pants: '#1b1b1b', skin: '#8d5a3b', shorts: true },
+  { hat: 'flat', hairStyle: 'short', pants: '#6b705c', skin: '#f5d0b5', beard: 'stubble' },
+];
+function partyGolfer(who, i) {
+  if (who === 'career' && app.career) return golferFor(null);
+  if (PARTY_TIERS[who]) {
+    const lv = PARTY_TIERS[who].level;
+    const stats = { power: lv, accuracy: lv, irons: lv, shortGame: lv, putting: lv, recovery: lv, mental: lv, wind: lv, consistency: lv };
+    const lk = TIER_LOOKS[i % TIER_LOOKS.length];
+    return { name: PARTY_TIERS[who].name, stats, traits: [], ball: 'tourbal', look: { ...lk, shirt: PARTY_COLORS[i], cap: '#ffffff', hair: '#3b2a1f', shoe: PARTY_COLORS[i] }, gender: lk.gender || 'm' };
+  }
+  if (proById(who)) return golferFor(who);
+  return golferFor(null);
+}
+
+function startParty() {
+  const o = app.partyOpts;
+  if (!o) { openParty({}); return; }
+  // pick up any names typed but not yet committed
+  document.querySelectorAll('[data-field^="party.name."]').forEach((el) => { o.players[+el.dataset.field.split('.')[2]].name = el.value; });
+  const course = courseById(o.courseId);
+  const rng = new RNG(Date.now() & 0xffffff);
+  const players = o.players.map((pl, i) => ({ name: (pl.name || '').trim() || `Player ${i + 1}`, color: PARTY_COLORS[i], golfer: partyGolfer(pl.who, i) }));
+  const n = { 3: 3, 6: 6 }[o.holes];
+  const start = n ? rng.int(0, 18 - n) : 0;
+  const holeList = n ? [...Array(n).keys()].map((k) => start + k) : o.holes === 'front' ? [...Array(9).keys()] : o.holes === 'back' ? [...Array(9).keys()].map((k) => k + 9) : [...Array(18).keys()];
+  const windMph = { calm: rng.float(0, 3), breezy: rng.float(8, 12), windy: rng.float(15, 22) }[o.wind] ?? rng.float(course.wind[0], course.wind[1]);
+  const cond = {
+    windMph, windDir: rng.float(0, Math.PI * 2), gust: 0.15, stimp: course.stimp, firm: course.firm,
+    timeOfDay: parseFloat(o.time), overcast: course.style === 'Links' ? rng.chance(0.4) : rng.chance(0.1), pinDay: 0, seed: rng.int(1, 1e9),
+  };
+  const party = new Party(players, o.format, course, holeList);
+  app.screens.hide();
+  const round = new RoundController(app, {
+    course, holeList, golfer: players[0].golfer, cond, crowd: false, party,
+    onRoundDone: () => {
+      endRound();
+      sfx.applause(1.2);
+      partyResults(app.screens, app, party);
+    },
+  });
+  app.round = round;
+  app.hud.attach(round);
+  round.start();
+}
+
+function modeBoardModal(mode) {
+  const rows = mode.board();
+  modal(`<h3>${esc(GAMES[mode.kind].name)}</h3><div class="table-wrap"><table class="tbl"><thead><tr><th>Pos</th><th>Player</th><th>Score</th></tr></thead><tbody>${rows.map((r) => `<tr class="${r.you ? 'me' : ''}"><td>${r.pos}</td><td>${esc(r.you ? 'You' : r.name)}</td><td><b>${esc(r.text)}</b>${r.you && r.partial ? ' <span class="muted small">(so far)</span>' : ''}</td></tr>`).join('')}</tbody></table></div><div class="actions"><button class="btn" data-close>Close</button></div>`);
 }
 
 function quickSummary(course, scores, hstats, golfer, holeList) {
