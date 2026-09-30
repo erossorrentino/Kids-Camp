@@ -18,6 +18,7 @@ import {
 import { HUMAN_ID } from '../game/tournament.js';
 import { CHARACTERS, CHAR_BY_ID, CHAR_TIERS, playAs, abilityList, charBoostOf, marketItem, proPrice } from '../data/characters.js';
 import { fillPortraits } from '../render/portrait.js';
+import { WEATHERS, TIMES } from '../game/weather.js';
 
 const TOUR_TAG = { CH: 'Challenger', WT: 'World Tour', MAJ: 'Major', FIN: 'Finale' };
 
@@ -645,7 +646,10 @@ export class Screens {
             <div><label for="q-greens">Greens</label><select id="q-greens" data-field="q.greens"><option value="course" ${q.greens === 'course' ? 'selected' : ''}>Course setup (stimp ${c.stimp})</option><option value="9" ${q.greens === '9' ? 'selected' : ''}>Slow (stimp 9)</option><option value="11" ${q.greens === '11' ? 'selected' : ''}>Medium (stimp 11)</option><option value="13" ${q.greens === '13' ? 'selected' : ''}>Tour fast (stimp 13)</option><option value="14.5" ${q.greens === '14.5' ? 'selected' : ''}>Lightning (stimp 14.5)</option></select></div>
           </div>
           <div class="row2">
-            <div><label for="q-time">Time of day</label><select id="q-time" data-field="q.time"><option value="0.3" ${q.time === '0.3' ? 'selected' : ''}>Morning</option><option value="0.5" ${q.time === '0.5' ? 'selected' : ''}>Midday</option><option value="0.78" ${q.time === '0.78' ? 'selected' : ''}>Late afternoon</option></select></div>
+            <div><label for="q-time">Time of day</label><select id="q-time" data-field="q.time">${TIMES.map(([v, l]) => `<option value="${v}" ${q.time === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+            <div><label for="q-weather">Weather</label><select id="q-weather" data-field="q.weather"><option value="course" ${!q.weather || q.weather === 'course' ? 'selected' : ''}>Typical for the course</option>${Object.entries(WEATHERS).map(([v, l]) => `<option value="${v}" ${q.weather === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+          </div>
+          <div class="row2">
             <div><label for="q-pin">Pins</label><select id="q-pin" data-field="q.pin"><option value="0" ${q.pin === '0' ? 'selected' : ''}>Friendly</option><option value="1" ${q.pin === '1' ? 'selected' : ''}>Tournament</option><option value="3" ${q.pin === '3' ? 'selected' : ''}>Sunday tucked</option></select></div>
           </div>
         </section>

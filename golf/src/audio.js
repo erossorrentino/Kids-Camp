@@ -4,7 +4,9 @@ let ctx = null;
 let master = null;
 let enabled = true;
 let windGain = null;
+let rainGain = null;
 let noiseBuf = null;
+let ambience = { rain: 0, night: false };
 
 export function initAudio() {
   if (ctx) { if (ctx.state === 'suspended') ctx.resume(); return; }
@@ -27,7 +29,20 @@ export function initAudio() {
     windGain.gain.value = 0;
     src.connect(lp).connect(windGain).connect(master);
     src.start();
+    // rain bed: bright hiss plus a soft low patter
+    const rs = ctx.createBufferSource();
+    rs.buffer = noiseBuf;
+    rs.loop = true;
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'bandpass';
+    hp.frequency.value = 2600;
+    hp.Q.value = 0.4;
+    rainGain = ctx.createGain();
+    rainGain.gain.value = 0;
+    rs.connect(hp).connect(rainGain).connect(master);
+    rs.start(0, 0.7);
     scheduleBirds();
+    setAmbience(ambience);
   } catch (e) {
     ctx = null;
   }
@@ -36,6 +51,12 @@ export function initAudio() {
 export function setSound(on) {
   enabled = on;
   if (master) master.gain.value = on ? 0.8 : 0;
+}
+
+// Rain (0..1) and night (crickets instead of birds)
+export function setAmbience({ rain = 0, night = false } = {}) {
+  ambience = { rain, night };
+  if (rainGain) rainGain.gain.setTargetAtTime(rain * 0.16, ctx.currentTime, 0.8);
 }
 
 export function setWind(mph) {
@@ -117,17 +138,30 @@ export const sfx = {
   },
   groan() { noise(0.9, { type: 'lowpass', freq: 380, gain: 0.25, attack: 0.15, decay: 0.8 }); },
   click() { tone(900, 0.03, { type: 'square', gain: 0.05 }); },
+  thunder() {
+    if (!ctx) return;
+    noise(3.2, { type: 'lowpass', freq: 160, gain: 0.5, attack: 0.25, decay: 3 });
+    noise(1.2, { type: 'lowpass', freq: 420, gain: 0.25, attack: 0.02, decay: 1, when: 0.05 });
+  },
 };
 
 function scheduleBirds() {
   if (!ctx) return;
   const chirp = () => {
     if (enabled && ctx.state === 'running') {
-      const base = 2400 + Math.random() * 2200;
-      const n = 2 + Math.floor(Math.random() * 4);
-      for (let i = 0; i < n; i++) tone(base + Math.random() * 400, 0.07, { gain: 0.025, when: i * 0.11, slide: 700 });
+      if (ambience.night) {
+        // crickets: quick high trills
+        const f = 4200 + Math.random() * 600;
+        const n = 3 + Math.floor(Math.random() * 3);
+        for (let i = 0; i < n; i++) tone(f, 0.035, { type: 'triangle', gain: 0.018, when: i * 0.06 });
+      } else if (ambience.rain < 0.5) {
+        const base = 2400 + Math.random() * 2200;
+        const n = 2 + Math.floor(Math.random() * 4);
+        for (let i = 0; i < n; i++) tone(base + Math.random() * 400, 0.07, { gain: 0.025, when: i * 0.11, slide: 700 });
+      }
+      if (ambience.rain > 0.8 && Math.random() < 0.12) sfx.thunder();
     }
-    setTimeout(chirp, 3000 + Math.random() * 7000);
+    setTimeout(chirp, ambience.night ? 900 + Math.random() * 1800 : 3000 + Math.random() * 7000);
   };
   setTimeout(chirp, 2000);
 }

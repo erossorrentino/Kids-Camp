@@ -5,6 +5,7 @@ import { courseById } from '../data/courses.js';
 import { courseProfile, simRound, drawForm, drawDayForm, simHole, effectiveStats, fxWithGear } from '../sim/aisim.js';
 import { RNG, mixSeed, clamp } from '../util/rng.js';
 import { purseShare, pointsShare, splitTies, TOURS, MISSED_CUT_PAY } from '../data/tour.js';
+import { rollWeather, applyWeather } from './weather.js';
 
 export const HUMAN_ID = 'you';
 export const CUT_SIZE = 65;
@@ -14,7 +15,7 @@ export function makeConditions(course, seed, roundIdx, isMajor) {
   const [w0, w1] = course.wind;
   const windMph = Math.max(0, rng.float(w0, w1) + rng.gauss(0, 2));
   const windDir = rng.float(0, Math.PI * 2); // direction the wind blows TOWARD (heading convention)
-  return {
+  const c = {
     windMph,
     windDir,
     stimp: course.stimp + (isMajor ? 0.5 : 0) + roundIdx * 0.2,
@@ -24,6 +25,10 @@ export function makeConditions(course, seed, roundIdx, isMajor) {
     overcast: course.style === 'Links' ? rng.chance(0.55) : rng.chance(0.15),
     gust: rng.float(0.05, 0.25),
   };
+  // weather from its own stream so older events keep the same wind and pins
+  const wr = new RNG(mixSeed(seed, 'weather', roundIdx));
+  applyWeather(c, rollWeather(course.style, wr), null, wr);
+  return c;
 }
 
 export function coursePar(course) {

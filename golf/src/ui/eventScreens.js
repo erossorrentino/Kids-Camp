@@ -6,6 +6,7 @@ import { proById } from '../data/players.js';
 import { TOURS, scoringBonuses, bonusTotal, MISSED_CUT_PAY } from '../data/tour.js';
 import { leaderboard, coursePar, humanPlayer, CUT_SIZE } from '../game/tournament.js';
 import { ACHIEVEMENTS } from '../game/career.js';
+import { weatherText, timeText } from '../game/weather.js';
 
 function windWords(mph) {
   return mph < 4 ? 'Calm' : mph < 10 ? 'Light breeze' : mph < 16 ? 'Breezy' : mph < 22 ? 'Windy' : 'Blowing a gale';
@@ -17,8 +18,8 @@ export function conditionsHtml(cond, units) {
     <div><small>Wind</small><b>${windWords(cond.windMph)}, ${w}</b></div>
     <div><small>Greens</small><b>Stimp ${cond.stimp.toFixed(1)}</b></div>
     <div><small>Fairways</small><b>${cond.firm > 0.7 ? 'Firm & fast' : cond.firm > 0.45 ? 'Medium' : 'Soft'}</b></div>
-    <div><small>Sky</small><b>${cond.overcast ? 'Overcast' : 'Sunny'}</b></div>
-    <div><small>Tee time</small><b>${cond.timeOfDay < 0.4 ? 'Morning' : cond.timeOfDay < 0.62 ? 'Midday' : 'Afternoon'}</b></div>
+    <div><small>Weather</small><b>${esc(weatherText(cond))}${cond.weather === 'rain' ? ' · soft ground' : ''}</b></div>
+    <div><small>Tee time</small><b>${esc(timeText(cond))}</b></div>
   </div>`;
 }
 

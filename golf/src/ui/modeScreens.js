@@ -4,6 +4,7 @@ import { esc, money, ordinal, modal, fmtToPar, toParClass } from './dom.js';
 import { courseById } from '../data/courses.js';
 import { proById, generatePros } from '../data/players.js';
 import { FORMATS, PARTY_COLORS } from '../game/party.js';
+import { WEATHERS, TIMES } from '../game/weather.js';
 import { TRAITS } from '../data/traits.js';
 import { GAMES, GAME_ORDER, MINI_PRIZES } from '../game/minigames.js';
 
@@ -39,6 +40,7 @@ export function miniMenu(screens, app, o) {
         <section class="card pickrow" data-a="miniPickPro"><small>Golfer</small><b>${esc(golferName)}</b>${who ? `<span class="muted">OVR ${who.ovr} · ${who.traits.map((t) => TRAITS[t].name).join(', ')}</span>` : ''}<span class="chev">Change</span></section>
       </div>
       ${o.proId && g ? '<div class="actions left"><button class="linkbtn" data-a="miniUseMine">Use my career golfer instead</button></div>' : ''}
+      <div class="seg sky">${[['day', 'Daytime'], ['sunset', 'Sunset'], ['night', 'Night under lights'], ['rain', 'Rain']].map(([k, l]) => `<button class="segbtn ${(o.sky || 'day') === k ? 'on' : ''}" data-a="miniSky" data-s="${k}">${l}</button>`).join('')}</div>
       ${c ? `<p class="muted small prize-note">${prizeOn ? `<b>Prize money:</b> the first go at each challenge every career week pays your career golfer up to ${money(MINI_PRIZES[0])} (1st place), and every finisher earns something.` : 'Prize money only goes to your career golfer. Switch back to them to earn it.'}</p>` : ''}
       <div class="games">
         ${GAME_ORDER.map((k) => {
@@ -147,7 +149,9 @@ export function partySetup(screens, app, o) {
           <div><label for="p-wind">Wind</label><select id="p-wind" data-field="party.wind">
             ${[['calm', 'Calm'], ['course', 'Typical'], ['breezy', 'Breezy'], ['windy', 'Windy']].map(([v, l]) => `<option value="${v}" ${o.wind === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
           <div><label for="p-time">Time of day</label><select id="p-time" data-field="party.time">
-            ${[['0.3', 'Morning'], ['0.5', 'Midday'], ['0.78', 'Late afternoon']].map(([v, l]) => `<option value="${v}" ${o.time === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+            ${TIMES.map(([v, l]) => `<option value="${v}" ${o.time === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
+          <div><label for="p-weather">Weather</label><select id="p-weather" data-field="party.weather">
+            <option value="course" ${o.weather === 'course' ? 'selected' : ''}>Typical for the course</option>${Object.entries(WEATHERS).map(([v, l]) => `<option value="${v}" ${o.weather === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
         </div>
       </section>
       <p class="muted small">Pass the device to whoever's turn it is: a banner shows who plays next. The player farthest from the hole always goes first, like real golf.</p>

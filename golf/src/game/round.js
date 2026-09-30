@@ -9,7 +9,7 @@ import { CLUBS, CLUB_BY_ID, BALL_BY_ID } from '../data/equipment.js';
 import { traitEffects } from '../data/traits.js';
 import { gearFor, normBag, MODEL_BY_ID } from '../data/clubsets.js';
 import { RNG, mixSeed, clamp } from '../util/rng.js';
-import { sfx, setWind } from '../audio.js';
+import { sfx, setWind, setAmbience } from '../audio.js';
 import { simHole, courseProfile, effectiveStats } from '../sim/aisim.js';
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
@@ -194,6 +194,7 @@ export class RoundController {
       this.world.loadHole(this.hole, { crowd: !!this.opts.crowd, board });
       this.world.wind = this.wind.vec;
       setWind(this.wind.mph);
+      setAmbience({ rain: this.cond.weather === 'rain' ? (this.cond.rainLevel ?? 0.8) : 0, night: !!this.cond.night });
       this.strokes = 0;
       this.putts = 0;
       this.penalties = 0;

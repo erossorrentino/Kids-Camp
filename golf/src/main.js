@@ -15,7 +15,8 @@ import { MiniGame, MINI_PRIZES, betterScore, GAMES } from './game/minigames.js';
 import { miniMenu, miniResults, partySetup, partyResults, partyCardModal, PARTY_TIERS } from './ui/modeScreens.js';
 import { Party, PARTY_COLORS } from './game/party.js';
 import { YD } from './sim/hole.js';
-import { initAudio, setSound, sfx } from './audio.js';
+import { initAudio, setSound, sfx, setAmbience } from './audio.js';
+import { applyWeather, rollWeather } from './game/weather.js';
 import { proById, generatePros } from './data/players.js';
 import { generateCourses, courseById } from './data/courses.js';
 import { HoleModel } from './sim/hole.js';
@@ -203,7 +204,11 @@ function startMenuScene() {
   const pick = courses[Math.floor(Math.random() * courses.length)];
   const hole = new HoleModel(pick, pick.signature - 1);
   app.menuHole = hole;
-  app.world.setConditions({ timeOfDay: 0.62, overcast: pick.style === 'Links' }, hole.style, hole.teeHeading);
+  // the view behind the menus changes: mostly afternoon, sometimes sunset or night
+  const r = Math.random();
+  const menuCond = { timeOfDay: r < 0.18 ? 0.93 : 0.62, night: r > 0.86, weather: pick.style === 'Links' && Math.random() < 0.5 ? 'cloudy' : 'sunny', windMph: 5 };
+  app.world.setConditions(menuCond, hole.style, hole.teeHeading);
+  setAmbience({ rain: 0, night: menuCond.night });
   app.world.loadHole(hole, { crowd: false });
   app.world.aim.setVisible(false);
   app.world.ball.setVisible(false);
@@ -342,6 +347,7 @@ function pauseMenu() {
 }
 
 function endRound() {
+  setAmbience({ rain: 0, night: false });
   if (app.round) app.round.destroy();
   app.round = null;
   app.hud.detach();
@@ -484,6 +490,7 @@ app.onAction = (a, d, elx) => {
     case 'miniPickCourse': app.pickFor = 'mini'; app.screens.courses({ ...app.coursesOpts, pick: true }); break;
     case 'miniPickPro': app.pickFor = 'mini'; app.screens.players({ ...app.playersOpts, pick: true }); break;
     case 'miniUseMine': app.miniOpts.proId = null; openMini({}); break;
+    case 'miniSky': app.miniOpts.sky = d.s; openMini({}); break;
     case 'playMini': startMini(d.g); break;
     case 'party': openParty({}); break;
     case 'partyPickCourse': app.pickFor = 'party'; app.screens.courses({ ...app.coursesOpts, pick: true }); break;
@@ -804,7 +811,7 @@ function openQuick(pre) {
   const courses = generateCourses();
   const base = app.quickOpts || {
     courseId: courses[Math.floor(Math.random() * courses.length)].id,
-    proId: null, holes: '18', ball: app.career ? app.career.golfer.ball : 'tourbal', wind: 'course', greens: 'course', time: '0.5', pin: '0',
+    proId: null, holes: '18', ball: app.career ? app.career.golfer.ball : 'tourbal', wind: 'course', greens: 'course', time: '0.5', pin: '0', weather: 'course',
   };
   app.quickOpts = { ...base, ...pre };
   if (pre.proId) app.quickOpts.ball = proById(pre.proId).ball;
@@ -835,9 +842,10 @@ function startQuick() {
   const cond = {
     windMph, windDir: rng.float(0, Math.PI * 2), gust: 0.15,
     stimp: q.greens === 'course' ? course.stimp : parseFloat(q.greens),
-    firm: course.firm, timeOfDay: parseFloat(q.time), overcast: course.style === 'Links' ? rng.chance(0.5) : rng.chance(0.12),
+    firm: course.firm, timeOfDay: 0.5,
     pinDay: parseInt(q.pin, 10), seed: rng.int(1, 1e9),
   };
+  applyWeather(cond, !q.weather || q.weather === 'course' ? rollWeather(course.style, rng) : q.weather, q.time, rng);
   const holeList = q.holes === 'front' ? [...Array(9).keys()] : q.holes === 'back' ? [...Array(9).keys()].map((i) => i + 9) : q.holes === 'sig' ? [course.signature - 1] : [...Array(18).keys()];
   app.screens.hide();
   const round = new RoundController(app, {
@@ -871,8 +879,10 @@ function startMini(kind) {
   // mini-games are played in pleasant conditions: a light, steady breeze
   const cond = {
     windMph: kind === 'putt' ? 0 : rng.float(2, kind === 'range' ? 6 : 9), windDir: rng.float(0, Math.PI * 2), gust: 0.08,
-    stimp: course.stimp, firm: course.firm, timeOfDay: rng.float(0.35, 0.7), overcast: false, pinDay: 1, seed: rng.int(1, 1e9),
+    stimp: course.stimp, firm: course.firm, timeOfDay: rng.float(0.35, 0.7), pinDay: 1, seed: rng.int(1, 1e9),
   };
+  const sky = o.sky || 'day';
+  applyWeather(cond, sky === 'rain' ? 'rain' : 'sunny', sky === 'night' ? 'night' : sky === 'sunset' ? '0.93' : String(cond.timeOfDay), rng);
   const mode = new MiniGame(kind, { course, golfer, seed: cond.seed, units: app.settings.units, cond });
   app.screens.hide();
   const round = new RoundController(app, {
@@ -937,7 +947,7 @@ function openParty(pre) {
   const courses = generateCourses();
   const base = app.partyOpts || {
     courseId: courses[Math.floor(Math.random() * courses.length)].id,
-    format: 'stroke', holes: '3', wind: 'course', time: '0.5',
+    format: 'stroke', holes: '3', wind: 'course', time: '0.5', weather: 'sunny',
     players: [{ name: app.career ? app.career.golfer.name.split(' ')[0] : 'Player 1', who: app.career ? 'career' : 'club' }, { name: 'Player 2', who: 'club' }],
   };
   app.partyOpts = { ...base, ...pre };
@@ -979,8 +989,9 @@ function startParty() {
   const windMph = { calm: rng.float(0, 3), breezy: rng.float(8, 12), windy: rng.float(15, 22) }[o.wind] ?? rng.float(course.wind[0], course.wind[1]);
   const cond = {
     windMph, windDir: rng.float(0, Math.PI * 2), gust: 0.15, stimp: course.stimp, firm: course.firm,
-    timeOfDay: parseFloat(o.time), overcast: course.style === 'Links' ? rng.chance(0.4) : rng.chance(0.1), pinDay: 0, seed: rng.int(1, 1e9),
+    timeOfDay: 0.5, pinDay: 0, seed: rng.int(1, 1e9),
   };
+  applyWeather(cond, !o.weather || o.weather === 'course' ? rollWeather(course.style, rng) : o.weather, o.time, rng);
   const party = new Party(players, o.format, course, holeList);
   app.screens.hide();
   const round = new RoundController(app, {
