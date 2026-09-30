@@ -842,6 +842,10 @@ export class RoundController {
     // Was that a shot for the highlights?
     const rate = rateShot({ res, start: fl.start, putt: this.putting, holeIndex: this.holeIndex, strokes: this.strokes, par, hole: h, units: this.app.settings.units, teeShot: wasTee });
     if (rate) this.noteBestShot(rate, fl);
+    if (this.opts.onShot) {
+      const st = fl.start;
+      this.opts.onShot({ putt: this.putting, outcome: res.outcome, total: res.total, carry: res.carry, from: Math.hypot(h.pin.x - st.x, h.pin.z - st.z), teeShot: wasTee && par > 3, surface: res.outcome === 'rest' ? h.surfaceAt(res.rest.x, res.rest.z) : null, strokes: this.strokes });
+    }
     const great = !!(rate && rate.great && this.app.settings.replays !== false);
     if (res.outcome === 'holed') {
       if (great) {

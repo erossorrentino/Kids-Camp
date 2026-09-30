@@ -21,6 +21,8 @@ import { fillPortraits } from '../render/portrait.js';
 import { WEATHERS, TIMES } from '../game/weather.js';
 import { BRAND_BY_ID, SLOTS, sponsorOffers, SPONSOR_TIERS } from '../game/sponsors.js';
 import { cupAvailable, CUP_WEEK } from '../game/cup.js';
+import { renderTrophyRoom } from '../render/trophyRoom.js';
+import { GAMES, GAME_ORDER } from '../game/minigames.js';
 
 const TOUR_TAG = { CH: 'Challenger', WT: 'World Tour', MAJ: 'Major', FIN: 'Finale' };
 
@@ -29,6 +31,19 @@ function charBoost(g, k) {
   if (!g.char) return '';
   const v = playAs(g).stats[k] - g.stats[k];
   return v ? `<em class="boost ${v < 0 ? 'neg' : ''}">${v > 0 ? '+' : '−'}${Math.abs(v)}</em>` : '<em class="boost"></em>';
+}
+
+// Trophies for the cabinet: one per title, Cups, and cars won
+export function trophyItems(c) {
+  const items = [];
+  for (const h of c.history.slice().reverse()) {
+    if (h.pos !== 1) continue;
+    const kind = h.tour === 'CH' ? 'ch' : h.tour === 'WT' ? 'wt' : h.tour === 'FIN' ? 'fin' : /Augustine/.test(h.name) ? 'jacket' : 'maj';
+    items.push({ kind, plaque: `${h.year}` });
+  }
+  for (const cup of c.cups || []) items.push({ kind: 'cup', plaque: `Cup ${cup.year}` });
+  for (const car of c.garage || []) items.push({ kind: 'car', color: car.color });
+  return items;
 }
 
 export class Screens {
@@ -114,6 +129,8 @@ export class Screens {
             <div class="create-fields">
               <label for="f-name">Name</label>
               <input id="f-name" data-field="name" maxlength="24" value="${esc(draft.name)}" placeholder="Your name">
+              <label for="f-nick">Nickname <span class="muted small">(optional)</span></label>
+              <input id="f-nick" data-field="nickname" maxlength="18" value="${esc(draft.nickname || '')}" placeholder="The Rocket">
               <label for="f-country">Country</label>
               <select id="f-country" data-field="country">${countries.map(([k, v]) => `<option value="${k}" ${k === draft.country ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select>
             </div>
@@ -158,7 +175,7 @@ export class Screens {
     const prev = c.prevRank[HUMAN_ID];
     const move = prev && prev !== r ? `<span class="${prev > r ? 'up' : 'down'}">${prev > r ? '▲' : '▼'}${Math.abs(prev - r)}</span>` : '';
     const lvlPct = Math.round((g.xp / xpForLevel(g.level)) * 100);
-    const tabs = [['week', 'This week'], ['schedule', 'Schedule'], ['rankings', 'World ranking'], ['race', 'Season race'], ['players', 'Players'], ['golfer', 'Golfer'], ['sponsors', 'Sponsors'], ['shop', 'Pro shop'], ['trophies', 'Trophy room']];
+    const tabs = [['week', 'This week'], ['schedule', 'Schedule'], ['rankings', 'World ranking'], ['race', 'Season race'], ['players', 'Players'], ['golfer', 'Golfer'], ['stats', 'Stats'], ['sponsors', 'Sponsors'], ['shop', 'Pro shop'], ['trophies', 'Trophy room']];
     let body = '';
     if (tab === 'week') body = this.hubWeek(c);
     else if (tab === 'schedule') body = this.hubSchedule(c);
@@ -169,6 +186,7 @@ export class Screens {
     else if (tab === 'shop') body = this.hubShop(c);
     else if (tab === 'trophies') body = this.hubTrophies(c);
     else if (tab === 'sponsors') body = this.hubSponsors(c);
+    else if (tab === 'stats') body = this.hubStats(c);
     this.show(`
       <div class="page">
         <header class="hub-head">
@@ -176,6 +194,7 @@ export class Screens {
           <button class="hub-avatar" data-a="tab" data-t="players" aria-label="Players"><img data-portrait="me" alt=""></button>
           <div class="hub-id">
             <div class="hub-name">${esc(g.name)} <span class="cc">${esc(g.country)}</span></div>
+            ${g.nickname ? `<div class="hub-nick">“${esc(g.nickname)}”</div>` : ''}
             ${g.char && marketItem(g.char) ? `<div class="hub-char">Playing as <b>${esc(marketItem(g.char).name)}</b></div>` : ''}
             <div class="hub-meta">Season ${c.year} · Week ${c.week} of ${SEASON_WEEKS}</div>
             <div class="save-line" id="saveLine">${this.app.saveText ? esc(this.app.saveText()) : ''}</div>
@@ -231,6 +250,52 @@ export class Screens {
         <section class="card"><h3>Around the tour</h3>${news ? `<ul class="news">${news}</ul>` : '<p class="muted">The season is just getting started.</p>'}
           ${last ? `<p class="muted small">Your last event: ${esc(last.name)}, ${last.posText === 'CUT' ? 'missed the cut' : `finished ${last.posText}`} (${fmtToPar(last.toPar)})</p>` : ''}</section>
       </div>`;
+  }
+
+  hubStats(c) {
+    const st = c.stats;
+    const hist = c.history;
+    const g = c.golfer;
+    const wins = hist.filter((h) => h.pos === 1);
+    const byTour = (t) => wins.filter((h) => h.tour === t).length;
+    const made = hist.filter((h) => h.posText !== 'CUT').length;
+    const top10 = hist.filter((h) => h.pos && h.pos <= 10).length;
+    const best = hist.reduce((b, h) => (h.pos && (!b || h.pos < b.pos) ? h : b), null);
+    const fmtL = (m) => (m ? (this.app.settings.units === 'meters' ? `${Math.round(m)} m` : `${Math.round(m / 0.9144)} yds`) : '–');
+    const fmtS = (m) => (m ? (this.app.settings.units === 'meters' ? `${m.toFixed(1)} m` : `${Math.round(m / 0.3048)} ft`) : '–');
+    const recs = this.app.records || {};
+    const tile = (label, value, sub = '') => `<div class="stile"><small>${esc(label)}</small><b>${value}</b>${sub ? `<span>${esc(sub)}</span>` : ''}</div>`;
+    return `<section class="card"><h3>Scoring</h3><div class="stiles">
+        ${tile('Rounds played', st.rounds)}
+        ${tile('Scoring average', st.holes ? (st.strokes / st.holes * 18).toFixed(1) : '–')}
+        ${tile('Best round', st.best ?? '–')}
+        ${tile('Most birdies in a round', st.mostBirdies || 0)}
+        ${tile('Birdies', st.birdies)}
+        ${tile('Eagles', st.eagles)}
+        ${tile('Holes-in-one', st.aces)}
+        ${tile('Hole-outs', st.holeOuts || 0, 'chip-ins and holed shots')}
+      </div></section>
+      <section class="card"><h3>Long game &amp; putting</h3><div class="stiles">
+        ${tile('Longest drive', fmtL(st.longestDrive))}
+        ${tile('Fairways hit', st.fairwayChances ? Math.round((st.fairways / st.fairwayChances) * 100) + '%' : '–')}
+        ${tile('Greens in regulation', st.girChances ? Math.round((st.gir / st.girChances) * 100) + '%' : '–')}
+        ${tile('Putts per round', st.holes && st.putts ? (st.putts / st.holes * 18).toFixed(1) : '–')}
+        ${tile('Longest putt holed', fmtS(st.longestPutt))}
+      </div></section>
+      <section class="card"><h3>Career</h3><div class="stiles">
+        ${tile('Events', hist.length)}
+        ${tile('Wins', wins.length, `${byTour('MAJ')} major${byTour('MAJ') === 1 ? '' : 's'} · ${byTour('WT')} World Tour · ${byTour('CH')} Challenger`)}
+        ${tile('Top 10s', top10)}
+        ${tile('Cuts made', hist.length ? `${made} of ${hist.length}` : '–')}
+        ${tile('Best finish', best ? best.posText : '–', best ? best.name : '')}
+        ${tile('Career earnings', money(g.careerMoney, true))}
+        ${tile('Rival record', c.rival ? `${c.rival.w}–${c.rival.l}${c.rival.t ? `–${c.rival.t}` : ''}` : '–')}
+        ${tile('Legends Cups', (c.cups || []).length)}
+      </div></section>
+      <section class="card"><h3>Mini-game bests</h3><div class="stiles">
+        ${GAME_ORDER.filter((k) => k !== 'range').map((k) => tile(GAMES[k].name, recs[k] ? esc(recs[k].text) : '–')).join('')}
+        ${tile('Longest range drive', recs.rangeDrive ? esc(recs.rangeDrive.text) : '–')}
+      </div></section>`;
   }
 
   rivalCard(c) {
@@ -342,7 +407,7 @@ export class Screens {
         ${STAT_KEYS.map((k) => `<div class="upg ro">${statBar(STAT_LABELS[k], g.stats[k], charBoost(g, k))}<small>${esc(STAT_HELP[k])}</small></div>`).join('')}
         <p><button class="btn primary" data-a="tab" data-t="players">Buy a better player</button></p>
       </section>
-      <section class="card"><h3>Career</h3>
+      <section class="card"><div class="card-head"><h3>Career</h3><button class="linkbtn" data-a="nickname">${g.nickname ? `“${esc(g.nickname)}” · change nickname` : 'Add a nickname'}</button></div>
         <div class="facts">
           <div><small>Career earnings</small><b>${money(g.careerMoney)}</b></div>
           <div><small>Wins</small><b>${c.p[HUMAN_ID].cw}</b></div>
@@ -537,7 +602,17 @@ export class Screens {
 
   hubTrophies(c) {
     const hist = c.history.slice(0, 40);
-    return `<div class="cols">
+    const items = trophyItems(c);
+    requestAnimationFrame(() => {
+      const im = this.root.querySelector('#trophyImg');
+      if (!im) return;
+      const url = renderTrophyRoom(this.app.world.renderer, items, { w: 900, h: 520 });
+      if (url) { im.src = url; im.classList.add('ready'); }
+    });
+    const wins = c.history.filter((h) => h.pos === 1);
+    return `<section class="card cabinet"><img id="trophyImg" alt="Your trophy cabinet"><div class="cab-cap">${wins.length ? `${wins.length} title${wins.length === 1 ? '' : 's'}` : 'No titles yet'}${(c.cups || []).length ? ` · ${c.cups.length} Legends Cup${c.cups.length === 1 ? '' : 's'}` : ''}${(c.garage || []).length ? ` · ${c.garage.length} car${c.garage.length === 1 ? '' : 's'} won` : ''}</div></section>
+      ${(c.garage || []).length ? `<section class="card"><h3>Garage</h3><ul class="garage">${c.garage.map((car) => `<li><i style="background:${car.color}"></i><b>${esc(car.name)}</b><span class="muted small">Hole-in-one on the ${car.hole}th · ${esc(car.event)} ${car.year} · worth ${money(car.value, true)}</span></li>`).join('')}</ul></section>` : ''}
+      <div class="cols">
       <section class="card"><h3>Achievements</h3><ul class="achv">${Object.entries(ACHIEVEMENTS).map(([k, a]) => `<li class="${c.achievements[k] ? 'got' : ''}"><b>${esc(a.name)}</b><small>${esc(a.desc)}</small></li>`).join('')}</ul></section>
       <section class="card"><h3>Results</h3>${hist.length ? `<div class="table-wrap"><table class="tbl"><thead><tr><th>Year</th><th>Event</th><th>Pos</th><th>Score</th><th>Money</th></tr></thead><tbody>${hist.map((h) => `<tr class="${h.pos === 1 ? 'win' : ''}"><td>${h.year}</td><td>${esc(h.name)}</td><td>${esc(h.posText)}</td><td class="${toParClass(h.toPar)}">${fmtToPar(h.toPar)}</td><td>${money(h.money, true)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">No events yet.</p>'}</section>
     </div>`;

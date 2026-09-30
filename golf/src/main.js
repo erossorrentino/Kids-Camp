@@ -193,10 +193,32 @@ function boot() {
   });
 }
 
+const NICKS = ['The Rocket', 'Birdie Machine', 'Ice Cold', 'The Wizard', 'Big Hitter', 'Captain Putt', 'The Shark', 'Lucky', 'Thunder', 'The Professor', 'Laser', 'Smooth'];
+function nicknameModal() {
+  const c = app.career;
+  if (!c) return;
+  const m = modal(`<h3>Your nickname</h3><p class="muted">The crowd and the commentators will use it.</p>
+    <input id="nickIn" maxlength="18" value="${esc(c.golfer.nickname || '')}" placeholder="The Rocket" style="width:100%">
+    <div class="chips" style="margin-top:10px">${NICKS.map((n) => `<button class="chipbtn" data-nick="${esc(n)}">${esc(n)}</button>`).join('')}</div>
+    <div class="actions"><button class="btn primary" data-save>Save</button><button class="btn" data-clear>No nickname</button></div>`);
+  const inp = m.el.querySelector('#nickIn');
+  m.el.addEventListener('click', (e) => {
+    const b = e.target.closest('[data-nick]');
+    if (b) inp.value = b.dataset.nick;
+    if (e.target.closest('[data-save]') || e.target.closest('[data-clear]')) {
+      const v = e.target.closest('[data-clear]') ? '' : inp.value.trim().slice(0, 18);
+      if (v) c.golfer.nickname = v; else delete c.golfer.nickname;
+      saveCareer(c);
+      m.close();
+      app.screens.hub(c, app.screens.tab || 'golfer');
+    }
+  });
+}
+
 function careerInfo() {
   const c = app.career;
   if (!c) return '';
-  return `${c.golfer.name} · World #${career.rankOf(c)} · ${c.year} week ${c.week}`;
+  return `${c.golfer.name}${c.golfer.nickname ? ` “${c.golfer.nickname}”` : ''} · World #${career.rankOf(c)} · ${c.year} week ${c.week}`;
 }
 
 function showTitle() {
@@ -506,6 +528,7 @@ app.onAction = (a, d, elx) => {
     case 'cupSim': playCup(true); break;
     case 'playDaily': { const ch = dailyChallenge(dayKey()); startMini(ch.kind, ch); break; }
     case 'watchBest': if (app.lastBestShot) watchReplay(app.lastBestShot); break;
+    case 'nickname': nicknameModal(); break;
     case 'signSponsor': {
       const off = sponsorOffers(c, career.rankOf(c)).find((o) => o.key === d.k);
       if (off) {
@@ -587,6 +610,7 @@ app.onField = (k, v) => {
   }
   if (app.draft) {
     if (k === 'name') app.draft.name = v;
+    else if (k === 'nickname') app.draft.nickname = v;
     else if (k === 'country') app.draft.country = v;
     else if (k === 'gender') app.draft.gender = v;
     else if (k.startsWith('look.')) {
@@ -615,6 +639,8 @@ function createCareer() {
   if (!name) { toast('Give your golfer a name'); document.getElementById('f-name')?.focus(); return; }
   // everyone starts with the same skills and no traits
   const c = career.newCareer({ name, country: d.country, gender: d.gender, look: d.look });
+  const nick = (document.getElementById('f-nick')?.value || d.nickname || '').trim();
+  if (nick) c.golfer.nickname = nick.slice(0, 18);
   app.career = c;
   saveCareer(c);
   app.draft = null;
@@ -695,6 +721,7 @@ function startTournamentRound() {
       }
     },
     prizeCar: prizeCarFor(t, course, c),
+    onShot: (sh) => trackShot(c, sh),
     onAceCar: (car) => {
       c.golfer.money += car.value;
       c.garage = c.garage || [];
@@ -768,6 +795,14 @@ function watchReplay(shot) {
   app.world.snapCamera();
 }
 
+// Career records from individual shots: longest drive, longest putt, hole-outs
+function trackShot(c, sh) {
+  const s = c.stats;
+  if (sh.teeShot && sh.outcome === 'rest' && (sh.surface === 'fairway' || sh.surface === 'first')) s.longestDrive = Math.max(s.longestDrive || 0, sh.total);
+  if (sh.outcome === 'holed' && sh.putt) s.longestPutt = Math.max(s.longestPutt || 0, sh.from);
+  if (sh.outcome === 'holed' && !sh.putt && sh.strokes > 1) s.holeOuts = (s.holeOuts || 0) + 1;
+}
+
 function trackHole(c, par, strokes, hs) {
   const s = c.stats;
   const hsum = c.active && c.active.hs;
@@ -790,6 +825,11 @@ function trackHole(c, par, strokes, hs) {
 function trackRound(c, scores) {
   const tot = scores.reduce((a, b) => a + (b || 0), 0);
   c.stats.rounds++;
+  if (c.active) {
+    const course = courseById(c.active.t.courseId);
+    const birdies = scores.filter((s, i) => s != null && s < course.holes[i].par).length;
+    c.stats.mostBirdies = Math.max(c.stats.mostBirdies || 0, birdies);
+  }
   if (c.stats.best == null || tot < c.stats.best) c.stats.best = tot;
   const hsum = c.active && c.active.hs;
   if (hsum) {
