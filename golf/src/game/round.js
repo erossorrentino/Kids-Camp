@@ -11,6 +11,8 @@ import { gearFor, normBag, MODEL_BY_ID } from '../data/clubsets.js';
 import { RNG, mixSeed, clamp } from '../util/rng.js';
 import { sfx, setWind, setAmbience } from '../audio.js';
 import { simHole, courseProfile, effectiveStats } from '../sim/aisim.js';
+import { ReplayDirector, rateShot } from './replay.js';
+import { buildPrizeCar } from '../render/prizes.js';
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const fwdOf = (h) => ({ x: Math.sin(h), z: -Math.cos(h) });
@@ -192,6 +194,8 @@ export class RoundController {
         board = { title: this.opts.tournament.name, rows: lb.map((r) => ({ name: r.human ? this.golfer.name : this.app.nameOf(r.id), toPar: r.toPar })) };
       }
       this.world.loadHole(this.hole, { crowd: !!this.opts.crowd, board });
+      const car = this.opts.prizeCar;
+      if (car && car.hole === i && !car.won) this.world.holeScene.group.add(buildPrizeCar(this.hole, car));
       this.world.wind = this.wind.vec;
       setWind(this.wind.mph);
       setAmbience({ rain: this.cond.weather === 'rain' ? (this.cond.rainLevel ?? 0.8) : 0, night: !!this.cond.night });
@@ -833,7 +837,23 @@ export class RoundController {
     }
     const par = h.par;
     const wasTee = fl.start && this.prevPos.lie === 'tee';
+    // Was that a shot for the highlights?
+    const rate = rateShot({ res, start: fl.start, putt: this.putting, holeIndex: this.holeIndex, strokes: this.strokes, par, hole: h, units: this.app.settings.units, teeShot: wasTee });
+    if (rate) this.noteBestShot(rate, fl);
+    const great = !!(rate && rate.great && this.app.settings.replays !== false);
     if (res.outcome === 'holed') {
+      if (great) {
+        this.world.ball.setVisible(false);
+        sfx.cup();
+        if (this.strokes === 1) this.aceCelebration();
+        else {
+          sfx.applause(1.3);
+          this.world.cheer(1.3);
+          this.hud.message(rate.kind === 'putt' ? 'What a putt!' : 'It\'s in!', rate.label, 'good');
+        }
+        this.queueReplay(rate, () => this.holeOut(true));
+        return;
+      }
       this.holeOut();
       return;
     }
@@ -878,7 +898,7 @@ export class RoundController {
     this.hud.message(title, sub, tone);
     // Tap-in
     if (this.app.settings.tapIn && surf === 'green' && d < 0.45) {
-      setTimeout(() => {
+      const tap = () => setTimeout(() => {
         if (this.destroyed) return;
         this.strokes++;
         this.putts++;
@@ -886,6 +906,7 @@ export class RoundController {
         this.hud.message('Tap-in', '', 'neutral');
         this.holeOut(true);
       }, 900);
+      if (great) this.queueReplay(rate, tap); else tap();
       return;
     }
     // Pick up after a quadruple bogey
@@ -898,7 +919,63 @@ export class RoundController {
       }, 1400);
       return;
     }
+    if (great) { this.queueReplay(rate, () => this.afterPause(0.6)); return; }
     this.afterPause(this.putting ? 1.2 : 2.2);
+  }
+
+  // ---------------- highlights ----------------
+  noteBestShot(rate, fl) {
+    if (this.bestShot && this.bestShot.value >= rate.value) return;
+    const who = this.party ? this.party.players[this.cur] : null;
+    const c = CLUB_BY_ID[this.club];
+    this.bestShot = {
+      value: rate.value, kind: rate.kind, label: who ? `${who.name}: ${rate.label}` : rate.label,
+      res: fl.res, start: { ...fl.start }, heading: this.heading, putt: this.putting,
+      holeIndex: this.holeIndex, courseId: this.course.id, course: this.course, holeOpts: this.opts.holeOpts || null,
+      cond: { ...this.cond }, look: { ...this.golfer.look, gender: this.golfer.gender }, club: { kind: c.kind, length: c.length },
+      crowd: !!this.opts.crowd,
+    };
+  }
+
+  // Watch it again from the TV angles, then carry on with `then`
+  queueReplay(rate, then) {
+    const fl = this.flight;
+    this.phase = 'replayWait';
+    this.replayAt = performance.now() + (rate.kind === 'ace' ? 2600 : 1500);
+    this.replayThen = then;
+    this.replayShot = { res: fl.res, start: fl.start, heading: this.heading, putt: this.putting, label: rate.label };
+  }
+
+  startReplay() {
+    this.phase = 'replay';
+    this.hud.replayTag(true, this.replayShot.label);
+    this.replay = new ReplayDirector(this.world, this.hole, this.replayShot, () => {
+      this.hud.replayTag(false);
+      this.replay = null;
+      this.phase = 'result';
+      const then = this.replayThen;
+      this.replayThen = null;
+      if (then) then();
+    });
+  }
+
+  skipReplay() {
+    if (this.phase === 'replayWait') this.startReplay();
+    if (this.phase === 'replay' && this.replay) this.replay.finish();
+  }
+
+  // Fireworks, the crowd going wild, and maybe a new car
+  aceCelebration() {
+    const pin = this.hole.pin;
+    this.world.celebrate(pin, '#f2c230', true);
+    this.world.cheer(2);
+    sfx.applause(2);
+    const car = this.opts.prizeCar;
+    if (car && car.hole === this.holeIndex && !car.won) {
+      car.won = true;
+      this.hud.message('HOLE IN ONE!', `You won the ${car.name}!`, 'good');
+      if (this.opts.onAceCar) this.opts.onAceCar(car);
+    } else this.hud.message('HOLE IN ONE!', `On the ${ordinal(this.holeIndex + 1)}`, 'good');
   }
 
   afterPause(sec) {
@@ -1086,6 +1163,10 @@ export class RoundController {
     } else if (this.phase === 'holedone' && this.resumeAt && performance.now() > this.resumeAt) {
       this.resumeAt = 0;
       this.nextHole();
+    } else if (this.phase === 'replayWait' && performance.now() > this.replayAt) {
+      this.startReplay();
+    } else if (this.phase === 'replay' && this.replay) {
+      this.replay.update(dt);
     } else if (this.phase === 'modeEnd' && this.resumeAt && performance.now() > this.resumeAt) {
       this.resumeAt = 0;
       this.phase = 'done';

@@ -5,6 +5,7 @@ import { courseById } from '../data/courses.js';
 import { proById, generatePros } from '../data/players.js';
 import { FORMATS, PARTY_COLORS } from '../game/party.js';
 import { WEATHERS, TIMES } from '../game/weather.js';
+import { bestShotCard } from './eventScreens.js';
 import { TRAITS } from '../data/traits.js';
 import { GAMES, GAME_ORDER, MINI_PRIZES } from '../game/minigames.js';
 
@@ -201,6 +202,7 @@ export function partyResults(screens, app, party) {
           return `<tr class="${f.winners.includes(r.i) ? 'me' : ''}"><td>${f.format === 'match' ? (f.winners.includes(r.i) ? 1 : 2) : r.pos}</td><td><i class="pdot" style="background:${r.color}"></i>${esc(r.name)}</td><td><b>${esc(val(r))}</b></td><td>${r.total}</td><td>${birdies}</td></tr>`;
         }).join('')}
       </tbody></table></div></section>
+      ${bestShotCard(app.lastBestShot)}
       <section class="card scorecard"><h3>Scorecard</h3>${partyCardHtml(course, party)}</section>
       <div class="actions"><button class="btn primary big" data-a="startParty">Play again</button><button class="btn" data-a="party">Change setup</button><button class="btn" data-a="title">Main menu</button></div>
     </div>`);

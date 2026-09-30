@@ -216,6 +216,7 @@ export const DEFAULT_SETTINGS = {
   swingSens: 1,
   tapIn: true,
   flyover: true,
+  replays: true,
 };
 
 export function loadSettings() {

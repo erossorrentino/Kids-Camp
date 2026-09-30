@@ -30,6 +30,7 @@ export class SwingInput {
     const round = this.app.round;
     if (!round) return;
     if (round.phase === 'intro') { round.skipIntro(); return; }
+    if (round.phase === 'replay' || round.phase === 'replayWait') { round.skipReplay(); return; }
     if (e.button !== undefined && e.button !== 0) return;
     if (!round.beginDrag()) return;
     this.target.setPointerCapture(e.pointerId);

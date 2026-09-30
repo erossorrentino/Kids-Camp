@@ -685,3 +685,22 @@ tr.me td { color: var(--flag); }
 .plog b { display: inline-block; width: 26px; color: var(--flag); font-family: var(--display); }
 .tbl.scard tr.score th { white-space: nowrap; }
 @media (max-width: 560px) { .prow { grid-template-columns: 18px 1fr 30px; } .prow select { grid-column: 2 / 4; grid-row: 2; } }
+
+/* ---------------- replays ---------------- */
+.replaytag { position: absolute; top: calc(var(--safe-t) + 12px); left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 7px 14px; border-radius: 6px; background: rgba(9,23,17,.88); border: 1px solid rgba(255,255,255,.15); white-space: nowrap; pointer-events: none; }
+.rt-live { display: inline-flex; align-items: center; gap: 7px; font: 800 18px/1 var(--display); letter-spacing: .12em; text-transform: uppercase; color: #fff; background: #c8322c; padding: 5px 10px 5px 8px; border-radius: 4px; }
+.rt-live i { width: 9px; height: 9px; border-radius: 50%; background: #fff; animation: pulse 1s infinite; }
+.rt-label { font: 700 17px/1.2 var(--display); letter-spacing: .04em; text-transform: uppercase; }
+.rt-skip { font: 600 12px/1 var(--display); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+#hud.replaying .hud-bottom, #hud.replaying .aimbtns, #hud.replaying .minimap, #hud.replaying .hud-top, #hud.replaying .stats, #hud.replaying .swing-hint { display: none; }
+.compact .replaytag { gap: 8px; padding: 5px 9px; max-width: 94vw; }
+.compact .rt-label { font-size: 13px; white-space: normal; }
+.compact .rt-skip { display: none; }
+.replay-overlay { position: fixed; inset: 0; z-index: 6; pointer-events: auto; }
+.replay-overlay .replaytag { pointer-events: none; }
+.bestshot { display: flex; align-items: center; gap: 14px; border-color: rgba(242,194,48,.45); background: linear-gradient(90deg, rgba(200,50,44,.18), rgba(14,33,24,.95) 55%); }
+.bestshot > div:nth-child(2) { display: grid; gap: 2px; flex: 1; }
+.bestshot small { font: 700 12px/1 var(--display); letter-spacing: .1em; text-transform: uppercase; color: var(--flag); }
+.bestshot b { font: 700 20px/1.15 var(--display); text-transform: uppercase; letter-spacing: .02em; }
+.bs-icon { width: 44px; height: 44px; border-radius: 50%; background: #c8322c; display: grid; place-items: center; font-size: 18px; flex: none; }
+@media (max-width: 560px) { .bestshot { flex-wrap: wrap; } .bestshot .btn { width: 100%; } }

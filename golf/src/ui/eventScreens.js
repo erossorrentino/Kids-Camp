@@ -74,10 +74,17 @@ export function roundSummary(screens, app, c, t, info) {
         <div class="rh-score"><b>${tot}</b><span class="${toParClass(rel)}">${fmtToPar(rel)}</span></div>
         <div><div class="rh-pos">${info.missedCut ? 'Missed cut' : `Position ${esc(me.pos)}`}</div><div class="muted">Total ${fmtToPar(me.toPar)} · ${esc(next)}</div>${bonusSoFar(c, t)}</div>
       </section>
+      ${bestShotCard(info.bestShot)}
       ${scorecardHtml(course, sc, info.holeStats)}
       <section class="card"><h3>Leaderboard</h3>${boardTable(t, app.nameOf, { limit: 10, full: true })}</section>
       <div class="actions">${info.missedCut || info.done ? '<button class="btn primary big" data-a="finishEvent">See final results</button>' : `<button class="btn primary big" data-a="nextRound">On to round ${info.round + 2}</button><button class="btn" data-a="hub">Save & exit</button>`}</div>
     </div>`);
+}
+
+// The round's highlight, with a button to watch it again
+export function bestShotCard(shot) {
+  if (!shot) return '';
+  return `<section class="card bestshot"><div class="bs-icon" aria-hidden="true">▶</div><div><small>Shot of the round</small><b>${esc(shot.label)}</b></div><button class="btn primary" data-a="watchBest">Watch replay</button></section>`;
 }
 
 // Everyone who tees it up gets paid; say how before the first round

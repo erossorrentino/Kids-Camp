@@ -6,7 +6,9 @@ import { HUD } from './ui/hud.js';
 import { Screens } from './ui/screens.js';
 import { SwingInput } from './ui/swing.js';
 import { modal, toast, esc, fmtToPar, money } from './ui/dom.js';
-import { eventIntro, roundSummary, eventResults, scorecardModal, boardModal, scorecardHtml } from './ui/eventScreens.js';
+import { eventIntro, roundSummary, eventResults, scorecardModal, boardModal, scorecardHtml, bestShotCard } from './ui/eventScreens.js';
+import { ReplayDirector } from './game/replay.js';
+import { PRIZE_CARS, CAR_COLORS } from './render/prizes.js';
 import { RoundController } from './game/round.js';
 import * as career from './game/career.js';
 import * as tourn from './game/tournament.js';
@@ -241,6 +243,8 @@ function loop(now) {
       if (app.aimHold) app.round.nudgeAim(app.aimHold * dt * (app.round.putting ? 0.12 : 0.35));
       app.round.fast = !!app.fastHold;
       app.round.update(dt);
+    } else if (app.replay) {
+      app.replay.update(dt);
     } else {
       menuCamera(dt);
     }
@@ -492,6 +496,7 @@ app.onAction = (a, d, elx) => {
     case 'miniUseMine': app.miniOpts.proId = null; openMini({}); break;
     case 'miniSky': app.miniOpts.sky = d.s; openMini({}); break;
     case 'playMini': startMini(d.g); break;
+    case 'watchBest': if (app.lastBestShot) watchReplay(app.lastBestShot); break;
     case 'party': openParty({}); break;
     case 'partyPickCourse': app.pickFor = 'party'; app.screens.courses({ ...app.coursesOpts, pick: true }); break;
     case 'partyAdd': if (app.partyOpts.players.length < 4) { const n = app.partyOpts.players.length; app.partyOpts.players.push({ name: `Player ${n + 1}`, who: 'club' }); } openParty({}); break;
@@ -668,7 +673,17 @@ function startTournamentRound() {
         if (earned) setTimeout(() => toast(`+${money(earned)} ${strokes === 1 ? 'hole-in-one' : rel <= -3 ? 'albatross' : rel === -2 ? 'eagle' : 'birdie'} bonus`), 900);
       }
     },
+    prizeCar: prizeCarFor(t, course, c),
+    onAceCar: (car) => {
+      c.golfer.money += car.value;
+      c.garage = c.garage || [];
+      c.garage.push({ name: car.name, color: car.color, value: car.value, event: t.name, year: c.year, hole: car.hole + 1 });
+      c.active.carWon = true;
+      saveCareer(c, { now: true });
+      setTimeout(() => toast(`You won the ${car.name}! It's in your trophy room (worth ${money(car.value)}).`, 5000), 1800);
+    },
     onRoundDone: (scores, hstats) => {
+      app.lastBestShot = round.bestShot || null;
       trackRound(c, scores, hstats);
       endRound();
       afterHumanRound();
@@ -677,6 +692,58 @@ function startTournamentRound() {
   app.round = round;
   app.hud.attach(round);
   round.start();
+}
+
+// One par 3 in every tournament has a car for a hole-in-one
+function prizeCarFor(t, course, c) {
+  if (c.active && c.active.carWon) return null;
+  const par3 = course.holes.map((h, i) => ({ h, i })).filter((x) => x.h.par === 3);
+  if (!par3.length) return null;
+  const rng = new RNG(mixSeed(t.seed, 'car'));
+  const pick = par3[par3.length - 1];
+  const model = PRIZE_CARS[rng.int(0, PRIZE_CARS.length - 1)];
+  const bump = { CH: 0.6, WT: 1, MAJ: 1.5, FIN: 2 }[t.tour] || 1;
+  return { hole: pick.i, name: model.name, value: Math.round((model.value * bump) / 1000) * 1000, color: CAR_COLORS[rng.int(0, CAR_COLORS.length - 1)] };
+}
+
+// Watch a saved shot again on its own hole, then come back to this screen
+function watchReplay(shot) {
+  const html = app.screens.root.innerHTML;
+  const scroll = app.screens.root.scrollTop;
+  app.screens.hide();
+  const course = shot.course || courseById(shot.courseId);
+  const hole = new HoleModel(course, shot.holeIndex, { pinDay: shot.cond.pinDay || 0, ...(shot.holeOpts || {}) });
+  app.world.setConditions(shot.cond, hole.style, hole.teeHeading);
+  setAmbience({ rain: shot.cond.weather === 'rain' ? 0.7 : 0, night: !!shot.cond.night });
+  app.world.loadHole(hole, { crowd: shot.crowd });
+  app.world.setGolfer(shot.look);
+  const g = app.world.golfer;
+  g.setClub(shot.club.kind, shot.club.length);
+  g.placeAt(shot.start, shot.heading);
+  // the golfer holds the finish while the ball flies
+  g.setBackswing(shot.putt ? 0.5 : 1);
+  g.swing(shot.putt ? 0.5 : 1, null);
+  for (let k = 0; k < 60; k++) g.update(0.05);
+  const cad = app.world.caddie;
+  if (cad) cad.place(shot.start, shot.heading, shot.putt, (x, z) => hole.heightAt(x, z));
+  const ov = document.createElement('div');
+  ov.className = 'replay-overlay';
+  ov.innerHTML = `<div class="replaytag"><span class="rt-live"><i></i>Replay</span><span class="rt-label">${esc(shot.label)}</span><span class="rt-skip">Tap to finish</span></div>`;
+  document.body.appendChild(ov);
+  const done = () => {
+    if (!app.replay) return;
+    app.replay = null;
+    ov.remove();
+    setAmbience({ rain: 0, night: false });
+    app.world.hidePlayers();
+    app.world.ball.setVisible(false);
+    startMenuScene();
+    app.screens.show(html);
+    app.screens.root.scrollTop = scroll;
+  };
+  ov.addEventListener('pointerdown', () => { if (app.replay) app.replay.finish(); });
+  app.replay = new ReplayDirector(app.world, hole, shot, done);
+  app.world.snapCamera();
 }
 
 function trackHole(c, par, strokes, hs) {
@@ -718,7 +785,7 @@ function afterHumanRound() {
   const fr = tourn.finishRound(t);
   const missedCut = tourn.humanMissedCut(t);
   saveCareer(c);
-  roundSummary(app.screens, app, c, t, { round: r, done: fr.done, missedCut, holeStats: [] });
+  roundSummary(app.screens, app, c, t, { round: r, done: fr.done, missedCut, holeStats: [], bestShot: app.lastBestShot });
 }
 
 function simTournamentRound() {
@@ -851,6 +918,7 @@ function startQuick() {
   const round = new RoundController(app, {
     course, holeList, golfer, cond, crowd: false,
     onRoundDone: (scores, hstats) => {
+      app.lastBestShot = round.bestShot || null;
       endRound();
       quickSummary(course, scores, hstats, golfer, holeList);
     },
@@ -997,6 +1065,7 @@ function startParty() {
   const round = new RoundController(app, {
     course, holeList, golfer: players[0].golfer, cond, crowd: false, party,
     onRoundDone: () => {
+      app.lastBestShot = round.bestShot || null;
       endRound();
       sfx.applause(1.2);
       partyResults(app.screens, app, party);
@@ -1019,6 +1088,7 @@ function quickSummary(course, scores, hstats, golfer, holeList) {
     <div class="page narrow">
       <header class="page-head"><h2>${esc(course.name)}</h2><span class="pill">${esc(golfer.name)}</span></header>
       <section class="card result-hero ${s < p ? 'good' : ''}"><div class="rh-score"><b>${s}</b><span class="${s - p < 0 ? 'tp-under' : s - p > 0 ? 'tp-over' : 'tp-even'}">${fmtToPar(s - p)}</span></div><div><div class="rh-pos">Round complete</div><div class="muted">${holeList.length} hole${holeList.length > 1 ? 's' : ''} · par ${p}</div></div></section>
+      ${bestShotCard(app.lastBestShot)}
       ${scorecardHtml(course, scores, hstats)}
       <div class="actions"><button class="btn primary big" data-a="startQuick">Play again</button><button class="btn" data-a="quick">Change setup</button><button class="btn" data-a="title">Main menu</button></div>
     </div>`);

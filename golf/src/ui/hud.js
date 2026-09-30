@@ -71,6 +71,7 @@ export class HUD {
       <svg class="swing-trail" id="swingTrail"><polyline id="trailLine" points=""/></svg>
       <div class="strike" id="strike" hidden></div>
       <div class="turn" id="turn" hidden></div>
+      <div class="replaytag" id="replayTag" hidden><span class="rt-live"><i></i>Replay</span><span class="rt-label" id="replayLabel"></span><span class="rt-skip">Tap to skip</span></div>
       <div class="msg" id="msg" hidden><div class="msg-title" id="msgTitle"></div><div class="msg-sub" id="msgSub"></div></div>
       <div class="stats panel" id="shotStats" hidden></div>
       <div class="intro panel" id="intro" hidden></div>
@@ -137,6 +138,12 @@ export class HUD {
     this.$('playerTag').hidden = !round.party;
     this.$('ballName').textContent = round.ball.name;
     this.root.classList.toggle('party', !!round.party);
+  }
+
+  replayTag(on, label = '') {
+    this.$('replayTag').hidden = !on;
+    this.$('replayLabel').textContent = label;
+    this.root.classList.toggle('replaying', on);
   }
 
   // Multiplayer: whose turn it is
