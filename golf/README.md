@@ -141,9 +141,10 @@ you want to move on.
   greens, uphill or downhill), plus the course record.
 - **People**: your golfer has shoes, belt, collar and logo, face, hair,
   cap and optional shades, and breathes at address; a caddie with your
-  name on the bib carries your bag; galleries line the fairways and
-  cheer birdies and holed shots, with marshals, TV camera towers,
-  grandstands and carts driving the paths.
+  name on the bib carries your bag; galleries line the fairways, turn to
+  follow your ball (some point at it while it's in the air), clap good
+  shots, throw their arms up for birdies and take photos, with marshals,
+  TV camera towers, grandstands and carts driving the paths.
 - **Scenery**: species trees in three variants each that sway in the wind,
   grass tufts, wildflowers, fescue, heather, desert shrubs, rocks, reeds
   by the water, cart paths, tee signs with a hole map, clubhouse, homes
@@ -152,7 +153,131 @@ you want to move on.
   Creeks run downhill through a shallow valley with footbridges; ponds
   get fountains, bunkers get rakes, tees get a ball washer, cooler and
   flower bed, seaside holes get a lighthouse, and your shots leave divots
-  in the fairway and pitch marks on the greens.
+  in the fairway and pitch marks on the greens. In a bunker you leave
+  footprints walking in and where you stood, the club leaves a crater, and
+  once you've played out the caddie rakes it into neat grooves.
+- **Wildlife** (`src/render/wildlife.js`): mallards on the ponds, and
+  sometimes a mother duck leading a line of ducklings; rabbits nibbling
+  in the rough (jackrabbits in the desert); squirrels darting round the
+  tree trunks; fireflies at night. Land a ball near them and they scatter:
+  drakes take off quacking and circle back a little later, the mother
+  hurries her ducklings away across the water, rabbits bolt for cover and
+  squirrels run up the far side of a tree.
+
+## Mini-games
+
+**Mini-games** on the title screen (`src/game/minigames.js`) put you
+against 7 tour pros on a real course, with prize money for your career
+($25K for a win down to $2,500) and personal bests saved on the device:
+
+- **Practice Range**: unlimited balls with any club at a range with mats,
+  ball pyramids, distance boards and target greens every 50 yards. It
+  keeps your average and longest carry with every club.
+- **Closest to the Pin**: three balls at a par 3; your closest one counts,
+  and a hole-in-one wins outright.
+- **Long Drive**: six drives down the longest hole; only balls that stop
+  in the fairway count, and the longest one wins.
+- **Putting Challenge**: six putts from 5 to 40 feet around one hole.
+  Holing one is worth 2 to 8 points (more for the long ones) and a lag
+  inside 3 feet still earns a point.
+- **Target Challenge**: ten balls at five ringed targets with tall flags
+  from 60 to 230 yards: 10 for the bullseye, 5 for the middle ring, 2 for
+  the outer, and the far targets multiply your points by 2 or 3.
+
+Each game can be played in daylight, at sunset, at night under
+floodlights or in the rain. The pros' scores come from their real skills, so a better
+putter really does win the putting challenge more often.
+
+## Play with friends
+
+**Play with friends** is 2-4 players taking turns on one device (pass it
+round). Each player plays as a tour pro, your career golfer, or a club
+pro / weekend golfer / beginner, and picks a colour: their ball, name tag
+and shot tracer are drawn in it. Choose **stroke play**, **match play**
+(two players, hole by hole) or **skins** (ties carry over), then 3 holes, 6,
+the front or back nine, or 18 on any course with any weather. The farthest ball from the hole
+plays first, the other balls stay on the course with name tags, and the
+honour goes to the best score on the last hole. There's a shared
+scorecard, a live standings panel and a final results screen with the
+shot of the round.
+
+## Weather and time of day
+
+Quick rounds, mini-games and tournaments can be **sunny, cloudy, rainy or
+foggy**, in the **morning, at midday, late afternoon, at sunset or at
+night**. Rain falls in streaks round the camera, slows the greens and
+softens the fairways (less roll), and brings the odd rumble of thunder;
+fog closes in the horizon; sunsets turn the sky orange; at night the sky
+fills with stars and the Milky Way and the hole is lit by floodlight
+towers with a pool of light on the green. Each course style has its own
+typical weather, and a tournament's four rounds can change.
+
+## Replays and highlights
+
+A great shot (a hole-in-one, a chip-in, a long putt, a bomb of a drive, an
+approach to tap-in range) gets a **TV replay**: from behind the golfer, a
+raised side camera following the ball, and a slow-motion shot at the
+finish. Each round picks a **shot of the round** that you can watch again
+from the results screen. A **hole-in-one** sets off fireworks and
+confetti over the green, and on some tournament par 3s there's a **prize
+car** parked by the tee: ace it and it's yours (it goes in your garage in
+the trophy room).
+
+## Career extras
+
+- **Your rival**: a pro close to your level is picked as your rival. The
+  hub shows your head-to-head record, they're always in your field, they
+  send you a message after each event, and beating them at a major is
+  worth a $50K bonus. Once you're well ahead of them a new rival takes
+  over.
+- **Sponsors**: as your ranking climbs, sponsors (Local, Regional,
+  National and Global) offer deals for your cap and shirt and your golf
+  bag: money every event you enter plus bonuses for a top 10 or a win. The
+  logo appears on your golfer's chest, cap and bag.
+- **Daily challenge**: one mini-game a day, the same for everyone that
+  day (course, weather and wind come from the date). Beat the target to
+  win $10K and build a streak worth up to $50K a day.
+- **The Legends Cup**: from week 18 of each season, captain Team Legends
+  (you plus the pros you own and the best players from your country)
+  against your rival's Team World in five nine-hole singles matches. You
+  play yours hole by hole; the others are played out from the players'
+  skills. $150K for winning, $40K for taking part.
+- **Trophy room**: a 3D cabinet rendered by the game with a trophy for
+  every win (a different one for each tour, majors and the Tour
+  Championship), a green jacket, the cups you've won and the cars in your
+  garage.
+- **Stats**: rounds played, scoring average, best round, most birdies in
+  a round, birdies, eagles, longest drive, fairways hit, greens in
+  regulation, putts per round and the longest putt you've holed.
+- **Nickname**: pick one (or type your own) and the commentator uses it.
+
+## Sound, commentary and the caddie
+
+A **commentator** calls the big moments (bombs, darts, splashes, lip-outs,
+holed putts, birdies) as a caption at the top of the screen and, if the
+device can speak, out loud. The **crowd** gasps "ooh" at a near-miss and
+"aah" as a good approach drops near the flag; the menus have their own
+**music**; and there's rain, crickets at night and ducks quacking. Your
+**caddie** gives advice before every shot: wind helping or hurting,
+crosswind drift, water or bunkers near where your club lands, out of
+bounds, how the lie will play, and on the green how many cups the putt
+breaks and whether it's uphill or downhill. Every one of these can be
+switched off in Settings.
+
+## Style shop
+
+The pro shop's **Style** tab sells looks that never change how the ball
+flies (`src/data/cosmetics.js`):
+
+- **Shot trails**: the classic golden TV tracer (free), Neon pink, Ice
+  comet (with snowflake sparkles), Fireball (yellow to red flames that
+  spit embers and smoke), Stardust (twinkling gold stars), Rainbow,
+  Party time (a stream of confetti) and Lightning bolt (a crackling
+  zig-zag with electric sparks), from $8K to $45K.
+- **Ball colours**: tour white, optic yellow, blaze orange, bubblegum
+  pink, lime, sky blue and gold.
+
+Your trail and ball colour show in replays too.
 
 ## Phones
 
@@ -189,11 +314,15 @@ golf/
     main.js                      app controller: menus, career flow, rounds
     audio.js                     WebAudio sound effects
     util/rng.js                  seeded RNG + simplex noise
-    data/                        pros, traits, courses, clubs & balls, tour calendar
+    data/                        pros, traits, courses, clubs & balls, tour calendar, trails
     sim/                         physics, hole generator, shot model, caddie, AI sim
-    game/                        round controller, tournaments, career, storage
-    render/                      world, terrain shader, trees, decor, golfer, effects
-    ui/                          HUD, swing input, menu and tournament screens
+    game/                        round controller, tournaments, career, storage,
+                                 mini-games, multiplayer, weather, replays, rival,
+                                 sponsors, daily challenge, Legends Cup,
+                                 commentary, caddie tips
+    render/                      world, terrain shader, trees, decor, golfer, effects,
+                                 wildlife, targets, prize cars, trophy cabinet
+    ui/                          HUD, swing input, menu, tournament and mode screens
   tools/
     tune_physics.mjs             fits drag/lift to tour data (--search)
     bot_round.mjs                a bot plays holes through the physics
