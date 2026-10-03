@@ -65,17 +65,44 @@ you want to move on.
   1-5 **advantages / disadvantages** (Bomber, Putting Machine, Wind
   Whisperer, Choker, The Yips, Hook Prone and 29 more). Traits change both
   the AI scoring and how the ball behaves when you play as that pro.
-- **29 club sets** in five slots (driver, woods & hybrid, irons, wedges,
-  putter) in `src/data/clubsets.js`. Each trades one strength for another:
-  a low-spin Rocket driver that flies far but punishes mishits, a
-  Stable Max with a huge sweet spot, a draw-biased driver that fights a
-  slice, a deck-friendly mini driver, blades that shape the ball vs.
-  super game improvement irons that stay straight, high-bounce wedges for
-  sand and low-bounce tour wedges for spin, mallet, milled, counterbalanced
-  and arm-lock putters (aim, pace, nerve, longer read). Each set has its
-  own head in 3D (wood crowns and faces, cavity backs vs. blades, blade vs.
-  mallet putters), the pros each carry a bag that suits their game, and
-  you buy and swap sets in the pro shop.
+- **The club store** (the **Club store** tab in your career hub, data in
+  `src/data/clubsets.js`): 54 club sets in five slots (driver, woods &
+  hybrid, irons, wedges, putter). The **Strata line** is the upgrade
+  ladder: Club ($8K-$20K), Pro, Tour, Elite and Legend ($550K-$1.4M), and
+  every step hits it **further and straighter** than the one before (more
+  spin and bunker help for wedges, a truer roll and calmer nerves for
+  putters). With a typical swing, a Legend driver carries about 20 yds
+  further than the free Starter 460 and misses the centre line by half as
+  much. The **specialty sets** trade one strength for another: a low-spin
+  Rocket driver that flies far but punishes mishits, a Stable Max with a
+  huge sweet spot, a draw-biased driver that fights a slice, a
+  deck-friendly mini driver, blades that shape the ball vs. super game
+  improvement irons that stay straight, high- and low-bounce wedges,
+  mallet, milled, counterbalanced and arm-lock putters. The store shows
+  your bag with its driver and 7-iron carry, accuracy and level, a 3D
+  picture of every set, its real specs (lofts, head size, bounce, a shaft
+  fitted to your swing speed), and what it would do **for you**: "+12 yds
+  carry, 41% straighter than your bag". **Try it** takes a set to the
+  practice range before you buy it, then shows your average carry,
+  longest ball and how far offline you hit it, with a button to buy it.
+  The pros each carry a bag that suits their game.
+- **Realistic clubs in 3D** (`src/render/clubs.js`): a pear-shaped 460 cc
+  driver with a domed crown, a lofted face with score lines, an alignment
+  mark, an adjustable hosel sleeve and a sole weight; shallower fairway
+  woods and compact hybrids; irons that taper from a thin top line to a
+  wide sole, as muscle-back blades or cavity backs with a badge, with
+  grooves and each club's real loft; teardrop wedges with a bounced sole;
+  Anser-style blade and fang mallet putters with sight lines; chrome
+  step-pattern steel or painted graphite shafts and tapered grips. The
+  face sits square to the target with the ball on its centre, and the
+  shaft leaves the heel at the club's lie angle. `tools/dev/clubs.html`
+  lines them up from any angle.
+- **Where you strike it matters** (`src/sim/shot.js`): every swing finds a
+  spot on the face. Off-centre hits lose ball speed (less with a
+  forgiving head), toe strikes on a wood draw and heel strikes fade (gear
+  effect), high strikes launch higher with less spin and low ones lower
+  with more, and irons can be thinned. The launch monitor after each shot
+  shows club speed, smash factor and a dot on the face where you hit it.
 - **Buying players is the only way to get better.** Every career golfer
   starts with the same skills (overall 56) and no strengths or
   weaknesses, and skills can't be trained. The **Players** tab
@@ -134,7 +161,8 @@ you want to move on.
   hole on staggered tee times, plus a paper scorecard (birdies circled,
   bogeys boxed).
 - **Broadcast-style HUD**: lie and slope, "plays like" yardage, wind, a
-  launch-monitor readout after every shot (ball speed, launch, spin,
+  launch-monitor readout after every shot (club speed, ball speed, smash
+  factor, strike location, launch, spin,
   carry, total, height, curve, land angle), shot tracer, minimap.
 - **Yardage book**: each course card draws all 18 holes from above with a
   caddie's note on how to play them (doglegs, bunkers, water, two-tier
@@ -328,6 +356,7 @@ golf/
     bot_round.mjs                a bot plays holes through the physics
     calibrate_sim.mjs            AI scoring averages by rating
     dev/view.html                hole viewer (?c=course&h=hole&v=tee|green|top|trees|stand|water|golfer|caddie|crowd)
+    dev/clubs.html               club viewer (?set=driver|woods|irons|wedges|putters|bag&v=face|toe|top|back|hero|golfer)
 ```
 
 The simulation modules (`src/data`, `src/sim`, `src/game`) have no

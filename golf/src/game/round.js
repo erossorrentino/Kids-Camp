@@ -7,7 +7,7 @@ import { simulate, BALL_R, SURFACES } from '../sim/physics.js';
 import { clubTable, suggestClub } from '../sim/caddie.js';
 import { CLUBS, CLUB_BY_ID, BALL_BY_ID } from '../data/equipment.js';
 import { traitEffects } from '../data/traits.js';
-import { gearFor, normBag, MODEL_BY_ID } from '../data/clubsets.js';
+import { gearFor, normBag, MODEL_BY_ID, loftOf, bounceOf } from '../data/clubsets.js';
 import { RNG, mixSeed, clamp } from '../util/rng.js';
 import { sfx, setWind, setAmbience } from '../audio.js';
 import { simHole, courseProfile, effectiveStats } from '../sim/aisim.js';
@@ -488,7 +488,8 @@ export class RoundController {
   updateGolfer() {
     const g = this.world.golfer;
     const c = CLUB_BY_ID[this.club];
-    g.setClub(c.kind, c.length, gearFor(this.bag, this.club).look);
+    const model = gearFor(this.bag, this.club);
+    g.setClub(c.kind, c.length, model.look, { id: c.id, loft: loftOf(model, c.id, c.loft), bounce: bounceOf(model, c.id) });
     g.placeAt(this.ballPos, this.heading);
     g.address();
     const cad = this.world.caddie;
@@ -756,7 +757,7 @@ export class RoundController {
       const L = computeLaunch(inp);
       const st = launchState(this.heading, L);
       res = simulate({ pos: { x: b.x, y: b.y + BALL_R + 0.01, z: b.z }, vel: st.vel, spin: st.spin, env: this.env, ball: this.aero, rng: this.rand, pinIn: true });
-      launchInfo = { speed: L.speed, launch: L.launchDeg, spin: L.spinRpm, axis: L.axisDeg, start: L.startDeg, note: L.lieNote };
+      launchInfo = { speed: L.speed, launch: L.launchDeg, spin: L.spinRpm, axis: L.axisDeg, start: L.startDeg, note: L.lieNote, strike: L.strike, clubSpeed: L.clubSpeed, smash: L.smash };
     }
     sfx.impact(club.kind, power);
     this.hud.strike(dev, tempo, this.putting);
@@ -1014,7 +1015,7 @@ export class RoundController {
       value: rate.value, kind: rate.kind, label: who ? `${who.name}: ${rate.label}` : rate.label,
       res: fl.res, start: { ...fl.start }, heading: this.heading, putt: this.putting,
       holeIndex: this.holeIndex, courseId: this.course.id, course: this.course, holeOpts: this.opts.holeOpts || null,
-      cond: { ...this.cond }, look: { ...this.golfer.look, gender: this.golfer.gender }, club: { kind: c.kind, length: c.length },
+      cond: { ...this.cond }, look: { ...this.golfer.look, gender: this.golfer.gender }, club: { kind: c.kind, length: c.length, id: c.id, loft: loftOf(gearFor(this.bag, c.id), c.id, c.loft), look: gearFor(this.bag, c.id).look },
       trail: this.golfer.trail || null, ballColor: ballColorOf(this.golfer), tint: who ? who.color : null,
       crowd: !!this.opts.crowd,
     };
@@ -1123,6 +1124,10 @@ export class RoundController {
       landAngle: land.angle ? (land.angle * 180) / Math.PI : null,
       note: li.note,
       dev: fl.dev,
+      strike: li.strike || null,
+      clubSpeed: li.clubSpeed ? li.clubSpeed / 0.44704 : null,
+      smash: li.smash || null,
+      kind: fl.club.kind,
     };
   }
 

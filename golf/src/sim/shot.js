@@ -5,6 +5,10 @@ import { airDensity, stimpDecel, launch, simulate, BALL_R } from './physics.js';
 
 const deg = Math.PI / 180;
 
+// Smash factor (ball speed / club speed) for a centred strike, as launch
+// monitors measure for tour players
+const SMASH = { DR: 1.49, '3W': 1.47, '5W': 1.46, '4H': 1.44, '5I': 1.38, '6I': 1.36, '7I': 1.33, '8I': 1.31, '9I': 1.28, PW: 1.24, GW: 1.2, SW: 1.15, LW: 1.1 };
+
 export function speedFactor(stats) {
   // Tour-average swing speed at Power 64
   return 0.875 + stats.power * 0.00195;
@@ -170,6 +174,7 @@ export function computeLaunch(inp) {
   const over = Math.max(0, p - 1);
   k *= 1 + over * 6; // overswinging past 100% costs accuracy fast
   k *= 1.45 - 0.9 * gear.forgive; // a bigger sweet spot forgives a crooked swing
+  k *= gear.straight ?? 1;
   let startDeg = e * 0.25 * k;
   let axisDeg = e * 1.15 * k * ball.side;
   axisDeg += shape.x * 9 * ball.side * gear.work;
@@ -182,17 +187,49 @@ export function computeLaunch(inp) {
   let pf = 1 + pressure * (1 - stats.mental / 100) * 0.9;
   if (fx.pressure < 0) pf *= 1 + pressure * 0.6;
   if (fx.pressure > 0) pf = 1 + (pf - 1) * 0.4;
-  const D = (1.45 - skill / 100) * fx.dispersion * lie.disp * pf * (1 + over * 3) * (inp.dispMult || 1) * (1.25 - 0.5 * gear.forgive);
+  const D = (1.45 - skill / 100) * fx.dispersion * lie.disp * pf * (1 + over * 3) * (inp.dispMult || 1) * (1.25 - 0.5 * gear.forgive) * (gear.straight ?? 1);
   const cons = 1.25 - stats.consistency * 0.004;
   startDeg += gauss() * 0.9 * D;
-  axisDeg += gauss() * 2.6 * D * ball.side;
-  speed *= 1 + gauss() * 0.012 * D * cons;
+  axisDeg += gauss() * (isWood ? 2.2 : 2.6) * D * ball.side;
+  speed *= 1 + gauss() * 0.008 * D * cons;
   launchDeg += gauss() * 0.5 * D;
   spin *= 1 + gauss() * 0.05 * D;
 
+  // Where the ball met the face, in mm from the sweet spot (+ toe, + high).
+  // A crooked swing tends to find the heel or toe. Off-centre hits lose ball
+  // speed (less with a forgiving head); a wood's curved face twists them back
+  // (toe hits draw, heel hits fade); high strikes launch higher with less
+  // spin, low ones lower with more. Losses are measured against the average
+  // strike, so the predicted carry stays the typical one.
+  const clubSpeed = speed / (SMASH[club.id] || 1.3);
+  let sh = 0, sv = 0;
+  let strikeNote = '';
+  if (!inp.noRandom) {
+    const sigH = 6 * D, sigV = 4.2 * D;
+    sh = gauss() * sigH + (e ? (rng() < 0.5 ? -1 : 1) * Math.min(8, Math.abs(e)) * 0.6 : 0);
+    sv = gauss() * sigV;
+    const soft = 1.5 - gear.forgive;
+    const lossOf = (h, v) => ((h * h + 1.8 * v * v) / 625) * 0.1 * soft;
+    const avg = ((sigH * sigH + 1.8 * sigV * sigV) / 625) * 0.1 * soft;
+    speed *= 1 + avg - lossOf(sh, sv);
+    if (isWood) {
+      axisDeg -= sh * 0.5 * ball.side;
+      startDeg += sh * 0.05;
+      launchDeg += sv * 0.09;
+      spin *= Math.max(0.6, 1 - sv * 0.01);
+    } else if (club.kind !== 'putter') {
+      axisDeg -= sh * 0.12 * ball.side;
+      if (sv < -7) { launchDeg -= 1.5; spin *= 0.85; speed *= 0.97; strikeNote = 'Thinned it'; }
+      else if (sv > 8) { launchDeg += 1; speed *= 0.985; }
+    }
+    if (!strikeNote && Math.abs(sh) > 9) strikeNote = sh > 0 ? 'Off the toe' : 'Off the heel';
+    else if (!strikeNote && Math.abs(sv) > 8) strikeNote = sv > 0 ? 'High on the face' : 'Low on the face';
+  }
+
   return {
     speed, launchDeg, spinRpm: Math.max(0, spin), axisDeg, startDeg,
-    lieNote: lie.note, club,
+    lieNote: lie.note || strikeNote, club,
+    strike: { h: sh, v: sv }, clubSpeed, smash: clubSpeed > 0 ? speed / clubSpeed : 0,
   };
 }
 

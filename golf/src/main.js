@@ -30,7 +30,10 @@ import { HoleModel } from './sim/hole.js';
 import { RNG, mixSeed } from './util/rng.js';
 import { traitEffects } from './data/traits.js';
 import { BALL_BY_ID } from './data/equipment.js';
-import { MODEL_BY_ID, normBag } from './data/clubsets.js';
+import { MODEL_BY_ID, normBag, spreadOf, CAT_OF } from './data/clubsets.js';
+import { fullShot } from './sim/caddie.js';
+import { ballAero } from './sim/shot.js';
+import { CLUB_BY_ID } from './data/equipment.js';
 import { scoringBonuses } from './data/tour.js';
 import { CHAR_BY_ID, playAs, marketItem } from './data/characters.js';
 import { TRAIL_BY_ID, BALL_COLOR_BY_ID } from './data/cosmetics.js';
@@ -473,20 +476,31 @@ app.onAction = (a, d, elx) => {
     }
     case 'useTrail': c.golfer.trail = d.id; saveCareer(c); app.screens.hub(c, 'shop'); break;
     case 'useBallColor': c.golfer.ballColor = d.id; saveCareer(c); app.screens.hub(c, 'shop'); break;
-    case 'shopTab': if (d.t === 'chars') { app.screens.hub(c, 'players'); break; } app.screens.shopTab = d.t; app.screens.hub(c, 'shop'); break;
+    case 'shopTab':
+      if (d.t === 'chars') { app.screens.hub(c, 'players'); break; }
+      if (d.t === 'clubs') { app.screens.hub(c, 'store'); break; }
+      app.screens.shopTab = d.t; app.screens.hub(c, 'shop'); break;
+    case 'storeCat': keepScroll(() => { app.screens.storeCat = d.t; app.screens.hub(c, 'store'); }); break;
+    case 'storeJump': {
+      const el = document.querySelector(`.clubcard [data-club="m-${d.id}"]`);
+      if (el) el.closest('.clubcard').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      break;
+    }
     case 'buyClub': {
       const m = MODEL_BY_ID[d.id];
       if (m && c.golfer.money >= m.price && !c.golfer.clubs.includes(m.id)) {
+        const before = clubGain(c, m);
         c.golfer.money -= m.price;
         c.golfer.clubs.push(m.id);
         c.golfer.bag = { ...normBag(c.golfer.bag), [m.cat]: m.id };
         saveCareer(c);
-        sfx.click();
-        toast(`${m.brand} ${m.name} is in your bag`);
+        sfx.cash();
+        toast(`${m.name} is in your bag${before ? `: ${before}` : ''}`, 4200);
       }
-      app.screens.hub(c, 'shop');
+      keepScroll(() => app.screens.hub(c, app.screens.tab === 'store' ? 'store' : 'shop'));
       break;
     }
+    case 'tryClub': tryClub(d.id); break;
     case 'buyChar': {
       const it = marketItem(d.id);
       const g = c.golfer;
@@ -517,7 +531,7 @@ app.onAction = (a, d, elx) => {
     case 'useClub': {
       const m = MODEL_BY_ID[d.id];
       if (m) { c.golfer.bag = { ...normBag(c.golfer.bag), [m.cat]: m.id }; saveCareer(c); toast(`Switched to ${m.brand} ${m.name}`); }
-      app.screens.hub(c, 'shop');
+      keepScroll(() => app.screens.hub(c, app.screens.tab === 'store' ? 'store' : 'shop'));
       break;
     }
     case 'players': app.fromHub = false; app.playersOpts = { q: '', sort: 'rank', limit: 120 }; app.screens.players(app.playersOpts); break;
@@ -792,7 +806,7 @@ function watchReplay(shot) {
   app.world.setGolfer(shot.look);
   app.world.setTrail(TRAIL_BY_ID[shot.trail], shot.ballColor, shot.tint);
   const g = app.world.golfer;
-  g.setClub(shot.club.kind, shot.club.length);
+  g.setClub(shot.club.kind, shot.club.length, shot.club.look || null, shot.club.id ? shot.club : null);
   g.placeAt(shot.start, shot.heading);
   // the golfer holds the finish while the ball flies
   g.setBackswing(shot.putt ? 0.5 : 1);
@@ -972,6 +986,46 @@ function openQuick(pre) {
   app.screens.quick(app.quickOpts);
 }
 
+// Re-render a screen without jumping back to the top
+function keepScroll(fn) {
+  const y = app.screens.root.scrollTop;
+  fn();
+  app.screens.root.scrollTop = y;
+}
+
+// What a new set does compared with the one in your bag, for the toast
+function clubGain(c, m) {
+  const g = c.golfer;
+  const me = playAs(g);
+  const fx = traitEffects(me.traits || []);
+  const ball = BALL_BY_ID[g.ball] || BALL_BY_ID.tourbal;
+  const aero = ballAero(ball, me.stats, fx);
+  const bag = normBag(g.bag);
+  const cur = MODEL_BY_ID[bag[m.cat]];
+  if (m.cat === 'putter') {
+    const aim = Math.round((1 - m.aim / cur.aim) * 100);
+    return aim > 0 ? `your putts start ${aim}% truer` : '';
+  }
+  const id = { driver: 'DR', woods: '3W', irons: '7I', wedges: 'GW' }[m.cat];
+  const d = fullShot(me.stats, fx, ball, aero, { ...bag, [m.cat]: m.id }, id).carry - fullShot(me.stats, fx, ball, aero, bag, id).carry;
+  const dd = app.settings.units === 'meters' ? Math.round(d) : Math.round(d / YD);
+  const st = Math.round((1 - spreadOf(m) / spreadOf(cur)) * 100);
+  const bits = [];
+  if (dd) bits.push(`${dd > 0 ? '+' : '−'}${Math.abs(dd)} ${app.settings.units === 'meters' ? 'm' : 'yds'}`);
+  if (Math.abs(st) >= 2) bits.push(`${Math.abs(st)}% ${st > 0 ? 'straighter' : 'wilder'}`);
+  return bits.join(' and ');
+}
+
+// Take a set to the range before you buy it
+function tryClub(id) {
+  const m = MODEL_BY_ID[id];
+  if (!m || !app.career) return;
+  const courses = generateCourses();
+  app.miniOpts = { ...(app.miniOpts || { courseId: courses[Math.floor(Math.random() * courses.length)].id }), proId: null, sky: 'day' };
+  app.trial = { id: m.id, cat: m.cat, club: { driver: 'DR', woods: m.id === 'w-rescue' ? '4H' : '3W', irons: '7I', wedges: 'SW' }[m.cat] };
+  startMini('range');
+}
+
 // The golfer for a quick round or mini-game: a chosen pro, your career
 // golfer (as the player you're playing as), or a club pro
 function golferFor(proId, ball) {
@@ -1038,6 +1092,9 @@ function startMini(kind, daily = null) {
   const course = courseById(daily ? daily.courseId : o.courseId);
   const rng = new RNG(daily ? daily.seed : Date.now() & 0xffffff);
   const golfer = golferFor(daily ? null : o.proId);
+  const trial = kind === 'range' && !daily ? app.trial : null;
+  app.trial = null;
+  if (trial) golfer.bag = { ...normBag(golfer.bag), [trial.cat]: trial.id };
   // mini-games are played in pleasant conditions: a light, steady breeze
   const cond = {
     windMph: kind === 'putt' ? 0 : rng.float(2, kind === 'range' ? 6 : 9), windDir: rng.float(0, Math.PI * 2), gust: 0.08,
@@ -1048,6 +1105,7 @@ function startMini(kind, daily = null) {
   applyWeather(cond, sky === 'rain' ? 'rain' : 'sunny', sky === 'night' ? 'night' : sky === 'sunset' ? '0.93' : String(cond.timeOfDay), rng);
   const mode = new MiniGame(kind, { course, golfer, seed: cond.seed, units: app.settings.units, cond });
   mode.daily = daily;
+  if (trial) { mode.trial = trial; mode.keepClub = trial.club; }
   app.screens.hide();
   const round = new RoundController(app, {
     course: mode.course, holeList: [mode.holeIndex], golfer, cond, crowd: kind === 'ctp' || kind === 'putt',
@@ -1069,11 +1127,41 @@ function fmtShort(m) {
   return inch === 12 ? `${f + 1} ft` : `${f} ft ${inch} in`;
 }
 
+// After a club test drive: how it went, then back to the store
+function trialDone(res) {
+  const c = app.career;
+  const m = MODEL_BY_ID[res.trial.id];
+  const owned = m.price === 0 || c.golfer.clubs.includes(m.id);
+  const rows = Object.entries(res.clubLog).filter(([id]) => CAT_OF[id] === m.cat).map(([id, arr]) => {
+    const off = res.offLog[id] || [];
+    const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
+    const lng = Math.max(...arr);
+    const offAvg = off.length ? off.reduce((a, b) => a + b, 0) / off.length : 0;
+    return `<tr><td>${esc(CLUB_BY_ID[id].name)}</td><td>${arr.length}</td><td>${fmtLong(avg)}</td><td>${fmtLong(lng)}</td><td>${fmtLong(offAvg)}</td></tr>`;
+  }).join('');
+  app.screens.storeCat = m.cat;
+  goHub();
+  app.screens.hub(c, 'store');
+  const gain = clubGain(c, m);
+  const md = modal(`<h3>${esc(m.name)}: test drive</h3>
+    ${rows ? `<table class="lb trial-tbl"><thead><tr><th>Club</th><th>Balls</th><th>Avg carry</th><th>Longest</th><th>Avg offline</th></tr></thead><tbody>${rows}</tbody></table>` : '<p class="muted">You didn\'t hit any balls with it.</p>'}
+    ${gain ? `<p>Compared with your bag: <b>${esc(gain)}</b>.</p>` : ''}
+    <div class="actions">${owned ? `<button class="btn primary" data-go="use">Put it in the bag</button>` : `<button class="btn primary" data-go="buy" ${c.golfer.money < m.price ? 'disabled' : ''}>Buy it for ${money(m.price, true)}</button>`}<button class="btn" data-close>Not today</button></div>`);
+  md.el.querySelector('[data-go]').addEventListener('click', (e) => {
+    md.close();
+    app.onAction(e.currentTarget.dataset.go === 'buy' ? 'buyClub' : 'useClub', { id: m.id });
+  });
+}
+
 function miniDone(mode) {
   const res = mode.result();
   const recs = app.records;
   const extra = { fmt: fmtLong, fmtSmall: fmtShort };
   if (mode.daily) { dailyDone(mode, res, extra); return; }
+  if (res.kind === 'range' && res.trial && app.career) {
+    trialDone(res);
+    return;
+  }
   if (res.kind === 'range') {
     if (res.best && betterScore('drive', res.best, recs.rangeDrive && recs.rangeDrive.score)) {
       recs.rangeDrive = { score: res.best, text: fmtLong(res.best), name: res.course.name, date: Date.now() };

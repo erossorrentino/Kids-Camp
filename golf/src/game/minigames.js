@@ -205,6 +205,7 @@ export class MiniGame {
     this.score = kind === 'ctp' ? Infinity : 0;
     this.best = null;
     this.clubLog = {}; // range: club -> [carry...]
+    this.offLog = {}; // range: club -> [metres offline...]
     this.last = null;
     this.targetIdx = 1;
     this.field = [];
@@ -320,6 +321,8 @@ export class MiniGame {
   // Club for the shot (target challenge: the club for the chosen target)
   prepare(round) {
     if (this.kind === 'drive' && round.lie === 'tee') round.club = 'DR';
+    // a club test drive keeps the club you're trying in your hands
+    if (this.kind === 'range' && this.keepClub) round.club = this.keepClub;
     if (this.kind === 'target' && this.targets) {
       const t = this.targets[this.targetIdx];
       const d = Math.hypot(t.x - round.ballPos.x, t.z - round.ballPos.z);
@@ -341,6 +344,7 @@ export class MiniGame {
 
   // After changing clubs on the target range, aim at the matching target
   onClubChange(round) {
+    if (this.kind === 'range' && this.keepClub) this.keepClub = round.club;
     if (this.kind !== 'target' || !this.targets || round.aimManual || this.picking) return;
     const carry = round.table[round.club] ? round.table[round.club].carry : 100;
     let best = 0;
@@ -368,6 +372,12 @@ export class MiniGame {
     if (this.kind === 'range') {
       const carry = res.carry, total = res.total;
       (this.clubLog[round.club] || (this.clubLog[round.club] = [])).push(carry);
+      if (rest) {
+        // how far from the straight line down the range it finished
+        const h = round.hole.teeHeading;
+        const off = Math.abs((rest.x - start.x) * Math.cos(h) + (rest.z - start.z) * Math.sin(h));
+        (this.offLog[round.club] || (this.offLog[round.club] = [])).push(lost ? 40 : off);
+      }
       this.last = { club: round.club, carry, total, lost };
       if (!lost && restPos) markers.add(restPos.x, restPos.y, restPos.z, { label: this.fmt(total, false), color: '#ffffff', fade: 14 });
       if (round.club === 'DR' && !lost && (!this.best || total > this.best)) this.best = total;
@@ -515,7 +525,7 @@ export class MiniGame {
   result() {
     const rows = this.board();
     const me = rows.find((r) => r.you);
-    return { kind: this.kind, name: this.meta.name, rows, pos: me ? me.pos : null, score: this.score, scoreText: this.scoreText(this.score), shots: this.shots, course: this.baseCourse, clubLog: this.clubLog, best: this.best };
+    return { kind: this.kind, name: this.meta.name, rows, pos: me ? me.pos : null, score: this.score, scoreText: this.scoreText(this.score), shots: this.shots, course: this.baseCourse, clubLog: this.clubLog, offLog: this.offLog, best: this.best, trial: this.trial || null };
   }
 }
 

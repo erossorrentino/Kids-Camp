@@ -5,7 +5,13 @@ import { generatePros, proById, STAT_KEYS, STAT_LABELS, STAT_HELP, overall } fro
 import { generateCourses, courseById, STYLES } from '../data/courses.js';
 import { COUNTRIES } from '../data/names.js';
 import { BALLS, BALL_BY_ID, ballBars } from '../data/equipment.js';
-import { CLUB_CATS, CLUB_MODELS, MODEL_BY_ID, modelBars, normBag } from '../data/clubsets.js';
+import { CLUB_CATS, CLUB_MODELS, MODEL_BY_ID, modelBars, normBag, tierOf, TIERS, TIER_BY_ID, loftOf, bounceOf, shaftOf, headOf, spreadOf, accuracyOf } from '../data/clubsets.js';
+import { CLUB_BY_ID } from '../data/equipment.js';
+import { fullShot } from '../sim/caddie.js';
+import { ballAero } from '../sim/shot.js';
+import { traitEffects } from '../data/traits.js';
+import { YD } from '../sim/hole.js';
+import { fillClubShots } from '../render/clubShots.js';
 import { HoleModel } from '../sim/hole.js';
 import { drawHoleMap, caddieNote } from './holemap.js';
 import { RNG, mixSeed } from '../util/rng.js';
@@ -45,6 +51,16 @@ export function trophyItems(c) {
   for (const cup of c.cups || []) items.push({ kind: 'cup', plaque: `Cup ${cup.year}` });
   for (const car of c.garage || []) items.push({ kind: 'car', color: car.color });
   return items;
+}
+
+// The club each set is pictured and measured with in the club store
+const CAT_KEY = { DR: 'driver', '3W': 'woods', '5W': 'woods', '4H': 'woods', '5I': 'irons', '6I': 'irons', '7I': 'irons', '8I': 'irons', '9I': 'irons', PW: 'irons', GW: 'wedges', SW: 'wedges', LW: 'wedges', PT: 'putter' };
+const DIST_CLUB = { driver: 'DR', woods: '3W', irons: '7I', wedges: 'GW', putter: 'PT' };
+const REP_CLUB = (m) => (m.cat === 'driver' ? 'DR' : m.cat === 'woods' ? (m.id === 'w-rescue' ? '4H' : '3W') : m.cat === 'irons' ? '7I' : m.cat === 'wedges' ? 'SW' : 'PT');
+function specFor(m) {
+  const id = REP_CLUB(m);
+  const cl = CLUB_BY_ID[id];
+  return { kind: cl.kind, id, loft: loftOf(m, id, cl.loft), length: cl.length, bounce: bounceOf(m, id), look: m.look };
 }
 
 // A little picture of a shot trail: the ball's arc drawn in the trail's colours
@@ -200,7 +216,7 @@ export class Screens {
     const prev = c.prevRank[HUMAN_ID];
     const move = prev && prev !== r ? `<span class="${prev > r ? 'up' : 'down'}">${prev > r ? '▲' : '▼'}${Math.abs(prev - r)}</span>` : '';
     const lvlPct = Math.round((g.xp / xpForLevel(g.level)) * 100);
-    const tabs = [['week', 'This week'], ['schedule', 'Schedule'], ['rankings', 'World ranking'], ['race', 'Season race'], ['players', 'Players'], ['golfer', 'Golfer'], ['stats', 'Stats'], ['sponsors', 'Sponsors'], ['shop', 'Pro shop'], ['trophies', 'Trophy room']];
+    const tabs = [['week', 'This week'], ['schedule', 'Schedule'], ['rankings', 'World ranking'], ['race', 'Season race'], ['players', 'Players'], ['golfer', 'Golfer'], ['stats', 'Stats'], ['sponsors', 'Sponsors'], ['store', 'Club store'], ['shop', 'Pro shop'], ['trophies', 'Trophy room']];
     let body = '';
     if (tab === 'week') body = this.hubWeek(c);
     else if (tab === 'schedule') body = this.hubSchedule(c);
@@ -209,6 +225,7 @@ export class Screens {
     else if (tab === 'golfer') body = this.hubGolfer(c);
     else if (tab === 'players') body = this.charShop(c);
     else if (tab === 'shop') body = this.hubShop(c);
+    else if (tab === 'store') body = this.clubStore(c);
     else if (tab === 'trophies') body = this.hubTrophies(c);
     else if (tab === 'sponsors') body = this.hubSponsors(c);
     else if (tab === 'stats') body = this.hubStats(c);
@@ -235,6 +252,7 @@ export class Screens {
         <div class="tab-body">${body}</div>
       </div>`);
     this.fillCharPortraits(c);
+    if (tab === 'store' && this.clubSpecs) fillClubShots(this.app.world.renderer, this.root, this.clubSpecs);
   }
 
   eventCard(c, ev, big = false) {
@@ -453,10 +471,9 @@ export class Screens {
 
   hubShop(c) {
     const g = c.golfer;
-    const sub = ['balls', 'style'].includes(this.shopTab) ? this.shopTab : 'clubs';
+    const sub = this.shopTab === 'style' ? 'style' : 'balls';
     const tab = (id, label) => `<button class="chipbtn ${sub === id ? 'on' : ''}" data-a="shopTab" data-t="${id}">${label}</button>`;
     const head = `<div class="chips shop-tabs">${tab('clubs', 'Clubs')}${tab('balls', 'Balls')}${tab('style', 'Style')}<span class="muted small">Bank: ${money(g.money)}</span></div>`;
-    if (sub === 'clubs') return head + this.clubShop(c);
     if (sub === 'style') return head + this.styleShop(c);
     return `${head}<p class="muted">Each ball trades one strength for another. Prize money buys new ones; you can switch any time between events.</p>
       <div class="balls">${BALLS.map((b) => {
@@ -622,33 +639,134 @@ export class Screens {
     fillPortraits(this.app.world.renderer, this.root, looks);
   }
 
-  clubShop(c) {
+  // ---------------- club store ----------------
+  // Your bag up top, then one category at a time: the Strata upgrade line
+  // (every step longer and straighter) and the specialty sets that trade one
+  // strength for another. Each card says what it would do for *you*.
+  clubStore(c) {
     const g = c.golfer;
+    const units = this.app.settings.units;
+    const me = playAs(g);
+    const fx = traitEffects(me.traits || []);
+    const ball = BALL_BY_ID[g.ball] || BALL_BY_ID.tourbal;
+    const aero = ballAero(ball, me.stats, fx);
     const bag = normBag(g.bag);
     const owned = new Set(g.clubs || []);
-    const sw = (m) => {
-      const lk = m.look || {};
-      const col = lk.crown || lk.accent || lk.head || '#999';
-      return `<span class="club-swatch ${m.cat}" style="--h:${lk.head || '#999'};--a:${col}"></span>`;
+    const cat = this.storeCat || 'driver';
+    const shotMemo = new Map();
+    const carry = (b, id) => {
+      const k = `${b[CAT_KEY[id]]}|${id}`;
+      if (!shotMemo.has(k)) shotMemo.set(k, fullShot(me.stats, fx, ball, aero, b, id).carry);
+      return shotMemo.get(k);
     };
-    const bagRow = Object.entries(CLUB_CATS).map(([cat, v]) => {
-      const m = MODEL_BY_ID[bag[cat]];
-      return `<div class="bagslot">${sw(m)}<div><small>${esc(v.label)}</small><b>${esc(m.brand)} ${esc(m.name)}</b></div></div>`;
+    const len = (m) => (units === 'meters' ? `${Math.round(m)} m` : `${Math.round(m / YD)} yds`);
+    const unit = units === 'meters' ? 'm' : 'yds';
+    const specs = {};
+    const pic = (key, m, w = 240, h = 150) => {
+      specs[key] = specFor(m);
+      return `<img data-club="${key}" data-w="${w}" data-h="${h}" alt="">`;
+    };
+    const tierChip = (m) => { const t = tierOf(m); return `<span class="tierchip" style="--tc:${t.color}">${esc(t.name)}</span>`; };
+    // ---- your bag
+    const slots = Object.entries(CLUB_CATS).map(([k, v]) => {
+      const m = MODEL_BY_ID[bag[k]];
+      return `<button class="bagslot2 ${k === cat ? 'on' : ''}" data-a="storeCat" data-t="${k}" style="--tc:${tierOf(m).color}">
+        <div class="bs-pic">${pic(`bag-${k}`, m, 150, 96)}</div>
+        <small>${esc(v.label)}</small><b>${esc(m.name)}</b>${tierChip(m)}</button>`;
     }).join('');
-    return `<section class="card"><h3>Your bag</h3><div class="bagrow">${bagRow}</div><p class="muted small">14 clubs: driver, 3-wood, 5-wood, 4-hybrid, 5-iron to pitching wedge, gap, sand and lob wedge, and a putter. Each set trades one strength for another.</p></section>
-      ${Object.entries(CLUB_CATS).map(([cat, v]) => `
-        <h3 class="shop-cat">${esc(v.label)}</h3>
-        <div class="balls">${CLUB_MODELS.filter((m) => m.cat === cat).map((m) => {
-          const inBag = bag[cat] === m.id;
-          const has = owned.has(m.id) || m.price === 0;
-          return `<article class="ballcard ${inBag ? 'on' : ''}">
-            <div class="bc-head">${sw(m)}<div><small>${esc(m.brand)}</small><h4>${esc(m.name)}</h4></div><b class="price">${m.price ? money(m.price, true) : 'Free'}</b></div>
-            ${Object.entries(modelBars(m)).map(([k, val]) => statBar(k, val)).join('')}
-            <ul class="proscons">${m.pros.map((p) => `<li class="adv">${esc(p)}</li>`).join('')}${m.cons.map((p) => `<li class="dis">${esc(p)}</li>`).join('')}</ul>
-            <div class="bc-foot">${inBag ? '<span class="pill">In your bag</span>' : has ? `<button class="btn" data-a="useClub" data-id="${m.id}">Put in bag</button>` : `<button class="btn primary" data-a="buyClub" data-id="${m.id}" ${g.money < m.price ? 'disabled' : ''}>Buy ${money(m.price, true)}</button>`}</div>
-          </article>`;
-        }).join('')}</div>`).join('')}`;
+    const playable = ['driver', 'woods', 'irons', 'wedges'].map((k) => MODEL_BY_ID[bag[k]]);
+    const bagAcc = Math.round(playable.reduce((a, m) => a + accuracyOf(m), 0) / playable.length);
+    const bagTier = TIERS[Math.round(Object.keys(CLUB_CATS).reduce((a, k) => a + tierOf(MODEL_BY_ID[bag[k]]).rank, 0) / 5)];
+    // ---- this category
+    const cur = MODEL_BY_ID[bag[cat]];
+    const all = CLUB_MODELS.filter((m) => m.cat === cat);
+    const starter = all.find((m) => m.price === 0);
+    const ladder = [starter, ...all.filter((m) => m.strata).sort((a, b) => a.price - b.price)];
+    const special = all.filter((m) => !m.strata && m.price > 0).sort((a, b) => a.price - b.price);
+    const has = (m) => m.price === 0 || owned.has(m.id);
+    let top = 0;
+    ladder.forEach((m, i) => { if (has(m)) top = i; });
+    const next = ladder[top + 1] || null;
+    const distId = DIST_CLUB[cat];
+    const gains = (m) => {
+      if (m.id === cur.id) return '<span class="gain same">In your bag now</span>';
+      const out = [];
+      if (cat === 'putter') {
+        const aim = Math.round((1 - m.aim / cur.aim) * 100), pace = Math.round((1 - m.pace / cur.pace) * 100);
+        if (aim) out.push(`<span class="gain ${aim > 0 ? 'up' : 'down'}">Start line ${Math.abs(aim)}% ${aim > 0 ? 'truer' : 'looser'}</span>`);
+        if (pace) out.push(`<span class="gain ${pace > 0 ? 'up' : 'down'}">Pace ${Math.abs(pace)}% ${pace > 0 ? 'steadier' : 'jumpier'}</span>`);
+        if (m.nerve > cur.nerve) out.push('<span class="gain up">Calmer under pressure</span>');
+      } else {
+        const b2 = { ...bag, [cat]: m.id };
+        const d = carry(b2, distId) - carry(bag, distId);
+        const dd = units === 'meters' ? Math.round(d) : Math.round(d / YD);
+        if (dd) out.push(`<span class="gain ${dd > 0 ? 'up' : 'down'}">${dd > 0 ? '+' : '−'}${Math.abs(dd)} ${unit} ${cat === 'wedges' ? '' : 'carry'}</span>`);
+        const st = Math.round((1 - spreadOf(m) / spreadOf(cur)) * 100);
+        if (Math.abs(st) >= 2) out.push(`<span class="gain ${st > 0 ? 'up' : 'down'}">${Math.abs(st)}% ${st > 0 ? 'straighter' : 'wilder'}</span>`);
+        if (cat === 'wedges') {
+          const sp = Math.round((m.spin / cur.spin - 1) * 100);
+          if (sp) out.push(`<span class="gain ${sp > 0 ? 'up' : 'down'}">${sp > 0 ? '+' : '−'}${Math.abs(sp)}% spin</span>`);
+          if (m.sand > cur.sand + 0.02) out.push('<span class="gain up">Easier from sand</span>');
+        }
+      }
+      return out.join('') || '<span class="gain same">About the same as yours</span>';
+    };
+    const specLine = (m) => {
+      const id = REP_CLUB(m);
+      const cl = CLUB_BY_ID[id];
+      if (cat === 'putter') return `${headOf(m)} · ${shaftOf(m)}`;
+      if (cat === 'wedges') return `${['GW', 'SW', 'LW'].map((w) => `${loftOf(m, w, CLUB_BY_ID[w].loft)}°/${bounceOf(m, w)}°`).join(' · ')} · ${headOf(m)}`;
+      if (cat === 'irons') return `7-iron ${loftOf(m, '7I', 32)}° · ${headOf(m)} · ${shaftOf(m, me.stats.power)}`;
+      if (cat === 'woods') return `${['3W', '5W', '4H'].map((w) => `${w} ${loftOf(m, w, CLUB_BY_ID[w].loft)}°`).join(' · ')} · ${shaftOf(m, me.stats.power)}`;
+      return `${loftOf(m, id, cl.loft)}° · ${headOf(m)} · ${shaftOf(m, me.stats.power)}`;
+    };
+    const foot = (m) => {
+      const inBag = bag[cat] === m.id;
+      const try_ = cat !== 'putter' && !inBag ? `<button class="btn ghost" data-a="tryClub" data-id="${m.id}">Try it</button>` : '';
+      if (inBag) return '<span class="pill">In your bag</span>';
+      if (has(m)) return `${try_}<button class="btn" data-a="useClub" data-id="${m.id}">Put in bag</button>`;
+      return `${try_}<button class="btn primary" data-a="buyClub" data-id="${m.id}" ${g.money < m.price ? 'disabled' : ''}>Buy ${money(m.price, true)}</button>`;
+    };
+    const card = (m) => `<article class="clubcard ${bag[cat] === m.id ? 'on' : ''} ${next && next.id === m.id ? 'next' : ''}" style="--tc:${tierOf(m).color}">
+        <div class="cc-pic">${pic(`m-${m.id}`, m)}${tierChip(m)}${next && next.id === m.id ? '<span class="nextchip">Next upgrade</span>' : ''}</div>
+        <div class="cc-body">
+          <small>${esc(m.brand)}</small><h4>${esc(m.name)}</h4>
+          <div class="cc-specs">${esc(specLine(m))}</div>
+          <div class="gains">${gains(m)}</div>
+          ${Object.entries(modelBars(m)).map(([k, val]) => statBar(k, val)).join('')}
+          <ul class="proscons">${m.pros.map((p) => `<li class="adv">${esc(p)}</li>`).join('')}${m.cons.map((p) => `<li class="dis">${esc(p)}</li>`).join('')}</ul>
+        </div>
+        <div class="cc-foot"><b class="price">${m.price ? money(m.price, true) : 'Free'}</b><div class="cc-btns">${foot(m)}</div></div>
+      </article>`;
+    const steps = ladder.map((m, i) => `<button class="lstep ${i <= top ? 'got' : ''} ${bag[cat] === m.id ? 'on' : ''} ${next && next.id === m.id ? 'next' : ''}" data-a="storeJump" data-id="${m.id}" style="--tc:${tierOf(m).color}">
+        <i></i><b>${esc(tierOf(m).name)}</b><small>${m.price ? money(m.price, true) : 'Free'}</small></button>`).join('');
+    const cats = Object.entries(CLUB_CATS).map(([k, v]) => `<button class="chipbtn ${k === cat ? 'on' : ''}" data-a="storeCat" data-t="${k}">${esc(v.label)}</button>`).join('');
+    this.clubSpecs = specs;
+    return `<section class="card storehead">
+        <div class="sh-top">
+          <div><h3>Club store</h3><p class="muted">Better clubs hit it <b>further</b> and <b>straighter</b>. Climb the Strata line one step at a time, or pick a specialty set built for one job.</p></div>
+          <div class="sh-kpis">
+            <div class="kpi"><small>Driver carry</small><b>${len(carry(bag, 'DR'))}</b></div>
+            <div class="kpi"><small>7-iron carry</small><b>${len(carry(bag, '7I'))}</b></div>
+            <div class="kpi"><small>Bag accuracy</small><b>${bagAcc}</b></div>
+            <div class="kpi"><small>Bag level</small><b style="color:${bagTier.color}">${esc(bagTier.name)}</b></div>
+            <div class="kpi"><small>Bank</small><b>${money(g.money, true)}</b></div>
+          </div>
+        </div>
+        <div class="bagslots">${slots}</div>
+      </section>
+      <div class="chips store-cats">${cats}</div>
+      <section class="card ladder-card">
+        <h3>The Strata line: ${esc(CLUB_CATS[cat].label)}</h3>
+        <p class="muted small">Each step is longer and straighter than the one before${cat === 'wedges' ? ', with more spin and help from the sand' : cat === 'putter' ? ': a truer roll and steadier nerves' : ''}.${next ? ` Your next upgrade is <b>${esc(next.name)}</b> for ${money(next.price, true)}.` : ' You have the best there is.'}</p>
+        <div class="ladder">${steps}</div>
+      </section>
+      <div class="clubcards">${ladder.map(card).join('')}</div>
+      <h3 class="shop-h">Specialty ${esc(CLUB_CATS[cat].label.toLowerCase())}</h3>
+      <p class="muted small">These trade one strength for another: more distance but wilder, or a huge sweet spot but less spin.</p>
+      <div class="clubcards">${special.map(card).join('')}</div>`;
   }
+
 
   hubTrophies(c) {
     const hist = c.history.slice(0, 40);

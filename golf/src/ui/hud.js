@@ -6,6 +6,16 @@ import { drawHoleMap } from './holemap.js';
 
 const MM_W = 132, MM_H = 224;
 
+// The club face with a dot where the ball was struck (heel left, toe right)
+function impactFace(st, kind) {
+  const wood = kind === 'wood' || kind === 'hybrid';
+  const x = Math.max(6, Math.min(94, 50 + st.h * 1.9)), y = Math.max(5, Math.min(37, 21 - st.v * 1.9));
+  const face = wood ? '<path d="M8 30 Q6 10 26 6 L78 6 Q96 8 94 26 Q92 37 74 37 L22 37 Q10 37 8 30 Z"/>' : '<path d="M8 36 L10 14 Q12 6 24 7 L80 4 Q95 4 93 20 Q92 33 80 36 Z"/>';
+  const lines = [12, 17, 22, 27, 32].map((ly) => `<line x1="${wood ? 30 : 16}" x2="${wood ? 70 : 84}" y1="${ly}" y2="${ly}"/>`).join('');
+  const label = Math.abs(st.h) < 5 && Math.abs(st.v) < 4 ? 'Centre' : `${Math.abs(st.v) >= 4 ? (st.v > 0 ? 'High' : 'Low') : ''}${Math.abs(st.v) >= 4 && Math.abs(st.h) >= 5 ? ' ' : ''}${Math.abs(st.h) >= 5 ? (st.h > 0 ? 'toe' : 'heel') : ''}`;
+  return `<div class="st-face"><svg viewBox="0 0 100 42" aria-hidden="true"><g class="fc">${face}</g><g class="gr">${lines}</g><circle class="sweet" cx="50" cy="21" r="5"/><circle class="hit" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.2"/></svg><span>Strike: ${esc(label.charAt(0).toUpperCase() + label.slice(1))}</span></div>`;
+}
+
 export class HUD {
   constructor(root, app) {
     this.root = root;
@@ -403,7 +413,9 @@ export class HUD {
     const rows = s.putt
       ? [['Ball speed', `${s.ballSpeed.toFixed(1)} mph`], ['Roll', dist(s.total)]]
       : [
+          ['Club speed', s.clubSpeed ? `${s.clubSpeed.toFixed(1)} mph` : '—'],
           ['Ball speed', `${s.ballSpeed.toFixed(1)} mph`],
+          ['Smash', s.smash ? s.smash.toFixed(2) : '—'],
           ['Launch', `${s.launch.toFixed(1)}°`],
           ['Spin', `${Math.round(s.spin).toLocaleString()} rpm`],
           ['Carry', dist(s.carry)],
@@ -413,8 +425,10 @@ export class HUD {
           ['Land angle', s.landAngle != null ? `${s.landAngle.toFixed(0)}°` : '—'],
         ];
     const dev = s.dev || 0;
-    const swingTxt = Math.abs(dev) < 3 ? 'Pure strike' : `Swing path ${Math.abs(dev).toFixed(0)}° ${dev > 0 ? 'right' : 'left'}`;
-    el.innerHTML = `<div class="st-head">${esc(s.club)}<span>${esc(swingTxt)}</span></div>${rows.map(([k, v]) => `<div class="st-row"><span>${k}</span><b>${v}</b></div>`).join('')}${s.note ? `<div class="st-note">${esc(s.note)}</div>` : ''}`;
+    const st = s.strike;
+    const centred = !st || (Math.abs(st.h) < 5 && Math.abs(st.v) < 4);
+    const swingTxt = Math.abs(dev) < 3 && centred ? 'Pure strike' : Math.abs(dev) < 3 ? 'Good swing' : `Swing path ${Math.abs(dev).toFixed(0)}° ${dev > 0 ? 'right' : 'left'}`;
+    el.innerHTML = `<div class="st-head">${esc(s.club)}<span>${esc(swingTxt)}</span></div>${st && !s.putt ? impactFace(st, s.kind) : ''}${rows.map(([k, v]) => `<div class="st-row"><span>${k}</span><b>${v}</b></div>`).join('')}${s.note ? `<div class="st-note">${esc(s.note)}</div>` : ''}`;
     el.hidden = false;
     clearTimeout(this._stT);
     this._stT = setTimeout(() => { el.hidden = true; }, 5200);

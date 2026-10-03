@@ -26,6 +26,15 @@ export function clubTable(stats, fx, ball, aero, rho = 1.225, bag = null) {
   return out;
 }
 
+// One clean full swing with a club from this bag: { carry, total } in meters
+export function fullShot(stats, fx, ball, aero, bag, clubId, rho = 1.225) {
+  const gear = gearFor(bag, clubId);
+  const L = computeLaunch({ clubId, power: 1, stats, fx, ball, gear, lie: 'tee', noRandom: true, heading: 0 });
+  const st = launchState(0, L);
+  const r = simulate({ pos: { x: 0, y: 0.03, z: 0 }, vel: st.vel, spin: st.spin, env: flatEnv({ rho }), ball: aero, maxTime: 20 });
+  return { carry: r.carry, total: r.total };
+}
+
 // Power needed for a club to carry `dist` meters (interpolating the table curve)
 export function powerFor(entry, dist) {
   const c = entry.curve;

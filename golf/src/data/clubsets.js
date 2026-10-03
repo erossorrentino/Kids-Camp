@@ -6,6 +6,7 @@
 //   spin     backspin multiplier
 //   forgive  0..1, 0.5 = average: shrinks random dispersion and how much a
 //            crooked swing hurts (big sweet spot)
+//   straight multiplier on every miss (lower = straighter; Strata line)
 //   work     shot-shaping multiplier (how much the Shape control bends it)
 //   bias     built-in curve, degrees of spin-axis tilt (- = draw)
 //   sand     0..1 share of the bunker penalty removed (negative = worse)
@@ -25,7 +26,7 @@ export const CLUB_CATS = {
 export const CAT_OF = {};
 for (const [cat, v] of Object.entries(CLUB_CATS)) for (const c of v.clubs) CAT_OF[c] = cat;
 
-const D = (o) => ({ speed: 1, launch: 0, spin: 1, forgive: 0.5, work: 1, bias: 0, sand: 0, rough: 0, deck: false, ...o });
+const D = (o) => ({ speed: 1, launch: 0, spin: 1, forgive: 0.5, straight: 1, work: 1, bias: 0, sand: 0, rough: 0, deck: false, ...o });
 const P = (o) => ({ aim: 1, pace: 1, nerve: 0, read: 1, ...o });
 
 export const CLUB_MODELS = [
@@ -93,6 +94,102 @@ export const CLUB_MODELS = [
     look: { head: '#d9dde2', accent: '#c1121f', style: 'blade' }, pros: ['The best roll money can buy'], cons: ['Costs a fortune'] }),
 ];
 
+// ---------------- the Strata upgrade line ----------------
+// Unlike the specialty sets above, every step up the Strata line is simply
+// better: longer AND straighter (more spin and bunker help for wedges, a
+// truer roll for putters). The price climbs steeply.
+export const TIERS = [
+  { id: 'starter', name: 'Starter', color: '#8d99ae' },
+  { id: 'club', name: 'Club', color: '#cd8a4a' },
+  { id: 'pro', name: 'Pro', color: '#c6ccd4' },
+  { id: 'tour', name: 'Tour', color: '#f2c230' },
+  { id: 'elite', name: 'Elite', color: '#6fd3ff' },
+  { id: 'legend', name: 'Legend', color: '#c792ff' },
+];
+export const TIER_BY_ID = Object.fromEntries(TIERS.map((t, i) => [t.id, { ...t, rank: i }]));
+
+const STEPS = ['club', 'pro', 'tour', 'elite', 'legend'];
+const STRATA_LOOKS = [
+  // club, pro, tour, elite, legend
+  { crown: '#3a3f47', head: '#2b2f36', accent: '#cd8a4a', iron: '#c3c8cf', shaftAccent: '#cd8a4a' },
+  { crown: '#24467e', head: '#1b2027', accent: '#4f8cff', iron: '#cdd2d8', shaftAccent: '#4f8cff' },
+  { crown: '#141518', head: '#141518', accent: '#d8322c', iron: '#d6dbe0', shaftAccent: '#d8322c' },
+  { crown: '#101114', head: '#0c0d0f', accent: '#e8c04a', iron: '#dfe3e7', shaftAccent: '#e8c04a', shaftColor: '#f1f1ee' },
+  { crown: '#c9a227', head: '#17110a', accent: '#c792ff', iron: '#e7d6a3', shaftAccent: '#c792ff', shaftColor: '#2a1f3d' },
+];
+const STRATA = {
+  driver: { price: [15000, 45000, 140000, 400000, 1100000], speed: [1.0, 1.012, 1.024, 1.036, 1.05], forgive: [0.65, 0.71, 0.77, 0.84, 0.91], straight: [0.94, 0.86, 0.78, 0.7, 0.6], spin: [1.03, 1.0, 0.97, 0.95, 0.94], work: [1, 1.05, 1.1, 1.15, 1.2] },
+  woods: { price: [10000, 30000, 90000, 260000, 700000], speed: [0.998, 1.009, 1.02, 1.031, 1.042], forgive: [0.66, 0.72, 0.78, 0.84, 0.9], straight: [0.94, 0.86, 0.78, 0.7, 0.62], spin: [1.01, 1.0, 0.98, 0.97, 0.96], work: [1, 1.05, 1.1, 1.15, 1.2], rough: [0.05, 0.1, 0.15, 0.2, 0.28] },
+  irons: { price: [20000, 60000, 180000, 500000, 1400000], speed: [1.008, 1.017, 1.026, 1.035, 1.045], forgive: [0.69, 0.73, 0.78, 0.84, 0.9], straight: [0.94, 0.87, 0.8, 0.72, 0.64], spin: [0.98, 1.0, 1.02, 1.04, 1.06], work: [0.95, 1.05, 1.15, 1.25, 1.35] },
+  wedges: { price: [8000, 25000, 70000, 200000, 550000], speed: [1, 1.005, 1.01, 1.015, 1.02], spin: [1.03, 1.07, 1.11, 1.15, 1.2], forgive: [0.58, 0.62, 0.66, 0.71, 0.76], straight: [0.95, 0.89, 0.83, 0.77, 0.7], sand: [0.05, 0.12, 0.2, 0.3, 0.42], rough: [0.03, 0.08, 0.12, 0.18, 0.25], work: [1, 1.08, 1.16, 1.24, 1.32] },
+  putter: { price: [8000, 25000, 80000, 220000, 600000], aim: [0.92, 0.85, 0.78, 0.72, 0.66], pace: [0.92, 0.86, 0.8, 0.74, 0.68], nerve: [0.1, 0.2, 0.3, 0.4, 0.5], read: [1.02, 1.05, 1.08, 1.12, 1.16] },
+};
+const STRATA_NAMES = { driver: 'Driver', woods: 'Woods', irons: 'Irons', wedges: 'Wedges', putter: 'Putter' };
+for (const [cat, t] of Object.entries(STRATA)) {
+  STEPS.forEach((tier, i) => {
+    const lk = STRATA_LOOKS[i];
+    const pick = (k) => (t[k] ? t[k][i] : undefined);
+    const tierName = TIER_BY_ID[tier].name;
+    const base = { id: `s-${cat}-${tier}`, cat, brand: 'Summit', name: `Strata ${tierName}${cat === 'putter' ? ' Putter' : ''}`, price: t.price[i], tier, strata: true };
+    let m;
+    if (cat === 'putter') {
+      m = P({ ...base, aim: pick('aim'), pace: pick('pace'), nerve: pick('nerve'), read: pick('read'),
+        look: { head: i >= 3 ? '#1b1c20' : '#9aa0a8', accent: lk.accent, style: i % 2 ? 'mallet' : 'blade', grip: i >= 2 ? '#1f2a44' : null, gripAccent: lk.accent },
+        pros: [`Truer roll than the ${i ? TIER_BY_ID[STEPS[i - 1]].name : 'Starter'} model`, i >= 2 ? 'Calms the nerves on short putts' : 'Better pace control'], cons: i === 4 ? ['Costs a fortune'] : [] });
+    } else {
+      const spec = { speed: pick('speed') ?? 1, forgive: pick('forgive'), straight: pick('straight') ?? 1, spin: pick('spin') ?? 1, work: pick('work') ?? 1, sand: pick('sand') ?? 0, rough: pick('rough') ?? 0 };
+      const look = cat === 'irons' ? { head: lk.iron, accent: lk.accent, back: i >= 3 ? '#2a2c31' : null, style: 'cavity', size: 1.06 - i * 0.025, shaftAccent: lk.shaftAccent }
+        : cat === 'wedges' ? { head: i === 4 ? '#8a6b3f' : lk.iron, style: 'wedge', size: 1, stamp: lk.accent }
+        : { head: lk.head, crown: lk.crown, style: 'wood', size: 1, shaftAccent: lk.shaftAccent, shaftColor: lk.shaftColor, skirt: lk.accent };
+      const prev = i ? TIER_BY_ID[STEPS[i - 1]].name : 'Starter';
+      const pros = cat === 'wedges' ? [`More spin and sand help than the ${prev} set`, 'Checks up on the greens'] : [`Longer and straighter than the ${prev} model`, i >= 2 ? 'Shapes the ball when you ask' : 'Forgiving on mishits'];
+      m = D({ ...base, ...spec, look, pros, cons: i === 4 ? ['Costs a fortune'] : i === 0 ? ['Still a long way from tour gear'] : [] });
+    }
+    CLUB_MODELS.push(m);
+  });
+}
+
+// Tier for every set: the Strata line has its own, specialty sets go by price
+export function tierOf(m) {
+  if (m.tier) return TIER_BY_ID[m.tier];
+  const p = m.price;
+  return TIER_BY_ID[p === 0 ? 'starter' : p < 35000 ? 'club' : p < 75000 ? 'pro' : p < 300000 ? 'tour' : p < 1000000 ? 'elite' : 'legend'];
+}
+
+// Real-world specs for a set: lofts, head size, shaft
+const LOFT_DELTA = { 'd-rocket': -1.5, 'd-tour': -2, 'd-mini': 1, 'd-stable': 0, 'd-elite': -1.5, 'w-launch': 1.5, 'w-tour': -1,
+  'i-starter': -1, 'i-blade': 2, 'i-cavity': 0, 'i-distance': -4, 'i-sgi': -3, 'i-forged': -2, 'i-elite': 1 };
+export function loftOf(m, clubId, baseLoft) {
+  let d = LOFT_DELTA[m.id] || 0;
+  if (m.strata && m.cat === 'driver') d = [0, -0.5, -1, -1.5, -1.5][STEPS.indexOf(m.tier)];
+  if (m.strata && m.cat === 'irons') d = [-2, -1.5, -1, -0.5, 0][STEPS.indexOf(m.tier)];
+  return Math.round((baseLoft + d) * 2) / 2;
+}
+const BOUNCE = { GW: 10, SW: 12, LW: 8 };
+export function bounceOf(m, clubId) {
+  const b = BOUNCE[clubId];
+  if (b == null) return undefined;
+  return b + (m.id === 'we-bounce' ? 3 : m.id === 'we-tour' ? -3 : 0);
+}
+export function shaftOf(m, power = 64) {
+  const wood = m.cat === 'driver' || m.cat === 'woods';
+  if (m.cat === 'putter') return m.id === 'p-arm' ? 'Steel, 41 in arm-lock' : m.id === 'p-counter' ? 'Steel, 38 in counterbalanced' : 'Steel, 34 in';
+  // flex is fitted to your swing speed
+  const mph = Math.round(113 * (0.875 + power * 0.00195));
+  const flex = mph >= 112 ? 'X-Stiff' : mph >= 100 ? 'Stiff' : mph >= 88 ? 'Regular' : 'Senior';
+  const t = tierOf(m).rank;
+  if (wood) return `Graphite ${55 + t * 2}g ${flex}`;
+  if (m.cat === 'wedges') return `Steel 120g Wedge flex`;
+  return m.id === 'i-sgi' || m.id === 'i-starter' ? `Graphite 75g ${flex}` : `Steel ${100 + t * 4}g ${flex}`;
+}
+export function headOf(m) {
+  if (m.cat === 'driver') return m.id === 'd-mini' ? '300 cc' : m.id === 'd-tour' ? '445 cc' : '460 cc';
+  if (m.cat === 'woods') return m.id === 'w-rescue' ? 'Rescue hybrids' : 'Steel-face woods';
+  if (m.cat === 'irons') return (m.look && m.look.style === 'blade') ? 'Forged muscle back' : m.strata ? (STEPS.indexOf(m.tier) >= 3 ? 'Forged cavity, tungsten toe' : 'Cast cavity back') : m.id === 'i-sgi' ? 'Wide sole, deep cavity' : 'Cavity back';
+  if (m.cat === 'wedges') return m.id === 'we-elite' || (m.strata && m.tier === 'legend') ? 'Raw forged, milled face' : m.id === 'we-spin' ? 'Milled face' : 'Chrome';
+  return (m.look && m.look.style === 'mallet') ? 'Fang mallet' : 'Blade';
+}
+
 export const MODEL_BY_ID = Object.fromEntries(CLUB_MODELS.map((m) => [m.id, m]));
 
 export const STARTER_BAG = { driver: 'd-starter', woods: 'w-starter', irons: 'i-starter', wedges: 'we-starter', putter: 'p-starter' };
@@ -112,13 +209,22 @@ export function gearFor(bag, clubId) {
   return MODEL_BY_ID[b[CAT_OF[clubId]]];
 }
 
+// How far a set's shots stray, relative to an average club (1 = average;
+// the same factors the shot model applies to swing errors and dispersion)
+export function spreadOf(m) {
+  return (1.45 - 0.9 * m.forgive) * (1.25 - 0.5 * m.forgive) * (m.straight ?? 1) / 0.75;
+}
+export function accuracyOf(m) {
+  return Math.round(Math.max(0, Math.min(100, (2.25 - spreadOf(m)) / 1.9 * 100)));
+}
+
 // Bars for the shop (0-100, 50 = tour average)
 export function modelBars(m) {
   const bar = (v, range, invert = false, center = 1) => Math.round(Math.max(0, Math.min(100, 50 + ((invert ? center - v : v - center) / range) * 50)));
   if (m.cat === 'putter') {
     return { 'Aim (start line)': bar(m.aim, 0.35, true), 'Pace control': bar(m.pace, 0.3, true), Nerves: Math.round(50 + m.nerve * 50), 'Read length': bar(m.read, 0.2) };
   }
-  const out = { Distance: bar(m.speed, 0.035), Forgiveness: Math.round(m.forgive * 100), Spin: bar(m.spin, 0.18), Shaping: bar(m.work, 0.5) };
+  const out = { Distance: bar(m.speed, 0.05), Accuracy: accuracyOf(m), Spin: bar(m.spin, 0.2), Shaping: bar(m.work, 0.5) };
   if (m.sand || m.rough) out['Sand / rough'] = Math.round(50 + Math.max(m.sand, m.rough) * 100);
   return out;
 }

@@ -1,0 +1,107 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Club viewer</title>
+<style>html,body{margin:0;height:100%;background:#1c2a22}#c{position:fixed;inset:0}#l{position:fixed;left:8px;top:6px;color:#fff;font:12px sans-serif}</style></head>
+<body><div id="c"></div><div id="l"></div>
+<script type="module">
+// Club heads lined up at address. ?set=driver|woods|irons|wedges|putters|all
+// &v=face|toe|top|back|dtl|golfer  (&club=7I with v=golfer)
+import * as THREE from '../../vendor/three.module.min.js';
+import { buildClub, addressDir, BALL_Y } from '../../src/render/clubs.js';
+import { CLUB_MODELS, CAT_OF } from '../../src/data/clubsets.js';
+import { CLUB_BY_ID } from '../../src/data/equipment.js';
+import { Golfer } from '../../src/render/golfer.js';
+const q = new URLSearchParams(location.search);
+const view = q.get('v') || 'face';
+const set = q.get('set') || 'irons';
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(1);
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+document.getElementById('c').appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#9cc4e4');
+scene.add(new THREE.HemisphereLight(0xe4efff, 0x5d6b4c, 1.5));
+const sun = new THREE.DirectionalLight(0xfff1dc, 2.4);
+sun.position.set(2, 5, 3);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+Object.assign(sun.shadow.camera, { left: -2, right: 2, top: 2, bottom: -2 });
+scene.add(sun);
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshLambertMaterial({ color: '#5f9e45' }));
+ground.rotation.x = -Math.PI / 2;
+ground.receiveShadow = true;
+scene.add(ground);
+const LIE = { wood: 57, hybrid: 59, iron: 62, wedge: 64, putter: 71 };
+const pick = (cat, clubs) => CLUB_MODELS.filter((m) => m.cat === cat).map((m) => ({ m, id: clubs(m) }));
+let items = [];
+if (set === 'driver') items = pick('driver', () => 'DR');
+else if (set === 'woods') items = pick('woods', () => q.get('club') || '3W').concat(pick('woods', () => '4H').slice(0, 2));
+else if (set === 'irons') items = pick('irons', () => q.get('club') || '7I');
+else if (set === 'wedges') items = pick('wedges', () => q.get('club') || 'SW');
+else if (set === 'putters') items = pick('putter', () => 'PT');
+else if (set === 'one') items = [{ m: CLUB_MODELS.find((m) => m.id === q.get('m')), id: q.get('club') || '7I' }];
+else if (set === 'bag') items = ['DR', '3W', '5W', '4H', '5I', '7I', '9I', 'PW', 'GW', 'SW', 'LW', 'PT'].map((id) => ({ m: CLUB_MODELS.find((m) => m.cat === CAT_OF[id] && m.price === 0), id }));
+const side = ['face', 'back', 'top'].includes(view);
+const gap = side ? 0.22 : 0.16;
+const labels = [];
+if (q.get('only')) { const keep = q.get('only').split(',').map(Number); items = items.filter((_, i) => keep.includes(i)); }
+if (view !== 'golfer') {
+  items.forEach(({ m, id }, i) => {
+    const c = CLUB_BY_ID[id];
+    const lie = LIE[c.kind];
+    const ball = new THREE.Vector3(0, BALL_Y, 0);
+    const grip = ball.clone().addScaledVector(addressDir(lie), c.length);
+    const b = buildClub({ kind: c.kind, id, loft: c.loft + (m.loftDelta || 0), lie, length: c.length, bounce: c.bounce, look: m.look }, { ball, grip });
+    const qq = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, -1, 0), b.hosel.clone().sub(grip).normalize());
+    b.group.quaternion.copy(qq);
+    const k = (i - (items.length - 1) / 2) * gap;
+    const off = side ? new THREE.Vector3(k, 0, 0) : new THREE.Vector3(0, 0, k);
+    b.group.position.copy(grip).add(off);
+    scene.add(b.group);
+    const ballM = new THREE.Mesh(new THREE.SphereGeometry(0.021335, 20, 14), new THREE.MeshLambertMaterial({ color: '#ffffff' }));
+    ballM.position.set(off.x, BALL_Y, off.z);
+    ballM.castShadow = true;
+    if (!q.get('noball')) scene.add(ballM);
+    labels.push(`${m.name} ${id}`);
+  });
+}
+document.getElementById('l').textContent = labels.join(' | ');
+const span = Math.max(0.3, items.length * gap);
+const cam = new THREE.PerspectiveCamera(24, innerWidth / innerHeight, 0.01, 100);
+const d = span * (side ? 0.62 : 1.9);
+if (view === 'face') { cam.position.set(0.02, 0.07, -d * 1.1); cam.lookAt(0.02, 0.03, 0); }
+else if (view === 'toe') { cam.position.set(d * 0.9, 0.08, 0.02); cam.lookAt(0, 0.03, 0); }
+else if (view === 'top') { cam.position.set(0.02, d * 1.5, 0.07); cam.lookAt(0.02, 0, 0.04); }
+else if (view === 'back') { cam.position.set(0.02, 0.1, d * 1.1); cam.lookAt(0.02, 0.03, 0); }
+else if (view === 'dtl') { cam.position.set(-0.6, 0.35, span * 1.3); cam.lookAt(0.05, 0.05, 0); }
+else if (view === 'hero') { cam.position.set(0.32 * span, 0.22 * span, -0.9 * span); cam.lookAt(0.02, 0.03, 0); }
+if (view === 'golfer') {
+  const id = q.get('club') || '7I';
+  const c = CLUB_BY_ID[id];
+  const m = CLUB_MODELS.find((x) => x.cat === CAT_OF[id] && (q.get('m') ? x.id === q.get('m') : x.price === 0));
+  const g = new Golfer({ shirt: '#2a9d8f', pants: '#2b2d42', cap: '#ffffff' });
+  g.setClub(c.kind, c.length, m.look, { id, loft: c.loft + (m.loftDelta || 0), bounce: c.bounce });
+  g.placeAt({ x: 0, y: 0, z: 0 }, 0);
+  g.baseY = 0;
+  const pose = q.get('pose') || 'address';
+  if (pose === 'address') g.address();
+  else if (pose === 'top') g.setBackswing(1);
+  else if (pose === 'impact') { g.setBackswing(1); g.swing(1, null); for (let k = 0; k < 60 && !g.hitDone; k++) g.update(0.004); }
+  g.root.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+  scene.add(g.root);
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(0.021335, 20, 14), new THREE.MeshLambertMaterial({ color: '#ffffff' }));
+  const bd = g.ballDist;
+  // golfer stands at -r from the ball; heading 0 -> r = +x
+  ball.position.set(0, BALL_Y, 0);
+  scene.add(ball);
+  const cv = q.get('cv') || 'close';
+  if (cv === 'close') { cam.position.set(0.35, 0.25, -0.55); cam.lookAt(0, 0.04, 0); }
+  else if (cv === 'dtl') { cam.position.set(-bd - 0.3, 1.2, 2.6); cam.lookAt(-bd * 0.4, 0.6, 0); }
+  else { cam.position.set(1.4, 1.1, -0.1); cam.lookAt(-bd * 0.5, 0.7, 0); }
+  cam.fov = cv === 'close' ? 30 : 40;
+  cam.updateProjectionMatrix();
+}
+renderer.render(scene, cam);
+document.body.dataset.ready = '1';
+</script>
+</body></html>

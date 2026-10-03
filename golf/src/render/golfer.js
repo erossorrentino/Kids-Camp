@@ -5,6 +5,7 @@
 // Local space: the golfer faces +x (the ball), the target is along -z
 // (the golfer's left, for a right-hander), y is up. The root sits at the feet.
 import * as THREE from '../../vendor/three.module.min.js';
+import { buildClub, addressDir, BALL_Y } from './clubs.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 const tmpQ = new THREE.Quaternion();
@@ -126,6 +127,8 @@ function shirtTexture(base, accent, pattern) {
   t.repeat.set(pattern === 'argyle' ? 3 : 2, 2);
   return t;
 }
+
+const DEFAULT_LOFT = { DR: 10.5, '3W': 15, '5W': 18, '4H': 21, '5I': 25, '6I': 28, '7I': 32, '8I': 36, '9I': 40, PW: 45, GW: 50, SW: 56, LW: 60, PT: 3 };
 
 const CLUB_SETUP = {
   wood: { lie: 57, ball: 1.02, tilt: 0.5 },
@@ -502,67 +505,26 @@ export class Golfer {
     }
   }
 
-  setClub(kind, length, look = null) {
-    const key = `${kind}|${length}|${look ? JSON.stringify(look) : ''}`;
+  // spec (optional): { id, loft, bounce } of the club in the bag
+  setClub(kind, length, look = null, spec = null) {
+    const id = (spec && spec.id) || (kind === 'wood' ? (length > 1.1 ? 'DR' : '3W') : kind === 'hybrid' ? '4H' : kind === 'wedge' ? 'SW' : kind === 'putter' ? 'PT' : '7I');
+    const loft = spec && spec.loft != null ? spec.loft : DEFAULT_LOFT[id] ?? 30;
+    const key = JSON.stringify([kind, length, id, loft, spec && spec.bounce, look]);
     if (this.clubKey === key) return;
     this.clubKey = key;
     this.clubKind = kind;
     this.clubLen = length;
-    while (this.club.children.length) this.club.remove(this.club.children[0]);
-    const lk = look || {};
-    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.0045, length, 6), new THREE.MeshLambertMaterial({ color: kind === 'wood' || kind === 'hybrid' ? '#2a2d33' : '#c9ccd1' }));
-    shaft.position.y = -length / 2;
-    const grip = new THREE.Mesh(new THREE.CylinderGeometry(0.013, 0.011, 0.26, 8), new THREE.MeshLambertMaterial({ color: '#1b1b1b' }));
-    grip.position.y = -0.1;
-    const parts = [shaft, grip];
-    const mat = (c) => new THREE.MeshLambertMaterial({ color: c });
-    const headY = -length;
-    if (kind === 'wood' || kind === 'hybrid') {
-      const size = (lk.size || 1) * (kind === 'wood' && length > 1.1 ? 1 : 0.78);
-      const crown = new THREE.Mesh(new THREE.SphereGeometry(0.062 * size, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), mat(lk.crown || '#23262b'));
-      crown.scale.set(1.3, 0.62, 1.05);
-      crown.position.set(0.035, headY + 0.004, 0);
-      const sole = new THREE.Mesh(new THREE.SphereGeometry(0.062 * size, 16, 6, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), mat(lk.head || '#23262b'));
-      sole.scale.set(1.3, 0.28, 1.05);
-      sole.position.copy(crown.position);
-      const face = new THREE.Mesh(new THREE.BoxGeometry(0.004, 0.036 * size, 0.1 * size), mat('#9aa0a8'));
-      face.position.set(0.035 + 0.078 * size, headY + 0.012, 0);
-      parts.push(crown, sole, face);
-    } else if (kind === 'putter') {
-      if (lk.style === 'mallet') {
-        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.055, 0.028, 16, 1, false, -Math.PI / 2, Math.PI), mat(lk.head || '#1b1b1b'));
-        body.rotation.z = Math.PI / 2;
-        body.rotation.y = Math.PI / 2;
-        body.position.set(-0.01, headY, 0);
-        const line = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.03, 0.006), mat(lk.accent || '#ffffff'));
-        line.position.set(-0.02, headY + 0.003, 0);
-        parts.push(body, line);
-      } else {
-        const body = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.028, 0.11), mat(lk.head || '#8f959c'));
-        body.position.set(0.01, headY, 0);
-        const line = new THREE.Mesh(new THREE.BoxGeometry(0.02, 0.029, 0.004), mat(lk.accent || '#ffffff'));
-        line.position.set(0.005, headY + 0.001, 0);
-        parts.push(body, line);
-      }
-    } else {
-      const size = lk.size || 1;
-      const thick = lk.style === 'blade' ? 0.012 : lk.style === 'wedge' ? 0.016 : 0.022;
-      const head = new THREE.Mesh(new THREE.BoxGeometry(thick, 0.05 * size, 0.082 * size), mat(lk.head || '#b8bec6'));
-      head.position.set(0.01, headY + 0.01, 0);
-      parts.push(head);
-      if (lk.style === 'cavity') {
-        const badge = new THREE.Mesh(new THREE.BoxGeometry(0.006, 0.02 * size, 0.04 * size), mat(lk.accent || '#c1121f'));
-        badge.position.set(0.01 - thick / 2 - 0.002, headY + 0.008, 0.004);
-        parts.push(badge);
-      }
-      const hosel = new THREE.Mesh(new THREE.CylinderGeometry(0.007, 0.009, 0.05, 6), mat(lk.head || '#b8bec6'));
-      hosel.position.set(0.004, headY + 0.035, -0.035);
-      parts.push(hosel);
-    }
-    for (const m of parts) { m.castShadow = true; this.club.add(m); }
     const setup = CLUB_SETUP[kind] || CLUB_SETUP.iron;
     this.setup = setup;
     this.putting = kind === 'putter';
+    // the head is placed so its face centre meets the ball at address and
+    // the shaft leaves the heel toward the hands
+    const B = new THREE.Vector3(setup.ball, BALL_Y, 0);
+    const A0 = B.clone().addScaledVector(addressDir(setup.lie), length);
+    const built = buildClub({ kind, id, loft, lie: setup.lie, bounce: spec && spec.bounce, length, look: look || {} }, { ball: B, grip: A0 });
+    while (this.club.children.length) this.club.remove(this.club.children[0]);
+    this.club.add(built.group);
+    this.hoselAt = built.hosel;
     this.computeAddress();
   }
 
@@ -577,14 +539,15 @@ export class Golfer {
     this.applyBody(this.swingState('back', 0, 0));
     this.root.updateMatrixWorld(true);
     const hub = this.localOf(this.hubAnchor);
-    const B = new THREE.Vector3(s.ball, 0.025, 0);
-    const lie = (s.lie * Math.PI) / 180;
-    const u = new THREE.Vector3(-Math.cos(lie), Math.sin(lie), -0.04).normalize();
-    const A0 = B.clone().addScaledVector(u, this.clubLen);
+    const B = new THREE.Vector3(s.ball, BALL_Y, 0);
+    const A0 = B.clone().addScaledVector(addressDir(s.lie), this.clubLen);
+    // the shaft runs from the hands to the top of the hosel (the head hangs
+    // below it with its face centre on the ball)
+    const H = this.hoselAt || B;
     this.hub = hub;
-    this.ballLocal = B;
+    this.ballLocal = H;
     this.v0 = A0.clone().sub(hub);
-    this.d0 = B.clone().sub(A0).normalize();
+    this.d0 = H.clone().sub(A0).normalize();
     this.n = new THREE.Vector3().crossVectors(this.v0, new THREE.Vector3(0, 0, 1)).normalize();
   }
 
