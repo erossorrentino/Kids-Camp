@@ -38,6 +38,7 @@ namespace MobileFPS.Monetization
     /// - Ready-state events, so UI shows the ad button only when it will work.
     /// </summary>
     [AutoCreateSingleton]
+    [DefaultExecutionOrder(-450)] // before MetaGame wires it
     public sealed class AdsManager : Singleton<AdsManager>
     {
         [SerializeField] private AdsConfig config;
@@ -51,7 +52,14 @@ namespace MobileFPS.Monetization
         private float _nextRetryAt = -1f;
         private bool _audioPausedByUs;
 
-        public AdsConfig Config => config;
+        public AdsConfig Config
+        {
+            get
+            {
+                EnsureConfig();
+                return config;
+            }
+        }
         public bool IsShowing => _showing;
         public string ProviderName => _provider?.Name ?? "none";
 
@@ -60,8 +68,7 @@ namespace MobileFPS.Monetization
 
         protected override void OnSingletonAwake()
         {
-            if (config == null) config = Resources.Load<AdsConfig>("MobileFPS/AdsConfig");
-            if (config == null) config = ScriptableObject.CreateInstance<AdsConfig>();
+            EnsureConfig();
             _retryDelay = config.initialRetryDelaySeconds;
 
             MainThreadDispatcher.Warmup();
@@ -80,6 +87,12 @@ namespace MobileFPS.Monetization
         {
             _limiter = limiter;
             if (!string.IsNullOrEmpty(userId)) _userId = userId;
+        }
+
+        private void EnsureConfig()
+        {
+            if (config == null) config = Resources.Load<AdsConfig>("MobileFPS/AdsConfig");
+            if (config == null) config = ScriptableObject.CreateInstance<AdsConfig>();
         }
 
         public bool IsRewardedAvailable(string placementId)

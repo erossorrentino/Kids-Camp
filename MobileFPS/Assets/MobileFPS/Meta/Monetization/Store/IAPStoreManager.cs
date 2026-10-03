@@ -44,6 +44,7 @@ namespace MobileFPS.Monetization
     /// delivered during store init) are queued, not dropped.
     /// </summary>
     [AutoCreateSingleton]
+    [DefaultExecutionOrder(-450)] // before MetaGame wires it
     public sealed class IAPStoreManager : Singleton<IAPStoreManager>, IStoreBackendListener
     {
         [SerializeField] private StoreCatalog catalog;
@@ -54,7 +55,14 @@ namespace MobileFPS.Monetization
         private IPurchaseFulfillment _fulfillment;
         private IReceiptValidator _validator;
 
-        public StoreCatalog Catalog => catalog;
+        public StoreCatalog Catalog
+        {
+            get
+            {
+                EnsureCatalog();
+                return catalog;
+            }
+        }
         public bool IsInitialized { get; private set; }
         public string BackendName => _backend?.Name ?? "none";
 
@@ -62,15 +70,21 @@ namespace MobileFPS.Monetization
 
         protected override void OnSingletonAwake()
         {
+            EnsureCatalog();
+            MainThreadDispatcher.Warmup();
+        }
+
+        private void EnsureCatalog()
+        {
             if (catalog == null) catalog = Resources.Load<StoreCatalog>("MobileFPS/StoreCatalog");
             if (catalog == null) catalog = StoreCatalog.CreateDefault();
-            MainThreadDispatcher.Warmup();
         }
 
         /// <summary>Connects to the store. Called by MetaGame once the profile is loaded.</summary>
         public void Initialize(IPurchaseFulfillment fulfillment, IReceiptValidator validator = null)
         {
             _fulfillment = fulfillment ?? throw new ArgumentNullException(nameof(fulfillment));
+            EnsureCatalog();
             _validator = validator ?? new TrustingReceiptValidator();
             if (_validator is TrustingReceiptValidator && !Application.isEditor && !Debug.isDebugBuild)
             {
@@ -85,7 +99,7 @@ namespace MobileFPS.Monetization
             _backend.Initialize(catalog.products, this);
         }
 
-        public StoreProductDefinition FindProduct(string productId) => catalog.Find(productId);
+        public StoreProductDefinition FindProduct(string productId) => Catalog.Find(productId);
 
         /// <summary>Localized price from the store ("₹399", "4,99 €"), falling back to the catalog string.</summary>
         public string GetPriceString(string productId)

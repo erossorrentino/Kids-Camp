@@ -143,7 +143,13 @@ namespace MobileFPS.Player
             // In loopback testing this process also plays server: mirror our state into it.
             if (CombatAuthority.HasInstance && CombatAuthority.Instance.IsServerSimulated)
             {
-                CombatAuthority.Instance.UpdateShooter(_entity.Id, AimTransform.position, _motor.Velocity.magnitude, IsAlive);
+                CombatAuthority authority = CombatAuthority.Instance;
+                authority.UpdateShooter(_entity.Id, AimTransform.position, _motor.Velocity.magnitude, IsAlive);
+                // Covers switching authority mode at runtime (debug panel) after the weapon was drawn.
+                if (weapon != null && authority.GetOrCreateShooter(_entity.Id).EquippedWeapon != weapon.NetworkId)
+                {
+                    authority.NotifyEquipped(_entity.Id, weapon.NetworkId, weapon.Stats, weapon.AmmoInMagazine);
+                }
             }
 
             _previousAimHeld = frame.AimHeld;
