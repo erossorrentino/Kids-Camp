@@ -1,0 +1,29 @@
+{
+    "name": "MobileFPS.Integrations.Notifications",
+    "rootNamespace": "MobileFPS.Integrations.Notifications",
+    "references": [
+        "MobileFPS.Core",
+        "MobileFPS.Meta",
+        "Unity.Notifications.Android"
+    ],
+    "includePlatforms": [
+        "Android",
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "MOBILEFPS_NOTIFICATIONS"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.mobile.notifications",
+            "expression": "2.0.0",
+            "define": "MOBILEFPS_NOTIFICATIONS"
+        }
+    ],
+    "noEngineReferences": false
+}

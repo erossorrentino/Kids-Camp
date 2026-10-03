@@ -1,0 +1,22 @@
+{
+    "name": "MobileFPS.Editor",
+    "rootNamespace": "MobileFPS.EditorTools",
+    "references": [
+        "MobileFPS.Core",
+        "MobileFPS.Gameplay",
+        "MobileFPS.Meta",
+        "MobileFPS.UI",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

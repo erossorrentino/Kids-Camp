@@ -1,0 +1,28 @@
+{
+    "name": "MobileFPS.Integrations.UnityIAP",
+    "rootNamespace": "MobileFPS.Integrations.UnityIAP",
+    "references": [
+        "MobileFPS.Core",
+        "MobileFPS.Meta",
+        "UnityEngine.Purchasing",
+        "UnityEngine.Purchasing.Stores",
+        "Unity.Services.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "MOBILEFPS_UNITY_IAP"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.unity.purchasing",
+            "expression": "[4.8.0,5.0.0)",
+            "define": "MOBILEFPS_UNITY_IAP"
+        }
+    ],
+    "noEngineReferences": false
+}

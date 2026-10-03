@@ -1,0 +1,25 @@
+{
+    "name": "MobileFPS.Integrations.AdMob",
+    "rootNamespace": "MobileFPS.Integrations.AdMob",
+    "references": [
+        "MobileFPS.Core",
+        "MobileFPS.Meta"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "MOBILEFPS_ADMOB"
+    ],
+    "versionDefines": [
+        {
+            "name": "com.google.ads.mobile",
+            "expression": "9.0.0",
+            "define": "MOBILEFPS_ADMOB"
+        }
+    ],
+    "noEngineReferences": false
+}

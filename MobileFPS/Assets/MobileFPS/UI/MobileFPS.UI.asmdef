@@ -1,0 +1,19 @@
+{
+    "name": "MobileFPS.UI",
+    "rootNamespace": "MobileFPS.UI",
+    "references": [
+        "MobileFPS.Core",
+        "MobileFPS.Gameplay",
+        "MobileFPS.Meta",
+        "UnityEngine.UI"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
