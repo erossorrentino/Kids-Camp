@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../Unity.props" />
+  <PropertyGroup><AssemblyName>MobileFPS.UI</AssemblyName><DefineConstants>$(DefineConstants);</DefineConstants></PropertyGroup>
+  <ItemGroup><Compile Include="$(SrcRoot)/UI/**/*.cs" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../Core/Core.csproj" /><ProjectReference Include="../Gameplay/Gameplay.csproj" /><ProjectReference Include="../Meta/Meta.csproj" /><ProjectReference Include="../../Stubs/UGUI/UGUIStubs.csproj" /></ItemGroup>
+  
+</Project>

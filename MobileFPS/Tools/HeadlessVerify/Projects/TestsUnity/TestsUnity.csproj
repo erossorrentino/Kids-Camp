@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../Unity.props" />
+  <PropertyGroup><AssemblyName>MobileFPS.Tests.EditMode</AssemblyName><DefineConstants>$(DefineConstants);UNITY_5_3_OR_NEWER;UNITY_INCLUDE_TESTS;UNITY_EDITOR</DefineConstants></PropertyGroup>
+  <ItemGroup><Compile Include="$(SrcRoot)/Tests/EditMode/*.cs;$(StubRoot)/TestRunnerStubs.cs" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../Core/Core.csproj" /><ProjectReference Include="../Gameplay/Gameplay.csproj" /><ProjectReference Include="../Meta/Meta.csproj" /></ItemGroup>
+  <ItemGroup><PackageReference Include="NUnit" Version="3.14.0" /></ItemGroup>
+</Project>

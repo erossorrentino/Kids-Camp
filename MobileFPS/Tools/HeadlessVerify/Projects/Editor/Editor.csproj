@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../Unity.props" />
+  <PropertyGroup><AssemblyName>MobileFPS.Editor</AssemblyName><DefineConstants>$(DefineConstants);UNITY_EDITOR</DefineConstants></PropertyGroup>
+  <ItemGroup><Compile Include="$(SrcRoot)/Editor/**/*.cs" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../Core/Core.csproj" /><ProjectReference Include="../Gameplay/Gameplay.csproj" /><ProjectReference Include="../Meta/Meta.csproj" /><ProjectReference Include="../UI/UI.csproj" /><ProjectReference Include="../../Stubs/UGUI/UGUIStubs.csproj" /></ItemGroup>
+  <ItemGroup><PackageReference Include="Unity3D.SDK" Version="2021.1.14.1" ExcludeAssets="all" GeneratePathProperty="true" PrivateAssets="all" /><Reference Include="UnityEditor" HintPath="$(PkgUnity3D_SDK)/lib/UnityEditor.dll" Private="false" /></ItemGroup>
+</Project>

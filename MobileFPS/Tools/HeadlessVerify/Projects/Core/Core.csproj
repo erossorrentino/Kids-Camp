@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../Unity.props" />
+  <PropertyGroup><AssemblyName>MobileFPS.Core</AssemblyName><DefineConstants>$(DefineConstants);</DefineConstants></PropertyGroup>
+  <ItemGroup><Compile Include="$(SrcRoot)/Core/**/*.cs;$(StubRoot)/PlatformStubs.cs" /></ItemGroup>
+  <ItemGroup></ItemGroup>
+  
+</Project>

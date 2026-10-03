@@ -1,0 +1,15 @@
+<Project>
+  <!--
+    Compiles project sources against Unity 2021.3 reference assemblies from NuGet
+    (UnityEngine.Modules) the way Unity would for an Android player build.
+    Unity 2022.3 is a superset of this API surface; 2022-only calls are guarded
+    by UNITY_2022_2_OR_NEWER in the sources and are not exercised here.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <DefineConstants>$(DefineConstants);UNITY_2021_3_OR_NEWER;UNITY_2021_2_OR_NEWER;UNITY_2020_1_OR_NEWER;UNITY_ANDROID;ENABLE_LEGACY_INPUT_MANAGER;ENABLE_IL2CPP;DEVELOPMENT_BUILD</DefineConstants>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="UnityEngine.Modules" Version="2021.3.33" PrivateAssets="all" />
+  </ItemGroup>
+</Project>
