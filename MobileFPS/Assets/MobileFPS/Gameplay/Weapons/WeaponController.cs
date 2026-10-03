@@ -21,6 +21,7 @@ namespace MobileFPS.Weapons
     {
         private const int MaxShotsPerFrame = 4;
         private const float SemiAutoBufferSeconds = 0.12f;
+        private const float AutoReloadDelaySeconds = 0.15f;
 
         private readonly IWeaponOwner _owner;
         private readonly ushort _networkId;
@@ -142,6 +143,9 @@ namespace MobileFPS.Weapons
             if (context.Input.ReloadPressed) TryStartReload();
             UpdateReload(context, dt);
             HandleTrigger(context);
+
+            // Auto-reload a moment after the last round (lets the final shot's kick play out).
+            if (AmmoInMagazine == 0 && !_reloading && ReserveAmmo > 0 && _timeSinceLastShot > AutoReloadDelaySeconds) TryStartReload();
 
             CurrentSpreadDegrees = ComputeSpread(context);
         }

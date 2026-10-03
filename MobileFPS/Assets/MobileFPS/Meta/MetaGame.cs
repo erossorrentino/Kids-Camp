@@ -150,7 +150,7 @@ namespace MobileFPS.Meta
             }
         }
 
-        private void OnApplicationQuit()
+        protected override void OnSingletonApplicationQuit()
         {
             if (IsReady) Profile.SaveNow();
         }

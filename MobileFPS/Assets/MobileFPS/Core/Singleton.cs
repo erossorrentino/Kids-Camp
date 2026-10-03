@@ -15,8 +15,10 @@ namespace MobileFPS.Core
     /// MonoBehaviour singleton for app-lifetime services (ads, store, pools, meta).
     ///
     /// Rules that keep this pattern safe in production:
-    /// - Derived classes must not declare Awake/OnDestroy/OnApplicationQuit; override
-    ///   <see cref="OnSingletonAwake"/> / <see cref="OnSingletonDestroy"/> instead.
+    /// - Derived classes must not declare Awake/OnDestroy/OnApplicationQuit (Unity
+    ///   would call the derived method and silently skip this base logic); override
+    ///   <see cref="OnSingletonAwake"/> / <see cref="OnSingletonDestroy"/> /
+    ///   <see cref="OnSingletonApplicationQuit"/> instead.
     /// - Duplicates (e.g. a service placed in several scenes) self-destruct.
     /// - Never resurrected during application quit, which otherwise leaks objects into
     ///   the Editor scene and logs "Some objects were not cleaned up".
@@ -62,7 +64,7 @@ namespace MobileFPS.Core
         /// <summary>Override to false for scene-scoped singletons (e.g. a match controller).</summary>
         protected virtual bool PersistAcrossScenes => true;
 
-        private void Awake()
+        protected void Awake()
         {
             if (s_instance != null && s_instance != this)
             {
@@ -80,19 +82,21 @@ namespace MobileFPS.Core
             OnSingletonAwake();
         }
 
-        private void OnDestroy()
+        protected void OnDestroy()
         {
             if (s_instance != this) return;
             OnSingletonDestroy();
             s_instance = null;
         }
 
-        private void OnApplicationQuit()
+        protected void OnApplicationQuit()
         {
             s_isQuitting = true;
+            OnSingletonApplicationQuit();
         }
 
         protected virtual void OnSingletonAwake() { }
         protected virtual void OnSingletonDestroy() { }
+        protected virtual void OnSingletonApplicationQuit() { }
     }
 }

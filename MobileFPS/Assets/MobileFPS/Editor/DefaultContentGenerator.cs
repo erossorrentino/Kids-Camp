@@ -181,8 +181,6 @@ namespace MobileFPS.EditorTools
                 w.recoil = new RecoilSettings { pattern = pistolPattern, scale = 1f, permanentFraction = 0.25f };
             }));
 
-            foreach (WeaponDefinition weapon in content.Weapons) weapon.presentation.impactOverride = null;
-
             AttachmentDefinition[] attachments =
             {
                 Attachment("muzzle_compensator", "Compensator", AttachmentSlot.Muzzle, 2, (WeaponStat.VerticalRecoil, -15f), (WeaponStat.AdsTime, 5f)),
