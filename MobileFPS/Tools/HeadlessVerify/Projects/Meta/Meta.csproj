@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../Unity.props" />
+  <PropertyGroup><AssemblyName>MobileFPS.Meta</AssemblyName><DefineConstants>$(DefineConstants);</DefineConstants></PropertyGroup>
+  <ItemGroup><Compile Include="$(SrcRoot)/Meta/**/*.cs" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../Core/Core.csproj" /></ItemGroup>
+  
+</Project>

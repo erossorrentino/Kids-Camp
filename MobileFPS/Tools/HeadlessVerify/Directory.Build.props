@@ -1,0 +1,14 @@
+<Project>
+  <!-- Shared settings for every headless verification project. -->
+  <PropertyGroup>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!-- CS0649: Unity suppresses "never assigned" for [SerializeField] fields; so do we. -->
+    <NoWarn>$(NoWarn);CS1591;CS0649;MSB3277;NU1701</NoWarn>
+    <SrcRoot>$(MSBuildThisFileDirectory)../../Assets/MobileFPS</SrcRoot>
+    <StubRoot>$(MSBuildThisFileDirectory)Stubs</StubRoot>
+  </PropertyGroup>
+</Project>

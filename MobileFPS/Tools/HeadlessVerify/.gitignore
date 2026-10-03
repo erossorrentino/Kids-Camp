@@ -1,0 +1,4 @@
+bin/
+obj/
+# Unity ignores generated *.csproj at the project root; these are hand-written.
+!*.csproj

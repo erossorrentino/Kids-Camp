@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../Unity.props" />
+  <PropertyGroup><AssemblyName>VendorStubs</AssemblyName><NoWarn>$(NoWarn);CS0067;CS0169;CS0414</NoWarn></PropertyGroup>
+  <ItemGroup><Compile Include="VendorStubs.cs" /></ItemGroup>
+</Project>

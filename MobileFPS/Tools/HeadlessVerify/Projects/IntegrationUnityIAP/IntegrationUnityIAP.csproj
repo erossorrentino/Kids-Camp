@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../Unity.props" />
+  <PropertyGroup><AssemblyName>MobileFPS.Integrations.UnityIAP</AssemblyName><DefineConstants>$(DefineConstants);MOBILEFPS_UNITY_IAP</DefineConstants></PropertyGroup>
+  <ItemGroup><Compile Include="$(SrcRoot)/Integrations/UnityIAP/**/*.cs" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../Core/Core.csproj" /><ProjectReference Include="../Meta/Meta.csproj" /><ProjectReference Include="../../Stubs/Vendor/VendorStubs.csproj" /></ItemGroup>
+  
+</Project>

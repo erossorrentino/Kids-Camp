@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Runs the pure-logic sources and the EditMode tests on .NET with a managed UnityEngine shim (no engine required). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <AssemblyName>MobileFPS.TestRun</AssemblyName>
+    <NoWarn>$(NoWarn);CS0414;CS0169;CS0067</NoWarn>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="NUnit" Version="3.14.0" />
+    <PackageReference Include="NUnitLite" Version="3.14.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs;UnityShim.cs" />
+    <Compile Include="$(SrcRoot)/Core/StaticReset.cs;$(SrcRoot)/Core/Singleton.cs;$(SrcRoot)/Core/Events/*.cs;$(SrcRoot)/Core/Shared/*.cs;$(SrcRoot)/Core/Math/*.cs;$(SrcRoot)/Core/Time/*.cs;$(SrcRoot)/Core/Save/ISaveStore.cs;$(SrcRoot)/Core/Threading/*.cs" />
+    <Compile Include="$(SrcRoot)/Gameplay/Combat/HitShapes.cs;$(SrcRoot)/Gameplay/Combat/HitQueries.cs;$(SrcRoot)/Gameplay/Effects/SurfaceTypes.cs;$(SrcRoot)/Gameplay/Effects/ImpactEffectLibrary.cs" />
+    <Compile Include="$(SrcRoot)/Gameplay/Weapons/WeaponDefinition.cs;$(SrcRoot)/Gameplay/Weapons/RecoilPattern.cs;$(SrcRoot)/Gameplay/Weapons/AttachmentDefinition.cs;$(SrcRoot)/Gameplay/Weapons/WeaponStats.cs;$(SrcRoot)/Gameplay/Weapons/SpreadPattern.cs;$(SrcRoot)/Gameplay/Weapons/HitscanSolver.cs" />
+    <Compile Include="$(SrcRoot)/Gameplay/Networking/ShotRequest.cs;$(SrcRoot)/Gameplay/Networking/HitboxHistory.cs;$(SrcRoot)/Gameplay/Networking/ServerShotValidator.cs" />
+    <Compile Include="$(SrcRoot)/Meta/**/*.cs" Exclude="$(SrcRoot)/Meta/MetaGame.cs;$(SrcRoot)/Meta/Monetization/Store/IAPStoreManager.cs" />
+    <Compile Include="$(SrcRoot)/Tests/EditMode/*.cs" />
+  </ItemGroup>
+</Project>

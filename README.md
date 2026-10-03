@@ -1,5 +1,10 @@
 # Crime City (working title)
 
+> **Also in this repo:** [`MobileFPS/`](MobileFPS/README.md), a separate Unity
+> project with the foundation for a competitive mobile first-person shooter
+> for Google Play (touch controls, lag-compensated hit registration, rewarded
+> ads, IAP, battle pass, daily rewards). Open that folder on its own in Unity Hub.
+
 An open-world crime game in the GTA tradition: steal cars, plan and run
 heists, build wanted stars, buy guns and vehicles. Built as a real Unity
 project with working, data-driven systems rather than hand-placed content,

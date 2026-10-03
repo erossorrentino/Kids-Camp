@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../Unity.props" />
+  <PropertyGroup><AssemblyName>MobileFPS.Integrations.AdMob</AssemblyName><DefineConstants>$(DefineConstants);MOBILEFPS_ADMOB</DefineConstants></PropertyGroup>
+  <ItemGroup><Compile Include="$(SrcRoot)/Integrations/AdMob/**/*.cs" /></ItemGroup>
+  <ItemGroup><ProjectReference Include="../Core/Core.csproj" /><ProjectReference Include="../Meta/Meta.csproj" /><ProjectReference Include="../../Stubs/Vendor/VendorStubs.csproj" /></ItemGroup>
+  
+</Project>

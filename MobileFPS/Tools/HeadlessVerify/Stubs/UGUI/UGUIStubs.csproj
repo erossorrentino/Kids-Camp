@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../Unity.props" />
+  <PropertyGroup><AssemblyName>UnityEngine.UI</AssemblyName></PropertyGroup>
+  <ItemGroup><Compile Include="UGUIStubs.cs" /></ItemGroup>
+</Project>
