@@ -1,4 +1,3 @@
-using System.Collections.Generic;
 using MobileFPS.Combat;
 using MobileFPS.Core;
 using UnityEngine;
@@ -66,20 +65,12 @@ namespace MobileFPS.Networking
             _count = 0;
         }
 
-        /// <summary>Records every living rig. Call on the authority after animation (LateUpdate).</summary>
-        public void Record(double time, IReadOnlyList<HitboxRig> rigs)
-        {
-            BeginFrame(time);
-            for (int i = 0; i < rigs.Count; i++)
-            {
-                HitboxRig rig = rigs[i];
-                if (!rig.IsAlive) continue;
-                rig.RefreshShapes();
-                AddRig(rig.Id, rig.GetWorldShapes(), rig.ShapeCount);
-            }
-        }
-
-        /// <summary>Starts a frame. Recording the same (or an older) time again overwrites the newest frame.</summary>
+        /// <summary>
+        /// Starts a frame; follow with <see cref="AddRig"/> per character. (The
+        /// HitboxRig convenience overload lives in <see cref="HitboxHistoryRecording"/>,
+        /// keeping this class engine-independent and unit-testable.)
+        /// Recording the same (or an older) time again overwrites the newest frame.
+        /// </summary>
         public void BeginFrame(double time)
         {
             if (_count == 0 || time > _frames[_newest].Time)

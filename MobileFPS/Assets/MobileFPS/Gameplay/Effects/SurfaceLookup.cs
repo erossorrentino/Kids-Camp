@@ -5,24 +5,6 @@ using UnityEngine.SceneManagement;
 
 namespace MobileFPS.Effects
 {
-    public enum SurfaceType : byte
-    {
-        Default,
-        Concrete,
-        Metal,
-        Wood,
-        Dirt,
-        Water,
-        Glass,
-        Flesh,
-    }
-
-    public struct SurfaceInfo
-    {
-        public SurfaceType Type;
-        public float PenetrationCost;
-    }
-
     /// <summary>
     /// Collider to surface lookup with a per-collider cache. A shotgun blast or LMG
     /// spray asks about the same few colliders hundreds of times; after the first

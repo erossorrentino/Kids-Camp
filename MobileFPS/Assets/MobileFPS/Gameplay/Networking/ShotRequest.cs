@@ -41,8 +41,8 @@ namespace MobileFPS.Networking
     /// naive floats. Shots are the highest-frequency gameplay message (an SMG
     /// sends ~15/s), and on mobile networks every byte costs latency and battery.
     ///
-    /// - Direction: octahedral encoding, 2 x 16 bits. Worst-case error is about
-    ///   0.006°, roughly 1 cm at 100 m, well under hitbox tolerances.
+    /// - Direction: octahedral encoding, 2 x 16 bits. Measured worst-case error
+    ///   is 0.004° (under 1 cm at 100 m), well under hitbox tolerances (see tests).
     /// - Spread: 0.01° steps in 16 bits.
     /// - Origin stays full precision: hit registration is most sensitive to it.
     ///

@@ -5,14 +5,6 @@ using UnityEngine.SceneManagement;
 
 namespace MobileFPS.Effects
 {
-    /// <summary>A world impact to visualize (bullet hole, spark, dust).</summary>
-    public struct ImpactPoint
-    {
-        public Vector3 Point;
-        public Vector3 Normal;
-        public SurfaceType Surface;
-        public float Distance;
-    }
 
     /// <summary>
     /// Spawns pooled impact particles and decals under a strict budget.
