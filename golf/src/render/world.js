@@ -1,74 +1,30 @@
 // Renderer, sky, lights, camera rig and per-hole scene management.
 import * as THREE from '../../vendor/three.module.min.js';
+import { setClubMaterials } from './clubs.js';
 import { HoleScene } from './holeScene.js';
 import { sfx } from '../audio.js';
 import { Golfer } from './golfer.js';
 import { Caddie } from './people.js';
-import { Ball, Tracer, AimRing, DotLine, GreenGrid, Particles, Marks, BallMarkers, Celebration, Rain, TrailSparks, SandPrints } from './effects.js';
+import { Post } from './post.js';
+import { makeSkyMaterial, skyRadiance, sunTransmittance } from './sky.js';
+import { installAtmosphere, CLOUD_UNIFORMS } from './atmosphere.js';
 
-function skyMaterial() {
-  return new THREE.ShaderMaterial({
-    side: THREE.BackSide,
-    depthWrite: false,
-    uniforms: {
-      uZenith: { value: new THREE.Color('#3f76b8') },
-      uHorizon: { value: new THREE.Color('#d3e6f2') },
-      uGround: { value: new THREE.Color('#9fb5a4') },
-      uSunDir: { value: new THREE.Vector3(0.3, 0.6, -0.5).normalize() },
-      uSunColor: { value: new THREE.Color('#fff4d6') },
-      uSunSize: { value: 1 },
-      uTime: { value: 0 },
-      uCloud: { value: 0.45 },
-      uCloudDark: { value: 0 },
-      uNight: { value: 0 },
-    },
-    vertexShader: 'varying vec3 vDir; void main(){ vDir = normalize(position); vec4 p = projectionMatrix * modelViewMatrix * vec4(position,1.0); gl_Position = p.xyww; }',
-    fragmentShader: `uniform vec3 uZenith, uHorizon, uGround, uSunDir, uSunColor; uniform float uSunSize, uTime, uCloud, uCloudDark, uNight; varying vec3 vDir;
-      float hash(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
-      float noise(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f*f*(3.0-2.0*f);
-        return mix(mix(hash(i), hash(i+vec2(1,0)), u.x), mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), u.x), u.y); }
-      float fbm(vec2 p){ float a = 0.5, s = 0.0; for (int i = 0; i < 5; i++){ s += a * noise(p); p = p * 2.03 + 17.1; a *= 0.5; } return s; }
-      void main(){
-        vec3 d = normalize(vDir);
-        float h = d.y;
-        vec3 col = h > 0.0 ? mix(uHorizon, uZenith, pow(clamp(h, 0.0, 1.0), 0.55)) : mix(uHorizon, uGround, clamp(-h * 6.0, 0.0, 1.0));
-        float s = max(dot(d, normalize(uSunDir)), 0.0);
-        col += uSunColor * (pow(s, 900.0) * 3.0 * uSunSize + (pow(s, 12.0) * 0.25 + pow(s, 3.0) * 0.08) * (1.0 - 0.8 * uNight));
-        if (uNight > 0.0 && h > 0.0) {
-          // stars: one bright point in a few of the cells of a fine sky grid
-          vec2 g = floor(vec2(atan(d.z, d.x) * 160.0, asin(clamp(d.y, -1.0, 1.0)) * 160.0));
-          float r = hash(g);
-          vec2 f = fract(vec2(atan(d.z, d.x) * 160.0, asin(clamp(d.y, -1.0, 1.0)) * 160.0)) - 0.5;
-          float star = step(0.992, r) * smoothstep(0.35, 0.0, length(f)) * smoothstep(0.02, 0.3, h);
-          float tw = 0.65 + 0.35 * sin(uTime * (1.5 + r * 3.0) + r * 40.0);
-          col += vec3(0.95, 0.97, 1.0) * star * tw * uNight * (0.5 + hash(g + 3.1));
-          // a faint band of the milky way
-          float band = exp(-pow(dot(d, normalize(vec3(0.3, 0.2, 1.0))) * 3.2, 2.0)) * fbm(d.xz * 6.0 + 3.0);
-          col += vec3(0.18, 0.2, 0.3) * band * uNight * smoothstep(0.0, 0.4, h);
-        }
-        if (h > 0.0) {
-          // clouds on a flat layer, thinning toward the horizon
-          vec2 uv = d.xz / (h + 0.12) * 0.9 + vec2(uTime * 0.006, uTime * 0.002);
-          float n = fbm(uv);
-          float cov = smoothstep(1.0 - uCloud, 1.0 - uCloud + 0.28, n);
-          float lit = fbm(uv + normalize(uSunDir.xz) * 0.08);
-          vec3 cc = mix(vec3(1.0, 0.99, 0.97), vec3(0.62, 0.66, 0.72), clamp((lit - n) * 3.0 + 0.35 + uCloudDark, 0.0, 1.0));
-          cc += uSunColor * pow(s, 8.0) * 0.35;
-          cc *= 1.0 - 0.86 * uNight;
-          col = mix(col, cc, cov * smoothstep(0.0, 0.18, h) * 0.95);
-        }
-        gl_FragColor = vec4(col, 1.0);
-        #include <colorspace_fragment>
-      }`,
-  });
-}
+installAtmosphere();
+import { Ball, Tracer, AimRing, DotLine, GreenGrid, Particles, Marks, BallMarkers, Celebration, Rain, TrailSparks, SandPrints } from './effects.js';
 
 export class World {
   constructor(container, settings) {
     this.container = container;
     this.settings = settings;
     this.quality = this.pickQuality(settings.quality);
-    this.renderer = new THREE.WebGLRenderer({ antialias: this.quality !== 'low', powerPreference: this.quality === 'high' ? 'high-performance' : 'default' });
+    // Medium and high draw through the HDR post-processing chain (which
+    // does its own multisampling); low draws straight to the screen
+    this.usePost = this.quality !== 'low' && settings.post !== false;
+    this.renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: this.quality === 'high' ? 'high-performance' : 'default' });
+    this.renderer.toneMapping = this.usePost ? THREE.NoToneMapping : THREE.ACESFilmicToneMapping;
+    this.exposure = 1;
+    this.bloom = 0.06;
+    this.glare = 1;
     // Phones get a lighter pixel budget; the frame-rate governor below can
     // lower it further if the device still struggles
     this.maxPR = Math.min(window.devicePixelRatio || 1, this.quality === 'high' ? 2 : this.quality === 'medium' ? 1.5 : 1.25);
@@ -78,6 +34,8 @@ export class World {
     this.renderer.shadowMap.enabled = this.quality !== 'low';
     this.renderer.shadowMap.type = this.quality === 'high' ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
     this.renderer.domElement.className = 'gl';
+    this.post = this.usePost ? new Post(this.renderer, this.quality) : null;
+    this.dbSize = new THREE.Vector2();
     container.appendChild(this.renderer.domElement);
     // The browser can drop the GPU context (low memory, app switching).
     // Keep the game alive and redraw once the context comes back.
@@ -98,7 +56,7 @@ export class World {
 
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(50, 1, 0.05, 12000);
-    this.sky = new THREE.Mesh(new THREE.SphereGeometry(9000, 32, 16), skyMaterial());
+    this.sky = new THREE.Mesh(new THREE.SphereGeometry(9000, 48, 24), makeSkyMaterial());
     this.sky.frustumCulled = false;
     this.sky.renderOrder = -1;
     this.sky.material.depthTest = false;
@@ -115,9 +73,10 @@ export class World {
     this.sun.shadow.normalBias = 0.04;
     this.scene.add(this.sun, this.sun.target);
     this.sunDir = new THREE.Vector3(0.3, 0.7, -0.4).normalize();
-    this.scene.fog = new THREE.Fog(0xcfe0ea, 300, 5200);
+    this.scene.fog = new THREE.Fog(0xcfe0ea, 120, 9000);
 
-    this.ball = new Ball();
+    setClubMaterials(this.quality !== 'low');
+    this.ball = new Ball({ pbr: this.quality !== 'low' });
     this.ball.addTo(this.scene);
     this.tracer = new Tracer();
     this.scene.add(this.tracer.mesh);
@@ -133,7 +92,7 @@ export class World {
     this.scene.add(this.particles.points);
     this.marks = new Marks();
     this.marks.addTo(this.scene);
-    this.markers = new BallMarkers();
+    this.markers = new BallMarkers(14, { pbr: this.quality !== 'low' });
     this.markers.addTo(this.scene);
     this.party = new Celebration();
     this.scene.add(this.party.points);
@@ -190,6 +149,10 @@ export class World {
     if (this.pr > cap) this.renderer.setPixelRatio(Math.max(0.5, cap));
     else this.renderer.setPixelRatio(this.pr);
     this.renderer.setSize(w, h, false);
+    if (this.post) {
+      this.renderer.getDrawingBufferSize(this.dbSize);
+      this.post.setSize(this.dbSize.x, this.dbSize.y);
+    }
     this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
   }
@@ -210,62 +173,125 @@ export class World {
   }
 
   // Sky, sun, fog and weather. cond: timeOfDay (0 dawn .. 1 dusk), night,
-  // weather ('sunny' | 'cloudy' | 'rain' | 'fog'), overcast (older saves)
+  // weather ('sunny' | 'cloudy' | 'rain' | 'fog'), overcast (older saves).
+  // The sky is a physical atmosphere model; the sunlight colour, the light
+  // from the sky, the haze and the camera exposure all come from it, so the
+  // course is lit the way the sky looks.
   setConditions(cond, style, headingOffset = 0) {
     const t = cond.timeOfDay ?? 0.45;
     const night = !!cond.night;
     const wx = cond.weather || (cond.overcast ? 'cloudy' : 'sunny');
-    const grey = wx === 'cloudy' || wx === 'rain' || wx === 'fog';
-    const elev = night ? 0.75 : Math.max(0.12, Math.sin(Math.PI * t)) * 1.05;
+    const rain = wx === 'rain';
+    const grey = wx === 'cloudy' || rain || wx === 'fog';
+    // the sun climbs quickly after dawn and sinks low for sunset (about 8°
+    // up at the sunset setting), so evening light is properly golden
+    const st = Math.sin(Math.PI * t);
+    const elev = night ? 0.75 : Math.max(0.06, (st >= 0.5 ? st : st ** 1.6 / 0.5 ** 0.6) * 1.05);
     const az = headingOffset + (night ? 0.9 : (t - 0.5) * 2.6 + 0.6);
     this.sunDir.set(Math.sin(az) * Math.cos(elev), Math.sin(elev), -Math.cos(az) * Math.cos(elev)).normalize();
     const u = this.sky.material.uniforms;
     const golden = night ? 0 : Math.max(0, 1 - Math.sin(Math.PI * t) * 1.6);
-    const fog = this.scene.fog;
-    fog.near = 300; fog.far = 5200;
-    this.hemi.color.set('#cfe3ff');
-    this.hemi.groundColor.set('#4a5a3a');
-    this.sun.color.set('#fff1dc');
-    u.uNight.value = night ? 1 : 0;
-    u.uSunColor.value.set('#fff4d6');
-    u.uCloud.value = grey ? 0.9 : 0.28 + ((cond.windMph || 5) % 7) * 0.04;
-    u.uCloudDark.value = grey ? 0.35 : 0;
+    const hazy = style && style.scenery === 'mesas' ? 1.5 : style && style.scenery === 'ocean' ? 1 : 0;
+    const atm = { rayleigh: 1.7 + golden * 1.0, turbidity: (grey ? 14 : 3.6 + hazy) + golden * 2, mie: 0.0035 + golden * 0.002, mieG: 0.8, scale: 0.36 };
+    u.uRayleigh.value = atm.rayleigh; u.uTurbidity.value = atm.turbidity; u.uMie.value = atm.mie; u.uMieG.value = atm.mieG;
+    u.uSunDir.value.copy(this.sunDir);
+    u.uMoonDir.value.set(-this.sunDir.x, Math.max(0.35, this.sunDir.y * 0.7), -this.sunDir.z).normalize();
+    const sd = night ? { x: this.sunDir.x, y: -0.25, z: this.sunDir.z } : this.sunDir;
+    // what the sky looks like straight up and along the horizon
+    const rad = (x, y, z) => skyRadiance({ x, y, z }, sd, atm);
+    const hd = Math.hypot(this.sunDir.x, this.sunDir.z) || 1;
+    const sx = this.sunDir.x / hd, sz = this.sunDir.z / hd;
+    const zen = rad(0, 1, 0);
+    const hSun = rad(sx, 0.04, sz), hAnti = rad(-sx, 0.04, -sz), hSide = rad(-sz, 0.04, sx);
+    const C = (a) => new THREE.Color(a[0], a[1], a[2]);
+    const lum = (c) => 0.2126 * c.r + 0.7152 * c.g + 0.0722 * c.b;
+    const skyAvg = C(zen).multiplyScalar(0.4).add(C(hSide).multiplyScalar(0.35)).add(C(hSun).multiplyScalar(0.12)).add(C(hAnti).multiplyScalar(0.13));
+    const tr = sunTransmittance(this.sunDir, atm);
+    // golden-hour warmth on top of what the atmosphere already filters out
+    const sunCol = new THREE.Color(tr.color[0], tr.color[1], tr.color[2]).lerp(new THREE.Color(1, 0.6, 0.3), golden * 0.35);
+    let fog = C(hAnti).lerp(C(hSun), 0.3).lerp(C(hSide), 0.3);
+    let sunI = 3.1 * Math.min(1, tr.strength * 1.15) * (0.35 + 0.65 * Math.min(1, this.sunDir.y / 0.35));
+    // more fill from the glowing sky when the sun is low
+    let hemiI = 1.0 + golden * 0.4;
+    const sky = skyAvg.clone();
+    // haze picks up the sky's colour (a bit more saturated, like the sky)
+    { const fl = lum(fog); fog.setRGB(fl + (fog.r - fl) * 1.3, fl + (fog.g - fl) * 1.3, fl + (fog.b - fl) * 1.3); }
+    let vis = style && style.scenery === 'mesas' ? 11000 : 15000, clear = 150;
+    u.uNight.value = 0; u.uOver.value = 0; u.uCloudDark.value = 0;
+    u.uCloud.value = 0.3 + ((cond.windMph || 5) % 7) * 0.035;
+    u.uScale.value = atm.scale;
     if (night) {
-      u.uZenith.value.set('#050a1c'); u.uHorizon.value.set('#1a2645'); u.uSunSize.value = 0.4;
-      u.uSunColor.value.set('#dfe8ff');
-      u.uCloud.value = grey ? 0.8 : 0.18;
-      this.hemi.color.set('#8ea6dc'); this.hemi.groundColor.set('#1a2433'); this.hemi.intensity = 0.55;
-      this.sun.color.set('#b8c8ff'); this.sun.intensity = 0.6;
-      fog.color.set('#0e1629'); fog.near = 200; fog.far = 2400;
+      u.uNight.value = 1;
+      u.uCloud.value = grey ? 0.75 : 0.15;
+      sunCol.set('#9fb4ff'); sunI = 0.35;
+      sky.setRGB(0.02, 0.03, 0.06); hemiI = 1.0;
+      fog.setRGB(0.016, 0.022, 0.04); vis = 2600; clear = 60;
     } else if (grey) {
-      const rain = wx === 'rain';
-      u.uZenith.value.set(rain ? '#5d6873' : '#8793a0'); u.uHorizon.value.set(rain ? '#9ba4ab' : '#cdd3d8'); u.uSunSize.value = 0.15;
-      u.uCloudDark.value = rain ? 0.62 : 0.35;
-      u.uCloud.value = rain ? 0.98 : 0.9;
-      this.hemi.intensity = rain ? 1.3 : 1.6; this.sun.intensity = rain ? 0.55 : 1.1;
-      fog.color.set(rain ? '#8f989f' : '#c9cfd4');
-      if (rain) { fog.near = 70; fog.far = 1500; }
-    } else {
-      u.uZenith.value.set('#3b72b6'); u.uHorizon.value.set('#d4e6f1').lerp(new THREE.Color('#f5b37a'), golden * 0.85); u.uSunSize.value = 1;
-      if (golden > 0.45) u.uZenith.value.lerp(new THREE.Color('#5a5f9e'), (golden - 0.45) * 0.9);
-      this.hemi.intensity = 1.15 - golden * 0.25; this.sun.intensity = 2.5 - golden * 0.9;
-      this.sun.color.set('#fff1dc').lerp(new THREE.Color('#ff9f5a'), golden * 0.75);
-      u.uSunColor.value.set('#fff4d6').lerp(new THREE.Color('#ffb070'), golden);
-      fog.color.copy(u.uHorizon.value);
+      const over = rain ? 0.95 : 0.85;
+      u.uOver.value = over;
+      const g = rain ? 0.42 : 0.68;
+      u.uOvercast.value.setRGB(g * 0.97, g, g * 1.04);
+      u.uCloud.value = rain ? 0.95 : 0.85; u.uCloudDark.value = rain ? 0.6 : 0.3;
+      sunI = rain ? 0.35 : 0.8;
+      sky.setRGB(g * 0.97, g, g * 1.03); hemiI = rain ? 1.1 : 1.35;
+      fog.setRGB(g * 0.96, g * 0.99, g * 1.02); vis = rain ? 1400 : 4200; clear = rain ? 30 : 80;
     }
     if (wx === 'fog') {
-      fog.color.set(night ? '#1b2335' : '#c7ced3'); fog.near = 12; fog.far = 330;
-      u.uHorizon.value.copy(fog.color);
-      this.sun.intensity *= 0.7;
+      fog.setRGB(0.62, 0.65, 0.68).multiplyScalar(night ? 0.06 : 1); vis = 340; clear = 8;
+      sunI *= 0.7;
     }
-    if (style && style.fog && !night && wx !== 'fog') fog.color.lerp(new THREE.Color(style.fog), 0.5);
-    u.uSunDir.value.copy(this.sunDir);
-    u.uGround.value.copy(fog.color).multiplyScalar(0.85);
-    this.rain.setLevel(wx === 'rain' ? (cond.rainLevel ?? 0.8) : 0);
+    if (style && style.fog && !night && wx !== 'fog') fog.lerp(new THREE.Color(style.fog).convertSRGBToLinear().multiplyScalar(lum(fog) / 0.6), 0.25);
+    // lights
+    this.sun.color.copy(sunCol);
+    this.sun.intensity = sunI;
+    const skyN = sky.clone().multiplyScalar(1 / Math.max(1e-4, Math.max(sky.r, sky.g, sky.b)));
+    this.hemi.color.copy(skyN);
+    this.hemi.groundColor.set(night ? '#0d140e' : '#56603c').lerp(sunCol, 0.15);
+    this.hemi.intensity = hemiI * (night ? 0.35 : Math.min(1.6, 0.55 + lum(sky) * 1.1));
+    // haze
+    this.scene.fog.color.copy(fog);
+    this.scene.fog.near = clear;
+    this.scene.fog.far = vis;
+    u.uHazeColor.value.copy(fog);
+    u.uHaze.value = grey ? 0.6 : 0.22;
+    // clouds lit by the sun, shaded by the sky
+    u.uCloudLit.value.copy(sunCol).multiplyScalar(night ? 0.04 : grey ? lum(sky) * 1.1 : 0.9 + sunI * 0.22);
+    u.uCloudShade.value.copy(sky).multiplyScalar(night ? 0.6 : 0.72).lerp(new THREE.Color(0.35, 0.37, 0.42).multiplyScalar(night ? 0.05 : grey ? lum(sky) : 1), 0.4);
+    // exposure follows the brightness of the sky, like a camera would
+    const L = lum(skyAvg);
+    this.exposure = night ? 1.9 : grey ? 1.15 : Math.max(0.85, Math.min(2.0, 1.12 * (0.5 / Math.max(0.05, L)) ** 0.35));
+    this.bloom = night ? 0.12 : grey ? 0.04 : 0.06;
+    this.glare = night || grey ? 0 : 1;
+    // shadows of the clouds on the ground (none without direct sunlight)
+    CLOUD_UNIFORMS.uCloudCover.value = u.uCloud.value;
+    CLOUD_UNIFORMS.uCloudShadow.value = night || grey ? 0 : 1;
+    this.rain.setLevel(rain ? (cond.rainLevel ?? 0.8) : 0);
     this.night = night;
     // the ball glows a little under the lights so it's easy to follow
-    this.ball.mesh.material.emissive.set(night ? '#8a8a7a' : '#222222');
+    this.ball.mesh.material.emissive.set(night ? '#8a8a7a' : '#000000');
     this.applyTrail();
+    this.updateEnvironment();
+  }
+
+  // Reflections for shiny things (the ball, clubs, water): the sky itself
+  updateEnvironment() {
+    if (this.quality === 'low') return;
+    if (!this.pmrem) {
+      this.pmrem = new THREE.PMREMGenerator(this.renderer);
+      this.envScene = new THREE.Scene();
+      this.envSky = new THREE.Mesh(new THREE.SphereGeometry(50, 32, 16), this.sky.material);
+      this.envScene.add(this.envSky);
+      // the land below the horizon
+      const ground = new THREE.Mesh(new THREE.CircleGeometry(40, 24).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x2f3d22 }));
+      ground.position.y = -2;
+      this.envGround = ground;
+      this.envScene.add(ground);
+    }
+    this.envGround.material.color.copy(this.scene.fog.color).multiplyScalar(0.3).lerp(new THREE.Color(0.06, 0.09, 0.035), 0.6);
+    const prev = this.envRT;
+    this.envRT = this.pmrem.fromScene(this.envScene, 0, 0.1, 100);
+    this.scene.environment = this.envRT.texture;
+    if (prev) prev.dispose();
   }
 
   // The player's tracer style and ball colour (cosmetic)
@@ -288,7 +314,7 @@ export class World {
       this.scene.remove(this.holeScene.group);
       this.holeScene.dispose();
     }
-    this.holeScene = new HoleScene(hole, { quality: this.quality, crowd: opts.crowd, board: opts.board, night: this.night, rain: this.rain.level > 0 });
+    this.holeScene = new HoleScene(hole, { quality: this.quality, crowd: opts.crowd, board: opts.board, night: this.night, rain: this.rain.level > 0, sunDir: this.sunDir.clone() });
     this.scene.add(this.holeScene.group);
     this.grid.build(hole);
     this.grid.setVisible(false);
@@ -300,13 +326,36 @@ export class World {
     this.puttLine.clear();
   }
 
+  // Swap simple shading on a figure for physically based materials: cloth,
+  // skin and shoes pick up soft light from the sky and a little sheen
+  pbrify(obj) {
+    if (this.quality === 'low') return obj;
+    const swap = new Map();
+    obj.traverse((o) => {
+      if (!o.isMesh || o.isInstancedMesh || !o.material || !o.material.isMeshLambertMaterial) return;
+      const m = o.material;
+      let s = swap.get(m);
+      if (!s) {
+        s = new THREE.MeshStandardMaterial({
+          color: m.color, map: m.map, emissive: m.emissive, vertexColors: m.vertexColors, side: m.side,
+          transparent: m.transparent, opacity: m.opacity, roughness: 0.68, metalness: 0, envMapIntensity: 0.45,
+        });
+        swap.set(m, s);
+      }
+      o.material = s;
+    });
+    return obj;
+  }
+
   setGolfer(look, name = '') {
     this.clearGolfers();
     if (this.golfer) this.scene.remove(this.golfer.root);
     this.golfer = new Golfer(look);
+    this.pbrify(this.golfer.root);
     this.scene.add(this.golfer.root);
     if (this.caddie) this.scene.remove(this.caddie.group);
     this.caddie = new Caddie(look, name);
+    this.pbrify(this.caddie.group);
     this.scene.add(this.caddie.group);
   }
 
@@ -316,6 +365,7 @@ export class World {
     let e = this.golfers.get(key);
     if (!e) {
       e = { golfer: new Golfer(look), caddie: new Caddie(look, name) };
+      this.pbrify(e.golfer.root); this.pbrify(e.caddie.group);
       this.golfers.set(key, e);
     }
     if (this.golfer && this.golfer !== e.golfer) this.scene.remove(this.golfer.root);
@@ -355,6 +405,8 @@ export class World {
   }
 
   // The gallery: polite applause, turning to follow the ball, photos
+  // grow the patch of real grass blades round the ball
+  grassAt(x, z) { if (this.holeScene && this.holeScene.grass) this.holeScene.grass.place(x, z); }
   clap(strength = 1) { if (this.holeScene) this.holeScene.clap(strength); }
   crowdWatch(x, y, z, pointing = false) {
     if (!this.holeScene) return;
@@ -401,6 +453,10 @@ export class World {
     }
     this.sky.position.copy(this.camera.position);
     this.sky.material.uniforms.uTime.value += dt;
+    // cloud shadows drift with the wind
+    const co = CLOUD_UNIFORMS.uCloudOffset.value;
+    co.x -= (this.wind.x * 0.8 + 1.2) * dt;
+    co.y -= (this.wind.z * 0.8 + 0.4) * dt;
     // shadows follow what we're looking at
     const f = this.focus;
     this.sun.target.position.copy(f);
@@ -413,6 +469,12 @@ export class World {
     this.markers.update(dt, this.camera);
     this.tracer.update(this.camera, dt);
     this.sparks.update(dt);
-    if (!this.lost) this.renderer.render(this.scene, this.camera);
+    if (this.lost) return;
+    if (this.post) {
+      this.post.render(this.scene, this.camera, { exposure: this.exposure, bloom: this.bloom, sunDir: this.sunDir, sunColor: this.sun.color, glare: this.glare }, realDt);
+    } else {
+      this.renderer.toneMappingExposure = this.exposure;
+      this.renderer.render(this.scene, this.camera);
+    }
   }
 }

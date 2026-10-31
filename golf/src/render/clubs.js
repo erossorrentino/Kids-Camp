@@ -438,13 +438,25 @@ function shaftAndGrip(metal, paint, rubber, len, o) {
 // ---------------------------------------------------------------- build
 const cache = new Map();
 const MATS = {};
+let pbr = false;
+// Physically based metal, paint and rubber (they mirror the sky and the
+// course) when the scene has an environment map; simple shading otherwise
+export function setClubMaterials(usePbr) { pbr = !!usePbr; }
 function mats() {
-  if (!MATS.metal) {
-    MATS.metal = new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0x8a8a8a, shininess: 70, side: THREE.DoubleSide });
-    MATS.paint = new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0x3a3a3a, shininess: 45, side: THREE.DoubleSide });
-    MATS.rubber = new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide });
+  const key = pbr ? 'pbr' : 'basic';
+  if (!MATS[key]) {
+    const side = THREE.DoubleSide;
+    MATS[key] = pbr ? {
+      metal: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0.92, roughness: 0.26, side }),
+      paint: new THREE.MeshPhysicalMaterial({ vertexColors: true, metalness: 0.05, roughness: 0.4, clearcoat: 0.8, clearcoatRoughness: 0.12, side }),
+      rubber: new THREE.MeshStandardMaterial({ vertexColors: true, metalness: 0, roughness: 0.82, side }),
+    } : {
+      metal: new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0x8a8a8a, shininess: 70, side }),
+      paint: new THREE.MeshPhongMaterial({ vertexColors: true, specular: 0x3a3a3a, shininess: 45, side }),
+      rubber: new THREE.MeshLambertMaterial({ vertexColors: true, side }),
+    };
   }
-  return MATS;
+  return MATS[key];
 }
 
 /**

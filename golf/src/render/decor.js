@@ -6,6 +6,7 @@ import * as THREE from '../../vendor/three.module.min.js';
 import { RNG, mixSeed, clamp } from '../util/rng.js';
 import { mergeGeos, TREE_UNIFORMS } from './trees.js';
 import { buildPeople } from './people.js';
+import { albedo } from './terrainMaterial.js';
 
 const UP = new THREE.Vector3(0, 1, 0);
 
@@ -106,8 +107,10 @@ function swayMat(double = true, amp = 1) {
           float s = sin(uTime * 2.2 + ip.x * 0.8 + ip.y * 0.6);
           transformed.xz += (normalize(uWind + vec2(0.0001)) * (0.6 + 0.4 * s)) * k * (0.05 + length(uWind) * 0.02) * ${amp.toFixed(2)};
         }`);
+    // both faces of a blade light like the lawn (no flipping to a dark underside)
+    if (double) sh.fragmentShader = sh.fragmentShader.replace('#include <normal_fragment_begin>', 'float faceDirection = 1.0;\nvec3 normal = normalize( vNormal );\nvec3 nonPerturbedNormal = normal;');
   };
-  m.customProgramCacheKey = () => `grass-sway-${amp}`;
+  m.customProgramCacheKey = () => `grass-sway-${amp}-${double}`;
   return m;
 }
 
@@ -221,7 +224,10 @@ export function buildGroundCover(hole, quality) {
     }
   }
   const baseTuft = style.colors.rough;
-  const tuftGeo = mergeGeos([bladeClump(new RNG(3), { h: 0.34, base: new THREE.Color(baseTuft).getStyle(), tip: new THREE.Color(style.colors.fairway).lerp(new THREE.Color('#d6e08c'), 0.45).getStyle() })]);
+  // colours calibrated like the terrain so tufts sit in the rough instead of
+  // standing out as dark spikes
+  const tuftBase = albedo(baseTuft, 0.75, 0.62), tuftTip = albedo(baseTuft, 0.8, 0.8).lerp(albedo(style.colors.fairway, 0.8, 0.8), 0.4).lerp(new THREE.Color(0.42, 0.42, 0.24), 0.12);
+  const tuftGeo = mergeGeos([bladeClump(new RNG(3), { blades: 10, h: 0.34, w: 0.022, spread: 0.16, base: tuftBase.getStyle(), tip: tuftTip.getStyle() })]);
   const add = (m) => { if (m) group.add(m); };
   add(instanced(tuftGeo, swayMat(true, 1), tufts));
   const fescueGeo = mergeGeos([bladeClump(new RNG(5), { blades: 9, h: 0.75, w: 0.03, base: '#8a8a52', tip: '#e2d49a', spread: 0.2 })]);

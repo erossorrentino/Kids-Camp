@@ -2,6 +2,7 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { Wildlife } from './wildlife.js';
 import { makeTerrainMaterial } from './terrainMaterial.js';
+import { GrassField } from './grass.js';
 import { buildTrees, TREE_UNIFORMS } from './trees.js';
 import { buildGroundCover, buildCartPath, buildTeeFurniture, buildHouses, buildClubhouse, buildGrandstand, Birds, buildRakes, buildFountains, buildBridges, buildLighthouse, buildTeeExtras } from './decor.js';
 import { buildPeople, buildMarshals, buildCameraTower, Cart } from './people.js';
@@ -9,14 +10,60 @@ import { RNG, mixSeed, smoothstep, clamp, Noise2D } from '../util/rng.js';
 
 const CL = (v) => clamp(v, -60, 60);
 
-function gridGeometry(hole, x0, z0, x1, z1, step, heightFn, skipCell = null) {
+// Shade cast on the ground by the trees: soft ambient occlusion round each
+// trunk, and a shadow offset away from the sun (stretched when it's low).
+// Baked into the terrain so even trees beyond the live shadow map have them.
+function treeShadeFn(hole, sunDir) {
+  const trees = (hole.trees || []).filter((t) => t.canopyR > 0.5);
+  if (!trees.length) return null;
+  const sy = Math.max(0.12, sunDir.y);
+  const ox = -sunDir.x / sy, oz = -sunDir.z / sy;
+  const hl = Math.hypot(sunDir.x, sunDir.z) || 1;
+  const ax = sunDir.x / hl, az = sunDir.z / hl;
+  const stretch = Math.min(3, Math.max(1, 0.75 / sy));
+  const cell = 10;
+  const map = new Map();
+  const key = (i, j) => i * 100003 + j;
+  for (const t of trees) {
+    const hc = Math.max(1, t.canopyY - t.y - (t.shape === 'cone' ? t.canopyH * 0.3 : 0));
+    const it = { x: t.x, z: t.z, R: t.canopyR, sx: t.x + ox * hc, sz: t.z + oz * hc, dens: Math.min(1, t.density ?? 1) };
+    const r = t.canopyR * 1.8 * stretch;
+    const minX = Math.min(it.x, it.sx) - r, maxX = Math.max(it.x, it.sx) + r;
+    const minZ = Math.min(it.z, it.sz) - r, maxZ = Math.max(it.z, it.sz) + r;
+    for (let i = Math.floor(minX / cell); i <= Math.floor(maxX / cell); i++) {
+      for (let j = Math.floor(minZ / cell); j <= Math.floor(maxZ / cell); j++) {
+        const k = key(i, j);
+        if (!map.has(k)) map.set(k, []);
+        map.get(k).push(it);
+      }
+    }
+  }
+  const out = [1, 1];
+  return (x, z) => {
+    out[0] = 1; out[1] = 1;
+    const list = map.get(key(Math.floor(x / cell), Math.floor(z / cell)));
+    if (!list) return out;
+    for (const it of list) {
+      const dx = x - it.x, dz = z - it.z;
+      out[0] *= 1 - 0.42 * it.dens * Math.exp(-(dx * dx + dz * dz) / (it.R * it.R * 1.2));
+      const sx = x - it.sx, sz = z - it.sz;
+      const along = (sx * ax + sz * az) / stretch, across = -sx * az + sz * ax;
+      const ds = Math.hypot(along, across);
+      out[1] *= 1 - 0.78 * it.dens * smoothstep(it.R * 1.05, it.R * 0.5, ds);
+    }
+    return out;
+  };
+}
+
+function gridGeometry(hole, x0, z0, x1, z1, step, heightFn, skipCell = null, shadeFn = null) {
   const nx = Math.max(2, Math.ceil((x1 - x0) / step) + 1);
   const nz = Math.max(2, Math.ceil((z1 - z0) / step) + 1);
   const dx = (x1 - x0) / (nx - 1), dz = (z1 - z0) / (nz - 1);
   const n = nx * nz;
   const pos = new Float32Array(n * 3);
   const aF = new Float32Array(n * 4);
-  const aR = new Float32Array(n * 2);
+  const aR = new Float32Array(n * 3);
+  const aS = new Float32Array(n * 2).fill(1);
   const pr = {};
   for (let j = 0; j < nz; j++) {
     const z = z0 + j * dz;
@@ -28,7 +75,8 @@ function gridGeometry(hole, x0, z0, x1, z1, step, heightFn, skipCell = null) {
       const h = heightFn ? heightFn(x, z, f) : hole.heightFromFields(x, z, f);
       pos[k * 3] = x; pos[k * 3 + 1] = h; pos[k * 3 + 2] = z;
       aF[k * 4] = CL(f.dF); aF[k * 4 + 1] = CL(f.dG); aF[k * 4 + 2] = CL(f.dB); aF[k * 4 + 3] = CL(f.dT);
-      aR[k * 2] = CL(f.dR); aR[k * 2 + 1] = CL(f.dO);
+      aR[k * 3] = CL(f.dR); aR[k * 3 + 1] = CL(f.dO); aR[k * 3 + 2] = CL(f.dW);
+      if (shadeFn) { const sh = shadeFn(x, z); aS[k * 2] = sh[0]; aS[k * 2 + 1] = sh[1]; }
     }
   }
   const idx = new Uint32Array((nx - 1) * (nz - 1) * 6);
@@ -44,31 +92,128 @@ function gridGeometry(hole, x0, z0, x1, z1, step, heightFn, skipCell = null) {
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   g.setAttribute('aF', new THREE.BufferAttribute(aF, 4));
-  g.setAttribute('aR', new THREE.BufferAttribute(aR, 2));
+  g.setAttribute('aR', new THREE.BufferAttribute(aR, 3));
+  g.setAttribute('aS', new THREE.BufferAttribute(aS, 2));
   g.setIndex(new THREE.BufferAttribute(o < idx.length ? idx.slice(0, o) : idx, 1));
   g.computeVertexNormals();
   g.computeBoundingSphere();
   return g;
 }
 
-function waterMaterial(color, uniforms) {
-  const m = new THREE.MeshPhongMaterial({ color, specular: 0x9fc4d8, shininess: 120, transparent: true, opacity: 0.9 });
+// Water: a physically based surface that reflects the sky (from the
+// environment map) more strongly at grazing angles, with wind-driven waves
+// lit by the sun (bright glints that bloom), dark deep water, lighter
+// shallows you can see into, and broken foam along the shore.
+// Each vertex knows how far it is from the shore (aShore).
+function waterMaterial(color, uniforms, opts = {}) {
+  const deep = color.clone().multiplyScalar(0.28).lerp(new THREE.Color(0.01, 0.035, 0.045), 0.5);
+  const shallow = color.clone().multiplyScalar(0.55).lerp(new THREE.Color(0.11, 0.12, 0.07), 0.45);
+  const m = opts.simple
+    ? new THREE.MeshPhongMaterial({ color, specular: 0x9fc4d8, shininess: 120, transparent: true, opacity: 0.9 })
+    : new THREE.MeshStandardMaterial({ color: deep, roughness: 0.05, metalness: 0, transparent: true, envMapIntensity: 1.0 });
+  const extra = { uDeep: { value: deep }, uShallow: { value: shallow }, uWave: uniforms.uWave || { value: 1 } };
   m.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = uniforms.uTime;
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWP;').replace('#include <begin_vertex>', '#include <begin_vertex>\nvWP = (modelMatrix * vec4(position,1.0)).xyz;');
+    Object.assign(sh.uniforms, extra);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float aShore;\nvarying float vShore;\nvarying vec3 vWP;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvShore = aShore;\nvWP = (modelMatrix * vec4(position, 1.0)).xyz;');
     sh.fragmentShader = sh.fragmentShader
-      .replace('#include <common>', '#include <common>\nuniform float uTime;\nvarying vec3 vWP;')
+      .replace('#include <common>', `#include <common>
+uniform float uTime, uWave;
+uniform vec3 uDeep, uShallow;
+varying float vShore;
+varying vec3 vWP;
+float wHash(vec2 p){ vec3 p3 = fract(vec3(p.xyx) * 0.1031); p3 += dot(p3, p3.yzx + 33.33); return fract((p3.x + p3.y) * p3.z); }
+float wNoise(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
+  return mix(mix(wHash(i), wHash(i + vec2(1, 0)), u.x), mix(wHash(i + vec2(0, 1)), wHash(i + vec2(1, 1)), u.x), u.y); }
+// slope of a few travelling waves plus small ripples
+vec2 waveSlope(vec2 p, float t) {
+  vec2 g = vec2(0.0);
+  vec2 d1 = normalize(vec2(1.0, 0.35)), d2 = normalize(vec2(-0.45, 1.0)), d3 = normalize(vec2(0.8, -0.6)), d4 = normalize(vec2(-0.9, -0.2));
+  g += d1 * cos(dot(d1, p) * 0.9 + t * 1.5) * 0.06;
+  g += d2 * cos(dot(d2, p) * 1.7 - t * 2.1) * 0.045;
+  g += d3 * cos(dot(d3, p) * 3.3 + t * 2.9) * 0.03;
+  g += d4 * cos(dot(d4, p) * 6.1 + t * 3.7) * 0.02;
+  float e = 0.15;
+  vec2 q = p * 2.6 + vec2(t * 0.35, -t * 0.2);
+  float n0 = wNoise(q), nx = wNoise(q + vec2(e, 0.0)), nz = wNoise(q + vec2(0.0, e));
+  g += vec2(nx - n0, nz - n0) / e * 0.035;
+  return g;
+}
+float sFoam = 0.0;`)
+      .replace('vec4 diffuseColor = vec4( diffuse, opacity );', `
+float shoreD = vShore;
+vec3 base = mix(uShallow, uDeep, smoothstep(0.3, 7.0, shoreD));
+float fn = wNoise(vWP.xz * 1.3 + vec2(uTime * 0.25, uTime * 0.13)) * 0.6 + wNoise(vWP.xz * 4.1 - uTime * 0.3) * 0.4;
+sFoam = smoothstep(0.5, 0.0, shoreD + (fn - 0.5) * 0.8) * smoothstep(0.3, 0.7, fn);
+vec4 diffuseColor = vec4(mix(base, vec3(0.6, 0.62, 0.6), sFoam * 0.7), mix(0.62, 0.94, smoothstep(0.0, 3.5, shoreD)) + sFoam * 0.3);`)
       .replace('#include <normal_fragment_maps>', `#include <normal_fragment_maps>
-      {
-        vec2 p = vWP.xz;
-        float w1 = sin(p.x * 0.9 + uTime * 1.3) * cos(p.y * 0.7 - uTime * 1.1);
-        float w2 = sin(p.x * 2.3 - uTime * 2.1 + p.y * 1.7) * 0.5;
-        vec3 pert = vec3(w1 + w2, 0.0, cos(p.y * 1.1 + uTime) * 0.8 + w2) * 0.07;
-        normal = normalize(normal + (viewMatrix * vec4(pert, 0.0)).xyz);
-      }`);
+{
+  float wd = length(vWP - cameraPosition);
+  vec2 g = waveSlope(vWP.xz, uTime) * uWave * (1.0 - smoothstep(60.0, 400.0, wd) * 0.75);
+  normal = normalize(normal - (viewMatrix * vec4(g.x, 0.0, g.y, 0.0)).xyz);
+}`)
+      .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, 0.7, sFoam);')
+      // low reflections show the trees and banks round the water, not the sky
+      .replace('#include <lights_fragment_maps>', opts.simple ? '#include <lights_fragment_maps>' : `#include <lights_fragment_maps>
+{
+  vec3 rv = inverseTransformDirection(reflect(-geometryViewDir, normal), viewMatrix);
+  float up = smoothstep(0.0, 0.32, rv.y);
+  vec3 bank = vec3(0.028, 0.045, 0.026) * (0.6 + 0.4 * up);
+  #if NUM_HEMI_LIGHTS > 0
+    bank *= 0.5 + 0.5 * dot(hemisphereLights[0].skyColor, vec3(0.33));
+  #endif
+  radiance = mix(bank, radiance, up);
+}`);
   };
-  m.customProgramCacheKey = () => 'water-v1';
+  m.customProgramCacheKey = () => 'water-v2' + (opts.simple ? 's' : '');
   return m;
+}
+
+// A water surface as a fine grid clipped to the water (plus a margin
+// under the banks), each vertex at the water level with its distance
+// from the shore
+function waterGrid(hole, w, step) {
+  let x0, z0, x1, z1;
+  if (w.type === 'creek') {
+    x0 = Math.min(...w.points.map((p) => p.x)) - w.half - 4; x1 = Math.max(...w.points.map((p) => p.x)) + w.half + 4;
+    z0 = Math.min(...w.points.map((p) => p.z)) - w.half - 4; z1 = Math.max(...w.points.map((p) => p.z)) + w.half + 4;
+  } else {
+    const r = Math.max(w.rx, w.rz) * 1.4 + 3;
+    x0 = w.x - r; x1 = w.x + r; z0 = w.z - r; z1 = w.z + r;
+  }
+  const nx = Math.max(2, Math.ceil((x1 - x0) / step) + 1), nz = Math.max(2, Math.ceil((z1 - z0) / step) + 1);
+  const dx = (x1 - x0) / (nx - 1), dz = (z1 - z0) / (nz - 1);
+  const pos = new Float32Array(nx * nz * 3), shore = new Float32Array(nx * nz), dW = new Float32Array(nx * nz);
+  for (let j = 0; j < nz; j++) {
+    for (let i = 0; i < nx; i++) {
+      const x = x0 + i * dx, z = z0 + j * dz, k = j * nx + i;
+      const f = hole.fields(x, z);
+      const own = f.water === w;
+      dW[k] = own ? f.dW : Math.max(f.dW, 2);
+      pos[k * 3] = x; pos[k * 3 + 1] = own ? f.waterLevel : (w.level ?? f.waterLevel); pos[k * 3 + 2] = z;
+      shore[k] = Math.max(0, -dW[k]);
+    }
+  }
+  const idx = [];
+  for (let j = 0; j < nz - 1; j++) {
+    for (let i = 0; i < nx - 1; i++) {
+      const a = j * nx + i, b = a + 1, c = a + nx, d = c + 1;
+      if (Math.min(dW[a], dW[b], dW[c], dW[d]) > 1.6) continue;
+      idx.push(a, c, b, b, c, d);
+    }
+  }
+  if (!idx.length) return null;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('aShore', new THREE.BufferAttribute(shore, 1));
+  const nrm = new Float32Array(nx * nz * 3);
+  for (let k = 0; k < nx * nz; k++) nrm[k * 3 + 1] = 1;
+  g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+  g.setIndex(idx);
+  g.computeBoundingSphere();
+  return g;
 }
 
 function blobOutline(b, k = 1.25, n = 48) {
@@ -125,6 +270,17 @@ export class HoleScene {
     this.quality = opts.quality || 'high';
     const q = this.quality;
     this.step = q === 'low' ? 2.4 : q === 'medium' ? 1.8 : 1.4;
+    // detailed terrain covers the hole plus every pond and creek, so water near
+    // the edge never sits over the coarse far ground
+    const tb = { ...hole.bounds };
+    for (const w of hole.waters) {
+      const pts = w.type === 'creek' ? w.points.map((p) => ({ x: p.x, z: p.z, r: w.half + 8 })) : [{ x: w.x, z: w.z, r: Math.max(w.rx, w.rz) * 1.2 + 8 }];
+      for (const p of pts) {
+        tb.minX = Math.min(tb.minX, p.x - p.r); tb.maxX = Math.max(tb.maxX, p.x + p.r);
+        tb.minZ = Math.min(tb.minZ, p.z - p.r); tb.maxZ = Math.max(tb.maxZ, p.z + p.r);
+      }
+    }
+    this.tb = tb;
     this.build();
   }
 
@@ -158,16 +314,19 @@ export class HoleScene {
     };
 
     // --- main terrain ---
-    const mat = makeTerrainMaterial(style, heading, { ocean: hole.ocean });
+    const crossCut = (hole.course.seed % 3) === 0;
+    const mat = makeTerrainMaterial(style, heading, { ocean: hole.ocean, crossCut });
     this.terrainMat = mat;
-    const tg = gridGeometry(hole, b.minX, b.minZ, b.maxX, b.maxZ, this.step, (x, z, f) => hole.heightFromFields(x, z, f) - 0.35 * patchMask(x, z));
+    const shade = treeShadeFn(hole, this.opts.sunDir || new THREE.Vector3(0.3, 0.7, -0.4).normalize());
+    const tb = this.tb;
+    const tg = gridGeometry(hole, tb.minX, tb.minZ, tb.maxX, tb.maxZ, this.step, (x, z, f) => hole.heightFromFields(x, z, f) - 0.35 * patchMask(x, z), null, shade);
     const terrain = new THREE.Mesh(tg, mat);
     terrain.receiveShadow = shadows;
     this.group.add(terrain);
 
-    const pmat = makeTerrainMaterial(style, heading, { ocean: hole.ocean, polygonOffset: true });
+    const pmat = makeTerrainMaterial(style, heading, { ocean: hole.ocean, polygonOffset: true, crossCut });
     for (const p of patches) {
-      const pg = gridGeometry(hole, p.cx - p.R, p.cz - p.R, p.cx + p.R, p.cz + p.R, p.step);
+      const pg = gridGeometry(hole, p.cx - p.R, p.cz - p.R, p.cx + p.R, p.cz + p.R, p.step, null, null, shade);
       const m = new THREE.Mesh(pg, pmat);
       m.receiveShadow = shadows;
       this.group.add(m);
@@ -178,50 +337,25 @@ export class HoleScene {
 
     // --- water ---
     const wcol = new THREE.Color(style.colors.water);
-    const wmat = waterMaterial(wcol, this.uniforms);
+    this.uniforms.uWave = { value: 1 };
+    const wmat = waterMaterial(wcol, this.uniforms, { simple: this.quality === 'low' });
     for (const w of hole.waters) {
-      let geo;
-      if (w.type === 'creek') {
-        const pts = w.points;
-        const posArr = [];
-        for (let i = 0; i < pts.length; i++) {
-          const a = pts[Math.max(0, i - 1)], c = pts[Math.min(pts.length - 1, i + 1)];
-          let dx = c.x - a.x, dz = c.z - a.z;
-          const l = Math.hypot(dx, dz) || 1;
-          dx /= l; dz /= l;
-          const hw = w.half + 3;
-          const lv = w.levels ? w.levels[i] : w.level;
-          posArr.push(pts[i].x - dz * hw, lv, pts[i].z + dx * hw, pts[i].x + dz * hw, lv, pts[i].z - dx * hw);
-        }
-        const idx = [];
-        for (let i = 0; i < pts.length - 1; i++) {
-          const a = i * 2;
-          idx.push(a, a + 2, a + 1, a + 1, a + 2, a + 3);
-        }
-        geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.Float32BufferAttribute(posArr, 3));
-        geo.setIndex(idx);
-        geo.computeVertexNormals();
-        // make sure normals face up
-        const nArr = geo.attributes.normal.array;
-        for (let i = 0; i < nArr.length; i += 3) { nArr[i] = 0; nArr[i + 1] = 1; nArr[i + 2] = 0; }
-      } else {
-        geo = new THREE.ShapeGeometry(blobOutline(w, 1.3), 1);
-        geo.rotateX(-Math.PI / 2);
-        geo.translate(0, w.level, 0);
-      }
+      const geo = waterGrid(hole, w, this.quality === 'low' ? 2.2 : w.type === 'creek' ? 0.8 : 1.0);
+      if (!geo) continue;
       const m = new THREE.Mesh(geo, wmat);
       m.receiveShadow = shadows;
       this.group.add(m);
     }
     if (this.seaLevel !== undefined) {
-      const sea = new THREE.Mesh(new THREE.PlaneGeometry(12000, 12000, 1, 1).rotateX(-Math.PI / 2), waterMaterial(new THREE.Color(style.colors.water).lerp(new THREE.Color('#1c5f7a'), 0.4), this.uniforms));
+      const sg = new THREE.PlaneGeometry(12000, 12000, 1, 1).rotateX(-Math.PI / 2);
+      sg.setAttribute('aShore', new THREE.BufferAttribute(new Float32Array(sg.attributes.position.count).fill(40), 1));
+      const sea = new THREE.Mesh(sg, waterMaterial(new THREE.Color(style.colors.water).lerp(new THREE.Color('#1c5f7a'), 0.4), this.uniforms, { simple: this.quality === 'low' }));
       sea.position.set((b.minX + b.maxX) / 2, this.seaLevel, (b.minZ + b.maxZ) / 2);
       this.group.add(sea);
     }
 
     // --- trees ---
-    this.group.add(buildTrees(hole.trees, { shadows }));
+    this.group.add(buildTrees(hole.trees, { shadows, cards: this.quality !== 'low', coverage: this.quality === 'high', detail: this.quality === 'high' ? 1 : 0.65 }));
     this.buildBackgroundTrees();
 
     // --- scenery ring ---
@@ -238,6 +372,12 @@ export class HoleScene {
 
     // --- surroundings ---
     this.group.add(buildGroundCover(hole, this.quality));
+    if (this.quality !== 'low') {
+      this.grass = new GrassField(hole, { quality: this.quality });
+      const t = hole.teeSpot();
+      this.grass.place(t.x, t.z);
+      this.group.add(this.grass.mesh);
+    }
     const path = buildCartPath(hole);
     if (path) this.group.add(path);
     this.group.add(buildTeeFurniture(hole));
@@ -288,7 +428,7 @@ export class HoleScene {
 
   buildFarGround(mat, shadows) {
     const hole = this.hole;
-    const b = hole.bounds;
+    const b = this.tb;
     const style = hole.style;
     const cx = (b.minX + b.maxX) / 2, cz = (b.minZ + b.maxZ) / 2;
     const S = 2600;
@@ -318,7 +458,12 @@ export class HoleScene {
       return h;
     };
     // Only a ring around the playable area: inside it the detailed terrain rules
-    const skip = (x, z) => Math.min(x - b.minX, b.maxX - x, z - b.minZ, b.maxZ - z) > 70;
+    // and never over a pond or creek, where its coarse triangles would poke
+    // up through the water
+    const skip = (x, z) => {
+      const inside = Math.min(x - b.minX, b.maxX - x, z - b.minZ, b.maxZ - z);
+      return inside > 70 || (inside > 0 && hole.fields(x, z).dW < 36);
+    };
     const geo = gridGeometry(hole, cx - S, cz - S, cx + S, cz + S, this.quality === 'low' ? 60 : 40, farH, skip);
     const m = new THREE.Mesh(geo, mat);
     m.receiveShadow = false;
@@ -350,7 +495,8 @@ export class HoleScene {
       if (this.seaLevel !== undefined && y < this.seaLevel + 1.5) continue;
       out.push({ x, y, z, kind: rng.pick(kinds), sc: rng.float(0.8, 1.3) });
     }
-    this.group.add(buildTrees(out, { shadows: false }));
+    // far away, so crowns built from fewer, bigger cards look the same
+    this.group.add(buildTrees(out, { shadows: false, cards: this.quality !== 'low', coverage: this.quality === 'high', detail: this.quality === 'high' ? 0.6 : 0.45 }));
   }
 
   buildScenery() {
@@ -397,15 +543,16 @@ export class HoleScene {
     geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
     geo.setIndex(idx);
     geo.computeVertexNormals();
-    // Distance haze is baked into the colors so the far ranges keep their
-    // shape instead of fading into a flat pale wall
+    // A little haze is baked into the colors; the atmosphere adds the rest,
+    // thinning with height so the peaks keep their shape (and fog or rain
+    // hide the ranges altogether)
     const haze = new THREE.Color(hole.style.fog || '#c3d3e0');
     const ca = geo.attributes.color;
     for (let i = 0; i < ca.count; i++) {
-      const c = new THREE.Color(ca.getX(i), ca.getY(i), ca.getZ(i)).lerp(haze, 0.32);
+      const c = new THREE.Color(ca.getX(i), ca.getY(i), ca.getZ(i)).lerp(haze, 0.14);
       ca.setXYZ(i, c.r, c.g, c.b);
     }
-    const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide, fog: false }));
+    const m = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({ vertexColors: true, side: THREE.DoubleSide }));
     this.group.add(m);
   }
 
@@ -678,6 +825,8 @@ export class HoleScene {
 
   update(dt, wind) {
     this.uniforms.uTime.value += dt;
+    // waves grow with the wind
+    if (this.uniforms.uWave) this.uniforms.uWave.value += (0.55 + Math.min(1.6, Math.hypot(wind.x, wind.z) * 0.14) - this.uniforms.uWave.value) * Math.min(1, dt);
     TREE_UNIFORMS.uTime.value += dt;
     TREE_UNIFORMS.uWind.value.set(wind.x, wind.z);
     for (const b of this.birds || []) b.update(dt);

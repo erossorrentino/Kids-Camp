@@ -350,6 +350,7 @@ export class RoundController {
     this.forceClub = false;
     if (this.mode && this.mode.prepare) this.mode.prepare(this);
     this.aimDefault();
+    this.world.grassAt(b.x, b.z);
     // the caddie rakes the bunker you just played from; then, if you're in
     // the sand, walk in and dig your feet in
     this.world.sand.rakeAll(h);

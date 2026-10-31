@@ -27,6 +27,29 @@ function setup() {
   cam = new THREE.PerspectiveCamera(22, 1, 0.01, 10);
 }
 
+// A photo studio for the metal to reflect: a soft grey room with a big light
+// overhead and a strip light to one side
+function studioEnv(renderer) {
+  const room = new THREE.Scene();
+  const sphere = new THREE.Mesh(new THREE.SphereGeometry(5, 32, 16), new THREE.ShaderMaterial({
+    side: THREE.BackSide,
+    vertexShader: 'varying vec3 vD; void main(){ vD = normalize(position); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+    fragmentShader: `varying vec3 vD; void main(){
+      float y = vD.y;
+      vec3 c = mix(vec3(0.16, 0.17, 0.18), vec3(0.55, 0.58, 0.62), smoothstep(-0.4, 0.3, y));
+      c += vec3(3.2) * smoothstep(0.82, 0.9, y);
+      c += vec3(2.2, 2.3, 2.5) * smoothstep(0.86, 0.92, dot(vD, normalize(vec3(-1.0, 0.25, 0.6)))) ;
+      gl_FragColor = vec4(c, 1.0);
+    }`,
+  }));
+  room.add(sphere);
+  const pm = new THREE.PMREMGenerator(renderer);
+  const env = pm.fromScene(room, 0.02).texture;
+  pm.dispose();
+  sphere.geometry.dispose(); sphere.material.dispose();
+  return env;
+}
+
 // Where to look and how far back to stand for each kind of head
 // (heights are above the ground; the ball centre sits BALL_Y up)
 const FRAME = {
@@ -44,7 +67,7 @@ export function clubShot(renderer, spec, { w = 240, h = 150 } = {}) {
   const k = JSON.stringify([spec, w, h]);
   if (cache.has(k)) return cache.get(k);
   if (!renderer || (renderer.getContext && renderer.getContext().isContextLost())) return '';
-  if (!scene) setup();
+  if (!scene) { setup(); scene.environment = studioEnv(renderer); }
   const S = 2;
   const W = w * S, H = h * S;
   if (!rt || rt.width !== W || rt.height !== H) {

@@ -3,9 +3,63 @@
 import * as THREE from '../../vendor/three.module.min.js';
 import { BALL_R } from '../sim/physics.js';
 
+// A normal map of the ball's dimples: a staggered grid of shallow cups laid
+// over the sphere's UVs (about 36 round the middle and 18 pole to pole)
+let dimpleTex = null;
+function dimpleMap() {
+  if (dimpleTex) return dimpleTex;
+  const W = 512, H = 256, cols = 36, rows = 18;
+  const cw = W / cols, ch = H / rows, R = Math.min(cw, ch) * 0.47;
+  const cv = document.createElement('canvas');
+  cv.width = W; cv.height = H;
+  const g = cv.getContext('2d');
+  const img = g.createImageData(W, H);
+  for (let y = 0; y < H; y++) {
+    const row = Math.floor(y / ch);
+    // dimples crowd together toward the poles of the UV sphere, so thin them
+    const lat = Math.abs((y + 0.5) / H - 0.5) * Math.PI;
+    const squeeze = Math.max(0.25, Math.cos(lat));
+    for (let x = 0; x < W; x++) {
+      let nx = 0, ny = 0;
+      for (const r of [row - 1, row, row + 1]) {
+        const cy = (r + 0.5) * ch;
+        const off = (r & 1) ? cw / 2 : 0;
+        const cx = Math.round((x - off) / cw) * cw + off;
+        for (const c of [cx - cw, cx, cx + cw]) {
+          const dx = ((x - c) * squeeze) / R, dy = (y - cy) / R;
+          const d2 = dx * dx + dy * dy;
+          if (d2 < 1) { const k = 0.85 / Math.sqrt(1.05 - d2); nx = -dx * k; ny = -dy * k; }
+        }
+      }
+      const l = Math.hypot(nx, ny, 1);
+      const i = (y * W + x) * 4;
+      img.data[i] = (nx / l * 0.5 + 0.5) * 255;
+      img.data[i + 1] = (-ny / l * 0.5 + 0.5) * 255;
+      img.data[i + 2] = (1 / l * 0.5 + 0.5) * 255;
+      img.data[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  dimpleTex = new THREE.CanvasTexture(cv);
+  dimpleTex.wrapS = THREE.RepeatWrapping;
+  dimpleTex.anisotropy = 4;
+  return dimpleTex;
+}
+
+// Glossy cover over a dimpled ball (the dimples catch the light up close);
+// a plain shaded ball on low quality
+export function ballMaterial(pbr) {
+  if (!pbr) return new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x222222 });
+  return new THREE.MeshPhysicalMaterial({
+    color: 0xffffff, roughness: 0.42, metalness: 0, emissive: 0x000000,
+    normalMap: dimpleMap(), normalScale: new THREE.Vector2(0.9, 0.9),
+    clearcoat: 1, clearcoatRoughness: 0.1, clearcoatNormalMap: dimpleMap(), clearcoatNormalScale: new THREE.Vector2(0.35, 0.35),
+  });
+}
+
 export class Ball {
-  constructor() {
-    this.mesh = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, 16, 12), new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x222222 }));
+  constructor({ pbr = false } = {}) {
+    this.mesh = new THREE.Mesh(new THREE.SphereGeometry(BALL_R, pbr ? 32 : 16, pbr ? 20 : 12), ballMaterial(pbr));
     this.mesh.castShadow = true;
     this.shadow = new THREE.Mesh(new THREE.CircleGeometry(BALL_R * 1.1, 16).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.35, depthWrite: false }));
   }
@@ -335,12 +389,12 @@ function pillTexture(text, color) {
 }
 
 export class BallMarkers {
-  constructor(max = 14) {
+  constructor(max = 14, { pbr = false } = {}) {
     this.group = new THREE.Group();
     this.items = [];
     this.max = max;
-    this.ballGeo = new THREE.SphereGeometry(BALL_R, 12, 8);
-    this.ballMat = new THREE.MeshLambertMaterial({ color: 0xffffff, emissive: 0x222222 });
+    this.ballGeo = new THREE.SphereGeometry(BALL_R, pbr ? 24 : 12, pbr ? 16 : 8);
+    this.ballMat = ballMaterial(pbr);
     this.tmp = new THREE.Vector3();
   }
   addTo(scene) { scene.add(this.group); }

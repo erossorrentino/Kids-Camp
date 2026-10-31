@@ -192,6 +192,51 @@ you want to move on.
   hurries her ducklings away across the water, rabbits bolt for cover and
   squirrels run up the far side of a tree.
 
+## Graphics
+
+- **Film-style rendering** (`src/render/post.js`): the scene is drawn in
+  high dynamic range with multisampled edges, then bright things (the sun
+  on the water, floodlights, the ball under the lights) bloom softly,
+  ACES tone mapping rolls off the highlights the way a camera does, and a
+  light colour grade, vignette and dither finish the frame. Looking toward
+  the sun adds a glare that fades when trees or hills block it.
+- **A physical sky** (`src/render/sky.js`): the sky colour comes from a
+  model of how sunlight scatters in the air (deep blue overhead, pale at the
+  horizon, orange and pink at sunset), with drifting clouds lit from the
+  sun's side, a moon and stars at night. The sunlight colour, the fill
+  light from the sky, the haze and the camera's exposure are all worked out
+  from that same model, so the course is lit the way the sky looks, and the
+  sky is reflected in water and polished metal.
+- **Air you can see** (`src/render/atmosphere.js`): distant hills, trees and
+  mountains fade into haze that is thicker low down and glows toward the
+  sun; fog and rain close it right in. Cloud shadows drift across the
+  course with the wind.
+- **Grass** (`src/render/terrainMaterial.js`, `src/render/grass.js`):
+  fairways show light and dark mowing stripes that swap as you look up or
+  down them (some courses cut a criss-cross), with fine turf detail, a
+  sheen at low angles, soft shade under trees and dark ground beneath
+  their canopies. Round the ball, thousands of real 3D blades grow from the
+  ground: a fine fuzz on the fairway, thicker first cut, long rough,
+  waist-high fescue on links courses and heather on heathland. They sway in
+  the wind, and your ball sits down in the rough but stays in sight.
+- **Trees with leaves** (`src/render/foliage.js`, `src/render/trees.js`):
+  oak, birch, pine, cypress, palm and bush crowns are built from hundreds of
+  leaf cards (broad leaves, small leaves, pine needle sprays, palm fronds)
+  that let the light through, flutter in the wind and cast dappled
+  shadows. Far trees use fewer, bigger cards so the forest to the horizon
+  stays full.
+- **Water** (`src/render/holeScene.js`): ponds, creeks and the sea mirror the
+  sky and the banks, ripple with waves that grow with the wind, sparkle
+  where the sun hits them, show lighter shallows near the shore and a
+  broken line of foam where they meet the land.
+- **Materials**: a glossy, dimpled ball; club heads in polished and
+  brushed metal with painted crowns and rubber grips (the store's pictures
+  are shot in a photo studio); cloth and skin on the golfer and caddie that
+  pick up soft light from the sky.
+- **Quality levels**: High (everything, 4x multisampling), Medium (lighter
+  trees and grass, 2x multisampling) and Low (simple trees and water, no
+  effects pass) for older phones.
+
 ## Mini-games
 
 **Mini-games** on the title screen (`src/game/minigames.js`) put you
@@ -314,7 +359,7 @@ their own rows in portrait, one row along the bottom in landscape), the
 camera widens on tall screens so your golfer and the target both fit, and
 the swing's pull-down shortens to the room left below your finger.
 Graphics default to **Low** on phones (fewer spectators, no shadows,
-lighter resolution), and if the frame rate still drops the game lowers
+simple trees and water, lighter resolution), and if the frame rate still drops the game lowers
 its resolution on its own. If the phone takes the 3D view away (low
 memory, switching apps) the game says so, saves, and picks back up; if
 anything goes wrong it shows a card with a way out instead of a blank
@@ -348,8 +393,10 @@ golf/
                                  mini-games, multiplayer, weather, replays, rival,
                                  sponsors, daily challenge, Legends Cup,
                                  commentary, caddie tips
-    render/                      world, terrain shader, trees, decor, golfer, effects,
-                                 wildlife, targets, prize cars, trophy cabinet
+    render/                      world, terrain shader, sky, atmosphere, post effects,
+                                 trees and leaf cards, grass blades, decor, golfer,
+                                 clubs, effects, wildlife, targets, prize cars,
+                                 trophy cabinet
     ui/                          HUD, swing input, menu, tournament and mode screens
   tools/
     tune_physics.mjs             fits drag/lift to tour data (--search)
