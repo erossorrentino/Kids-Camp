@@ -338,6 +338,31 @@ function putterHead(metal, paint, o) {
   const face = o.face || head;
   const accent = o.accent || '#f4f4f0';
   const u = addressDir(o.lie);
+  if (o.style === 'twodisc') {
+    // a big rounded mallet with two white discs lined up behind the face
+    const W = 0.104, Dp = 0.092, Hh = 0.024;
+    const shape = new THREE.Shape();
+    shape.moveTo(-W / 2, 0);
+    shape.lineTo(W / 2, 0);
+    shape.bezierCurveTo(W / 2 + 0.002, Dp * 0.5, W * 0.3, Dp, 0, Dp);
+    shape.bezierCurveTo(-W * 0.3, Dp, -W / 2 - 0.002, Dp * 0.5, -W / 2, 0);
+    const g = new THREE.ExtrudeGeometry(shape, { depth: Hh, bevelEnabled: true, bevelThickness: 0.002, bevelSize: 0.002, bevelSegments: 3, curveSegments: 14 });
+    g.rotateX(Math.PI / 2);
+    g.translate(0, Hh + 0.002, 0);
+    metal.add(g, head);
+    // milled face insert
+    metal.add(new THREE.BoxGeometry(W * 0.72, Hh * 0.72, 0.0016).translate(0, Hh * 0.52, -0.0014), face);
+    // the two discs, ball-sized, with a sight line through them
+    for (const z of [0.03, 0.066]) paint.add(new THREE.CylinderGeometry(0.0168, 0.0168, 0.0012, 24).translate(0, Hh + 0.0026, z), accent);
+    paint.add(new THREE.BoxGeometry(0.0022, 0.0008, 0.016).translate(0, Hh + 0.0028, 0.008), accent);
+    // double-bend shaft into the heel
+    const hb = new THREE.Vector3(-0.03, Hh + 0.002, 0.012);
+    const bend = hb.clone().add(new THREE.Vector3(0.006, 0.045, -0.004));
+    metal.add(tube(hb, bend, 0.0046, 0.0046, 10), '#d5d9de');
+    const top = bend.clone().addScaledVector(u, 0.022);
+    metal.add(tube(bend, top, 0.0046, 0.0047, 10), '#d5d9de');
+    return { shift: new THREE.Vector3(0, -BALL_Y, faceShift(3)), hosel: top };
+  }
   if (o.style === 'mallet') {
     // a fang mallet: rounded back with two wings and a slot between
     const W = 0.098, Dp = 0.058, Hh = 0.024;

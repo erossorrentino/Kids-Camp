@@ -163,6 +163,8 @@ function turfCOR(vn) {
  *   rolling: start in rolling mode (putts)
  *   rng: function returning 0..1 (for tree deflections, lip-outs)
  *   pinIn: flagstick in the hole
+ *   magnet: a rolling ball is steered onto the line to the cup at a pace
+ *     that just gets it there, and always drops (a special player's putts)
  */
 export function simulate(o) {
   const env = o.env;
@@ -408,6 +410,21 @@ export function simulate(o) {
           v.x -= (v.x / speed) * dv; v.y -= (v.y / speed) * dv; v.z -= (v.z / speed) * dv;
         }
       }
+      if (o.magnet && cup) {
+        // curl onto the line to the cup, never stopping short or racing past
+        const dx = cup.x - p.x, dz = cup.z - p.z;
+        const dc = Math.hypot(dx, dz);
+        const hs = Math.hypot(v.x, v.z);
+        if (dc > 1e-4) {
+          const lo = Math.sqrt(2 * decel * dc) + 0.15, hi = Math.sqrt(2 * decel * (dc + 0.3)) + 0.3;
+          const want = Math.min(hi, Math.max(lo, hs));
+          const k = Math.min(1, dt * (dc < 2 ? 9 : 3));
+          let ux = hs > 1e-6 ? v.x / hs : dx / dc, uz = hs > 1e-6 ? v.z / hs : dz / dc;
+          ux += (dx / dc - ux) * k; uz += (dz / dc - uz) * k;
+          const ul = Math.hypot(ux, uz) || 1;
+          v.x = (ux / ul) * want; v.z = (uz / ul) * want;
+        }
+      }
       const px = p.x, pz = p.z;
       p.x += v.x * dt;
       p.z += v.z * dt;
@@ -437,7 +454,7 @@ export function simulate(o) {
             const lineD = hs > 1e-6 ? Math.abs((v.x * (cup.z - p.z) - v.z * (cup.x - p.x)) / hs) : d;
             const chord = 2 * Math.sqrt(Math.max(0, CUP_R * CUP_R - lineD * lineD));
             const vMax = chord / Math.sqrt((2 * BALL_R) / G);
-            if (hs < vMax || (hs < vMax * 1.2 && rng() < 0.3)) {
+            if (o.magnet || hs < vMax || (hs < vMax * 1.2 && rng() < 0.3)) {
               outcome = 'holed';
               p.x = cup.x; p.z = cup.z; p.y = cup.y - 0.05;
               events.push({ type: 'holed', t, x: p.x, y: p.y, z: p.z });

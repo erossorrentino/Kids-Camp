@@ -91,8 +91,8 @@ function pickTraits(rng, stats, arch, rankFrac) {
   if (arch === 'legend' && rng.chance(0.6)) want(rng.pick(['clutch', 'iceman', 'manager', 'windw']), adv);
   if (arch === 'grinder' && rng.chance(0.6)) want(rng.pick(['manager', 'bounce', 'lag']), adv);
 
-  const advPool = TRAIT_IDS.filter((t) => TRAITS[t].kind === 'adv');
-  const disPool = TRAIT_IDS.filter((t) => TRAITS[t].kind === 'dis');
+  const advPool = TRAIT_IDS.filter((t) => TRAITS[t].kind === 'adv' && !TRAITS[t].special);
+  const disPool = TRAIT_IDS.filter((t) => TRAITS[t].kind === 'dis' && !TRAITS[t].special);
   // Better players: more strengths, fewer weaknesses
   const extraAdv = rankFrac < 0.1 ? 2 : rankFrac < 0.4 ? 1 : rng.chance(0.6) ? 1 : 0;
   const extraDis = rankFrac < 0.05 ? (rng.chance(0.4) ? 1 : 0) : rankFrac < 0.4 ? 1 : rng.chance(0.7) ? 2 : 1;

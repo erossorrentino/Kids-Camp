@@ -40,6 +40,9 @@ export const TRAITS = {
   blowup:    { name: 'Blow-Up Prone', kind: 'dis', desc: 'Double bogeys sneak onto the card', fx: { blowup: 1.6 } },
   threeputt: { name: 'Three-Putt Risk', kind: 'dis', desc: 'Lag putts finish well past or short', fx: { lag: 1.5 } },
   fastfear:  { name: 'Fast Green Fear', kind: 'dis', desc: 'Putting suffers when greens run fast', fx: { fastGreens: 1 } },
+  // ---- special players only (never handed out to tour pros) ----
+  slapshot:  { name: 'Slapshot Drive', kind: 'adv', special: true, desc: 'Takes a running start: woods fly about 480 yds and dead straight', fx: { driveYds: 150, speedDrive: 2.15, driverErr: 0.25, dispersion: 0.6, runup: 1 } },
+  oneputt:   { name: 'One-Putt Wonder', kind: 'adv', special: true, desc: 'Every putt drops, from anywhere on the green', fx: { holeEvery: 1, puttOdds: 3 } },
 };
 
 export const TRAIT_IDS = Object.keys(TRAITS);
@@ -51,7 +54,7 @@ export function traitEffects(ids = []) {
     scramble: 0, chipErr: 1, bunker: 1, puttOdds: 1, puttPreview: 1, pressure: 0, wind: 1,
     bounceBack: 0, streak: 0, styleBonus: {}, home: 0, spinMult: 1, dispersion: 1, rough: 1,
     par5: 0, blowup: 1, lag: 1, lateFade: 0, shortPuttMiss: 0, yips: 0, hotHead: 0,
-    slowStart: 0, shapeBias: 0, fastGreens: 0,
+    slowStart: 0, shapeBias: 0, fastGreens: 0, runup: 0, holeEvery: 0,
   };
   const mult = new Set(['speedDrive', 'driverErr', 'ironProx', 'ironErr', 'chipErr', 'bunker', 'puttOdds', 'puttPreview', 'wind', 'spinMult', 'dispersion', 'rough', 'blowup', 'lag']);
   for (const id of ids) {

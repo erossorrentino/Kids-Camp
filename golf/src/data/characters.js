@@ -88,6 +88,15 @@ export const CHARACTERS = [
     boost: { power: 10, accuracy: 10, irons: 10, shortGame: 10, putting: 10, recovery: 8, mental: 8, wind: 8, consistency: 10 }, all: 30, abilities: ['striker', 'darts', 'putter'],
     look: { gender: 'm', shirt: '#ffffff', pattern: 'hoops', accent: '#f2c230', pants: '#ffffff', hat: 'cap', cap: '#f2c230', hairStyle: 'short', hair: '#e8d9a8', shades: true, skin: '#e8b996', glove: '#f2c230', shoe: '#f2c230', belt: '#f2c230' },
   },
+  {
+    // a hockey player who runs at the ball and slaps it, and putts with his
+    // two-disc mallet (`putter` is the head he always uses)
+    id: 'sully', name: 'Slapshot Sully', tier: 'legend', price: 50000,
+    tagline: 'Hockey player. Runs at the ball, drives the green, never two-putts.',
+    boost: { power: 15, putting: 15 }, all: 20, abilities: ['slapshot', 'oneputt'],
+    putter: { style: 'twodisc', head: '#1b1c20', face: '#9aa0a8', accent: '#ffffff' },
+    look: { gender: 'm', shirt: '#c8102e', pattern: 'hoops', accent: '#ffffff', pants: '#3a4a6b', hat: 'none', hairStyle: 'short', hair: '#6b4a2e', beard: 'stubble', skin: '#f0c8a8', glove: '#ffffff', shoe: '#1d1d1d', belt: '#1d1d1d' },
+  },
 ];
 
 export const CHAR_BY_ID = Object.fromEntries(CHARACTERS.map((c) => [c.id, c]));
@@ -138,7 +147,7 @@ export function playAs(g) {
   const stats = { ...g.stats };
   for (const k of Object.keys(stats)) stats[k] = Math.min(99, stats[k] + charBoostOf(ch, k));
   const traits = [...new Set([...(g.traits || []), ...ch.abilities])];
-  return { ...g, stats, traits, look: { ...ch.look }, gender: ch.look.gender, charName: ch.name };
+  return { ...g, stats, traits, look: { ...ch.look }, gender: ch.look.gender, charName: ch.name, charPutter: ch.putter || null };
 }
 
 // A character lifts every skill by `all`, and their signature skills by more

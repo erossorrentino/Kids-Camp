@@ -486,11 +486,20 @@ export class RoundController {
     this.updatePrediction();
   }
 
+  // A golfer with the running-start swing uses it for full shots (not
+  // putts, wedges or bunker shots)
+  runupShot() {
+    return this.fx.runup > 0 && !this.putting && this.lie !== 'bunker' && CLUB_BY_ID[this.club].kind !== 'wedge';
+  }
+
   updateGolfer() {
     const g = this.world.golfer;
     const c = CLUB_BY_ID[this.club];
     const model = gearFor(this.bag, this.club);
-    g.setClub(c.kind, c.length, model.look, { id: c.id, loft: loftOf(model, c.id, c.loft), bounce: bounceOf(model, c.id) });
+    // a special player may always putt with their own putter
+    const look = c.kind === 'putter' && this.golfer.charPutter ? this.golfer.charPutter : model.look;
+    g.setClub(c.kind, c.length, look, { id: c.id, loft: loftOf(model, c.id, c.loft), bounce: bounceOf(model, c.id) });
+    g.runup = this.runupShot();
     g.placeAt(this.ballPos, this.heading);
     g.address();
     const cad = this.world.caddie;
@@ -498,6 +507,31 @@ export class RoundController {
   }
 
   shotInput(power) {
+    return this.rawInput(this.drivePower(power));
+  }
+
+  // A slapshot drive at a green it can reach is hit just hard enough to get
+  // there: a full swing runs out by the pin instead of flying the green
+  drivePower(power) {
+    if (!(this.fx.runup > 0) || this.putting || this.lie !== 'tee' || this.hole.par < 4 || CLUB_BY_ID[this.club].kind !== 'wood') return power;
+    const b = this.ballPos;
+    // worked out once per club and tee spot (it barely changes as you aim)
+    const key = `${this.club}:${b.x.toFixed(1)}:${b.z.toFixed(1)}:${this.hole.index}`;
+    if (this.fitKey !== key) {
+      this.fitKey = key;
+      this.fitPower = null;
+      const dist = this.distToPin;
+      const total = (p) => predictShot(this.hole, this.env, b, this.heading, this.rawInput(p), true).total;
+      if (total(1) > dist) {
+        let lo = 0.2, hi = 1;
+        for (let i = 0; i < 7; i++) { const m = (lo + hi) / 2; if (total(m) > dist) hi = m; else lo = m; }
+        this.fitPower = (lo + hi) / 2;
+      }
+    }
+    return this.fitPower != null ? Math.min(power, this.fitPower) : power;
+  }
+
+  rawInput(power) {
     const b = this.ballPos;
     return {
       clubId: this.club, power, stats: this.golfer.stats, fx: this.fx, ball: this.ball, aero: this.aero, gear: gearFor(this.bag, this.club),
@@ -556,7 +590,9 @@ export class RoundController {
     // At rest, preview the pace that would roll to the hole; while dragging, the actual pace
     const pw = this.dragging ? power : Math.min(1, (dist + 0.35) / this.puttScale);
     const pt = computePutt({ power: pw, scale: this.puttScale, stimp: this.cond.stimp, heading: this.heading, stats: this.golfer.stats, fx: this.fx, ball: this.ball, gear: gearFor(this.bag, 'PT'), devDeg: 0, noRandom: true, distToPin: dist });
-    const r = simulate({ pos: { x: b.x, y: b.y + BALL_R, z: b.z }, vel: pt.vel, rolling: true, env: { ...this.env, cup: null }, maxTime: 20 });
+    // a player whose putts always drop sees the line curl into the cup
+    const magnet = this.fx.holeEvery > 0;
+    const r = simulate({ pos: { x: b.x, y: b.y + BALL_R, z: b.z }, vel: pt.vel, rolling: true, env: magnet ? this.env : { ...this.env, cup: null }, maxTime: 20, magnet });
     const S = r.samples;
     const pts = [];
     let travelled = 0;
@@ -614,8 +650,10 @@ export class RoundController {
       // a short landscape phone: tilt down a little so the ball clears the HUD
       const short = !tall && window.innerHeight < 540;
       const mc = this.mode && this.mode.cam;
-      const back = mc ? mc.back + (tall ? 1.5 : 0) : tall ? 5 : 3.7, side = mc ? mc.side : tall ? -0.2 : 0.55;
-      const up = mc ? mc.up + (tall ? 0.5 : 0) : tall ? 2.1 : 1.75;
+      // further back for a running start, so the whole run is in view
+      const run = !mc && this.runupShot();
+      const back = mc ? mc.back + (tall ? 1.5 : 0) : run ? (tall ? 7.5 : 6.4) : tall ? 5 : 3.7, side = mc ? mc.side : run ? -0.4 : tall ? -0.2 : 0.55;
+      const up = mc ? mc.up + (tall ? 0.5 : 0) : run ? (tall ? 2.8 : 2.4) : tall ? 2.1 : 1.75;
       w.setCamera(V(b.x - f.x * back + r.x * side, gy + up, b.z - f.z * back + r.z * side), V(b.x + f.x * lookD, lookY - (short ? 0.12 * lookD : 0), b.z + f.z * lookD), short ? 54 : 50, fast ? 10 : 3.5);
     }
     w.focus.set(b.x, gy, b.z);
@@ -737,6 +775,12 @@ export class RoundController {
     const sens = this.app.settings.swingSens || 1;
     const dev = devDeg * sens;
     const toImpact = this.world.golfer.swing(power, () => this.launchShot(power, dev, tempo, c));
+    if (this.world.golfer.runup) {
+      // watch the running start side-on, from across the ball (ahead of the caddie)
+      const b = this.ballPos, f = fwdOf(this.heading), r = rightOf(this.heading);
+      const gy = this.hole.heightAt(b.x, b.z);
+      this.world.setCamera(V(b.x + r.x * 4.3 + f.x * 1.0, gy + 1.5, b.z + r.z * 4.3 + f.z * 1.0), V(b.x - r.x * 0.9 - f.x * 1.5, gy + 0.9, b.z - r.z * 0.9 - f.z * 1.5), 52, 5);
+    }
     if (!this.putting) sfx.whoosh(power, toImpact);
   }
 
@@ -751,7 +795,7 @@ export class RoundController {
     if (this.putting) {
       this.putts++;
       const pt = computePutt({ power, scale: this.puttScale, stimp: this.cond.stimp, heading: this.heading, stats: this.golfer.stats, fx: this.fx, ball: this.ball, gear: gearFor(this.bag, 'PT'), devDeg: dev, distToPin: this.distToPin, pressure, rng: this.rand });
-      res = simulate({ pos: { x: b.x, y: b.y + BALL_R, z: b.z }, vel: pt.vel, rolling: true, env: this.env, rng: this.rand, pinIn: false });
+      res = simulate({ pos: { x: b.x, y: b.y + BALL_R, z: b.z }, vel: pt.vel, rolling: true, env: this.env, rng: this.rand, pinIn: false, magnet: this.fx.holeEvery > 0 });
       launchInfo = { putt: true, speed: pt.v0 };
     } else {
       const inp = { ...this.shotInput(power), devDeg: dev, tempo, pressure, rng: this.rand, heading: this.heading, dispMult: this.dispMult };

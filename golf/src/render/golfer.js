@@ -96,6 +96,19 @@ const FIN_POLE_L = new THREE.Vector3(-0.1, -1, -0.5);
 const FIN_POLE_R = new THREE.Vector3(0.5, -1, 0.1);
 const DOWN = new THREE.Vector3(0, -1, 0);
 const THIGH = 0.45, SHIN = 0.427;
+// The running-start swing: where the golfer backs up to (in his own frame:
+// +x toward the ball, +z away from the target) and which way he faces as he
+// runs back in
+const RUN_FROM = { x: -0.45, z: 3.3 };
+const RUN_YAW = Math.atan2(RUN_FROM.z, -RUN_FROM.x);
+const RUN_LEN = Math.hypot(RUN_FROM.x, RUN_FROM.z);
+// stride phase over the walk back, ending feet apart and flat (ready to sprint)
+const RUN_PH = 7.5 * Math.PI;
+function lerpState(A, B, k) {
+  const out = {};
+  for (const key of Object.keys(A)) out[key] = A[key] + (B[key] - A[key]) * k;
+  return out;
+}
 const shoeEuler = new THREE.Euler();
 const finQ = new THREE.Quaternion();
 
@@ -683,9 +696,19 @@ export class Golfer {
       const hipP = this.root.worldToLocal(this.pelvis.localToWorld(new THREE.Vector3(-0.012, -0.005, leg.side * 0.088)));
       const heel = lead ? 0 : S.heel;
       shoeEuler.set(0, 0.5 * heel, -1.05 * heel);
-      leg.shoe.quaternion.setFromEuler(shoeEuler);
       // pivot about the ball of the foot
       const pivot = new THREE.Vector3(0.13, 0, z);
+      const run = this.runLegs;
+      if (run && run.amp > 0) {
+        // running: the feet swing fore and aft, the back foot lifts and the
+        // toe points down as it pushes off
+        const ph = run.ph + (lead ? 0 : Math.PI);
+        pivot.x += 0.3 * Math.sin(ph) * run.amp;
+        pivot.y += 0.13 * Math.max(0, Math.cos(ph)) * run.amp;
+        pivot.z *= 1 - 0.4 * run.amp;
+        shoeEuler.set(0, 0, 0.5 * Math.min(0, Math.sin(ph)) * run.amp);
+      }
+      leg.shoe.quaternion.setFromEuler(shoeEuler);
       leg.shoe.position.copy(pivot).sub(new THREE.Vector3(0.11, 0, 0).applyQuaternion(leg.shoe.quaternion));
       const ankle = leg.shoe.position.clone().add(new THREE.Vector3(-0.02, 0.09, 0).applyQuaternion(leg.shoe.quaternion));
       // knees flex forward; the lead knee points in behind the ball at the
@@ -783,6 +806,27 @@ export class Golfer {
     this.baseY = ballPos.y;
     this.root.rotation.y = -heading;
     this.heading = heading;
+    this.addr = { x: this.root.position.x, y: ballPos.y, z: this.root.position.z, heading };
+  }
+
+  // Stand somewhere relative to the address spot (lx toward the ball, lz
+  // away from the target), turned by yaw, raised by bob
+  placeRun(lx, lz, yaw = 0, bob = 0) {
+    const a = this.addr;
+    if (!a) return;
+    const c = Math.cos(a.heading), s = Math.sin(a.heading);
+    this.root.position.set(a.x + c * lx - s * lz, a.y + bob, a.z + s * lx + c * lz);
+    this.root.rotation.y = -a.heading + yaw;
+  }
+
+  // The running start: pulling back walks the golfer back up his run with
+  // the club raised (k: 0 at the ball .. 1 at the far end)
+  runPose(k, lift, ph, amp, turn = 1, bob = 0) {
+    const hold = this.swingState('back', 0, 0.85 * lift);
+    hold.hip *= 0.4; hold.turn *= 0.5; hold.bend += 0.08 * amp; hold.drop -= 0.05 * amp;
+    this.st = hold;
+    this.runLegs = { ph, amp };
+    this.placeRun(RUN_FROM.x * k, RUN_FROM.z * k, RUN_YAW * turn, bob);
   }
 
   // Backswing depth follows the player's drag directly (0..1.1)
@@ -791,14 +835,21 @@ export class Golfer {
     this.reaction = null;
     this.top = p;
     this.preK = 0;
-    this.st = this.swingState('back', 0, p);
+    if (this.runup) {
+      const k = smooth(0, 1, Math.min(1, p));
+      this.runK = k;
+      this.runPose(k, Math.min(1, p * 1.6), k * RUN_PH, smooth(0, 0.12, p), smooth(0, 0.3, p));
+    } else {
+      this.runLegs = null;
+      this.st = this.swingState('back', 0, p);
+    }
     this.pose();
   }
 
   // While the player pushes forward, the downswing starts with them: the
   // hips unwind and the arms drop into the slot (f: 0..1 of the push)
   setDownswing(f) {
-    if (this.anim || this.reaction || this.top == null) return;
+    if (this.anim || this.reaction || this.top == null || this.runup) return;
     this.preK = 0.45 * Math.min(1, Math.max(0, f));
     this.st = this.swingState('down', this.preK, this.top);
     this.pose();
@@ -809,6 +860,9 @@ export class Golfer {
     if (this.reaction) { this.reaction = null; this.headGroup.rotation.z = 0; if (this.baseY != null) this.root.position.y = this.baseY; }
     this.top = null;
     this.preK = 0;
+    this.runK = 0;
+    this.runLegs = null;
+    this.placeRun(0, 0);
     this.st = this.swingState('back', 0, 0);
     this.pose();
   }
@@ -821,6 +875,15 @@ export class Golfer {
     const follow = putt ? 0.45 : 0.75;
     // carry on from wherever the forward push already took the downswing
     this.anim = { t: (this.preK || 0) * down, down, follow, top, power, onImpact, impacted: false };
+    if (this.runup && !putt) {
+      // run back in from wherever the pull took him, wind up fully on the
+      // last strides, then let rip
+      const k0 = this.runK || 0;
+      this.anim.t = 0;
+      this.anim.top = Math.max(1, top);
+      this.anim.run = { t: 0, dur: 0.25 + 0.8 * k0, k0, ph: k0 * RUN_PH };
+      return this.anim.run.dur + down;
+    }
     return down - this.anim.t; // seconds until the club meets the ball
   }
 
@@ -835,6 +898,26 @@ export class Golfer {
       return;
     }
     if (!an) return;
+    if (an.run) {
+      const r = an.run;
+      r.t += dt;
+      const u = Math.min(1, r.t / r.dur);
+      const e = u * u * (3 - 2 * u) * 0.35 + u * 0.65;
+      const k = r.k0 * (1 - e);
+      const ph = r.ph + (r.k0 - k) * RUN_LEN * Math.PI / 0.55;
+      const amp = 1 - smooth(0.78, 1, u);
+      const hop = u > 0.72 ? 0.09 * Math.sin(Math.PI * (u - 0.72) / 0.28) : 0;
+      this.runPose(k, 1, ph, amp, 1 - smooth(0.62, 0.96, u), 0.045 * Math.abs(Math.sin(ph)) * amp + hop);
+      // into the full backswing on the last strides
+      this.st = lerpState(this.st, this.swingState('back', 0, an.top), smooth(0.55, 1, u));
+      if (u >= 1) {
+        an.run = null;
+        this.runLegs = null;
+        this.placeRun(0, 0);
+      }
+      this.pose();
+      return;
+    }
     an.t += dt;
     if (an.t < an.down) {
       this.st = this.swingState('down', an.t / an.down, an.top, an.power);

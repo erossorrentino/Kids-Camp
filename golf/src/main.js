@@ -734,7 +734,7 @@ function startTournamentRound() {
     holeList: [...Array(18).keys()],
     startPos: done,
     scores: hp.scores[t.round] || [],
-    golfer: { name: g.name, stats: g.stats, traits: g.traits, ball: g.ball, bag: g.bag, look: { ...g.look, ...sponsorLook(c) }, gender: g.gender, trail: g.trail, ballColor: g.ballColor },
+    golfer: { name: g.name, stats: g.stats, traits: g.traits, ball: g.ball, bag: g.bag, look: { ...g.look, ...sponsorLook(c) }, gender: g.gender, trail: g.trail, ballColor: g.ballColor, charPutter: g.charPutter },
     cond: roundCond(t),
     tournament: t,
     crowd: true,
@@ -952,7 +952,7 @@ function startPlayoff(tied, scores = []) {
     app.screens.hide();
     const g = playAs(c.golfer);
     const round = new RoundController(app, {
-      course, holeList: [17], golfer: { name: g.name, stats: g.stats, traits: g.traits, ball: g.ball, bag: g.bag, look: { ...g.look, ...sponsorLook(c) }, gender: g.gender, trail: g.trail, ballColor: g.ballColor },
+      course, holeList: [17], golfer: { name: g.name, stats: g.stats, traits: g.traits, ball: g.ball, bag: g.bag, look: { ...g.look, ...sponsorLook(c) }, gender: g.gender, trail: g.trail, ballColor: g.ballColor, charPutter: g.charPutter },
       cond: { ...t.cond[t.rounds - 1], seed: mixSeed(t.seed, 'po', scores.length) }, crowd: true,
       onRoundDone: (sc) => { endRound(); startPlayoff(tied, [...scores, sc[17]]); },
     });
@@ -1035,7 +1035,7 @@ function golferFor(proId, ball) {
   }
   if (app.career) {
     const g = playAs(app.career.golfer);
-    return { name: g.name, stats: g.stats, traits: g.traits, ball: ball || g.ball, bag: g.bag, look: { ...g.look, ...sponsorLook(app.career) }, gender: g.gender, trail: g.trail, ballColor: g.ballColor };
+    return { name: g.name, stats: g.stats, traits: g.traits, ball: ball || g.ball, bag: g.bag, look: { ...g.look, ...sponsorLook(app.career) }, gender: g.gender, trail: g.trail, ballColor: g.ballColor, charPutter: g.charPutter };
   }
   const s = { power: 70, accuracy: 70, irons: 70, shortGame: 70, putting: 70, recovery: 70, mental: 70, wind: 70, consistency: 70 };
   return { name: 'Club Pro', stats: s, traits: [], ball: ball || 'tourbal', look: { shirt: '#2a9d8f', pants: '#2b2d42', cap: '#ffffff', skin: '#e8b996' }, gender: 'm' };
@@ -1297,7 +1297,7 @@ function playCup(sim) {
   app.screens.hide();
   const round = new RoundController(app, {
     course, holeList: holes, cond, crowd: true,
-    golfer: { name: g.name, stats: g.stats, traits: g.traits, ball: g.ball, bag: g.bag, look: { ...g.look, ...sponsorLook(c) }, gender: g.gender, trail: g.trail, ballColor: g.ballColor },
+    golfer: { name: g.name, stats: g.stats, traits: g.traits, ball: g.ball, bag: g.bag, look: { ...g.look, ...sponsorLook(c) }, gender: g.gender, trail: g.trail, ballColor: g.ballColor, charPutter: g.charPutter },
     versus: { name: rival.name, id: rival.id, scores },
     onRoundDone: () => {
       const v = round.versus;

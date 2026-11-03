@@ -113,9 +113,13 @@ you want to move on.
   their strengths *and* weaknesses, and their look (they sit out the
   events you play). Search by name, country or trait, sort by rating,
   price or any skill, and show only the ones you can afford; any pro's
-  card in Tour players has a Buy button too. There are also 12 special
+  card in Tour players has a Buy button too. There are also 13 special
   players with no weaknesses, from Birdie Bex ($25K, overall 62) to the
-  Golden Eagle ($40M, overall 96, the best golfer in the game). Switch
+  Golden Eagle ($40M, overall 96, the best golfer in the game). One is
+  **Slapshot Sully** ($50K), a hockey player who takes a running start at
+  every full shot (pull back and he walks back up his run, push and he
+  charges in and slaps it), drives about 480 yds so he can drive the green
+  on par 4s, and holes every putt with his two-disc mallet. Switch
   between the players you own any time; each is shown as a 3D portrait
   rendered by the game. Levels pay a cash bonus toward the next player. Careers saved before this change are set back to the
   standard skills, with any skill points they had paid back in cash.
