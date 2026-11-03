@@ -116,7 +116,8 @@ you want to move on.
   card in Tour players has a Buy button too. There are also 13 special
   players with no weaknesses, from Birdie Bex ($25K, overall 62) to the
   Golden Eagle ($40M, overall 96, the best golfer in the game). One is
-  **Slapshot Sully** ($50K), a hockey player who takes a running start at
+  **Slapshot Sully** ($100M, every skill maxed at 99, plus most of the
+  game's strengths), a hockey player who takes a running start at
   every full shot (pull back and he walks back up his run, push and he
   charges in and slaps it), drives about 480 yds so he can drive the green
   on par 4s, and holes every putt with his two-disc mallet. Switch
