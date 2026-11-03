@@ -91,11 +91,11 @@ export const CHARACTERS = [
   {
     // a hockey player who runs at the ball and slaps it, and putts with his
     // two-disc mallet (`putter` is the head he always uses)
-    id: 'sully', name: 'Slapshot Sully', tier: 'legend', price: 100000000,
+    id: 'sully', name: 'Happy Gilmore', tier: 'legend', price: 100000000,
     tagline: 'Hockey player. Runs at the ball, drives the green, never two-putts. Off the charts.',
     // every skill maxed out, whatever you start from
     boost: { power: 10, putting: 10 }, all: 50, abilities: ['slapshot', 'oneputt', 'striker', 'darts', 'magician', 'sand', 'rough', 'windw', 'iceman'],
-    putter: { brand: 'Sully’s', name: 'Two-Disc Mallet', style: 'twodisc', head: '#1b1c20', face: '#9aa0a8', accent: '#ffffff' },
+    putter: { brand: 'Happy’s', name: 'Two-Disc Mallet', style: 'twodisc', head: '#1b1c20', face: '#9aa0a8', accent: '#ffffff' },
     look: { gender: 'm', shirt: '#c8102e', pattern: 'hoops', accent: '#ffffff', pants: '#3a4a6b', hat: 'none', hairStyle: 'short', hair: '#6b4a2e', beard: 'stubble', skin: '#f0c8a8', glove: '#ffffff', shoe: '#1d1d1d', belt: '#1d1d1d' },
   },
 ];
