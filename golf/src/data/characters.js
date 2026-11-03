@@ -95,7 +95,7 @@ export const CHARACTERS = [
     tagline: 'Hockey player. Runs at the ball, drives the green, never two-putts. Off the charts.',
     // every skill maxed out, whatever you start from
     boost: { power: 10, putting: 10 }, all: 50, abilities: ['slapshot', 'oneputt', 'striker', 'darts', 'magician', 'sand', 'rough', 'windw', 'iceman'],
-    putter: { style: 'twodisc', head: '#1b1c20', face: '#9aa0a8', accent: '#ffffff' },
+    putter: { brand: 'Sully’s', name: 'Two-Disc Mallet', style: 'twodisc', head: '#1b1c20', face: '#9aa0a8', accent: '#ffffff' },
     look: { gender: 'm', shirt: '#c8102e', pattern: 'hoops', accent: '#ffffff', pants: '#3a4a6b', hat: 'none', hairStyle: 'short', hair: '#6b4a2e', beard: 'stubble', skin: '#f0c8a8', glove: '#ffffff', shoe: '#1d1d1d', belt: '#1d1d1d' },
   },
 ];

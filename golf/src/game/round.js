@@ -701,7 +701,8 @@ export class RoundController {
       elev,
       playsLike,
       club: c,
-      model: gearFor(this.bag, this.club),
+      // a special player's own putter goes by its own name
+      model: c.kind === 'putter' && this.golfer.charPutter && this.golfer.charPutter.name ? { brand: this.golfer.charPutter.brand, name: this.golfer.charPutter.name } : gearFor(this.bag, this.club),
       carry: t ? t.carry : null,
       predCarry: this.predCarry,
       putting: this.putting,

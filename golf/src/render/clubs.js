@@ -353,8 +353,8 @@ function putterHead(metal, paint, o) {
     // milled face insert
     metal.add(new THREE.BoxGeometry(W * 0.72, Hh * 0.72, 0.0016).translate(0, Hh * 0.52, -0.0014), face);
     // the two discs, ball-sized, with a sight line through them
-    for (const z of [0.03, 0.066]) paint.add(new THREE.CylinderGeometry(0.0168, 0.0168, 0.0012, 24).translate(0, Hh + 0.0026, z), accent);
-    paint.add(new THREE.BoxGeometry(0.0022, 0.0008, 0.016).translate(0, Hh + 0.0028, 0.008), accent);
+    for (const z of [0.03, 0.066]) paint.add(new THREE.CylinderGeometry(0.0168, 0.0168, 0.0012, 24).translate(0, Hh + 0.0046, z), accent);
+    paint.add(new THREE.BoxGeometry(0.0022, 0.0008, 0.016).translate(0, Hh + 0.0046, 0.008), accent);
     // double-bend shaft into the heel
     const hb = new THREE.Vector3(-0.03, Hh + 0.002, 0.012);
     const bend = hb.clone().add(new THREE.Vector3(0.006, 0.045, -0.004));
