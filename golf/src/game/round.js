@@ -776,10 +776,12 @@ export class RoundController {
     const dev = devDeg * sens;
     const toImpact = this.world.golfer.swing(power, () => this.launchShot(power, dev, tempo, c));
     if (this.world.golfer.runup) {
-      // watch the running start side-on, from across the ball (ahead of the caddie)
+      // cut to a side-on view of the running start, from across the ball
+      // (ahead of the caddie)
       const b = this.ballPos, f = fwdOf(this.heading), r = rightOf(this.heading);
       const gy = this.hole.heightAt(b.x, b.z);
       this.world.setCamera(V(b.x + r.x * 4.3 + f.x * 1.0, gy + 1.5, b.z + r.z * 4.3 + f.z * 1.0), V(b.x - r.x * 0.9 - f.x * 1.5, gy + 0.9, b.z - r.z * 0.9 - f.z * 1.5), 52, 5);
+      this.world.snapCamera();
     }
     if (!this.putting) sfx.whoosh(power, toImpact);
   }
