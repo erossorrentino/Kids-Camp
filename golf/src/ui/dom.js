@@ -16,6 +16,7 @@ export function toParClass(n) {
 }
 
 export function money(n, compact = false) {
+  if (compact && n >= 1e9) return `$${(n / 1e9).toFixed(n >= 1e10 ? 1 : 2).replace(/\.0+$/, '')}B`;
   if (compact && n >= 1e6) return `$${(n / 1e6).toFixed(n >= 1e7 ? 1 : 2)}M`;
   if (compact && n >= 1e4) return `$${Math.round(n / 1e3)}K`;
   return `$${Math.round(n).toLocaleString('en-US')}`;

@@ -64,13 +64,14 @@ export function newCareer({ name, country, gender, look }) {
   const c = {
     v: 1,
     created: Date.now(),
+    bigBank: true,
     savedAt: Date.now(),
     golfer: {
       name, country, gender, look,
       stats: { ...DEFAULT_STATS },
       traits: [],
       level: 1, xp: 0, sp: 0,
-      money: 25000, careerMoney: 0,
+      money: START_MONEY, careerMoney: 0,
       balls: ['range', 'tourbal'], ball: 'tourbal',
       bag: { ...STARTER_BAG }, clubs: Object.values(STARTER_BAG),
       chars: [], char: null,
@@ -416,6 +417,9 @@ export function golferOVR(g) {
   return overall(playAs(g).stats);
 }
 
+// Everyone starts with ten billion in the bank
+export const START_MONEY = 10_000_000_000;
+
 export const DEFAULT_STATS = { power: 58, accuracy: 56, irons: 56, shortGame: 55, putting: 56, recovery: 54, mental: 54, wind: 54, consistency: 58 };
 export { STAT_KEYS, courseById };
 
@@ -445,5 +449,10 @@ export function upgradeSave(c) {
   if (!Array.isArray(g.trails)) { g.trails = ['classic']; g.trail = 'classic'; }
   if (!Array.isArray(g.ballColors)) { g.ballColors = ['white']; g.ballColor = 'white'; }
   if (!c.rival) c.rival = pickRival(c, rankings(c), HUMAN_ID);
+  // careers from before the ten-billion start are topped up to it, once
+  if (!c.bigBank) {
+    c.bigBank = true;
+    if (g.money < START_MONEY) g.money = START_MONEY;
+  }
   return c;
 }
