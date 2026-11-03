@@ -106,7 +106,7 @@ you want to move on.
 - **Buying players is the only way to get better.** Every career golfer
   starts with the same skills (overall 56) and no strengths or
   weaknesses, and skills can't be trained. You start with
-  **$10,000,000,000** in the bank (older careers are topped up to it once). The **Players** tab
+  **$100,000** in the bank (older careers are topped up to it once). The **Players** tab
   (`src/data/characters.js`) sells **all 500 tour pros**, priced by their
   overall rating from $20K (overall 60) to about $30M for the biggest
   stars; buy one and you play your career as them, with their skills,

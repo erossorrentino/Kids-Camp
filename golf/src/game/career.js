@@ -417,8 +417,8 @@ export function golferOVR(g) {
   return overall(playAs(g).stats);
 }
 
-// Everyone starts with ten billion in the bank
-export const START_MONEY = 10_000_000_000;
+// Everyone starts with $100,000 in the bank
+export const START_MONEY = 100_000;
 
 export const DEFAULT_STATS = { power: 58, accuracy: 56, irons: 56, shortGame: 55, putting: 56, recovery: 54, mental: 54, wind: 54, consistency: 58 };
 export { STAT_KEYS, courseById };
