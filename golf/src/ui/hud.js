@@ -1,0 +1,563 @@
+// In-round heads-up display, broadcast-graphics style.
+import { YD } from '../sim/hole.js';
+import { CLUBS } from '../data/equipment.js';
+import { esc, fmtToPar, toParClass } from './dom.js';
+import { drawHoleMap } from './holemap.js';
+
+const MM_W = 132, MM_H = 224;
+
+// The club face with a dot where the ball was struck (heel left, toe right)
+function impactFace(st, kind) {
+  const wood = kind === 'wood' || kind === 'hybrid';
+  const x = Math.max(6, Math.min(94, 50 + st.h * 1.9)), y = Math.max(5, Math.min(37, 21 - st.v * 1.9));
+  const face = wood ? '<path d="M8 30 Q6 10 26 6 L78 6 Q96 8 94 26 Q92 37 74 37 L22 37 Q10 37 8 30 Z"/>' : '<path d="M8 36 L10 14 Q12 6 24 7 L80 4 Q95 4 93 20 Q92 33 80 36 Z"/>';
+  const lines = [12, 17, 22, 27, 32].map((ly) => `<line x1="${wood ? 30 : 16}" x2="${wood ? 70 : 84}" y1="${ly}" y2="${ly}"/>`).join('');
+  const label = Math.abs(st.h) < 5 && Math.abs(st.v) < 4 ? 'Centre' : `${Math.abs(st.v) >= 4 ? (st.v > 0 ? 'High' : 'Low') : ''}${Math.abs(st.v) >= 4 && Math.abs(st.h) >= 5 ? ' ' : ''}${Math.abs(st.h) >= 5 ? (st.h > 0 ? 'toe' : 'heel') : ''}`;
+  return `<div class="st-face"><svg viewBox="0 0 100 42" aria-hidden="true"><g class="fc">${face}</g><g class="gr">${lines}</g><circle class="sweet" cx="50" cy="21" r="5"/><circle class="hit" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="4.2"/></svg><span>Strike: ${esc(label.charAt(0).toUpperCase() + label.slice(1))}</span></div>`;
+}
+
+export class HUD {
+  constructor(root, app) {
+    this.root = root;
+    this.app = app;
+    this.round = null;
+    root.innerHTML = `
+      <div class="hud-top">
+        <div class="playertag panel" id="playerTag" hidden></div>
+        <div class="modecard panel" id="modeCard" hidden></div>
+        <div class="holecard panel" id="hc">
+          <div class="hc-row1"><span class="hc-hole" id="hcHole">HOLE 1</span><span class="hc-par" id="hcPar">PAR 4</span><span class="hc-yds" id="hcYds">400 YDS</span></div>
+          <div class="hc-row2"><span>Shot <b id="hcShot">1</b></span><span>Today <b id="hcToday" class="tp-even">E</b></span><span id="hcPos"></span><span id="hcPressure" class="pressure" hidden>Pressure</span></div>
+        </div>
+        <div class="lie panel" id="lie"><span class="lie-name" id="lieName">Tee Box</span><span class="lie-pct" id="liePct"></span><span class="lie-notes" id="lieNotes"></span></div>
+        <div class="lbstrip panel" id="lbStrip" hidden></div>
+      </div>
+      <div class="minimap panel" id="mm">
+        <canvas id="mmBase" width="${MM_W * 2}" height="${MM_H * 2}"></canvas>
+        <canvas id="mmOver" width="${MM_W * 2}" height="${MM_H * 2}"></canvas>
+        <div class="mm-cap">Tap the map to aim</div>
+      </div>
+      <div class="hud-bottom">
+        <div class="clubbox panel">
+          <button class="icon-btn" data-h="clubDown" aria-label="Previous club">&#9664;</button>
+          <div class="club-mid">
+            <div class="club-model" id="clubModel"></div>
+            <div class="club-name" id="clubName">Driver</div>
+            <div class="club-carry" id="clubCarry">Full carry 275 yds</div>
+          </div>
+          <button class="icon-btn" data-h="clubUp" aria-label="Next club">&#9654;</button>
+          <div class="ball-name" id="ballName"></div>
+        </div>
+        <div class="distbox panel">
+          <div class="dist-main"><b id="distPin">400</b><span id="distUnit"> yds to pin</span></div>
+          <div class="dist-sub" id="distSub">plays 410</div>
+          <div class="wind"><div class="wind-arrow" id="windArrow">&#10148;</div><span id="windTxt">8 mph</span></div>
+        </div>
+        <div class="btnrow">
+          <button class="hbtn" data-h="shape" id="btnShape" title="Shot shape (S)"><span class="shape-ball"><i id="shapeDot"></i></span>Shape</button>
+          <button class="hbtn" data-h="view" id="btnView" title="Camera view (V)">View</button>
+          <button class="hbtn" data-h="grid" id="btnGrid" title="Green slope grid (G)" hidden>Grid</button>
+          <button class="hbtn" data-h="scale" id="btnScale" title="Putter range (R)" hidden>Range</button>
+          <button class="hbtn" data-h="card" id="btnCard" title="Scorecard (C)">Card</button>
+          <button class="hbtn" data-h="board" id="btnBoard" title="Leaderboard (L)" hidden>Board</button>
+          <button class="hbtn" data-h="sim" id="btnSim" title="Simulate this hole with your stats">Sim hole</button>
+          <button class="hbtn" data-h="pause" title="Menu (Esc)">Menu</button>
+        </div>
+      </div>
+      <div class="aimbtns">
+        <button class="aim-btn" data-hold="left" aria-label="Aim left">&#9664;</button>
+        <button class="aim-btn" data-hold="right" aria-label="Aim right">&#9654;</button>
+      </div>
+      <div class="shape-pop panel" id="shapePop" hidden>
+        <div class="shape-title">Strike point</div>
+        <div class="shape-pad" id="shapePad"><i id="shapePadDot"></i><span class="sp-t">Low / less spin</span><span class="sp-b">High / more spin</span><span class="sp-l">Draw</span><span class="sp-r">Fade</span></div>
+        <button class="hbtn" data-h="shapeReset">Center</button>
+      </div>
+      <div class="swing-hint" id="swingHint">Press and <b>pull down</b> to swing back, then <b>push straight up</b> through the ball</div>
+      <div class="meter" id="meter" hidden>
+        <div class="meter-bar"><div class="meter-fill" id="meterFill"></div><div class="meter-100"></div></div>
+        <div class="meter-txt" id="meterTxt">0%</div>
+      </div>
+      <svg class="swing-trail" id="swingTrail"><polyline id="trailLine" points=""/></svg>
+      <div class="strike" id="strike" hidden></div>
+      <div class="turn" id="turn" hidden></div>
+      <div class="caddietip" id="caddieTip" hidden><i class="ct-face" aria-hidden="true"><svg viewBox="0 0 32 32"><circle cx="16" cy="18" r="9" fill="#e8b996"/><path d="M6 15 Q16 3 26 15 L29 16 L6 16z" fill="#fbfbf6"/><rect x="5" y="15" width="24" height="2.5" rx="1" fill="#c8322c"/><circle cx="13" cy="19" r="1.2" fill="#1b1b1b"/><circle cx="19" cy="19" r="1.2" fill="#1b1b1b"/><path d="M13 23 Q16 25.5 19 23" stroke="#8a4a3a" stroke-width="1.3" fill="none"/></svg></i><span id="caddieTxt"></span></div>
+      <div class="caption" id="caption" hidden><small>Commentary</small><span id="captionTxt"></span></div>
+      <div class="replaytag" id="replayTag" hidden><span class="rt-live"><i></i>Replay</span><span class="rt-label" id="replayLabel"></span><span class="rt-skip">Tap to skip</span></div>
+      <div class="msg" id="msg" hidden><div class="msg-title" id="msgTitle"></div><div class="msg-sub" id="msgSub"></div></div>
+      <div class="stats panel" id="shotStats" hidden></div>
+      <div class="intro panel" id="intro" hidden></div>
+      <div class="holeres" id="holeRes" hidden></div>
+      <div class="loading" id="loading" hidden><div class="spinner"></div><div id="loadingTxt"></div></div>
+    `;
+    this.$ = (id) => root.querySelector('#' + id);
+    this.mmBase = this.$('mmBase');
+    this.mmOver = this.$('mmOver');
+    this.bind();
+  }
+
+  bind() {
+    const root = this.root;
+    root.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-h]');
+      if (!b || !this.round) return;
+      this.app.onHudAction(b.dataset.h, b.dataset);
+    });
+    // Hold-to-aim buttons
+    root.querySelectorAll('[data-hold]').forEach((btn) => {
+      const dir = btn.dataset.hold === 'left' ? -1 : 1;
+      const start = (e) => { e.preventDefault(); this.app.aimHold = dir; };
+      const stop = () => { if (this.app.aimHold === dir) this.app.aimHold = 0; };
+      btn.addEventListener('pointerdown', start);
+      btn.addEventListener('pointerup', stop);
+      btn.addEventListener('pointerleave', stop);
+      btn.addEventListener('pointercancel', stop);
+    });
+    // Minimap aiming
+    this.mmOver.addEventListener('pointerdown', (e) => {
+      if (!this.round || !this.mm) return;
+      const r = this.mmOver.getBoundingClientRect();
+      const px = ((e.clientX - r.left) / r.width) * MM_W;
+      const py = ((e.clientY - r.top) / r.height) * MM_H;
+      const w = this.mmToWorld(px, py);
+      this.round.aimAt(w.x, w.z);
+    });
+    // Shot shape pad
+    const pad = this.$('shapePad');
+    const setFrom = (e) => {
+      const r = pad.getBoundingClientRect();
+      const x = ((e.clientX - r.left) / r.width) * 2 - 1;
+      const y = ((e.clientY - r.top) / r.height) * 2 - 1;
+      const l = Math.hypot(x, y);
+      const k = l > 1 ? 1 / l : 1;
+      if (this.round) this.round.setShape({ x: x * k, y: y * k });
+    };
+    pad.addEventListener('pointerdown', (e) => { pad.setPointerCapture(e.pointerId); setFrom(e); });
+    pad.addEventListener('pointermove', (e) => { if (e.buttons) setFrom(e); });
+  }
+
+  // Match play against a pro: the status next to the scorecard
+  setVersus(v, left) {
+    const el = this.$('playerTag');
+    const txt = this.round ? this.round.versusText(left) : '';
+    el.innerHTML = `<i style="background:#ff5a4e"></i><b>vs ${esc(v.short)}</b><span>${esc(txt)}${v.thru ? ` · thru ${v.thru}` : ''}</span>`;
+    el.style.setProperty('--pc', '#ff5a4e');
+    el.hidden = false;
+  }
+
+  attach(round) {
+    this.round = round;
+    this.root.hidden = false;
+    const mode = round.mode;
+    const board = !!round.opts.tournament || !!(mode && mode.board().length) || !!round.party;
+    this.$('btnBoard').hidden = !board;
+    this.$('lbStrip').hidden = !board;
+    this.$('modeCard').hidden = !mode;
+    this.$('hc').hidden = !!mode;
+    this.$('btnCard').hidden = !!mode;
+    this.$('btnSim').hidden = !!mode || !!round.party;
+    this.$('playerTag').hidden = !round.party && !round.versus;
+    if (round.versus) {
+      const v = round.versus;
+      this.$('playerTag').innerHTML = `<i style="background:#ff5a4e"></i><b>vs ${esc(v.short)}</b><span>Match play · all square</span>`;
+    }
+    this.$('ballName').textContent = round.ball.name;
+    this.root.classList.toggle('party', !!round.party);
+  }
+
+  // The caddie's advice before a shot
+  caddieSay(text) {
+    const el = this.$('caddieTip');
+    if (!text) { el.hidden = true; return; }
+    this.$('caddieTxt').textContent = text;
+    el.hidden = false;
+    el.classList.remove('pop');
+    void el.offsetWidth;
+    el.classList.add('pop');
+    clearTimeout(this._ctT);
+    this._ctT = setTimeout(() => { el.hidden = true; }, 7000);
+  }
+
+  // What the commentator just said
+  caption(text) {
+    const el = this.$('caption');
+    this.$('captionTxt').textContent = text;
+    el.hidden = false;
+    el.classList.remove('pop');
+    void el.offsetWidth;
+    el.classList.add('pop');
+    clearTimeout(this._capT);
+    this._capT = setTimeout(() => { el.hidden = true; }, 3800);
+  }
+
+  replayTag(on, label = '') {
+    this.$('replayTag').hidden = !on;
+    this.$('replayLabel').textContent = label;
+    this.root.classList.toggle('replaying', on);
+  }
+
+  // Multiplayer: whose turn it is
+  setPlayer(p, party, toPar) {
+    const el = this.$('playerTag');
+    const extra = party.format === 'match' ? party.matchText() : party.format === 'skins' ? `${p.skins} skin${p.skins === 1 ? '' : 's'}${party.carry ? ` · ${party.carry + 1} on this hole` : ''}` : '';
+    el.innerHTML = `<i style="background:${p.color}"></i><b>${esc(p.name)}</b>${extra ? `<span>${esc(extra)}</span>` : ''}`;
+    el.style.setProperty('--pc', p.color);
+    el.hidden = false;
+    this.$('ballName').textContent = p.kit.ball.name;
+    this.setToday(toPar);
+    this.updateBoard();
+  }
+
+  turnBanner(name, color, sub = '') {
+    const el = this.$('turn');
+    el.innerHTML = `<b>${esc(name)}</b><span>${esc(sub || 'to play')}</span>`;
+    el.style.setProperty('--pc', color);
+    el.hidden = false;
+    el.classList.remove('pop');
+    void el.offsetWidth;
+    el.classList.add('pop');
+    clearTimeout(this._turnT);
+    this._turnT = setTimeout(() => { el.hidden = true; }, 2300);
+  }
+
+  // Everyone's score on the hole just finished, and what it meant
+  partyHole(party, i, par, line) {
+    const el = this.$('holeRes');
+    const rows = party.players.map((p) => {
+      const s = p.scores[i];
+      const rel = s - par;
+      const cls = rel <= -2 ? 'eagle' : rel === -1 ? 'birdie' : rel === 0 ? 'par' : rel === 1 ? 'bogey' : 'double';
+      return `<div class="ph-row"><i style="background:${p.color}"></i><span>${esc(p.name)}</span><b class="${cls}">${s}</b></div>`;
+    }).join('');
+    el.className = 'holeres party-hole';
+    el.innerHTML = `<div class="hr-name">Hole ${i + 1}</div>${rows}<div class="hr-sub">${esc(line)}</div>`;
+    el.hidden = false;
+    clearTimeout(this._hrT);
+    this._hrT = setTimeout(() => { el.hidden = true; }, 3600);
+  }
+
+  // Mini-game panel: title, progress, standings and target chips
+  setMode(info) {
+    const el = this.$('modeCard');
+    if (!info) { el.hidden = true; return; }
+    el.innerHTML = `<div class="mc-title">${esc(info.title)}</div>${info.sub ? `<div class="mc-sub">${esc(info.sub)}</div>` : ''}
+      ${(info.lines || []).map((l) => `<div class="mc-line">${esc(l)}</div>`).join('')}
+      ${info.chips && info.chips.length ? `<div class="mc-chips">${info.chips.map((c) => `<button class="mc-chip${c.on ? ' on' : ''}" data-h="${c.h}" data-i="${c.i}" style="--c:${c.color || '#fff'}">${esc(c.label)}</button>`).join('')}</div>` : ''}
+      ${info.buttons && info.buttons.length ? `<div class="mc-btns">${info.buttons.map((b) => `<button class="hbtn" data-h="${b.h}">${esc(b.label)}</button>`).join('')}</div>` : ''}`;
+    el.hidden = false;
+  }
+
+  detach() {
+    this.round = null;
+    this.root.hidden = true;
+  }
+
+  loading(text) {
+    this.$('loadingTxt').textContent = text;
+    this.$('loading').hidden = false;
+  }
+  loaded() { this.$('loading').hidden = true; }
+
+  units() { return this.app.settings.units; }
+  d(m, small = false) {
+    if (this.units() === 'meters') return small && m < 20 ? m.toFixed(1) : String(Math.round(m));
+    if (small && m / YD < 20) return String(Math.round(m / 0.3048));
+    return String(Math.round(m / YD));
+  }
+  u(m, small = false) {
+    if (this.units() === 'meters') return 'm';
+    return small && m / YD < 20 ? 'ft' : 'yds';
+  }
+
+  setHole(hole, course, strokes, toPar) {
+    this.$('hcHole').textContent = `HOLE ${hole.index + 1}`;
+    this.$('hcPar').textContent = `PAR ${hole.par}`;
+    this.$('hcYds').textContent = this.units() === 'meters' ? `${Math.round(hole.yards * YD)} M` : `${hole.yards} YDS`;
+    this.setStrokes(strokes);
+    this.setToday(toPar);
+    this.updateBoard();
+  }
+  setStrokes(n) { this.$('hcShot').textContent = String(n + 1); }
+  setToday(tp) {
+    const el = this.$('hcToday');
+    el.textContent = fmtToPar(tp);
+    el.className = toParClass(tp);
+  }
+
+  setLie(info) {
+    this.$('lieName').textContent = info.name;
+    this.$('liePct').textContent = info.pct ? `${info.pct}` : '';
+    this.$('lieNotes').textContent = info.notes.join(' · ');
+    this.$('lie').dataset.lie = info.lie;
+  }
+
+  setPutting(p) {
+    this.$('btnGrid').hidden = !p;
+    this.$('btnScale').hidden = !p;
+    this.$('btnShape').hidden = p;
+    if (p) this.$('shapePop').hidden = true;
+  }
+  setGrid(on) { this.$('btnGrid').classList.toggle('on', on); }
+  setView(v) { this.$('btnView').textContent = v === 'address' ? 'View' : v === 'overhead' ? 'Overhead' : 'Target'; }
+
+  setShape(s) {
+    const dot = this.$('shapeDot');
+    dot.style.transform = `translate(${s.x * 7}px, ${s.y * 7}px)`;
+    const pd = this.$('shapePadDot');
+    pd.style.left = `${50 + s.x * 42}%`;
+    pd.style.top = `${50 + s.y * 42}%`;
+    this.$('btnShape').classList.toggle('on', Math.abs(s.x) > 0.05 || Math.abs(s.y) > 0.05);
+  }
+  toggleShape() { this.$('shapePop').hidden = !this.$('shapePop').hidden; }
+
+  setShot(info) {
+    this.shot = info;
+    const c = info.club;
+    this.$('clubName').textContent = c.name;
+    this.$('clubModel').textContent = info.model ? `${info.model.brand} ${info.model.name}` : '';
+    if (info.putting) this.$('clubCarry').textContent = `Putter range ${this.d(info.puttScale)} ${this.u(info.puttScale)}`;
+    else this.$('clubCarry').textContent = info.carry ? `Full carry ${this.d(info.carry)} ${this.u(info.carry)}` : '';
+    const small = info.putting;
+    this.$('distPin').textContent = this.d(info.dist, small);
+    this.$('distUnit').textContent = ` ${this.u(info.dist, small)} ${info.distLabel || 'to pin'}`;
+    const elevTxt = Math.abs(info.elev) >= 0.3 ? `${info.elev > 0 ? 'Up' : 'Down'} ${this.units() === 'meters' ? Math.abs(info.elev).toFixed(1) + ' m' : Math.round(Math.abs(info.elev) / 0.3048) + ' ft'}` : 'Level';
+    this.$('distSub').textContent = info.putting ? elevTxt : `Plays ${this.d(info.playsLike)} · ${elevTxt}`;
+    this.$('windTxt').textContent = this.units() === 'meters' ? `${(info.windMph * 0.447).toFixed(1)} m/s` : `${Math.round(info.windMph)} mph`;
+    const pr = this.$('hcPressure');
+    pr.hidden = !(info.pressure > 0);
+  }
+
+  showSwingHint(v) {
+    // Coach the first two swings, then get out of the way
+    this.$('swingHint').hidden = !v || (this.app.swingsDone || 0) >= 2;
+  }
+
+  // Swing meter
+  meterShow(x, y) {
+    this.$('caddieTip').hidden = true;
+    const m = this.$('meter');
+    m.hidden = false;
+    const W = window.innerWidth, H = window.innerHeight;
+    const mh = m.offsetHeight || 190;
+    // keep it on screen; flip to the left of the finger near the right edge
+    m.style.left = `${x + 120 > W ? Math.max(4, x - 110) : x + 34}px`;
+    m.style.top = `${Math.max(6, Math.min(H - mh - 6, y - 20))}px`;
+    this.meterSet(0);
+  }
+  meterSet(p, phase = 'back') {
+    const fill = this.$('meterFill');
+    fill.style.height = `${Math.min(110, p * 100) / 1.1}%`;
+    fill.classList.toggle('over', p > 1.0);
+    fill.classList.toggle('down', phase === 'down');
+    this.meterPct = p;
+    this.updateMeterText();
+  }
+  setPowerCarry(m, putt) {
+    this.meterCarry = m;
+    this.meterPutt = putt;
+    this.updateMeterText();
+  }
+  updateMeterText() {
+    const p = this.meterPct || 0;
+    const m = this.meterCarry;
+    const dist = m != null ? `${this.d(m, this.meterPutt)} ${this.u(m, this.meterPutt)}` : '';
+    this.$('meterTxt').innerHTML = `<b>${Math.round(p * 100)}%</b><span>${dist}</span>`;
+  }
+  meterHide() { this.$('meter').hidden = true; this.trail([]); }
+  trail(points, quality = 0) {
+    const pl = this.$('trailLine');
+    pl.setAttribute('points', points.map((p) => `${p.x},${p.y}`).join(' '));
+    pl.setAttribute('class', quality > 10 ? 'bad' : quality > 3 ? 'meh' : 'good');
+  }
+
+  // How the strike came off, flashed at impact
+  strike(dev, tempo, putt) {
+    const el = this.$('strike');
+    const a = Math.abs(dev);
+    const right = dev > 0;
+    let title, tone;
+    if (a < 1.5) { title = 'Perfect'; tone = 'gold'; }
+    else if (a < 3) { title = putt ? 'Pure roll' : 'Pure'; tone = 'good'; }
+    else if (putt) { title = a < 7 ? `Slightly ${right ? 'right' : 'left'}` : right ? 'Pushed' : 'Pulled'; tone = a < 7 ? 'ok' : 'bad'; }
+    else if (a < 7) { title = right ? 'Slight fade' : 'Slight draw'; tone = 'ok'; }
+    else if (a < 14) { title = right ? 'Fade' : 'Draw'; tone = 'ok'; }
+    else { title = right ? 'Slice' : 'Hook'; tone = 'bad'; }
+    const sub = tempo < 0.995 ? `Slow tempo · ${Math.round((1 - tempo) * 100)}% less speed` : a < 3 ? 'Smooth tempo' : '';
+    el.innerHTML = `<b>${esc(title)}</b>${sub ? `<span>${esc(sub)}</span>` : ''}`;
+    el.dataset.tone = tone;
+    el.hidden = false;
+    el.classList.remove('pop');
+    void el.offsetWidth;
+    el.classList.add('pop');
+    clearTimeout(this._strikeT);
+    this._strikeT = setTimeout(() => { el.hidden = true; }, 1700);
+  }
+
+  message(title, sub = '', tone = 'neutral') {
+    const m = this.$('msg');
+    this.$('msgTitle').textContent = title;
+    this.$('msgSub').textContent = sub;
+    m.dataset.tone = tone;
+    m.hidden = false;
+    m.classList.remove('pop');
+    void m.offsetWidth;
+    m.classList.add('pop');
+    clearTimeout(this._msgT);
+    this._msgT = setTimeout(() => { m.hidden = true; }, 2400);
+  }
+
+  showShotStats(s) {
+    const el = this.$('shotStats');
+    const u = this.units();
+    const dist = (m) => (u === 'meters' ? `${m.toFixed(1)} m` : `${(m / YD).toFixed(1)} yds`);
+    const rows = s.putt
+      ? [['Ball speed', `${s.ballSpeed.toFixed(1)} mph`], ['Roll', dist(s.total)]]
+      : [
+          ['Club speed', s.clubSpeed ? `${s.clubSpeed.toFixed(1)} mph` : '—'],
+          ['Ball speed', `${s.ballSpeed.toFixed(1)} mph`],
+          ['Smash', s.smash ? s.smash.toFixed(2) : '—'],
+          ['Launch', `${s.launch.toFixed(1)}°`],
+          ['Spin', `${Math.round(s.spin).toLocaleString()} rpm`],
+          ['Carry', dist(s.carry)],
+          ['Total', dist(s.total)],
+          ['Height', u === 'meters' ? `${s.apex.toFixed(0)} m` : `${Math.round(s.apex / 0.3048)} ft`],
+          ['Curve', `${dist(Math.abs(s.curve))} ${s.curve > 0.5 ? 'R' : s.curve < -0.5 ? 'L' : ''}`],
+          ['Land angle', s.landAngle != null ? `${s.landAngle.toFixed(0)}°` : '—'],
+        ];
+    const dev = s.dev || 0;
+    const st = s.strike;
+    const centred = !st || (Math.abs(st.h) < 5 && Math.abs(st.v) < 4);
+    const swingTxt = Math.abs(dev) < 3 && centred ? 'Pure strike' : Math.abs(dev) < 3 ? 'Good swing' : `Swing path ${Math.abs(dev).toFixed(0)}° ${dev > 0 ? 'right' : 'left'}`;
+    el.innerHTML = `<div class="st-head">${esc(s.club)}<span>${esc(swingTxt)}</span></div>${st && !s.putt ? impactFace(st, s.kind) : ''}${rows.map(([k, v]) => `<div class="st-row"><span>${k}</span><b>${v}</b></div>`).join('')}${s.note ? `<div class="st-note">${esc(s.note)}</div>` : ''}`;
+    el.hidden = false;
+    clearTimeout(this._stT);
+    this._stT = setTimeout(() => { el.hidden = true; }, 5200);
+  }
+
+  hideTransient() {
+    this.$('shapePop').hidden = true;
+  }
+
+  showIntro(hole, course, wind) {
+    const el = this.$('intro');
+    const d = hole.describe();
+    const yds = this.units() === 'meters' ? `${Math.round(hole.yards * YD)} m` : `${hole.yards} yds`;
+    el.innerHTML = `
+      <div class="in-num">${hole.index + 1}</div>
+      <div class="in-body">
+        <div class="in-title">Par ${hole.par} · ${yds}</div>
+        <div class="in-sub">${esc(d.shape)} · ${esc(d.elevText)} · Stroke index ${hole.info.si}</div>
+        <div class="in-sub">${d.hazards.length ? esc(d.hazards.join(' · ')) : 'No hazards in play'}</div>
+        <div class="in-course">${esc(course.name)}</div>
+      </div>
+      <div class="in-skip">Tap to skip</div>`;
+    el.hidden = false;
+  }
+  hideIntro() { this.$('intro').hidden = true; }
+
+  holeResult(strokes, par, name, toPar, extra = '') {
+    const el = this.$('holeRes');
+    const rel = strokes - par;
+    const cls = rel <= -2 ? 'eagle' : rel === -1 ? 'birdie' : rel === 0 ? 'par' : rel === 1 ? 'bogey' : 'double';
+    el.className = `holeres ${cls}`;
+    el.innerHTML = `<div class="hr-name">${esc(name)}</div><div class="hr-sub">${strokes} on a par ${par} · Today ${fmtToPar(toPar)}</div>${extra ? `<div class="hr-vs">${esc(extra)}</div>` : ''}`;
+    el.hidden = false;
+    this.$('msg').hidden = true;
+    this.setToday(toPar);
+    clearTimeout(this._hrT);
+    this._hrT = setTimeout(() => { el.hidden = true; }, 2500);
+    this.updateBoard();
+  }
+
+  updateBoard() {
+    const r = this.round;
+    const el = this.$('lbStrip');
+    if (r && r.mode) {
+      const rows = r.mode.board();
+      if (!rows.length) return;
+      const me = rows.find((x) => x.you);
+      const top = rows.slice(0, 5);
+      if (me && !top.includes(me)) top.push(me);
+      el.innerHTML = `<div class="lb-title">${esc(r.mode.meta.name)}</div>` + top.map((x) => `
+        <div class="lb-row mode${x.you ? ' me' : ''}"><span class="lb-pos">${x.pos}</span><span class="lb-name">${esc(x.you ? 'You' : this.app.nameOf(x.id, true))}</span><span class="lb-tp">${esc(x.text)}</span></div>`).join('');
+      return;
+    }
+    if (r && r.party) {
+      const party = r.party;
+      const rows = party.standings();
+      const title = party.format === 'match' ? `Match play · ${party.matchText()}` : party.format === 'skins' ? `Skins${party.carry ? ` · ${party.carry + 1} on this hole` : ''}` : 'Stroke play';
+      el.innerHTML = `<div class="lb-title">${esc(title)}</div>` + rows.map((x) => {
+        const val = party.format === 'skins' ? `${x.skins}` : fmtToPar(x.toPar);
+        const cls = party.format === 'skins' ? '' : toParClass(x.toPar);
+        return `<div class="lb-row${x.i === r.cur ? ' me' : ''}"><span class="lb-pos"><i class="pdot" style="background:${x.color}"></i>${x.pos}</span><span class="lb-name">${esc(x.name)}</span><span class="lb-tp ${cls}">${val}</span><span class="lb-thru">${x.thru || '-'}</span></div>`;
+      }).join('');
+      return;
+    }
+    if (!r || !r.opts.tournament || !r.opts.leaderboardFn) return;
+    const lb = r.opts.leaderboardFn();
+    const me = lb.find((x) => x.human);
+    const nameOf = this.app.nameOf;
+    const top = lb.slice(0, 5);
+    if (me && !top.includes(me)) top.push(me);
+    // keep an eye on your rival
+    const rid = this.app.career && this.app.career.rival && this.app.career.rival.id;
+    const rv = rid ? lb.find((x) => x.id === rid) : null;
+    if (rv && !top.includes(rv)) top.push(rv);
+    top.sort((a, b) => lb.indexOf(a) - lb.indexOf(b));
+    el.innerHTML = `<div class="lb-title">${esc(r.opts.tournament.name)} · R${r.opts.tournament.round + 1}</div>` + top.map((x) => `
+      <div class="lb-row${x.human ? ' me' : ''}${x === rv ? ' rival' : ''}"><span class="lb-pos">${x.pos}</span><span class="lb-name">${esc(x.human ? 'You' : nameOf(x.id, true))}${x === rv ? ' <em>RIVAL</em>' : ''}</span><span class="lb-tp ${toParClass(x.toPar)}">${fmtToPar(x.toPar)}</span><span class="lb-thru">${x.thru === 18 ? 'F' : x.thru || '-'}</span></div>`).join('');
+    const pos = me ? me.pos : '';
+    this.$('hcPos').textContent = pos ? `Pos ${pos}` : '';
+  }
+
+  // ---------------- minimap ----------------
+  buildMinimap(hole) {
+    const g = this.mmBase.getContext('2d');
+    this.mm = drawHoleMap(g, hole, MM_W, MM_H, { sc: 2 });
+  }
+
+  mmToWorld(px, py) { return this.mm.toWorld(px, py); }
+  worldToMm(x, z) { return this.mm.toMap(x, z); }
+
+  drawMinimapOverlay(round) {
+    if (!this.mm || !round.hole) return;
+    const g = this.mmOver.getContext('2d');
+    g.setTransform(2, 0, 0, 2, 0, 0);
+    g.clearRect(0, 0, MM_W, MM_H);
+    const h = round.hole;
+    const pin = this.worldToMm(h.pin.x, h.pin.z);
+    const b = round.flight && round.phase === 'flight' && round.flight.p ? round.flight.p : round.ballPos;
+    const bp = this.worldToMm(b.x, b.z);
+    if (round.phase === 'aim' && round.pred && !round.putting) {
+      const lp = this.worldToMm(round.pred.land.x, round.pred.land.z);
+      g.strokeStyle = 'rgba(255,255,255,0.9)';
+      g.lineWidth = 1.2;
+      g.setLineDash([3, 3]);
+      g.beginPath(); g.moveTo(bp.x, bp.y); g.lineTo(lp.x, lp.y); g.stroke();
+      g.setLineDash([]);
+      g.beginPath(); g.arc(lp.x, lp.y, 4, 0, Math.PI * 2); g.stroke();
+    }
+    g.fillStyle = '#f2c230';
+    g.fillRect(pin.x - 0.6, pin.y - 7, 1.2, 7);
+    g.beginPath(); g.moveTo(pin.x + 0.6, pin.y - 7); g.lineTo(pin.x + 5, pin.y - 5.5); g.lineTo(pin.x + 0.6, pin.y - 4); g.fill();
+    g.fillStyle = '#fff';
+    g.strokeStyle = '#000';
+    g.lineWidth = 1;
+    g.beginPath(); g.arc(bp.x, bp.y, 2.6, 0, Math.PI * 2); g.fill(); g.stroke();
+  }
+
+  frame(round, dt) {
+    if (!round || !round.hole) return;
+    this.drawMinimapOverlay(round);
+    // wind arrow relative to the camera
+    const cam = this.app.world.camera;
+    const dir = cam.getWorldDirection(this._v || (this._v = cam.position.clone()));
+    const camH = Math.atan2(dir.x, -dir.z);
+    const rel = round.wind.dir - camH;
+    this.$('windArrow').style.transform = `rotate(${(rel * 180) / Math.PI - 90}deg)`;
+  }
+}
+
+export function clubList() {
+  return CLUBS;
+}

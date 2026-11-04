@@ -1,5 +1,9 @@
 # Crime City (working title)
 
+> **Also in this repo: [Fairway Legends](golf/README.md)**, a 3D browser golf
+> game with 500 pros, 100 courses and a career mode. See `golf/` (runs with
+> any static web server, no build step).
+
 An open-world crime game in the GTA tradition: steal cars, plan and run
 heists, build wanted stars, buy guns and vehicles. Built as a real Unity
 project with working, data-driven systems rather than hand-placed content,
