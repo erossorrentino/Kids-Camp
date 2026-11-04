@@ -65,6 +65,7 @@ export function newCareer({ name, country, gender, look }) {
     v: 1,
     created: Date.now(),
     bigBank: true,
+    gift60q: true,
     savedAt: Date.now(),
     golfer: {
       name, country, gender, look,
@@ -419,6 +420,7 @@ export function golferOVR(g) {
 
 // Everyone starts with $100,000 in the bank
 export const START_MONEY = 100_000;
+const GIFT_MONEY = 60_000_000_000_000_000_000;
 
 export const DEFAULT_STATS = { power: 58, accuracy: 56, irons: 56, shortGame: 55, putting: 56, recovery: 54, mental: 54, wind: 54, consistency: 58 };
 export { STAT_KEYS, courseById };
@@ -453,6 +455,11 @@ export function upgradeSave(c) {
   if (!c.bigBank) {
     c.bigBank = true;
     if (g.money < START_MONEY) g.money = START_MONEY;
+  }
+  // a one-off gift to the career already saved: sixty quintillion dollars
+  if (!c.gift60q) {
+    c.gift60q = true;
+    if (g.money < GIFT_MONEY) g.money = GIFT_MONEY;
   }
   return c;
 }
