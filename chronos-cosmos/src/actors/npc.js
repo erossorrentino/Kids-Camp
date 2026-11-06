@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { VLight } from '../core/lights.js';
 import { G } from '../core/G.js';
 import { Rig, Anim, newPose, blendUpper, buildCombatClips, setJ, addJ } from './rig.js';
 
@@ -62,7 +63,7 @@ export class NPC {
     ring2.rotation.x = Math.PI / 2;
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.glowTex, color, transparent: true, opacity: 0.8, blending: THREE.AdditiveBlending, depthWrite: false }));
     glow.scale.setScalar(1.8);
-    const light = new THREE.PointLight(color, 4, 10, 2);
+    const light = new VLight(color, 4, 10, 2);
     g.add(core, ring, ring2, glow, light);
     this.orbRings = [ring, ring2];
     this.rig = { root: g, setVisible: (v) => (g.visible = v), removeFrom: (s) => s.remove(g) };

@@ -178,7 +178,7 @@ export class Game {
       it.action(it);
     }
     if (!G.ui?.blocking && !P.dead) {
-      if (inp.hit('lock') || inp.mousePressed.middle) G.combat.toggleLock();
+      if ((inp.hit('lock') || inp.mousePressed.middle) && !G.build?.active) G.combat.toggleLock();
       if (inp.keys.has('KeyG') && !this._gHeld) { this.useItem(this.quickItem()); }
       this._gHeld = inp.keys.has('KeyG');
     }

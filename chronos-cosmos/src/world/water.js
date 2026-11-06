@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { G, WORLD_SIZE, HALF_WORLD } from '../core/G.js';
-import { GLSL_NOISE, fogUniforms, TIME_UNIFORM, PLAYER_UNIFORM, NIGHT_UNIFORM, SHARED } from '../core/shaderlib.js';
+import { cheapDefine, GLSL_NOISE, fogUniforms, TIME_UNIFORM, PLAYER_UNIFORM, NIGHT_UNIFORM, SHARED } from '../core/shaderlib.js';
 import { N as HN } from './terrain.js';
 
 const VERT = /* glsl */ `
@@ -50,7 +50,11 @@ void main(){
   float dist = length(cameraPosition - vWPos);
   float th = terrainH(vWPos.xz);
   float depth = max(uLevel - th, 0.0);
+#ifdef CHEAP
+  vec2 g = waveGrad(vWPos.xz, uTime) * 0.13;
+#else
   vec2 g = waveGrad(vWPos.xz, uTime) * 0.11 + waveGrad(vWPos.xz * 3.1, uTime * 1.3) * 0.035;
+#endif
   // rain ripples
   if (uRain > 0.01) {
     vec2 cell = floor(vWPos.xz * 1.5);
@@ -89,7 +93,7 @@ void main(){
   }
   // frost-magic ice floes
   float ice = 0.0;
-  for (int i = 0; i < 8; i++) {
+  if (uIce > 0.5) for (int i = 0; i < 8; i++) {
     float rr = uIceRadii[i];
     if (rr > 0.0) {
       float d = distance(vWPos.xz, uIceCenters[i].xz);
@@ -144,6 +148,7 @@ export class Water {
       ...fogUniforms(),
     };
     const mat = new THREE.ShaderMaterial({
+      defines: cheapDefine() ? { CHEAP: 1 } : {},
       uniforms: this.uniforms,
       vertexShader: VERT,
       fragmentShader: FRAG,

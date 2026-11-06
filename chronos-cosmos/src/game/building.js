@@ -397,7 +397,7 @@ export class Building {
     if (!this.active) return;
     const inp = G.input;
     for (let i = 0; i < 9; i++) if (inp.hit('el' + (i + 1))) { this.sel = i; this.refreshBar(); }
-    if (inp.mouse.wheel) { this.sel = (this.sel + (inp.mouse.wheel > 0 ? 1 : BLOCKS.length - 1)) % BLOCKS.length; this.refreshBar(); }
+    if (inp.mouse.wheel || inp.hit('nextEl')) { this.sel = (this.sel + (inp.mouse.wheel < 0 ? BLOCKS.length - 1 : 1)) % BLOCKS.length; this.refreshBar(); }
     if (inp.hit('rotate')) this.rot = (this.rot + 1) % 4;
     if (G.player.mode !== 'ground' && G.player.mode !== 'air') return this.toggle(false);
     const t = this.target();

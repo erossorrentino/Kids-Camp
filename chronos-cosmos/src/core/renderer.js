@@ -109,16 +109,23 @@ const GrainShader = {
   `,
 };
 
+// post: run the HDR post-processing chain (bloom, rays, grading). Without it
+// the scene renders straight to the screen with tone mapping, which is far
+// cheaper and works on GPUs that cannot render to half-float buffers.
+// maxDpr caps the device pixel ratio before the pixelRatio scale applies.
 export const QUALITY = {
-  low: { pixelRatio: 0.75, shadows: false, shadowSize: 1024, bloom: false, rays: false, grass: 0.25, trees: 0.5, fxaa: true, drawDist: 0.7 },
-  medium: { pixelRatio: 1, shadows: true, shadowSize: 1024, bloom: true, rays: false, grass: 0.55, trees: 0.8, fxaa: true, drawDist: 0.85 },
-  high: { pixelRatio: 1, shadows: true, shadowSize: 2048, bloom: true, rays: true, grass: 1, trees: 1, fxaa: true, drawDist: 1 },
-  ultra: { pixelRatio: 1.5, shadows: true, shadowSize: 4096, bloom: true, rays: true, grass: 1.5, trees: 1, fxaa: true, drawDist: 1 },
+  mobile: { pixelRatio: 0.62, maxDpr: 1.6, shadows: false, shadowSize: 512, bloom: false, rays: false, grass: 0.14, trees: 0.45, fxaa: false, drawDist: 0.55, post: false, lights: 2 },
+  low: { pixelRatio: 0.8, maxDpr: 1.5, shadows: false, shadowSize: 1024, bloom: false, rays: false, grass: 0.3, trees: 0.6, fxaa: false, drawDist: 0.7, post: false, lights: 3 },
+  medium: { pixelRatio: 1, maxDpr: 1.5, shadows: true, shadowSize: 1024, bloom: true, rays: false, grass: 0.55, trees: 0.8, fxaa: true, drawDist: 0.85, post: true, lights: 4 },
+  high: { pixelRatio: 1, maxDpr: 2, shadows: true, shadowSize: 2048, bloom: true, rays: true, grass: 1, trees: 1, fxaa: true, drawDist: 1, post: true, lights: 6 },
+  ultra: { pixelRatio: 1.5, maxDpr: 2, shadows: true, shadowSize: 4096, bloom: true, rays: true, grass: 1.5, trees: 1, fxaa: true, drawDist: 1, post: true, lights: 8 },
 };
+export const QUALITY_ORDER = ['mobile', 'low', 'medium', 'high', 'ultra'];
 
 export function createRenderer(container) {
+  const q0 = QUALITY[G.settings.quality] || QUALITY.high;
   const renderer = new THREE.WebGLRenderer({
-    antialias: false,
+    antialias: !q0.post && G.settings.quality !== 'mobile',
     powerPreference: 'high-performance',
     stencil: false,
     depth: true,
@@ -137,6 +144,10 @@ export function createRenderer(container) {
   const scene = new THREE.Scene();
   const camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 6000);
 
+  // Half-float render targets need an extension some phone GPUs lack.
+  const ext = renderer.extensions;
+  G.postOK = renderer.capabilities.isWebGL2 && (ext.has('EXT_color_buffer_float') || ext.has('EXT_color_buffer_half_float'));
+  G.webgl2 = renderer.capabilities.isWebGL2;
   const composer = new EffectComposer(renderer);
   const renderPass = new RenderPass(scene, camera);
   composer.addPass(renderPass);
@@ -155,7 +166,7 @@ export function createRenderer(container) {
 
   function resize() {
     const q = QUALITY[G.settings.quality] || QUALITY.high;
-    const pr = Math.min((window.devicePixelRatio || 1) * q.pixelRatio, 2);
+    const pr = Math.min(Math.min(window.devicePixelRatio || 1, q.maxDpr || 2) * q.pixelRatio, 2);
     const w = window.innerWidth, h = window.innerHeight;
     renderer.setPixelRatio(pr);
     renderer.setSize(w, h);
@@ -167,11 +178,14 @@ export function createRenderer(container) {
     grade.uniforms.uRes.value.set(w * pr, h * pr);
   }
   window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', () => setTimeout(resize, 300));
   resize();
+  G.usePost = q0.post && G.postOK;
 
   function applyQuality() {
     const q = QUALITY[G.settings.quality] || QUALITY.high;
     renderer.shadowMap.enabled = q.shadows;
+    G.usePost = q.post && G.postOK;
     bloom.enabled = q.bloom;
     fxaa.enabled = q.fxaa;
     resize();

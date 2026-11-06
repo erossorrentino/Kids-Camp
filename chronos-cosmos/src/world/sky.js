@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { G } from '../core/G.js';
-import { GLSL_NOISE, SHARED, NIGHT_UNIFORM, TIME_UNIFORM } from '../core/shaderlib.js';
+import { cheapDefine, GLSL_NOISE, SHARED, NIGHT_UNIFORM, TIME_UNIFORM } from '../core/shaderlib.js';
 import { EPOCHS } from './epochs.js';
 
 const SKY_VERT = /* glsl */ `
@@ -57,12 +57,18 @@ void main(){
   float nightVis = max(uNight, uRift) * uStars;
   float cloudCover = uCloud;
   if (nightVis > 0.01 && y > -0.1) {
+#ifdef CHEAP
+    vec3 s = starLayer(d, 180.0, 0.982);
+#else
     vec3 s = starLayer(d, 180.0, 0.985) + starLayer(d, 420.0, 0.992) * 0.6;
+#endif
     vec3 bandN = normalize(vec3(0.3, 0.6, -0.74));
     float band = 1.0 - smoothstep(0.0, 0.32, abs(dot(d, bandN)));
     float mw = fbm3d(d * 6.0) * band;
     vec3 milky = mix(vec3(0.25, 0.3, 0.55), vec3(0.6, 0.45, 0.5), fbm3d(d * 3.0 + 5.0)) * pow(mw, 2.0) * 0.5;
+#ifndef CHEAP
     s += starLayer(d, 700.0, 0.97) * band * 0.8;
+#endif
     col += (s + milky) * nightVis * smoothstep(-0.05, 0.15, y) * (1.0 - cloudCover * 0.7);
   }
   // moon
@@ -211,6 +217,7 @@ export class Atmosphere {
       uEnv: { value: 0 },
     };
     const mat = new THREE.ShaderMaterial({
+      defines: cheapDefine() ? { CHEAP: 1 } : {},
       uniforms: this.uniforms,
       vertexShader: SKY_VERT,
       fragmentShader: SKY_FRAG,

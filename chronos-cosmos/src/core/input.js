@@ -60,6 +60,7 @@ export class Input {
   _bind() {
     window.addEventListener('keydown', (e) => {
       if (e.code === 'Tab') e.preventDefault();
+      if (this.lastDevice === 'touch' && !e.repeat) this.lastDevice = 'kbm';
       if (e.code === 'Space' && !this.uiCapture) e.preventDefault();
       if (e.repeat) return;
       this.keys.add(e.code);
@@ -74,8 +75,20 @@ export class Input {
       this.keys.clear();
       this.mouse.left = this.mouse.right = this.mouse.middle = false;
     });
+    // Phones fire emulated mouse events after every touch; ignore those so a
+    // drag to look around never turns into a sword swing.
+    this.lastTouch = -1e9;
+    const touched = () => {
+      this.lastTouch = performance.now();
+      this.lastDevice = 'touch';
+    };
+    window.addEventListener('touchstart', touched, { passive: true, capture: true });
+    window.addEventListener('touchend', touched, { passive: true, capture: true });
+    const fromTouch = () => performance.now() - this.lastTouch < 900;
+    this.fromTouch = fromTouch;
     const c = this.canvas;
     c.addEventListener('mousedown', (e) => {
+      if (fromTouch()) return;
       this.lastDevice = 'kbm';
       if (!this.locked && this.wantLock && (!this.canLock || this.canLock())) this.requestLock();
       const b = e.button === 0 ? 'left' : e.button === 2 ? 'right' : 'middle';
@@ -85,12 +98,14 @@ export class Input {
       e.preventDefault();
     });
     window.addEventListener('mouseup', (e) => {
+      if (fromTouch()) return;
       const b = e.button === 0 ? 'left' : e.button === 2 ? 'right' : 'middle';
       if (this.mouse[b]) this.mouseReleased[b] = true;
       this.mouse[b] = false;
       if (!this.mouse.left && !this.mouse.right) this.dragging = false;
     });
     window.addEventListener('mousemove', (e) => {
+      if (fromTouch()) return;
       this.mouse.x = e.clientX;
       this.mouse.y = e.clientY;
       if (this.locked) {
@@ -121,6 +136,8 @@ export class Input {
       this._lfT = setTimeout(() => (this.lockFailed = false), 1500);
     });
     window.addEventListener('gamepadconnected', () => (this.lastDevice = 'pad'));
+    document.addEventListener('gesturestart', (e) => e.preventDefault());
+    document.addEventListener('dblclick', (e) => e.preventDefault());
   }
 
   requestLock() {

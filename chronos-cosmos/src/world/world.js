@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { VLight } from '../core/lights.js';
 import { G } from '../core/G.js';
 import { ITEMS } from '../game/items.js';
 
@@ -287,7 +288,7 @@ export class World {
   addFirePatch(x, z, dur, r) {
     const y = G.terrain.heightAt(x, z);
     if (G.water && G.water.level > y + 0.1) return;
-    const light = new THREE.PointLight(0xff7a2a, 8, r * 5, 2);
+    const light = new VLight(0xff7a2a, 8, r * 5, 2);
     light.position.set(x, y + 1, z);
     G.scene.add(light);
     this.zones.push({ type: 'fire', x, z, y, r, t: dur, dur, light, tick: 0 });
@@ -333,6 +334,7 @@ export class World {
         }
         if (z.t <= 0) {
           G.scene.remove(z.light);
+          z.light.dispose();
           this.zones.splice(i, 1);
           changed = true;
         }

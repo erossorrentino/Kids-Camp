@@ -76,6 +76,9 @@ export class HUD {
     this.root.appendChild(this.toasts);
     this.bannerEl = el('div', 'banner', '<div class="b-title"></div><div class="b-sub"></div>');
     root.appendChild(this.bannerEl);
+    // damage vignette used when the post-processing chain is off (phones)
+    this.vig = el('div', 'dmg-vignette');
+    root.appendChild(this.vig);
     // damage vignette value
     this.damage = 0;
     // overlay canvas
@@ -139,6 +142,11 @@ export class HUD {
   epochBanner(e) {
     const ep = EPOCHS[e];
     this.banner(ep.name, ep.sub, 'epoch e' + e);
+  }
+
+  setVignette(v) {
+    const o = Math.min(0.85, v).toFixed(2);
+    if (this._vig !== o) { this._vig = o; this.vig.style.opacity = o; }
   }
 
   damageFlash(a) {

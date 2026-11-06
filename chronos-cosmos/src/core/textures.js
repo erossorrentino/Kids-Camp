@@ -135,25 +135,26 @@ function masonry(u, v, out, o) {
   void ey;
 }
 
-export function createTextures() {
+export function createTextures(maxSize = 512) {
   const T = {};
-  T.stone = generate(512, (u, v, o) =>
+  const S = (n) => Math.min(n, maxSize);
+  T.stone = generate(S(512), (u, v, o) =>
     masonry(u, v, o, {
       rows: 6, cols: 3, mortar: 0.035, color: [0.58, 0.55, 0.5], mortarColor: [0.36, 0.34, 0.31],
       tintVar: 0.35, seed: 4, aspect: 0.5, jitter: true,
     }), { normalStrength: 3.2 });
-  T.brick = generate(512, (u, v, o) =>
+  T.brick = generate(S(512), (u, v, o) =>
     masonry(u, v, o, {
       rows: 12, cols: 4, mortar: 0.05, color: [0.62, 0.36, 0.26], mortarColor: [0.55, 0.52, 0.47],
       tintVar: 0.4, seed: 7, aspect: 0.33,
     }), { normalStrength: 2.5 });
-  T.darkStone = generate(512, (u, v, o) => {
+  T.darkStone = generate(S(512), (u, v, o) => {
     masonry(u, v, o, {
       rows: 5, cols: 2, mortar: 0.03, color: [0.22, 0.21, 0.23], mortarColor: [0.08, 0.07, 0.07],
       tintVar: 0.25, seed: 11, aspect: 0.4, jitter: true,
     });
   }, { normalStrength: 3.5 });
-  T.marble = generate(512, (u, v, o) => {
+  T.marble = generate(S(512), (u, v, o) => {
     masonry(u, v, o, {
       rows: 4, cols: 2, mortar: 0.012, color: [0.9, 0.88, 0.84], mortarColor: [0.7, 0.66, 0.58],
       tintVar: 0.08, seed: 13, aspect: 0.5,
@@ -163,7 +164,7 @@ export function createTextures() {
     o[0] -= vv * 0.6; o[1] -= vv * 0.55; o[2] -= vv * 0.4;
     o[4] = 0.3 + o[4] * 0.2;
   }, { normalStrength: 1.2 });
-  T.cobble = generate(512, (u, v, o) => {
+  T.cobble = generate(S(512), (u, v, o) => {
     // voronoi cobbles
     const N = 10;
     const x = u * N, y = v * N;
@@ -188,7 +189,7 @@ export function createTextures() {
       o[3] = Math.sqrt(stoneH) * 0.8 + n * 0.1; o[4] = 0.7 + n * 0.25;
     }
   }, { normalStrength: 4 });
-  T.wood = generate(512, (u, v, o) => {
+  T.wood = generate(S(512), (u, v, o) => {
     const planks = 5;
     const px = u * planks;
     const p = Math.floor(px), fx = px - p;
@@ -208,20 +209,20 @@ export function createTextures() {
       o[3] = 0.6 + rings * 0.1 + fine * 0.05; o[4] = 0.65 + fine * 0.2;
     }
   }, { normalStrength: 2 });
-  T.bark = generate(256, (u, v, o) => {
+  T.bark = generate(S(256), (u, v, o) => {
     const n = pfbm(u * 8, v * 2, 8, 4, 31);
     const ridges = Math.pow(Math.abs(Math.sin((u * 10 + n * 2.5) * Math.PI)), 0.6);
     const t = 0.22 + ridges * 0.12 + n * 0.08;
     o[0] = t * 1.15; o[1] = t * 0.85; o[2] = t * 0.6; o[3] = ridges * 0.8 + n * 0.2; o[4] = 0.9;
   }, { normalStrength: 4 });
-  T.plaster = generate(256, (u, v, o) => {
+  T.plaster = generate(S(256), (u, v, o) => {
     const n = pfbm(u * 8, v * 8, 8, 5, 41);
     const n2 = pnoise(u * 64, v * 64, 64, 2);
     const stain = Math.max(0, pfbm(u * 2, v * 3, 2, 3, 51) - 0.45) * 0.9 * (1 - v * 0.5);
     const t = 0.86 + n * 0.08 + n2 * 0.03 - stain * 0.3;
     o[0] = t * 0.96; o[1] = t * 0.9; o[2] = t * 0.8; o[3] = n * 0.5 + n2 * 0.2; o[4] = 0.92;
   }, { normalStrength: 1.5 });
-  T.roof = generate(512, (u, v, o) => {
+  T.roof = generate(S(512), (u, v, o) => {
     // overlapping clay tiles
     const rows = 10, cols = 8;
     const ry = v * rows, row = Math.floor(ry), fy = ry - row;
@@ -237,7 +238,7 @@ export function createTextures() {
     o[3] = curve * 0.5 + (1 - fy) * 0.4 + n * 0.05;
     o[4] = 0.7 + n * 0.2;
   }, { normalStrength: 3 });
-  T.slate = generate(512, (u, v, o) => {
+  T.slate = generate(S(512), (u, v, o) => {
     const rows = 12, cols = 7;
     const ry = v * rows, row = Math.floor(ry), fy = ry - row;
     const rx = u * cols + (row % 2) * 0.5, col = Math.floor(rx), fx = rx - col;
@@ -248,7 +249,7 @@ export function createTextures() {
     o[0] = gap ? 0.04 : t * 0.9; o[1] = gap ? 0.04 : t * 1.0; o[2] = gap ? 0.05 : t * 1.2;
     o[3] = gap ? 0 : 0.3 + (1 - fy) * 0.5 + n * 0.05; o[4] = 0.55 + n * 0.2;
   }, { normalStrength: 3 });
-  T.thatch = generate(256, (u, v, o) => {
+  T.thatch = generate(S(256), (u, v, o) => {
     const strands = pnoise(u * 128, v * 6, 128, 8);
     const n = pfbm(u * 8, v * 8, 8, 3, 61);
     const rows = 6; const fy = (v * rows) % 1;
@@ -256,27 +257,27 @@ export function createTextures() {
     o[0] = 0.62 * t * (0.7 + fy * 0.3); o[1] = 0.5 * t * (0.7 + fy * 0.3); o[2] = 0.28 * t * (0.7 + fy * 0.3);
     o[3] = strands * 0.6 + fy * 0.4; o[4] = 0.95;
   }, { normalStrength: 3 });
-  T.metal = generate(256, (u, v, o) => {
+  T.metal = generate(S(256), (u, v, o) => {
     const n = pfbm(u * 16, v * 16, 16, 4, 71);
     const brush = pnoise(u * 256, v * 4, 256, 3);
     const t = 0.85 + n * 0.1 + brush * 0.08;
     o[0] = t; o[1] = t; o[2] = t; o[3] = n * 0.3 + brush * 0.1; o[4] = 0.25 + n * 0.3;
   }, { normalStrength: 0.8 });
-  T.cloth = generate(256, (u, v, o) => {
+  T.cloth = generate(S(256), (u, v, o) => {
     const wx = Math.sin(u * 256 * Math.PI) * 0.5 + 0.5;
     const wy = Math.sin(v * 256 * Math.PI) * 0.5 + 0.5;
     const n = pfbm(u * 8, v * 8, 8, 3, 81);
     const t = 0.85 + (wx * wy) * 0.12 + n * 0.1;
     o[0] = t; o[1] = t; o[2] = t; o[3] = wx * 0.3 + wy * 0.3; o[4] = 0.95;
   }, { normalStrength: 1 });
-  T.rock = generate(512, (u, v, o) => {
+  T.rock = generate(S(512), (u, v, o) => {
     const n = pfbm(u * 6, v * 6, 6, 6, 91);
     const n2 = pfbm(u * 24, v * 24, 24, 3, 92);
     const strata = Math.sin((v * 20 + n * 4) * Math.PI) * 0.5 + 0.5;
     const t = 0.45 + n * 0.3 + strata * 0.06;
     o[0] = t * 0.95; o[1] = t * 0.9; o[2] = t * 0.85; o[3] = n * 0.7 + n2 * 0.3; o[4] = 0.85;
   }, { normalStrength: 5 });
-  T.leaf = generate(256, (u, v, o) => {
+  T.leaf = generate(S(256), (u, v, o) => {
     const n = pfbm(u * 12, v * 12, 12, 4, 101);
     const t = 0.7 + n * 0.5;
     o[0] = t; o[1] = t; o[2] = t; o[3] = n; o[4] = 0.8;

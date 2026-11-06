@@ -18,6 +18,20 @@ const HINTS = {
   mount: 'Sneak (C) up to a Duskhorn and press E to try to tame it.',
 };
 
+// Same hints, phrased for touch screens.
+const TOUCH_HINTS = {
+  combat: 'Tap Strike (or tap the right side of the screen) to attack. Lock targets a foe. Tap Guard just as a gold glint flashes to parry.',
+  red: 'A red glint cannot be blocked. Tap Dodge to roll through it.',
+  climb: 'Climbing drains stamina. Rest on flat ledges.',
+  glide: 'Tap Jump in mid-air to glide. Campfires and fire create updrafts.',
+  build: 'You have materials! Tap Build (top left) to place bridges, shelters and traps.',
+  shift: 'Tap Age to shift to the next Age. Hold it and push the joystick to choose one.',
+  magic: 'Spell casts your element (hold for a greater spell). Elem switches element. Weave enchants your blade.',
+  skills: 'You have a skill point. Tap Menu and open Skills.',
+  dodge: 'Dodge at the very last moment to slow time around you.',
+  mount: 'Walk slowly up to a Duskhorn and tap Use to try to tame it.',
+};
+
 export class Tutorial {
   constructor() {
     this.t = 0;
@@ -42,7 +56,8 @@ export class Tutorial {
     S.flags.hints = S.flags.hints || {};
     if (S.flags.hints[id]) return;
     S.flags.hints[id] = true;
-    G.hud.toast(HINTS[id], 'tip');
+    const touch = G.input.lastDevice === 'touch';
+    G.hud.toast((touch && TOUCH_HINTS[id]) || HINTS[id], 'tip');
   }
 
   update(dt, rdt) {

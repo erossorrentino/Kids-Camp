@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { VLight } from '../core/lights.js';
 import { G } from '../core/G.js';
 import { mulberry32 } from '../core/noise.js';
 import { Spawner } from '../actors/enemies.js';
@@ -22,7 +23,7 @@ export const content = {
 };
 
 function addFireFx(e, epochs) {
-  const light = new THREE.PointLight(0xff9a4a, 0, 14, 2);
+  const light = new VLight(0xff9a4a, 0, 14, 2);
   light.position.set(e.x, e.y + 0.8, e.z);
   G.scene.add(light);
   content.fires.push({ ...e, light, epochs });
@@ -373,7 +374,7 @@ function buildSpire() {
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: G.glowTex, color: 0xffd890, transparent: true, opacity: 0.7, blending: THREE.AdditiveBlending, depthWrite: false }));
     glow.scale.setScalar(40);
     crown.add(glow);
-    const light = new THREE.PointLight(0xffd890, 60, 160, 1.5);
+    const light = new VLight(0xffd890, 60, 160, 1.5);
     crown.add(light);
     built.group.add(crown);
     content.anims.push((dt, t) => {
@@ -418,7 +419,7 @@ function buildSpire() {
     const heart = new THREE.Mesh(new THREE.IcosahedronGeometry(2, 1), MATS.heartAsh);
     heart.position.y = 6;
     shards.add(heart);
-    const light = new THREE.PointLight(0xff4a1a, 25, 80, 1.6);
+    const light = new VLight(0xff4a1a, 25, 80, 1.6);
     light.position.y = 6;
     shards.add(light);
     built.group.add(shards);
@@ -858,7 +859,7 @@ function buildRiftsAndCamps() {
       rocks.add(m);
     }
     built.group.add(rocks);
-    const light = new THREE.PointLight(0xa070ff, 10, 20, 2);
+    const light = new VLight(0xa070ff, 10, 20, 2);
     light.position.copy(disc.position);
     built.group.add(light);
     content.anims.push((dt, t) => {

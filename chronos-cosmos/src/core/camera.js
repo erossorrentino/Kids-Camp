@@ -73,6 +73,17 @@ export class CameraRig {
       this.pitch += inp.lookVec.y * sens * (G.settings.invertY ? -1 : 1);
     }
     this.pitch = THREE.MathUtils.clamp(this.pitch, -0.9, 1.25);
+    // on touch screens, swing gently behind the player while they move so
+    // one thumb is enough to explore
+    const mv = inp.moveVec;
+    if (inp.lastDevice === 'touch' && !player.lockTarget && this.topDown < 0.5 && Math.hypot(mv.x, mv.y) > 0.3 && G.time - (this.lastLookInput || 0) > 1.2 && Math.abs(mv.y) > 0.2) {
+      let want = player.yaw + Math.PI;
+      let dy = want - this.yaw;
+      while (dy > Math.PI) dy -= Math.PI * 2;
+      while (dy < -Math.PI) dy += Math.PI * 2;
+      if (mv.y < 0) this.yaw += dy * Math.min(1, dt * 0.9);
+    }
+    if (inp.lookVec.x || inp.lookVec.y) this.lastLookInput = G.time;
     if (inp.mouse.wheel && G.build?.active) {
       // wheel is used by build mode
     }

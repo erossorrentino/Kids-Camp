@@ -1,28 +1,36 @@
 import * as THREE from 'three';
 import { G, WORLD_SIZE, HALF_WORLD } from '../core/G.js';
 import { worldHeight, biomeMasks } from './worldmap.js';
-import { GLSL_NOISE, GLSL_EPOCH, EPOCH_UNIFORMS, TIME_UNIFORM, WET_UNIFORM, NIGHT_UNIFORM, addCompileHook } from '../core/shaderlib.js';
+import { GLSL_NOISE, GLSL_EPOCH, EPOCH_UNIFORMS, TIME_UNIFORM, WET_UNIFORM, NIGHT_UNIFORM, addCompileHook, cheapDefine } from '../core/shaderlib.js';
 
 export const SEG = 400; // cells per side
 export const N = SEG + 1; // vertices per side
 export const CELL = WORLD_SIZE / SEG; // 4 m
-export const MASK_RES = 512;
+export let MASK_RES = 512;
 
 export class Terrain {
-  constructor() {
+  constructor(maskRes = 512) {
+    MASK_RES = maskRes;
     this.heights = new Float32Array(N * N);
     this.masks = new Uint8Array(MASK_RES * MASK_RES * 4);
   }
 
-  generate(progress) {
+  // Generated in slices, yielding to the browser so the loading bar moves
+  // (on a phone this takes a few seconds).
+  async generate(progress, yieldFn) {
     const H = this.heights;
+    let t0 = performance.now();
     for (let r = 0; r < N; r++) {
       const z = -HALF_WORLD + r * CELL;
       for (let c = 0; c < N; c++) {
         const x = -HALF_WORLD + c * CELL;
         H[r * N + c] = worldHeight(x, z);
       }
-      if (progress && r % 40 === 0) progress(r / N);
+      if (yieldFn && performance.now() - t0 > 60) {
+        progress?.((r / N) * 0.65);
+        await yieldFn();
+        t0 = performance.now();
+      }
     }
     const M = this.masks;
     const ms = WORLD_SIZE / MASK_RES;
@@ -46,6 +54,11 @@ export class Terrain {
         M[i + 1] = m[1] * 255;
         M[i + 2] = m[2] * 255;
         M[i + 3] = m[3] * 255;
+      }
+      if (yieldFn && performance.now() - t0 > 60) {
+        progress?.(0.65 + (r / MASK_RES) * 0.35);
+        await yieldFn();
+        t0 = performance.now();
       }
     }
   }
@@ -140,7 +153,7 @@ export class Terrain {
       shader.vertexShader = shader.vertexShader
         .replace('#include <common>', '#include <common>\nvarying vec3 vWPos; varying vec3 vWNrm;')
         .replace('#include <worldpos_vertex>', '#include <worldpos_vertex>\n vWPos = (modelMatrix * vec4(transformed,1.0)).xyz; vWNrm = normalize(mat3(modelMatrix) * objectNormal);');
-      shader.fragmentShader = shader.fragmentShader
+      shader.fragmentShader = cheapDefine() + shader.fragmentShader
         .replace('#include <common>', '#include <common>\n' + TERRAIN_FRAG_PARS)
         .replace('#include <color_fragment>', '#include <color_fragment>\n' + TERRAIN_FRAG_COLOR)
         .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = tRough;')
@@ -277,6 +290,9 @@ const TERRAIN_FRAG_NORMAL = /* glsl */ `
   float dist = length(vWPos - cameraPosition);
   float fade = 1.0 - smoothstep(40.0, 140.0, dist);
   vec3 wn = normalize(vWNrm);
+#ifdef CHEAP
+  fade = 0.0;
+#endif
   if (fade > 0.01) {
     vec2 p = vWPos.xz;
     float e = 0.08;

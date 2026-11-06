@@ -61,7 +61,7 @@ export class UI {
           <span>Difficulty</span>
           <button data-d="story">Story</button><button data-d="balanced">Balanced</button><button data-d="hard">Hard</button>
         </div>
-        <div class="title-foot">Click to capture the mouse · Gamepad supported · Best with headphones</div>
+        <div class="title-foot"><span class="kbm-only">Click the game to capture the mouse · </span><span class="touch-only">Left thumb moves · right thumb looks · tap to strike · </span>Gamepad supported · Best with headphones</div>
       </div>`;
     this.root.appendChild(t);
     this.titleEl = t;
@@ -107,6 +107,14 @@ export class UI {
   }
 
   beginPlay() {
+    // phones: go full screen and landscape where the browser allows it
+    if (G.input.lastDevice === 'touch' || G.device === 'phone') {
+      try {
+        const de = document.documentElement;
+        const p = de.requestFullscreen ? de.requestFullscreen({ navigationUI: 'hide' }) : de.webkitRequestFullscreen && de.webkitRequestFullscreen();
+        if (p && p.then) p.then(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch(() => {});
+      } catch (e) {}
+    }
     this.titleEl.hidden = true;
     G.state = 'play';
     G.hud.show(true);
@@ -136,8 +144,9 @@ export class UI {
     P.mode = 'locked';
     G.story.introCutscene(() => {
       P.mode = 'ground';
-      G.hud.toast('WASD to move · Mouse to look · Shift to sprint · Space to jump', 'tip');
-      G.after(3.5, () => G.hud.toast('Talk to Lyra with E', 'tip'));
+      const touch = G.input.lastDevice === 'touch';
+      G.hud.toast(touch ? 'Left thumb moves (push fully to sprint) · Right thumb looks around' : 'WASD to move · Mouse to look · Shift to sprint · Space to jump', 'tip');
+      G.after(3.5, () => G.hud.toast(touch ? 'Walk up to Lyra and tap Use to talk' : 'Talk to Lyra with E', 'tip'));
     });
   }
 
@@ -540,7 +549,7 @@ export class UI {
       r.oninput = () => on(parseFloat(r.value));
       return r;
     };
-    row('Graphics quality', select('set-quality', [['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['ultra', 'Ultra']], s.quality, (v) => { s.quality = v; s.manualQuality = true; G.qualityCfg = QUALITY[v]; G.quality = v; G.applyQuality(); this.saveSettings(); }));
+    row('Graphics quality', select('set-quality', [['mobile', 'Mobile (phones)'], ['low', 'Low (Chromebooks)'], ['medium', 'Medium'], ['high', 'High'], ['ultra', 'Ultra']], s.quality, (v) => { s.quality = v; s.manualQuality = true; G.qualityCfg = QUALITY[v]; G.quality = v; G.applyQuality(); this.saveSettings(); }));
     row('Difficulty', select('set-diff', [['story', 'Story — relaxed, forgiving'], ['balanced', 'Balanced'], ['hard', 'Hard — punishing']], s.difficulty, (v) => { s.difficulty = v; this.saveSettings(); this.refreshDiff(); }));
     row('Mouse sensitivity', range('set-sens', 0.3, 2.5, 0.05, s.sensitivity, (v) => { s.sensitivity = v; this.saveSettings(); }));
     row('Field of view', range('set-fov', 55, 95, 1, s.fov, (v) => { s.fov = v; this.saveSettings(); }));
@@ -698,6 +707,7 @@ export class UI {
     if (inp.down('epoch')) {
       this.epochHeld = (this.epochHeld || 0) + dt;
       if (this.epochHeld > 0.28 && this.wheel.hidden && G.epochs.canShift().ok) {
+        this.wheelSel = -1;
         this.wheel.hidden = false;
         this.timeScale = 0.2;
         this.wheelAng = 0;
@@ -705,10 +715,12 @@ export class UI {
       if (!this.wheel.hidden) {
         this.wheelAng += inp.mouse.dx * 0.01 + inp.moveVec.x * dt * 4;
         const mx = inp.mouse.x - window.innerWidth / 2, my = inp.mouse.y - window.innerHeight / 2;
-        let sel;
-        if (!G.input.locked && Math.hypot(mx, my) > 40) sel = Math.round(((Math.atan2(mx, -my) / (Math.PI * 2)) * 3 + 3)) % 3;
+        let sel = this.wheelSel >= 0 ? this.wheelSel : G.epochs.current;
+        const mv = inp.moveVec;
+        if (Math.hypot(mv.x, mv.y) > 0.5) sel = Math.round(((Math.atan2(mv.x, -mv.y) / (Math.PI * 2)) * 3 + 3)) % 3;
+        else if (inp.lastDevice === 'touch' || inp.lastDevice === 'pad') sel = this.wheelSel >= 0 ? this.wheelSel : (G.epochs.current + 1) % 3;
+        else if (!G.input.locked && Math.hypot(mx, my) > 40) sel = Math.round(((Math.atan2(mx, -my) / (Math.PI * 2)) * 3 + 3)) % 3;
         else sel = (((Math.round(this.wheelAng * 0.8) % 3) + 3) % 3);
-        if (inp.moveVec.y < -0.5) sel = 0;
         this.wheelSel = sel;
         this.wheel.querySelectorAll('.ew-opt').forEach((o) => {
           const i = +o.dataset.e;

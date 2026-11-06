@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import { G } from './G.js';
+
+export const cheapDefine = () => (G.cheap ? '#define CHEAP\n' : '');
 
 // ---------------------------------------------------------------------------
 // Shared GLSL helpers
@@ -14,10 +17,17 @@ float vnoise3(vec3 p){ vec3 i=floor(p), f=fract(p); vec3 u=f*f*(3.-2.*f);
   return mix(mix(mix(hash13(i),hash13(i+vec3(1,0,0)),u.x), mix(hash13(i+vec3(0,1,0)),hash13(i+vec3(1,1,0)),u.x),u.y),
              mix(mix(hash13(i+vec3(0,0,1)),hash13(i+vec3(1,0,1)),u.x), mix(hash13(i+vec3(0,1,1)),hash13(i+vec3(1,1,1)),u.x),u.y), u.z); }
 const mat2 NROT = mat2(1.6, 1.2, -1.2, 1.6);
+#ifdef CHEAP
+float fbm2(vec2 p){ float a=.5, s=0.; for(int i=0;i<3;i++){ s+=a*vnoise(p); p=NROT*p; a*=.5; } return s / 0.875 * 0.97; }
+#else
 float fbm2(vec2 p){ float a=.5, s=0.; for(int i=0;i<5;i++){ s+=a*vnoise(p); p=NROT*p; a*=.5; } return s; }
+#endif
 float fbm3(vec2 p){ float a=.5, s=0.; for(int i=0;i<3;i++){ s+=a*vnoise(p); p=NROT*p; a*=.5; } return s/0.875; }
 float fbm3d(vec3 p){ float a=.5, s=0.; for(int i=0;i<4;i++){ s+=a*vnoise3(p); p=p*2.03+vec3(1.7,9.2,3.1); a*=.5; } return s; }
 // Voronoi-ish crack pattern: returns distance to cell edge (0 at crack)
+#ifdef CHEAP
+float cracks(vec2 p){ return abs(vnoise(p * 1.3) - 0.5) * 0.5 + abs(vnoise(p * 2.7 + 5.0) - 0.5) * 0.25; }
+#else
 float cracks(vec2 p){
   vec2 n = floor(p), f = fract(p); float md = 8.0; vec2 mr;
   for(int j=-1;j<=1;j++) for(int i=-1;i<=1;i++){ vec2 g=vec2(float(i),float(j)); vec2 o=hash22(n+g); vec2 r=g+o-f; float d=dot(r,r); if(d<md){md=d; mr=r;} }
@@ -25,6 +35,7 @@ float cracks(vec2 p){
   for(int j=-1;j<=1;j++) for(int i=-1;i<=1;i++){ vec2 g=vec2(float(i),float(j)); vec2 o=hash22(n+g); vec2 r=g+o-f; if(dot(mr-r,mr-r)>0.00001) md=min(md, dot(0.5*(mr+r), normalize(r-mr))); }
   return md;
 }
+#endif
 vec3 srgb(vec3 c){ return pow(c, vec3(2.2)); }
 `;
 

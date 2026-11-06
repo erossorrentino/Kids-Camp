@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { VLight } from '../core/lights.js';
 import { G } from '../core/G.js';
 import { GLSL_NOISE, TIME_UNIFORM, fogUniforms } from '../core/shaderlib.js';
 
@@ -249,7 +250,7 @@ export class FX {
     };
     // pooled point lights for spells/explosions
     for (let i = 0; i < 6; i++) {
-      const l = new THREE.PointLight(0xffaa55, 0, 12, 2);
+      const l = new VLight(0xffaa55, 0, 12, 2);
       l.visible = false;
       scene.add(l);
       this.lights.push({ l, t: 0, dur: 0, inten: 0 });

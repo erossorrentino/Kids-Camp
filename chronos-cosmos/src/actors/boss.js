@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { VLight } from '../core/lights.js';
 import { G } from '../core/G.js';
 import { Rig, Anim, newPose, blendPose, blendUpper, buildCombatClips, makeClip, setJ, addJ } from './rig.js';
 import { DIFFICULTY } from './player.js';
@@ -120,7 +121,7 @@ export class Boss {
     this.tmp = newPose();
     this.rig.addTo(G.scene);
     this.rig.root.position.copy(this.pos);
-    this.aura = new THREE.PointLight(d.fog, 0, 20, 2);
+    this.aura = new VLight(d.fog, 0, 20, 2);
     this.rig.root.add(this.aura);
     this.level = 1;
     this.resolveOut = {};

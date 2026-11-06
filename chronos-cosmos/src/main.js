@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { G } from './core/G.js';
 import { patchFogChunks, TIME_UNIFORM, PLAYER_UNIFORM, WIND_UNIFORM, WET_UNIFORM } from './core/shaderlib.js';
-import { createRenderer, QUALITY } from './core/renderer.js';
+import { createRenderer, QUALITY, QUALITY_ORDER } from './core/renderer.js';
+import { LightPool } from './core/lights.js';
 import { createTextures, radialTexture } from './core/textures.js';
 import { Input } from './core/input.js';
 import { CameraRig } from './core/camera.js';
@@ -49,31 +50,75 @@ function setLoad(p, msg) {
 
 const params = new URLSearchParams(location.search);
 
+// What kind of device are we on? Phones and Chromebooks get lighter
+// defaults; the adaptive quality system steps down further if needed.
+function detectDevice() {
+  const ua = navigator.userAgent;
+  const touch = navigator.maxTouchPoints > 1 || 'ontouchstart' in window;
+  const iPad = /Macintosh/.test(ua) && navigator.maxTouchPoints > 1;
+  if (/iPhone|iPod/.test(ua) || (/Android/.test(ua) && /Mobile/.test(ua)) || (/Mobi/.test(ua) && touch)) return 'phone';
+  if (iPad || /iPad|Tablet/.test(ua) || (/Android/.test(ua) && !/Mobile/.test(ua))) return 'tablet';
+  if (/CrOS/.test(ua)) return 'chromebook';
+  return 'desktop';
+}
+const DEVICE_QUALITY = { phone: 'mobile', tablet: 'low', chromebook: 'low', desktop: 'high' };
+
+function fatal(msg) {
+  const m = document.getElementById('load-msg');
+  if (m) m.innerHTML = msg;
+  const b = document.querySelector('.load-bar');
+  if (b) b.style.display = 'none';
+}
+
 async function boot() {
   try {
     const raw = localStorage.getItem('chronos-cosmos-settings');
     if (raw) Object.assign(G.settings, JSON.parse(raw));
   } catch (e) {}
+  G.device = detectDevice();
+  document.documentElement.classList.add('dev-' + G.device);
+  if (!G.settings.manualQuality) {
+    const want = DEVICE_QUALITY[G.device];
+    const cur = QUALITY_ORDER.indexOf(G.settings.quality);
+    const def = QUALITY_ORDER.indexOf(want);
+    G.settings.quality = QUALITY_ORDER[cur < 0 ? def : Math.min(cur, def)];
+  }
   if (params.get('q')) G.settings.quality = params.get('q');
-  if (/Mobi|Android|iPhone|iPad/i.test(navigator.userAgent) && !params.get('q') && G.settings.quality === 'high') G.settings.quality = 'low';
+  if (!QUALITY[G.settings.quality]) G.settings.quality = 'high';
+  const light = G.settings.quality === 'mobile' || G.settings.quality === 'low';
+  G.cheap = light;
   patchFogChunks();
-  const { renderer, scene, camera, applyQuality } = createRenderer(document.getElementById('viewport'));
+  let created;
+  try {
+    created = createRenderer(document.getElementById('viewport'));
+  } catch (e) {
+    fatal('Your browser could not start 3D graphics (WebGL). Try updating it, or turn on hardware acceleration in its settings.');
+    throw e;
+  }
+  const { renderer, scene, camera, applyQuality } = created;
+  if (!G.webgl2) {
+    fatal('This browser does not support WebGL 2, which the game needs for its 3D world. Please update it (Chrome, Safari 15+, Edge or Firefox).');
+    return;
+  }
   G.applyQuality = applyQuality;
-  const q = (G.qualityCfg = QUALITY[G.settings.quality] || QUALITY.high);
+  const q = (G.qualityCfg = QUALITY[G.settings.quality]);
   G.quality = G.settings.quality;
+  renderer.shadowMap.enabled = q.shadows;
   setLoad(0.04, 'Painting stone and timber…');
   await nextFrame();
-  G.tex = createTextures();
+  G.tex = createTextures(light ? 256 : 512);
   G.glowTex = radialTexture(64, 0, 2);
-  setLoad(0.15, 'Raising the mountains of Aeloria…');
+  setLoad(0.12, 'Raising the mountains of Aeloria…');
   await nextFrame();
-  const terrain = (G.terrain = new Terrain());
-  terrain.generate();
+  const terrain = (G.terrain = new Terrain(light ? 256 : 512));
+  await terrain.generate((p) => setLoad(0.12 + p * 0.3), nextFrame);
   scene.add(terrain.buildMesh());
-  setLoad(0.4, 'Filling Mirror Lake…');
+  setLoad(0.44, 'Filling Mirror Lake…');
   await nextFrame();
   G.collision = new CollisionWorld(terrain);
   G.atmo = new Atmosphere(scene);
+  G.atmo.sun.shadow.mapSize.set(q.shadowSize, q.shadowSize);
+  G.lights = new LightPool(scene, q.lights);
   G.water = new Water(scene, terrain);
   G.epochs = new EpochManager();
   setLoad(0.5, 'Planting the Thornwood…');
@@ -81,12 +126,10 @@ async function boot() {
   G.veg = new Vegetation(scene, terrain, G.collision, G.tex);
   G.veg.scatter(q.trees);
   const gq = q.grass;
-  G.grass = [
-    new GrassField(terrain, { count: 85000 * gq, size: 70, height: 0.62, width: 0.08, segments: 4, seed: 3 }),
-    new GrassField(terrain, { count: 30000 * gq, size: 180, height: 0.6, width: 0.22, segments: 3, seed: 8, inner: 30 }),
-    new GrassField(terrain, { count: 5000 * gq, size: 90, height: 0.55, width: 0.14, flower: true, seed: 12 }),
-    new GrassField(terrain, { count: 50000 * gq, size: 26, height: 0.55, width: 0.058, segments: 4, seed: 21 }),
-  ];
+  G.grass = [new GrassField(terrain, { count: 85000 * gq, size: gq < 0.2 ? 44 : 70, height: 0.62, width: gq < 0.2 ? 0.11 : 0.08, segments: gq < 0.2 ? 3 : 4, seed: 3 })];
+  if (gq >= 0.5) G.grass.push(new GrassField(terrain, { count: 30000 * gq, size: 180, height: 0.6, width: 0.22, segments: 3, seed: 8, inner: 30 }));
+  if (gq >= 0.25) G.grass.push(new GrassField(terrain, { count: 5000 * gq, size: 90, height: 0.55, width: 0.14, flower: true, seed: 12 }));
+  if (gq >= 0.5) G.grass.push(new GrassField(terrain, { count: 50000 * gq, size: 26, height: 0.55, width: 0.058, segments: 4, seed: 21 }));
   for (const g of G.grass) scene.add(g.mesh);
   setLoad(0.65, 'Waking the creatures…');
   await nextFrame();
@@ -125,7 +168,7 @@ async function boot() {
   G.ui = new UI();
   G.tutorial = new Tutorial();
   G.input.canLock = () => G.state === 'play' && !G.ui.blocking && !G.cutscene.active;
-  if ('ontouchstart' in window || navigator.maxTouchPoints > 1) G.touch = new TouchControls();
+  G.touch = new TouchControls();
 
   const sx = START.x, sz = START.z;
   G.player.spawn(sx, terrain.heightAt(sx, sz) + 0.1, sz);
@@ -133,6 +176,13 @@ async function boot() {
   G.epochs.setInstant(0);
   G.atmo.update(0, true);
   G.atmo.updateEnvironment(renderer, true);
+  setLoad(0.96, 'Preparing shaders…');
+  await nextFrame();
+  // compile materials up front so the first seconds of play don't stutter
+  try {
+    if (renderer.compileAsync) await Promise.race([renderer.compileAsync(scene, camera), new Promise((r) => setTimeout(r, 8000))]);
+    else renderer.compile(scene, camera);
+  } catch (e) {}
   setLoad(1, 'Ready');
 
   window.__cc = { G, THREE };
@@ -238,6 +288,7 @@ function step(rdt) {
     G.bosses?.update?.(dt);
   }
   if (playing) G.tutorial?.update(paused ? 0 : dt, rdt);
+  G.touch?.update(rdt);
   if (!playing || paused) {
     G.ui?.update?.(rdt);
     if (!paused) G.content?.update?.(rdt * 0.5, 1);
@@ -274,7 +325,12 @@ function step(rdt) {
   G.post.grain.uniforms.uTime.value = G.time;
   G.hud.update(rdt);
   G.audio?.update?.(rdt);
-  if (!G.noRender) G.post.composer.render(rdt);
+  G.lights.update(cam);
+  if (!G.noRender) {
+    if (G.usePost) G.post.composer.render(rdt);
+    else G.renderer.render(G.scene, G.camera);
+  }
+  G.hud.setVignette?.(G.usePost ? 0 : G.post.grade.uniforms.uDamage.value);
   inp.endFrame();
 }
 

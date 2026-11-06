@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { VLight } from '../core/lights.js';
 import { G } from '../core/G.js';
 import { NPCManager } from '../actors/npc.js';
 import { Builder, MATS } from '../world/structures.js';
@@ -296,7 +297,7 @@ export class Story {
       g.position.set(c.x, y, c.z);
       g.rotation.y = Math.atan2(START.x - c.x, START.z - c.z);
       G.scene.add(g);
-      const glow = new THREE.PointLight(0xffd890, 2, 6, 2);
+      const glow = new VLight(0xffd890, 2, 6, 2);
       glow.position.set(c.x, y + 1, c.z);
       G.scene.add(glow);
       const chest = { ...c, y, g, lidPivot, glow, opened: !!this.S.collected[c.id] };
@@ -338,7 +339,7 @@ export class Story {
       g.position.set(b.x, b.y, b.z);
       g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
       G.scene.add(g);
-      const light = new THREE.PointLight(0xff8a3a, 0, 10, 2);
+      const light = new VLight(0xff8a3a, 0, 10, 2);
       light.position.set(b.x, b.y + 2, b.z);
       G.scene.add(light);
       G.collision.addCyl(b.x, b.z, b.y, b.y + 1.5, 0.5, { climbable: false });
@@ -439,7 +440,7 @@ export class Story {
     g.add(base, lidPivot);
     g.position.set(c.x, c.y, c.z);
     built.group.add(g);
-    const glow = new THREE.PointLight(0xffd890, 2, 6, 2);
+    const glow = new VLight(0xffd890, 2, 6, 2);
     glow.position.set(c.x, c.y + 1, c.z);
     built.group.add(glow);
     const chest = { ...c, g, lidPivot, glow, opened: !!this.S.collected[c.id] };
