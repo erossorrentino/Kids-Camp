@@ -210,9 +210,11 @@ Surf terrainSurf(int ep, vec3 wp, vec3 wn, vec4 m, float n1, float n2, float n3)
     e += vec3(1.0, 0.32, 0.06) * vein * hot * 2.2 * pulse * (0.15 + 0.85 * nearF);
     // crater glow near volcano floor
     float crater = (1.0 - smoothstep(30.0, 60.0, distance(wp.xz, vec2(60.0, -560.0)))) * smoothstep(160.0, 175.0, h);
-    float lava = smoothstep(0.35, 0.6, fbm3(wp.xz * 0.06 + vec2(uTime * 0.03, 0.0)));
-    c = mix(c, srgb(vec3(0.1, 0.03, 0.02)), crater);
-    e += vec3(1.4, 0.4, 0.06) * crater * lava * 3.0 * pulse;
+    float lavaN = fbm3(wp.xz * 0.05 + vec2(uTime * 0.02, 0.0));
+    float lava = smoothstep(0.03, 0.0, abs(lavaN - 0.5)) + smoothstep(0.7, 0.78, lavaN);
+    c = mix(c, srgb(vec3(0.07, 0.05, 0.05)), crater);
+    e = mix(e, vec3(0.0), crater * 0.8);
+    e += vec3(1.4, 0.38, 0.05) * crater * lava * 1.6 * pulse;
     rough = 0.96;
     bump = mix(0.7, 1.5, rockT);
   } else {

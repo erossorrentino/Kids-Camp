@@ -1,0 +1,94 @@
+import { G } from '../core/G.js';
+import { QUALITY } from '../core/renderer.js';
+
+// Contextual one-time hints, adaptive quality and auto-pause.
+const HINTS = {
+  combat: 'Tab locks on. Left mouse attacks, hold it to charge. Right mouse blocks. Tap it as a gold glint flashes to parry.',
+  red: 'A red glint means the attack cannot be blocked or parried. Tap Shift to dodge through it.',
+  climb: 'Climbing drains stamina (the wheel beside you). Rest on flat ledges, or press C to let go.',
+  glide: 'Press Space in mid-air to glide. Fire and campfires create updrafts that lift you.',
+  harvest: 'Strike trees and rocks with your sword to gather wood and stone.',
+  build: 'You have materials! Press B to build. Bridges, shelters, traps and bounce pads.',
+  rest: 'Campfires are safe havens. Rest to heal, save and craft gear.',
+  shift: 'Tap T to shift to the next Age. Hold T to choose from the Age wheel.',
+  magic: 'Q casts your selected spell, hold Q for a greater spell. F weaves the element into your blade. 1–4 switch elements.',
+  skills: 'You have a skill point. Open the menu (Esc) and spend it under Skills.',
+  dodge: 'Dodge at the very last moment to trigger a Timeslip and slow the world around you.',
+  swim: 'Swimming uses stamina. Frost magic turns water into ice you can walk on.',
+  mount: 'Sneak (C) up to a Duskhorn and press E to try to tame it.',
+};
+
+export class Tutorial {
+  constructor() {
+    this.t = 0;
+    this.fpsT = 0;
+    this.frames = 0;
+    this.downgrades = 0;
+    this.warm = 0;
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden && G.state === 'play' && !G.ui.menuOpen && !G.cutscene.active && !G.dialogue.active && !G.rift?.picking) G.ui.openMenu('map');
+    });
+    document.addEventListener('pointerlockchange', () => {
+      const lostLock = !document.pointerLockElement;
+      if (lostLock && G.state === 'play' && !G.ui.blocking && !G.cutscene.active && !G.build?.active && !G.rift?.picking && !G.input.lockFailed) {
+        // the browser swallows the Esc that released the mouse: open the menu for it
+        setTimeout(() => { if (!document.pointerLockElement && !G.ui.menuOpen && G.state === 'play' && !G.ui.blocking) G.ui.openMenu(G.ui.tab || 'map'); }, 50);
+      }
+    });
+  }
+
+  hint(id) {
+    const S = G.game.state;
+    S.flags.hints = S.flags.hints || {};
+    if (S.flags.hints[id]) return;
+    S.flags.hints[id] = true;
+    G.hud.toast(HINTS[id], 'tip');
+  }
+
+  update(dt, rdt) {
+    if (G.state !== 'play') return;
+    // adaptive quality: step down if the frame rate stays low
+    this.warm += rdt;
+    if (this.warm > 6 && !G.ui.paused && !G.cutscene.active) {
+      this.fpsT += rdt;
+      this.frames++;
+      if (this.fpsT >= 4) {
+        const fps = this.frames / this.fpsT;
+        this.fpsT = 0;
+        this.frames = 0;
+        const order = ['low', 'medium', 'high', 'ultra'];
+        const qi = order.indexOf(G.settings.quality);
+        if (fps < 26 && qi > 0 && this.downgrades < 2 && !G.settings.manualQuality) {
+          this.downgrades++;
+          G.settings.quality = order[qi - 1];
+          G.qualityCfg = QUALITY[G.settings.quality];
+          G.quality = G.settings.quality;
+          G.applyQuality();
+          G.ui.saveSettings();
+          G.hud.toast(`Graphics lowered to ${G.settings.quality} for smoother play. You can change this in Settings.`, 'tip');
+        }
+      }
+    }
+    if (!dt) return;
+    this.t -= dt;
+    if (this.t > 0) return;
+    this.t = 0.5;
+    const P = G.player;
+    const S = G.game.state;
+    for (const e of G.enemies) {
+      if (!e.dead && e.state !== 'idle' && e.distTo(P.pos) < 25) { this.hint('combat'); break; }
+    }
+    if (G.enemies.some((e) => !e.dead && e.attack && e.attack.def.parryable === false && e.distTo(P.pos) < 12)) this.hint('red');
+    if (P.mode === 'climb' && P.stamina < P.maxStamina * 0.6) this.hint('climb');
+    if (P.mode === 'air' && P.vel.y < -6 && P.pos.y - G.terrain.heightAt(P.pos.x, P.pos.z) > 4) this.hint('glide');
+    if (P.mode === 'swim') this.hint('swim');
+    if (S.flags.hints?.combat && S.stats.kills >= 2) this.hint('dodge');
+    if (G.veg && S.flags.met_lyra && S.stats.kills >= 1) this.hint('harvest');
+    if ((S.inv.wood >= 4 || S.inv.stone >= 4) && !G.build.active) this.hint('build');
+    if (G.content.campfires.some((c) => Math.hypot(c.x - P.pos.x, c.z - P.pos.z) < 8)) this.hint('rest');
+    if (S.flags.shift_unlocked) this.hint('shift');
+    if (S.flags.hints?.combat && S.stats.kills >= 1) this.hint('magic');
+    if ((P.skillPoints || 0) > 0) this.hint('skills');
+    if (G.mounts && G.mounts.list.some((m) => m.visibleNow() && !m.tamed && m.pos.distanceTo(P.pos) < 30)) this.hint('mount');
+  }
+}

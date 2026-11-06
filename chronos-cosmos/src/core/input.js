@@ -116,6 +116,9 @@ export class Input {
     document.addEventListener('pointerlockerror', () => {
       this.locked = false;
       this.lockFailed = true;
+      // browsers refuse a re-lock right after Esc; allow retrying shortly after
+      clearTimeout(this._lfT);
+      this._lfT = setTimeout(() => (this.lockFailed = false), 1500);
     });
     window.addEventListener('gamepadconnected', () => (this.lastDevice = 'pad'));
   }
@@ -124,7 +127,7 @@ export class Input {
     if (this.lockFailed) return;
     try {
       const p = this.canvas.requestPointerLock && this.canvas.requestPointerLock();
-      if (p && p.catch) p.catch(() => (this.lockFailed = true));
+      if (p && p.catch) p.catch(() => {});
     } catch (e) {
       this.lockFailed = true;
     }

@@ -540,7 +540,7 @@ export class UI {
       r.oninput = () => on(parseFloat(r.value));
       return r;
     };
-    row('Graphics quality', select('set-quality', [['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['ultra', 'Ultra']], s.quality, (v) => { s.quality = v; G.qualityCfg = QUALITY[v]; G.quality = v; G.applyQuality(); this.saveSettings(); }));
+    row('Graphics quality', select('set-quality', [['low', 'Low'], ['medium', 'Medium'], ['high', 'High'], ['ultra', 'Ultra']], s.quality, (v) => { s.quality = v; s.manualQuality = true; G.qualityCfg = QUALITY[v]; G.quality = v; G.applyQuality(); this.saveSettings(); }));
     row('Difficulty', select('set-diff', [['story', 'Story — relaxed, forgiving'], ['balanced', 'Balanced'], ['hard', 'Hard — punishing']], s.difficulty, (v) => { s.difficulty = v; this.saveSettings(); this.refreshDiff(); }));
     row('Mouse sensitivity', range('set-sens', 0.3, 2.5, 0.05, s.sensitivity, (v) => { s.sensitivity = v; this.saveSettings(); }));
     row('Field of view', range('set-fov', 55, 95, 1, s.fov, (v) => { s.fov = v; this.saveSettings(); }));

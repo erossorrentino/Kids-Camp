@@ -35,6 +35,7 @@ import { Weather } from './world/weather.js';
 import { Audio } from './core/audio.js';
 import { UI } from './ui/ui.js';
 import { TouchControls } from './ui/touch.js';
+import { Tutorial } from './game/tutorial.js';
 
 const nextFrame = () => new Promise((r) => requestAnimationFrame(() => r()));
 function setLoad(p, msg) {
@@ -122,6 +123,7 @@ async function boot() {
   G.mount = G.mounts = new Mounts();
   G.weather = new Weather();
   G.ui = new UI();
+  G.tutorial = new Tutorial();
   G.input.canLock = () => G.state === 'play' && !G.ui.blocking && !G.cutscene.active;
   if ('ontouchstart' in window || navigator.maxTouchPoints > 1) G.touch = new TouchControls();
 
@@ -234,7 +236,9 @@ function step(rdt) {
     G.build?.update?.(dt);
     G.rift?.update?.(dt * worldScale, dt * playerScale);
     G.bosses?.update?.(dt);
-  } else {
+  }
+  if (playing) G.tutorial?.update(paused ? 0 : dt, rdt);
+  if (!playing || paused) {
     G.ui?.update?.(rdt);
     if (!paused) G.content?.update?.(rdt * 0.5, 1);
   }

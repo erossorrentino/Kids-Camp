@@ -334,11 +334,11 @@ export class Atmosphere {
     const fogDay = [fc[0] * (0.8 + golden * 0.25), fc[1] * (0.85 - golden * 0.1), fc[2] * (0.9 - golden * 0.3)];
     const fogNight = [nh[0] * 1.6 + 0.01, nh[1] * 1.6 + 0.012, nh[2] * 1.6 + 0.02];
     const fogCol = lerp3([0, 0, 0], fogNight, fogDay, day);
-    for (let i = 0; i < 3; i++) fogCol[i] = fogCol[i] + ((fogCol[0] + fogCol[1] + fogCol[2]) / 3 - fogCol[i]) * grey * 0.8;
+    for (let i = 0; i < 3; i++) fogCol[i] = (fogCol[i] + ((fogCol[0] + fogCol[1] + fogCol[2]) / 3 - fogCol[i]) * grey * 0.8) * (1 - W.storm * 0.45 - W.rain * 0.15);
     if (this.rift > 0) lerp3(fogCol, fogCol, [0.04, 0.01, 0.08], this.rift);
     // sky values are authored in linear space, keep fog consistent with them
     this.scene.fog.color.setRGB(fogCol[0], fogCol[1], fogCol[2]);
-    const dens = L(['fog', 'density']) * (1 + W.fog * 3 + W.rain * 0.8 + W.storm * 1.2 + W.ash * 0.8) * (1 + night * 0.3) * (G.quality === 'low' ? 1.3 : 1);
+    const dens = L(['fog', 'density']) * (1 + W.fog * 1.6 + W.rain * 0.45 + W.storm * 0.6 + W.ash * 0.6) * (1 + night * 0.3) * (G.quality === 'low' ? 1.3 : 1);
     SHARED.fogParams.x = this.rift > 0 ? 0.003 : dens;
     SHARED.fogParams.y = L(['fog', 'falloff']);
     SHARED.fogParams.z = 0;
