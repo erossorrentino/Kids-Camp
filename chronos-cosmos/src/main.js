@@ -81,10 +81,10 @@ async function boot() {
   G.veg.scatter(q.trees);
   const gq = q.grass;
   G.grass = [
-    new GrassField(terrain, { count: 110000 * gq, size: 70, height: 0.62, width: 0.075, segments: 4, seed: 3 }),
+    new GrassField(terrain, { count: 85000 * gq, size: 70, height: 0.62, width: 0.08, segments: 4, seed: 3 }),
     new GrassField(terrain, { count: 30000 * gq, size: 180, height: 0.6, width: 0.22, segments: 3, seed: 8, inner: 30 }),
     new GrassField(terrain, { count: 5000 * gq, size: 90, height: 0.55, width: 0.14, flower: true, seed: 12 }),
-    new GrassField(terrain, { count: 60000 * gq, size: 26, height: 0.55, width: 0.055, segments: 4, seed: 21 }),
+    new GrassField(terrain, { count: 50000 * gq, size: 26, height: 0.55, width: 0.058, segments: 4, seed: 21 }),
   ];
   for (const g of G.grass) scene.add(g.mesh);
   setLoad(0.65, 'Waking the creatures…');
@@ -135,12 +135,30 @@ async function boot() {
 
   window.__cc = { G, THREE };
   startLoop();
-  if (G.ui && G.ui.showTitle && !params.has('play')) G.ui.showTitle();
-  else {
-    document.getElementById('loading').classList.add('gone');
-    G.hud.show(true);
-    G.state = 'play';
-    if (G.ui?.startNew && params.has('play')) G.ui.startNew(true);
+  // When the page is updated in place by its host, carry the run across.
+  const hot = window.claude && window.claude.hot;
+  try {
+    hot?.snapshot?.(() => (G.state === 'play' ? { save: G.game.snapshot() } : null));
+  } catch (e) {}
+  const start = (data) => {
+    if (data && data.save) {
+      G.audio.init();
+      G.game.apply(data.save);
+      G.story.restoreFollowers();
+      G.epochs.locked = !data.save.flags.shift_unlocked;
+      G.ui.beginPlay();
+      return;
+    }
+    if (params.has('play')) {
+      document.getElementById('loading').classList.add('gone');
+      G.ui.startNew(true);
+    } else G.ui.showTitle();
+  };
+  try {
+    if (hot && hot.ready) hot.ready(start);
+    else start((hot && hot.data) || {});
+  } catch (e) {
+    start({});
   }
 }
 

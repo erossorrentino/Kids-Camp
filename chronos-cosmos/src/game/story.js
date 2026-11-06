@@ -228,7 +228,11 @@ export class Story {
       G.audio?.sfx('attune');
       G.hud.banner(p.name + ' attuned', n ? `${n} new places revealed on your map` : 'The land below is laid bare', 'discover');
     }
-    if (i === 0 && !S.flags.fracture && G.quests.stepId('main1') === 'attune') this.fractureCutscene(p);
+    const st = G.quests.stepId('main1');
+    if (i === 0 && !S.flags.fracture && (st === 'attune' || st === 'climb')) {
+      if (st === 'climb') G.quests.complete('main1');
+      this.fractureCutscene(p);
+    }
   }
 
   // ------------------------------------------------------------- collectibles
@@ -404,10 +408,10 @@ export class Story {
     built.group.add(canopy);
     this.sunheart = { built, canopy, sprout, mound };
     const apply = (e) => {
-      const grown = this.S.flags.seed_planted && e > 0;
+      const grown = !!this.S.flags.seed_planted && e > 0;
       built.group.visible = grown;
       for (const c of built.cols) c.active = grown;
-      sprout.visible = this.S.flags.seed_planted && e === 0;
+      sprout.visible = !!this.S.flags.seed_planted && e === 0;
       if (e === 1) leafMat.color.setHex(0xff9a4a), leafMat.emissive.setHex(0xaa3a0a);
       else leafMat.color.setHex(0xffd86a), leafMat.emissive.setHex(0xc88a1a);
     };
@@ -481,7 +485,7 @@ export class Story {
     G.cutscene.play([
       { cam: { from: () => V(P.pos.x + 5, P.pos.y + 3, P.pos.z + 5), to: () => V(P.pos.x + 3, P.pos.y + 2, P.pos.z - 3), look: () => V(P.pos.x, P.pos.y + 1.3, P.pos.z), dur: 3, fov: 50 }, line: { s: '', t: 'The astrolabe’s rings spin faster, faster, until they blur into a single burning circle.' } },
       { cam: { from: () => V(P.pos.x, P.pos.y + 4, P.pos.z), to: () => V(P.pos.x - 5, P.pos.y + 6, P.pos.z - 5), look: V(sp.x, sp.y + 100, sp.z), dur: 3.5, fov: 40 }, line: { s: '', t: 'Far across the lake, the Chrono Spire answers. A light like a second sunrise.' }, fn: () => { G.atmo.flash = 1; G.cam.shake(0.8); G.audio?.sfx('thunderBig'); } },
-      { fn: () => { G.epochs.shift(1, { force: true, center: P.pos, cooldown: 6 }); }, dur: 3.2, line: { s: '', t: 'And then the world breaks.' } },
+      { fn: () => { G.epochs.shift(1, { force: true, center: P.pos, cooldown: 3 }); }, dur: 3.2, line: { s: '', t: 'And then the world breaks.' } },
       { cam: { from: () => V(P.pos.x + 8, P.pos.y + 4, P.pos.z + 8), to: () => V(P.pos.x - 6, P.pos.y + 3, P.pos.z + 9), look: () => V(P.pos.x, P.pos.y + 1, P.pos.z), dur: 4, fov: 55 }, line: { s: '', t: 'Ash. A red sky. Dead trees as far as you can see. Hearthmere lies in ruins below.' } },
     ], () => {
       G.player.mode = 'ground';

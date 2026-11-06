@@ -84,6 +84,7 @@ export class Cutscene {
   }
 
   skipAll() {
+    if (!this.active) return;
     // run remaining callbacks so story state stays consistent
     for (let k = this.i + 1; k < this.steps.length; k++) if (this.steps[k].fn) this.steps[k].fn();
     this.finish();

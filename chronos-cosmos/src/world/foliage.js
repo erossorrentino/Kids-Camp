@@ -59,12 +59,8 @@ const GRASS_VERT_MAIN = /* glsl */ `
   vec2 muv = (wxz - uWorld.xy) / uWorld.z;
   vec4 m = texture2D(uMask, muv);
   float h = gH(wxz);
-  float e = 1.2;
-  float hx = gH(wxz + vec2(e, 0.0)) - gH(wxz - vec2(e, 0.0));
-  float hz = gH(wxz + vec2(0.0, e)) - gH(wxz - vec2(0.0, e));
-  float slope = length(vec2(hx, hz)) / (2.0 * e);
-  float dens = m.r * (1.0 - smoothstep(0.55, 0.9, slope));
-  dens *= smoothstep(uWaterLevel + 0.6, uWaterLevel + 1.6, h) * (1.0 - smoothstep(130.0, 150.0, h));
+  float dens = m.r;
+  dens *= smoothstep(uWaterLevel + 0.6, uWaterLevel + 1.6, h);
   float patchN = vnoise(wxz * 0.07);
   if (uIsFlower > 0.5) dens *= smoothstep(0.55, 0.75, patchN) * (1.0 - m.a);
   else dens *= 0.55 + 0.45 * smoothstep(0.2, 0.6, patchN);
@@ -667,120 +663,103 @@ export class Vegetation {
     this._buildCells();
   }
 
+  // Global instanced meshes with a dynamic two-level LOD: trees near the
+  // camera use the detailed mesh (and cast shadows), the rest use the cheap
+  // one. Rebuilt only when the camera has moved or something was harvested.
   _buildCells() {
-    const dummy = new THREE.Object3D();
-    const cellsMap = new Map();
-    const getCell = (x, z) => {
-      const ci = Math.min(CELLS - 1, Math.max(0, Math.floor((x + HALF_WORLD) / CELL_SIZE)));
-      const cj = Math.min(CELLS - 1, Math.max(0, Math.floor((z + HALF_WORLD) / CELL_SIZE)));
-      const k = ci * 100 + cj;
-      if (!cellsMap.has(k)) cellsMap.set(k, { ci, cj, cx: -HALF_WORLD + (ci + 0.5) * CELL_SIZE, cz: -HALF_WORLD + (cj + 0.5) * CELL_SIZE, trees: [[], [], []], rocks: [[], []], crystals: [], meshes: [] });
-      return cellsMap.get(k);
+    const d = new THREE.Object3D();
+    const toM = (o, sx, sy, sz) => {
+      d.position.set(o.x, o.y, o.z);
+      d.rotation.set(0, o.rot, 0);
+      d.scale.set(sx, sy, sz);
+      d.updateMatrix();
+      return d.matrix.toArray(new Float32Array(16));
     };
     for (const t of this.trees) {
-      const c = getCell(t.x, t.z);
-      t.cell = c;
-      t.idx = c.trees[t.kind].length;
-      c.trees[t.kind].push(t);
+      t.m = toM(t, t.s, t.s, t.s);
       t.col = this.collision.addCyl(t.x, t.z, t.y - 1, t.y + this.kinds[t.kind].lod0.height * t.s * 0.6, this.kinds[t.kind].lod0.trunkR * t.s * 1.1, { tag: 'tree', owner: t, climbable: true });
     }
     for (const r of this.rocks) {
-      const c = getCell(r.x, r.z);
-      r.cell = c;
-      r.idx = c.rocks[r.v].length;
-      c.rocks[r.v].push(r);
+      r.m = toM(r, r.s, r.s * r.sy, r.s);
       if (r.s > 0.8) r.col = this.collision.addCyl(r.x, r.z, r.y - r.s, r.y + r.s * r.sy * 0.75, r.s * 0.85, { tag: 'rock', owner: r, dome: r.s * r.sy * 0.35 });
     }
-    for (const cr of this.crystals) {
-      const c = getCell(cr.x, cr.z);
-      cr.cell = c;
-      cr.idx = c.crystals.length;
-      c.crystals.push(cr);
-    }
-    const mk = (geo, matPair, list, setM, cast) => {
-      const m = new THREE.InstancedMesh(geo, matPair.mat, Math.max(1, list.length));
+    for (const c of this.crystals) c.m = toM(c, c.s, c.s, c.s);
+    const mk = (geo, matPair, cap, cast) => {
+      const m = new THREE.InstancedMesh(geo, matPair.mat, Math.max(1, cap));
       m.customDepthMaterial = matPair.depth;
       m.castShadow = cast;
       m.receiveShadow = true;
-      for (let i = 0; i < list.length; i++) {
-        setM(list[i], dummy);
-        dummy.updateMatrix();
-        m.setMatrixAt(i, dummy.matrix);
-      }
-      m.count = list.length;
-      m.instanceMatrix.needsUpdate = true;
-      m.computeBoundingSphere();
+      m.frustumCulled = false;
+      m.count = 0;
+      m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       this.group.add(m);
       return m;
     };
-    const treeM = (t, d) => { d.position.set(t.x, t.y, t.z); d.rotation.set(0, t.rot, 0); d.scale.setScalar(t.alive ? t.s : 0); };
-    const rockM = (r, d) => { d.position.set(r.x, r.y, r.z); d.rotation.set(0, r.rot, 0); d.scale.set(r.alive ? r.s : 0, r.alive ? r.s * r.sy : 0, r.alive ? r.s : 0); };
-    const crysM = (r, d) => { d.position.set(r.x, r.y, r.z); d.rotation.set(0, r.rot, 0); d.scale.setScalar(r.alive ? r.s : 0); };
-    for (const c of cellsMap.values()) {
-      c.lod = [[], []];
-      for (let k = 0; k < 3; k++) {
-        if (!c.trees[k].length) continue;
-        for (let l = 0; l < 2; l++) {
-          const kd = this.kinds[k][l ? 'lod1' : 'lod0'];
-          const tm = mk(kd.trunk, this.mats[k][0], c.trees[k], treeM, true);
-          const lm = mk(kd.leaves, this.mats[k][1], c.trees[k], treeM, true);
-          c.lod[l].push(tm, lm);
-          if (!c.treeMeshes) c.treeMeshes = [[[], []], [[], []], [[], []]];
-          c.treeMeshes[k][l] = [tm, lm];
-        }
-      }
-      for (let v = 0; v < 2; v++) {
-        if (!c.rocks[v].length) continue;
-        const m0 = mk(this.rockGeo[v], this.mats[3][0], c.rocks[v], rockM, true);
-        const m1 = mk(this.rockGeoL[v], this.mats[3][0], c.rocks[v], rockM, true);
-        c.lod[0].push(m0);
-        c.lod[1].push(m1);
-        if (!c.rockMeshes) c.rockMeshes = [[], []];
-        c.rockMeshes[v] = [m0, m1];
-      }
-      if (c.crystals.length) {
-        c.crystalMesh = mk(this.crystalGeo, this.mats[4][0], c.crystals, crysM, false);
-      }
-      this.cells.push(c);
+    const counts = [0, 0, 0];
+    for (const t of this.trees) counts[t.kind]++;
+    this.treeMeshes = [];
+    for (let k = 0; k < 3; k++) {
+      this.treeMeshes.push([
+        [mk(this.kinds[k].lod0.trunk, this.mats[k][0], counts[k], true), mk(this.kinds[k].lod0.leaves, this.mats[k][1], counts[k], true)],
+        [mk(this.kinds[k].lod1.trunk, this.mats[k][0], counts[k], false), mk(this.kinds[k].lod1.leaves, this.mats[k][1], counts[k], false)],
+      ]);
     }
-    this._treeM = treeM;
-    this._rockM = rockM;
-    this._crysM = crysM;
-    this._dummy = dummy;
+    const rc = [0, 0];
+    for (const r of this.rocks) rc[r.v]++;
+    this.rockMeshes = [0, 1].map((v) => [mk(this.rockGeo[v], this.mats[3][0], rc[v], true), mk(this.rockGeoL[v], this.mats[3][0], rc[v], false)]);
+    this.crystalMesh = mk(this.crystalGeo, this.mats[4][0], this.crystals.length, false);
+    this.lastCam = new THREE.Vector3(1e9, 0, 0);
+    this.dirty = true;
   }
 
-  // Hide/show a single instance (after harvesting).
   refreshTree(t) {
-    const d = this._dummy;
-    this._treeM(t, d);
-    d.updateMatrix();
-    const ms = t.cell.treeMeshes[t.kind];
-    for (const l of ms) for (const m of l) { m.setMatrixAt(t.idx, d.matrix); m.instanceMatrix.needsUpdate = true; }
     if (t.col) t.col.active = t.alive;
+    this.dirty = true;
   }
   refreshRock(r) {
-    const d = this._dummy;
-    this._rockM(r, d);
-    d.updateMatrix();
-    for (const m of r.cell.rockMeshes[r.v]) { m.setMatrixAt(r.idx, d.matrix); m.instanceMatrix.needsUpdate = true; }
     if (r.col) r.col.active = r.alive;
+    this.dirty = true;
   }
-  refreshCrystal(c) {
-    const d = this._dummy;
-    this._crysM(c, d);
-    d.updateMatrix();
-    c.cell.crystalMesh.setMatrixAt(c.idx, d.matrix);
-    c.cell.crystalMesh.instanceMatrix.needsUpdate = true;
+  refreshCrystal() {
+    this.dirty = true;
   }
 
   update(camPos) {
-    const lodDist = 300 * (G.qualityCfg ? G.qualityCfg.drawDist : 1);
-    for (const c of this.cells) {
-      const d = Math.hypot(camPos.x - c.cx, camPos.z - c.cz) - CELL_SIZE * 0.5;
-      const near = d < lodDist * 0.6;
-      for (const m of c.lod[0]) m.visible = near;
-      for (const m of c.lod[1]) m.visible = !near;
+    const moved = Math.hypot(camPos.x - this.lastCam.x, camPos.z - this.lastCam.z);
+    if (!this.dirty && moved < 8) return;
+    this.dirty = false;
+    this.lastCam.copy(camPos);
+    const dd = G.qualityCfg ? G.qualityCfg.drawDist : 1;
+    const R0 = 105 * dd, R1 = 900 * dd;
+    const r0 = R0 * R0, r1 = R1 * R1;
+    const cx = camPos.x, cz = camPos.z;
+    const n = [[0, 0], [0, 0], [0, 0]];
+    const put = (mesh, idx, m) => mesh.instanceMatrix.array.set(m, idx * 16);
+    for (const t of this.trees) {
+      if (!t.alive) continue;
+      const dx = t.x - cx, dz = t.z - cz, d2 = dx * dx + dz * dz;
+      if (d2 > r1) continue;
+      const l = d2 < r0 ? 0 : 1;
+      const ms = this.treeMeshes[t.kind][l];
+      const i = n[t.kind][l]++;
+      put(ms[0], i, t.m);
+      put(ms[1], i, t.m);
     }
+    for (let k = 0; k < 3; k++) for (let l = 0; l < 2; l++) for (const m of this.treeMeshes[k][l]) { m.count = n[k][l]; m.instanceMatrix.needsUpdate = true; }
+    const rn = [[0, 0], [0, 0]];
+    const rr0 = (R0 * 0.8) ** 2, rr1 = (R1 * 0.5) ** 2;
+    for (const r of this.rocks) {
+      if (!r.alive) continue;
+      const dx = r.x - cx, dz = r.z - cz, d2 = dx * dx + dz * dz;
+      if (d2 > rr1 && r.s < 2) continue;
+      const l = d2 < rr0 ? 0 : 1;
+      put(this.rockMeshes[r.v][l], rn[r.v][l]++, r.m);
+    }
+    for (let v = 0; v < 2; v++) for (let l = 0; l < 2; l++) { const m = this.rockMeshes[v][l]; m.count = rn[v][l]; m.instanceMatrix.needsUpdate = true; }
+    let cn = 0;
+    for (const c of this.crystals) if (c.alive) put(this.crystalMesh, cn++, c.m);
+    this.crystalMesh.count = cn;
+    this.crystalMesh.instanceMatrix.needsUpdate = true;
   }
 
   nearestTree(x, z, r) {

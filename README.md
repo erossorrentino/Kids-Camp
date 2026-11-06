@@ -1,3 +1,12 @@
+# Kids-Camp game projects
+
+| Project | What it is | Start here |
+|---------|------------|------------|
+| **Chronos & Cosmos** | Open-world action RPG in the browser: shift between three Ages of time, climb, glide, fight, build, tame mounts, run rifts. Fully playable. | [`chronos-cosmos/`](chronos-cosmos/README.md) · open `chronos-cosmos/dist/index.html` |
+| **Crime City** | Unity project scaffold for a GTA-style crime game (scripts and data, needs the Unity Editor) | below |
+
+---
+
 # Crime City (working title)
 
 An open-world crime game in the GTA tradition: steal cars, plan and run

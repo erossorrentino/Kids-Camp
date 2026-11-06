@@ -86,7 +86,7 @@ export class UI {
     document.getElementById('loading').classList.add('gone');
     this.titleEl.querySelector('#btn-continue').hidden = !Game.hasSave();
     G.epochs.setInstant(0);
-    G.atmo.timeOfDay = 17.6;
+    G.atmo.timeOfDay = 16.4;
     G.player.rig.setVisible(false);
   }
 

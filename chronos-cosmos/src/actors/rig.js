@@ -347,8 +347,10 @@ export class Rig {
     this.body = new THREE.Group(); // pitch/roll for rolls, climbing
     this.root.add(this.body);
     const j = (this.j = {});
+    const bones = (this.bones = []);
     const mk = (name, parent, x, y, z) => {
-      const g = new THREE.Group();
+      const g = new THREE.Bone();
+      bones.push(g);
       g.name = name;
       g.position.set(x * s, y * s, z * s);
       parent.add(g);
@@ -383,15 +385,25 @@ export class Rig {
     const leather = M(c.leather, { rough: 0.7 });
     const metal = M(c.metal, { rough: 0.35, metal: 1, map: G.tex?.metal.map });
     const hair = M(c.hair, { rough: 0.9 });
-    this.materials = [skin, cloth, cloth2, leather, metal, hair];
-    const add = (parent, geo, m, x = 0, y = 0, z = 0, sx = 1, sy = 1, sz = 1) => {
-      const mesh = new THREE.Mesh(geo, m);
-      mesh.position.set(x * s, y * s, z * s);
-      mesh.scale.set(sx * s, sy * s, sz * s);
-      mesh.castShadow = true;
-      mesh.receiveShadow = false;
-      parent.add(mesh);
-      return mesh;
+    const slotOf = new Map([[skin, 'skin'], [cloth, 'cloth'], [cloth2, 'cloth2'], [leather, 'leather'], [metal, 'metal'], [hair, 'hair']]);
+    // Parts are collected and merged into a few skinned meshes (one draw
+    // call per material family) instead of ~25 separate meshes per rig.
+    const parts = [];
+    const add = (parent, geo, m, x = 0, y = 0, z = 0, sx = 1, sy = 1, sz = 1, real = false) => {
+      const proxy = new THREE.Object3D();
+      proxy.position.set(x * s, y * s, z * s);
+      proxy.scale.set(sx * s, sy * s, sz * s);
+      if (real || m.side === THREE.DoubleSide) {
+        const mesh = new THREE.Mesh(geo, m);
+        mesh.position.copy(proxy.position);
+        mesh.scale.copy(proxy.scale);
+        mesh.castShadow = true;
+        parent.add(mesh);
+        return mesh;
+      }
+      const glow = m.emissiveIntensity > 1 && m.emissive && (m.emissive.r + m.emissive.g + m.emissive.b) > 0;
+      parts.push({ parent, geo, m, proxy, group: glow ? 'glow' : m.metalness > 0.5 ? 'metal' : 'base', slot: slotOf.get(m) || 'other' });
+      return proxy;
     };
     const B = bulk;
     // torso
@@ -454,7 +466,7 @@ export class Rig {
       void foot;
     }
     if (opts.robe) {
-      const robe = add(j.hips, new THREE.CylinderGeometry(0.17 * B, 0.3 * B, 0.85, 12, 1, true), M(opts.robe, { side: THREE.DoubleSide, rough: 0.9 }), 0, -0.42, 0);
+      const robe = add(j.hips, new THREE.CylinderGeometry(0.17 * B, 0.3 * B, 0.85, 12, 1, true), M(opts.robe, { side: THREE.DoubleSide, rough: 0.9 }), 0, -0.42, 0, 1, 1, 1, true);
       this.robe = robe;
     }
     if (build === 'hero' || build === 'knight') {
@@ -467,6 +479,7 @@ export class Rig {
         add(j[p], new THREE.DodecahedronGeometry(r, 0), metal, x, y, z);
       }
     }
+    this.finalizeSkin(parts, unique, c);
     // weapon
     this.weaponSocket = new THREE.Group();
     this.weaponSocket.position.set(0, -0.06 * s, 0.01 * s);
@@ -487,6 +500,73 @@ export class Rig {
     this.groundY = 0;
     this.flash = 0;
     this.tint = null;
+  }
+
+  finalizeSkin(parts, unique, colors) {
+    this.root.updateMatrixWorld(true);
+    const groups = { base: [], metal: [], glow: [] };
+    const boneIndex = new Map(this.bones.map((b, i) => [b, i]));
+    const tmp = new THREE.Matrix4();
+    const col = new THREE.Color();
+    this.slotRanges = {};
+    for (const p of parts) {
+      p.proxy.updateMatrix();
+      tmp.multiplyMatrices(p.parent.matrixWorld, p.proxy.matrix);
+      let g = p.geo.index ? p.geo.toNonIndexed() : p.geo.clone();
+      for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
+      g.applyMatrix4(tmp);
+      const n = g.attributes.position.count;
+      const si = new Uint16Array(n * 4), sw = new Float32Array(n * 4), cc = new Float32Array(n * 3);
+      const bi = boneIndex.get(p.parent) || 0;
+      col.copy(p.m.color);
+      for (let i = 0; i < n; i++) { si[i * 4] = bi; sw[i * 4] = 1; cc[i * 3] = col.r; cc[i * 3 + 1] = col.g; cc[i * 3 + 2] = col.b; }
+      g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
+      g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(cc, 3));
+      groups[p.group].push({ g, slot: p.slot, m: p.m });
+    }
+    const skeleton = new THREE.Skeleton(this.bones);
+    this.materials = [];
+    this.meshes = {};
+    for (const key of ['base', 'metal', 'glow']) {
+      const list = groups[key];
+      if (!list.length) continue;
+      const merged = mergeGeometries(list.map((x) => x.g));
+      // remember which vertices belong to which colour slot (for armour dyes)
+      let off = 0;
+      for (const x of list) {
+        const cnt = x.g.attributes.position.count;
+        (this.slotRanges[x.slot] = this.slotRanges[x.slot] || []).push([key, off, cnt]);
+        off += cnt;
+      }
+      const ref = list[0].m;
+      const mat = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: key === 'metal' ? 0.32 : 0.75,
+        metalness: key === 'metal' ? 1 : 0,
+        emissive: key === 'glow' ? ref.emissive.clone() : new THREE.Color(0),
+        emissiveIntensity: key === 'glow' ? ref.emissiveIntensity : 1,
+        map: key === 'metal' ? G.tex?.metal.map || null : null,
+      });
+      const mesh = new THREE.SkinnedMesh(merged, mat);
+      mesh.castShadow = key !== 'glow';
+      mesh.receiveShadow = true;
+      this.root.add(mesh);
+      mesh.bind(skeleton);
+      mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, 0.9 * this.s, 0), 1.7 * this.s);
+      this.meshes[key] = mesh;
+      if (key !== 'glow') this.materials.push(mat);
+    }
+    this.root.updateMatrixWorld(true);
+  }
+
+  setPartColor(slot, hex) {
+    const col = new THREE.Color(hex);
+    for (const [key, off, cnt] of this.slotRanges[slot] || []) {
+      const a = this.meshes[key].geometry.attributes.color;
+      for (let i = off; i < off + cnt; i++) a.setXYZ(i, col.r, col.g, col.b);
+      a.needsUpdate = true;
+    }
   }
 
   setWeapon(type, wo = {}) {

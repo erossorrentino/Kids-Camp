@@ -122,7 +122,7 @@ export class Game {
     this.state.armor = key;
     G.player.armor = a.armor;
     const rig = G.player.rig;
-    rig.materials[1].color.setHex(a.cloth);
+    rig.setPartColor('cloth', a.cloth);
     if (rig.cape) {
       rig.cape.mesh.material.color.setHex(a.cape);
       rig.cape.mesh.material.emissive = new THREE.Color(a.capeGlow || 0x000000);

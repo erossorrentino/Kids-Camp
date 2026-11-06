@@ -273,14 +273,14 @@ export class FX {
     for (let i = 0; i < n; i++) {
       this.add.emit({ x, y, z, vx: rnd(speed), vy: Math.random() * speed, vz: rnd(speed), life: 0.25 + Math.random() * 0.35, size: 0.12, size1: 0.02, color: [c[0] * 4, c[1] * 4, c[2] * 4], grav: 14, drag: 0.94 });
     }
-    this.add.emit({ x, y, z, life: 0.12, size: 1.6, size1: 2.4, color: [c[0] * 3, c[1] * 3, c[2] * 3], alpha: 0.9 });
+    this.add.emit({ x, y, z, life: 0.1, size: 1.0, size1: 1.6, color: [c[0] * 2, c[1] * 2, c[2] * 2], alpha: 0.6 });
   }
   hitBurst(x, y, z, color = 0xffffff, strength = 1) {
     const c = hex(color);
     for (let i = 0; i < 10 * strength; i++) {
       this.add.emit({ x, y, z, vx: rnd(5), vy: rnd(5), vz: rnd(5), life: 0.2 + Math.random() * 0.25, size: 0.18, size1: 0.0, color: [c[0] * 3, c[1] * 3, c[2] * 3], drag: 0.9 });
     }
-    this.add.emit({ x, y, z, life: 0.1, size: 1.2 * strength, size1: 2.2 * strength, color: [c[0] * 2, c[1] * 2, c[2] * 2], alpha: 0.8 });
+    this.add.emit({ x, y, z, life: 0.09, size: 0.7 * strength, size1: 1.3 * strength, color: [c[0] * 1.5, c[1] * 1.5, c[2] * 1.5], alpha: 0.45 });
   }
   dust(x, y, z, s = 1) {
     const e = G.epochs ? G.epochs.current : 0;

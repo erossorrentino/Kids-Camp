@@ -32,6 +32,16 @@ export class Terrain {
         const x = -HALF_WORLD + (c + 0.5) * ms;
         const m = biomeMasks(x, z);
         const i = (r * MASK_RES + c) * 4;
+        // bake slope/altitude limits into grass density so the grass shader
+        // needs a single height lookup per vertex
+        const e = 1.5;
+        const gx = this.heightAt(x + e, z) - this.heightAt(x - e, z);
+        const gz = this.heightAt(x, z + e) - this.heightAt(x, z - e);
+        const slope = Math.hypot(gx, gz) / (2 * e);
+        const hh = this.heightAt(x, z);
+        const sl = Math.min(1, Math.max(0, (slope - 0.55) / 0.35));
+        const al = Math.min(1, Math.max(0, (hh - 130) / 20));
+        m[0] *= (1 - sl * sl * (3 - 2 * sl)) * (1 - al * al * (3 - 2 * al));
         M[i] = m[0] * 255;
         M[i + 1] = m[1] * 255;
         M[i + 2] = m[2] * 255;
