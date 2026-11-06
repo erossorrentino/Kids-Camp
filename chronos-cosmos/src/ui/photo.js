@@ -111,6 +111,13 @@ export class PhotoMode {
     this.pitch = 0.2;
     this.dist = 5;
     this.poseBuf = newPose();
+    // ask early so a save does not wait on the viewer handshake
+    setTimeout(() => this.downloads(), 0);
+  }
+
+  downloads() {
+    if (!this._dl) this._dl = Promise.resolve(window.claude?.use?.('downloads')).catch(() => null);
+    return this._dl;
   }
 
   canOpen() {
@@ -252,18 +259,32 @@ export class PhotoMode {
     const ep = EPOCHS[G.epochs.current]?.name || '';
     g.fillText(`Chronos & Cosmos · ${ep}`, w - fs, h - fs);
     const name = `chronos-cosmos-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, '-')}.png`;
-    const done = (url) => {
+    const viaLink = (blob) => {
+      const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       a.download = name;
       document.body.appendChild(a);
       a.click();
       a.remove();
-      setTimeout(() => URL.revokeObjectURL?.(url), 4000);
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+    };
+    const save = async (blob) => {
+      // inside the Claude viewer files are offered through its downloads capability
+      const framed = !!window.claude?.use;
+      const dl = framed ? await this.downloads() : null;
+      if (dl) {
+        try {
+          await dl.save({ filename: name, data: blob });
+          G.hud.toast('Photo saved.', 'good');
+        } catch (e) {
+          if (e?.code !== 'declined') G.hud.toast('The picture could not be saved here.', 'warn');
+        }
+      } else if (framed) G.hud.toast('Saving pictures is not available in this view.', 'warn');
+      else viaLink(blob);
     };
     try {
-      if (out.toBlob) out.toBlob((b) => b && done(URL.createObjectURL(b)), 'image/png');
-      else done(out.toDataURL('image/png'));
+      out.toBlob((b) => b && save(b), 'image/png');
     } catch (e) {
       G.hud.toast('This browser blocked saving the picture.', 'warn');
       return;
