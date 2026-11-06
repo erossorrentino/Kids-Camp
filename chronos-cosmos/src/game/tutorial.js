@@ -16,6 +16,9 @@ const HINTS = {
   dodge: 'Dodge at the very last moment to trigger a Timeslip and slow the world around you.',
   swim: 'Swimming uses stamina. Frost magic turns water into ice you can walk on.',
   mount: 'Sneak (C) up to a Duskhorn and press E to try to tame it.',
+  fox: 'A little fox is napping under the trees. Walk up and press E to befriend it.',
+  echo: 'A glowing Echo is close by. Thirty are hidden across the three Ages, and each one only shows in its own Age.',
+  photo: 'Press V for Photo Mode: freeze time, strike a pose and save a picture.',
 };
 
 // Same hints, phrased for touch screens.
@@ -30,6 +33,8 @@ const TOUCH_HINTS = {
   skills: 'You have a skill point. Tap Menu and open Skills.',
   dodge: 'Dodge at the very last moment to slow time around you.',
   mount: 'Walk slowly up to a Duskhorn and tap Use to try to tame it.',
+  fox: 'A little fox is napping under the trees. Walk up and tap Use to befriend it.',
+  photo: 'Open the Menu and tap Photo for Photo Mode: freeze time, strike a pose and save a picture.',
 };
 
 export class Tutorial {
@@ -104,5 +109,9 @@ export class Tutorial {
     if (S.flags.hints?.combat && S.stats.kills >= 1) this.hint('magic');
     if ((P.skillPoints || 0) > 0) this.hint('skills');
     if (G.mounts && G.mounts.list.some((m) => m.visibleNow() && !m.tamed && m.pos.distanceTo(P.pos) < 30)) this.hint('mount');
+    if (G.fox && !S.flags.fox && G.fox.pos.distanceTo(P.pos) < 14) this.hint('fox');
+    if (G.echoes && G.echoes.nearestUnfound(P.pos, 30)) this.hint('echo');
+    this.playT = (this.playT || 0) + 0.5;
+    if (this.playT > 300) this.hint('photo');
   }
 }

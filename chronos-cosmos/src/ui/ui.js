@@ -170,8 +170,9 @@ export class UI {
         <header class="menu-head">
           <nav class="tabs">
             <button data-tab="map">Map</button><button data-tab="inventory">Inventory</button><button data-tab="crafting">Crafting</button>
-            <button data-tab="journal">Journal</button><button data-tab="skills">Skills</button><button data-tab="settings">Settings</button><button data-tab="controls">Controls</button>
+            <button data-tab="journal">Journal</button><button data-tab="skills">Skills</button><button data-tab="feats">Feats</button><button data-tab="settings">Settings</button><button data-tab="controls">Controls</button>
           </nav>
+          <button class="photo-btn" title="Photo Mode (V)">Photo</button>
           <button class="close" aria-label="Close menu">✕</button>
         </header>
         <section class="menu-body"></section>
@@ -180,6 +181,7 @@ export class UI {
     this.menuEl = m;
     this.body = m.querySelector('.menu-body');
     m.querySelectorAll('.tabs button').forEach((b) => (b.onclick = () => this.setTab(b.dataset.tab)));
+    m.querySelector('.photo-btn').onclick = () => G.photo?.open();
     m.querySelector('.close').onclick = () => this.closeMenu();
   }
 
@@ -206,9 +208,14 @@ export class UI {
     this.menuEl.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.tab === t));
     const titleOnly = G.state !== 'play';
     this.menuEl.querySelectorAll('.tabs button').forEach((b) => (b.hidden = titleOnly && !['settings', 'controls'].includes(b.dataset.tab)));
+    this.menuEl.querySelector('.photo-btn').hidden = titleOnly;
     this.body.innerHTML = '';
     this.body.className = 'menu-body tab-' + t;
     this['tab_' + t]?.();
+  }
+
+  tab_feats() {
+    G.feats?.render(this.body);
   }
 
   // ---- map
@@ -577,7 +584,7 @@ export class UI {
       ['Attack (hold to charge)', 'Left mouse', 'X'], ['Block (hold) / Parry (tap at impact)', 'Right mouse', 'RB'], ['Cast spell (hold for greater spell)', 'Q', 'RT'],
       ['Weave element into blade', 'F', 'LT'], ['Choose element', '1 – 4 / Wheel', 'D-pad ← →'], ['Switch stance', 'R', 'R3'], ['Lock on', 'Tab / Middle mouse', 'LB'],
       ['Shift Age (tap) / Age wheel (hold)', 'T', 'D-pad ↑'], ['Interact · Talk', 'E', 'Y'], ['Quick item', 'G', '—'], ['Sneak', 'C / Ctrl', 'L3'],
-      ['Build mode', 'B', '—'], ['Call your mount', 'H', 'D-pad ↓'], ['Map', 'M', 'Back'], ['Journal', 'J', '—'], ['Inventory', 'I', '—'], ['Pause menu', 'Esc / P', 'Start'],
+      ['Build mode', 'B', '—'], ['Call your mount', 'H', 'D-pad ↓'], ['Map', 'M', 'Back'], ['Journal', 'J', '—'], ['Inventory', 'I', '—'], ['Pause menu', 'Esc / P', 'Start'], ['Photo mode', 'V', '—'], ['Pet Pip the fox', 'E (near Pip)', 'Y'],
     ];
     const t = el('table', 'controls');
     t.innerHTML = `<thead><tr><th>Action</th><th>Keyboard & Mouse</th><th>Gamepad</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${r[0]}</td><td><kbd>${r[1]}</kbd></td><td><kbd>${r[2]}</kbd></td></tr>`).join('')}</tbody>`;
@@ -699,6 +706,7 @@ export class UI {
       for (const [k, t] of [['map', 'map'], ['journal', 'journal'], ['inventory', 'inventory']]) if (inp.hit(k)) { if (this.tab === t) this.closeMenu(); else this.setTab(t); }
       return;
     }
+    if (inp.hit('photo')) return G.photo?.open();
     if (inp.hit('map')) return this.openMenu('map');
     if (inp.hit('journal')) return this.openMenu('journal');
     if (inp.hit('inventory')) return this.openMenu('inventory');

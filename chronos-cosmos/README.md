@@ -53,6 +53,7 @@ set it yourself in Settings.
 | Build mode | B | |
 | Call your mount | H | D-pad ↓ |
 | Map · Journal · Inventory · Menu | M · J · I · Esc | Back · Start |
+| Photo mode | V | |
 
 ### Touch controls
 
@@ -68,6 +69,7 @@ set it yourself in Settings.
 | Healing draught | **Heal** |
 | Shift Age (tap) · Age wheel (hold, then push the stick) | **Age** |
 | Menu · map · build · stance | Buttons along the top left |
+| Photo mode | **Menu**, then **Photo** |
 
 In dialogue, tap the text to continue and tap a reply to choose it.
 
@@ -115,6 +117,33 @@ In dialogue, tap the text to continue and tap a reply to choose it.
   day/night cycle with weather per Age (rain, storms, ashfall, ember storms,
   meteor showers, auroras).
 
+## Extras
+
+- **Pip the fox.** A fox naps under the trees near where you wake up. Walk
+  up and press E to befriend it. Pip then follows you through every Age:
+  it trots or sprints to keep up, sits and naps when you rest, and keeps
+  back from fights. Every few minutes it digs up a treasure, and its ears
+  perk up when an Echo is close. Press E near Pip for a pat.
+- **Echoes.** Thirty glowing collectibles are hidden on peaks, in forest
+  hollows, near landmarks and on the floating isles. There are ten per
+  Age, and each one only shows in its own Age. Close by you'll hear a soft
+  chime and see sparkles. Every five found makes the Echoes resonate,
+  which raises max health or stamina, or grants skill points.
+- **Feats.** Nineteen achievements in their own menu tab, for things like
+  parrying, building, rift runs, taming, Echo hunting and finishing the
+  story.
+- **Photo mode** (V, or **Photo** in the menu). Time freezes and the HUD
+  hides. You get a free camera (drag to orbit, wheel or pinch to zoom,
+  WASD to move), time of day, zoom, tilt, vignette, seven filters, poses
+  for the Wayfarer (wave, cheer, sit, pray…), and **Save Photo** for a PNG
+  with a small caption.
+- **Wildlife and ambience.** Each Age has its own fliers: swallows and V
+  formations in Bloom, circling vultures in Ash, glowing star-moths in
+  Stars. Butterflies flutter on sunny days, fish leap in the lake, leaves
+  drift through forests, and white wind streaks show when gliding,
+  galloping or in strong wind. A faint rainbow appears after rain.
+  Villagers turn their heads to look at you, and you glance back.
+
 ## Graphics
 
 Everything is generated in code. There are no image, model or audio files.
@@ -131,8 +160,12 @@ Everything is generated in code. There are no image, model or audio files.
   bioluminescence, rain ripples and freezable ice.
 - ACES tone mapping, bloom, god rays, chromatic aberration, a time-shift
   ripple, vignette, film grain and FXAA.
-- Procedural, skinned characters with cloth-simulated capes, weapon trails,
-  particles and dynamic lights.
+- Procedural, skinned characters with cloth-simulated capes and faces
+  (eyes with irises, brows, a swept fringe) that blink. A soft rim light
+  tinted by the sky separates them from the scenery. Weapon trails are
+  smoothed into curved, fading ribbons.
+- The volcano crater has lava that crusts into dark plates with glowing
+  seams. The floating isles have crystal stalactites and hanging roots.
 
 Five quality presets are in Settings. **Mobile** and **Low** skip the
 post-processing chain and shadows, render at a lower resolution, use

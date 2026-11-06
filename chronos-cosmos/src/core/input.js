@@ -32,6 +32,7 @@ const BINDINGS = {
   el9: ['Digit9'],
   confirm: ['Enter', 'NumpadEnter'],
   rotate: ['KeyR'],
+  photo: ['KeyV'],
 };
 
 export class Input {

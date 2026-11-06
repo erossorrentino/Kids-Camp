@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { G } from '../core/G.js';
+import { addRim } from '../core/shaderlib.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 // Four-legged creature rig: wolves, cinder hounds and the Duskhorn mount.
@@ -42,15 +43,19 @@ export class QuadRig {
     parts[parts.length - 1].proxy.scale.setScalar(s);
     this.head = bone(this.neck, 0, 0.28 * s, 0.2 * s);
     add(this.head, new THREE.SphereGeometry(0.14, 10, 8), fur).scale.set(s, s * 0.9, s * 1.1);
-    const snout = add(this.head, new THREE.CylinderGeometry(0.06, 0.09, 0.26, 8), fur2, 0, -0.03, 0.18);
+    const snoutM = o.snout ? { color: new THREE.Color(o.snout) } : fur2;
+    const ss = o.snoutScale || 1;
+    const snout = add(this.head, new THREE.CylinderGeometry(0.06 * ss * ss, 0.09 * ss, 0.26 * ss, 8), snoutM, 0, -0.03, 0.06 + 0.12 * ss);
     snout.rotation.x = Math.PI / 2;
     snout.scale.setScalar(s);
+    if (o.nose) add(this.head, new THREE.SphereGeometry(0.022, 6, 5), { color: new THREE.Color(o.nose) }, 0, -0.025, 0.07 + 0.25 * ss).scale.setScalar(s);
     this.jaw = bone(this.head, 0, -0.08 * s, 0.13 * s);
     add(this.jaw, new THREE.BoxGeometry(0.1, 0.04, 0.22), fur2).scale.setScalar(s);
     for (const sx of [-1, 1]) {
       add(this.head, new THREE.SphereGeometry(0.022, 6, 5), eye, 0.065 * sx, 0.04, 0.1).scale.setScalar(s);
       if (o.ears !== false) {
-        const ear = add(this.head, new THREE.ConeGeometry(0.045, 0.13, 5), fur2, 0.07 * sx, 0.13, -0.02);
+        const es = o.earScale || 1;
+        const ear = add(this.head, new THREE.ConeGeometry(0.045 * es, 0.13 * es, 5), fur2, 0.07 * sx, 0.13 + 0.03 * (es - 1), -0.02);
         ear.rotation.z = -0.25 * sx;
         ear.scale.setScalar(s);
       }
@@ -80,12 +85,16 @@ export class QuadRig {
       this.legs.push({ hip, knee, ph, front: z > 0 });
     }
     this.tail = bone(this.body, 0, 0.06 * s, -len * 0.55 * s);
-    const tl = add(this.tail, new THREE.CapsuleGeometry(0.05, o.tailLen || 0.4, 3, 6), fur2, 0, 0, -(o.tailLen || 0.4) / 2);
+    const tR = o.tailR || 0.05, tLen = o.tailLen || 0.4;
+    const tl = add(this.tail, new THREE.CapsuleGeometry(tR, tLen, 4, 8), o.tailColor ? { color: new THREE.Color(o.tailColor) } : fur2, 0, 0, -tLen / 2);
     tl.rotation.x = Math.PI / 2;
     tl.scale.setScalar(s);
+    if (o.tailTip) add(this.tail, new THREE.SphereGeometry(tR * 1.02, 8, 6), { color: new THREE.Color(o.tailTip) }, 0, 0, -tLen - tR * 0.55).scale.set(s, s, s * 1.3);
+    if (o.chest) add(this.neck, new THREE.SphereGeometry(0.11, 8, 6), { color: new THREE.Color(o.chest) }, 0, 0.04, 0.1).scale.set(s, s * 1.2, s * 0.8);
     this.finalize(parts, o);
     this.phase = 0;
     this.flash = 0;
+    this.tailBase = o.tailBase ?? 0.4;
   }
 
   finalize(parts, o) {
@@ -115,6 +124,7 @@ export class QuadRig {
       if (!list.length) continue;
       const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: key === 'glow' ? 0.4 : 0.92, metalness: 0 });
       if (key === 'glow') { mat.emissive = new THREE.Color(list[0].glow); mat.emissiveIntensity = 2.2; }
+      else addRim(mat, 0.22);
       const mesh = new THREE.SkinnedMesh(mergeGeometries(list.map((x) => x.g)), mat);
       mesh.castShadow = key === 'base';
       mesh.receiveShadow = true;
@@ -155,8 +165,9 @@ export class QuadRig {
     b.position.y += bob;
     if (gallop) b.rotation.x = Math.sin(this.phase) * 0.08;
     this.neck.rotation.x = 0.1 + (gallop ? Math.sin(this.phase) * 0.1 : Math.sin(G.time * 1.2) * 0.04);
-    this.head.rotation.x = 0;
-    this.tail.rotation.x = 0.4 + Math.sin(G.time * 3) * 0.08;
+    this.head.rotation.set(0, 0, 0);
+    this.neck.rotation.y = 0;
+    this.tail.rotation.x = this.tailBase + Math.sin(G.time * 3) * 0.08;
     this.tail.rotation.y = Math.sin(G.time * (speed > 0.5 ? 8 : 2)) * 0.3;
     this.jaw.rotation.x = 0;
     if (state === 'idle') {
@@ -184,6 +195,42 @@ export class QuadRig {
       b.rotation.z = Math.min(1, u) * 1.5;
       b.position.y = this.hipH * (1 - Math.min(1, u) * 0.7);
       for (const L of this.legs) L.hip.rotation.x = 0.4;
+    } else if (state === 'sit') {
+      b.rotation.x = -0.5;
+      b.position.y = this.hipH * 0.78;
+      for (const L of this.legs) {
+        if (L.front) { L.hip.rotation.x = 0.5; L.knee.rotation.x = 0; }
+        else { L.hip.rotation.x = -0.9; L.knee.rotation.x = 1.9; }
+      }
+      this.neck.rotation.x = 0.0 + Math.sin(G.time * 0.8) * 0.05;
+      this.head.rotation.x = 0.25;
+      this.tail.rotation.x = -1.0;
+      this.tail.rotation.y = 0.7 + Math.sin(G.time * 1.3) * 0.15;
+    } else if (state === 'sleep') {
+      b.position.y = this.hipH * 0.38;
+      b.rotation.z = 0.12;
+      for (const L of this.legs) { L.hip.rotation.x = L.front ? -1.3 : 1.2; L.knee.rotation.x = L.front ? 0.2 : -0.3; }
+      this.neck.rotation.x = 0.9;
+      this.neck.rotation.y = 0.0;
+      this.head.rotation.y = 0.8;
+      this.head.rotation.x = 0.3 + Math.sin(G.time * 1.1) * 0.03;
+      this.tail.rotation.x = -0.35;
+      this.tail.rotation.y = 1.7;
+    } else if (state === 'dig') {
+      b.rotation.x = 0.32;
+      b.position.y -= 0.05 * this.s;
+      this.neck.rotation.x = 0.9;
+      for (const L of this.legs) if (L.front) L.hip.rotation.x = -0.6 + Math.sin(G.time * 22 + (L.ph ? 3 : 0)) * 0.7;
+      this.tail.rotation.x = 0.6;
+      this.tail.rotation.y = Math.sin(G.time * 12) * 0.5;
+    } else if (state === 'happy' || state === 'point') {
+      const hop = state === 'happy' ? Math.abs(Math.sin(G.time * 9)) * 0.12 * this.s : 0;
+      b.position.y += hop;
+      this.neck.rotation.x = -0.25;
+      this.head.rotation.z = Math.sin(G.time * 4) * 0.25;
+      this.tail.rotation.x = 0.45;
+      this.tail.rotation.y = Math.sin(G.time * 16) * 0.6;
+      if (state === 'point') { this.head.rotation.z = 0; for (const L of this.legs) if (L.front && L.ph) L.hip.rotation.x = -0.9; }
     } else if (state === 'stagger') {
       b.rotation.z = Math.sin(u * Math.PI) * 0.3;
       b.position.y -= 0.1 * Math.sin(u * Math.PI) * this.s;

@@ -24,6 +24,7 @@ const fs = require('fs');
   const url = 'file://' + path.resolve(__dirname, '../dist/index.html') + (process.env.Q || '?manual');
   await page.goto(url);
   for (const s of steps) {
+    if (s.reload) await page.reload();
     if (s.wait) await page.waitForTimeout(s.wait);
     if (s.waitFor) await page.waitForFunction(s.waitFor, null, { timeout: s.timeout || 120000 });
     if (s.eval) {

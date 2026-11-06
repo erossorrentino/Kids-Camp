@@ -224,10 +224,17 @@ Surf terrainSurf(int ep, vec3 wp, vec3 wn, vec4 m, float n1, float n2, float n3)
     // crater glow near volcano floor
     float crater = (1.0 - smoothstep(30.0, 60.0, distance(wp.xz, vec2(60.0, -560.0)))) * smoothstep(160.0, 175.0, h);
     float lavaN = fbm3(wp.xz * 0.05 + vec2(uTime * 0.02, 0.0));
-    float lava = smoothstep(0.03, 0.0, abs(lavaN - 0.5)) + smoothstep(0.7, 0.78, lavaN);
+    float river = smoothstep(0.035, 0.0, abs(lavaN - 0.5));
+    float pool = smoothstep(0.7, 0.78, lavaN);
+    // pools crust over into dark plates with glowing seams; the core stays molten
+    float plates = smoothstep(0.03, 0.11, cracks(wp.xz * 0.45 + vec2(uTime * 0.035, uTime * 0.012)));
+    float core = smoothstep(0.84, 0.93, lavaN);
+    float heat = max(river, pool * mix(1.0, 0.16, plates * (1.0 - core)));
+    vec3 lavaC = mix(vec3(0.5, 0.05, 0.01), vec3(1.25, 0.34, 0.04), smoothstep(0.2, 0.7, heat));
+    lavaC = mix(lavaC, vec3(1.45, 0.9, 0.32), smoothstep(0.88, 1.0, heat) * 0.55);
     c = mix(c, srgb(vec3(0.07, 0.05, 0.05)), crater);
     e = mix(e, vec3(0.0), crater * 0.8);
-    e += vec3(1.4, 0.38, 0.05) * crater * lava * 1.6 * pulse;
+    e += lavaC * crater * heat * 1.05 * pulse;
     rough = 0.96;
     bump = mix(0.7, 1.5, rockT);
   } else {

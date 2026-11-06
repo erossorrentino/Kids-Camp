@@ -775,7 +775,35 @@ function buildAstral() {
       const a = rng() * Math.PI * 2, rr = rng() * is.r * 0.7;
       b.geo(k % 2 ? MATS.crystal : MATS.crystalPink, new THREE.OctahedronGeometry(0.4 + rng() * 0.8, 0), is.x + Math.sin(a) * rr, is.y + 0.6, is.z + Math.cos(a) * rr, rng(), rng(), 0);
     }
+    // underside: glowing crystal stalactites and dangling roots
+    const depth = is.r * 1.6;
+    for (let k = 0; k < 3 + Math.ceil(is.r / 4); k++) {
+      const a = rng() * Math.PI * 2, rr = (0.15 + rng() * 0.45) * is.r;
+      const len = 1.2 + rng() * is.r * 0.35;
+      const cone = new THREE.ConeGeometry(0.25 + rng() * 0.35, len, 5);
+      cone.rotateX(Math.PI);
+      cone.translate(0, -len / 2, 0);
+      // the island tapers from r at the top to 0.12r at the bottom: sit on that surface
+      const yy = is.y - Math.min(depth, (depth * (1 - rr / is.r)) / 0.88) * 0.94;
+      b.geo(k % 3 ? MATS.crystal : MATS.crystalPink, cone, is.x + Math.sin(a) * rr, yy, is.z + Math.cos(a) * rr, (rng() - 0.5) * 0.3, rng() * 3, (rng() - 0.5) * 0.3);
+    }
+    for (let k = 0; k < Math.ceil(is.r * 1.4); k++) {
+      const a = rng() * Math.PI * 2;
+      const len = 1.5 + rng() * 4.5;
+      const root = new THREE.CylinderGeometry(0.06, 0.02, len, 4);
+      root.translate(0, -len / 2, 0);
+      b.geo(MATS.moss, root, is.x + Math.sin(a) * is.r * 0.94, is.y - 0.2, is.z + Math.cos(a) * is.r * 0.94, (rng() - 0.5) * 0.25, 0, (rng() - 0.5) * 0.25);
+    }
+    // rim stones
+    for (let k = 0; k < Math.ceil(is.r / 2); k++) {
+      const a = rng() * Math.PI * 2;
+      b.geo(MATS.rockStar, new THREE.DodecahedronGeometry(0.4 + rng() * 0.7, 0), is.x + Math.sin(a) * is.r * 0.88, is.y + 0.15, is.z + Math.cos(a) * is.r * 0.88, rng() * 3, rng() * 3, 0);
+    }
     if (is.arena) {
+      // a slow-glowing rune ring set into the platform
+      const ring = new THREE.RingGeometry(is.r * 0.72, is.r * 0.75, 64);
+      ring.rotateX(-Math.PI / 2);
+      b.geo(MATS.rune, ring, is.x, is.y + 0.08, is.z);
       for (let i = 0; i < 10; i++) {
         const a = (i / 10) * Math.PI * 2;
         b.cyl(MATS.marbleStar, 0.6, 0.7, 6 + (i % 3) * 2, is.x + Math.sin(a) * (is.r - 2), is.y, is.z + Math.cos(a) * (is.r - 2), 10);

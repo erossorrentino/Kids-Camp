@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { VLight } from '../core/lights.js';
 import { G } from '../core/G.js';
-import { GLSL_NOISE, TIME_UNIFORM, fogUniforms } from '../core/shaderlib.js';
+import { GLSL_NOISE, TIME_UNIFORM, NIGHT_UNIFORM, fogUniforms } from '../core/shaderlib.js';
+import { forestMask } from '../world/worldmap.js';
 
 // ---------------------------------------------------------------------------
 // CPU-simulated, GPU-drawn particle pools
@@ -130,8 +131,8 @@ const rnd = (a = 1) => (Math.random() - 0.5) * 2 * a;
 // ---------------------------------------------------------------------------
 const AMB_VERT = /* glsl */ `
 attribute vec4 aRand;
-uniform vec3 uCenter; uniform float uSize; uniform float uTime; uniform float uKind; uniform float uAmount; uniform float uScale;
-varying float vA; varying vec3 vC; varying float vKind;
+uniform vec3 uCenter; uniform float uSize; uniform float uTime; uniform float uKind; uniform float uAmount; uniform float uScale; uniform float uNight;
+varying float vA; varying vec3 vC; varying float vKind; varying float vRot; varying float vFlip;
 ${GLSL_NOISE}
 void main(){
   vec3 p = position;
@@ -140,6 +141,7 @@ void main(){
   vec3 wp;
   float sz = 1.0; float a = 1.0; vec3 col = vec3(1.0);
   float t = uTime;
+  vRot = 0.0; vFlip = 1.0;
   if (k < 0.5) { // pollen / dust motes
     p += vec3(sin(t * 0.3 + aRand.x * 20.0) * 2.0, sin(t * 0.21 + aRand.y * 10.0) * 1.0, cos(t * 0.27 + aRand.z * 15.0) * 2.0);
     sz = 0.05 + aRand.w * 0.05; col = vec3(1.0, 0.95, 0.8) * 1.5; a = 0.55;
@@ -161,10 +163,21 @@ void main(){
     p.y -= t * 18.0;
     p.x += t * 2.0;
     sz = 0.06; col = vec3(0.6, 0.65, 0.75); a = 0.5;
-  } else { // snow
+  } else if (k < 5.5) { // snow
     p.y -= t * (1.0 + aRand.w);
     p.x += sin(t * 0.6 + aRand.x * 20.0) * 1.0;
     sz = 0.1; col = vec3(1.0); a = 0.85;
+  } else { // drifting leaves
+    p.y -= t * (0.45 + aRand.w * 0.4);
+    p.x += t * 0.5 + sin(t * 0.9 + aRand.x * 20.0) * 1.4;
+    p.z += cos(t * 0.7 + aRand.y * 20.0) * 1.1;
+    sz = 0.16 + aRand.w * 0.08;
+    col = mix(vec3(0.32, 0.42, 0.08), vec3(0.75, 0.38, 0.06), aRand.z);
+    if (aRand.y > 0.8) col = vec3(0.8, 0.62, 0.12);
+    col *= mix(1.0, 0.1, uNight);
+    a = 0.95;
+    vRot = t * (1.0 + aRand.y * 2.0) + aRand.x * 6.28;
+    vFlip = abs(sin(t * (1.5 + aRand.z * 2.0) + aRand.y * 9.0));
   }
   vec3 h = vec3(uSize, uSize * 0.5, uSize);
   wp = c + mod(p - c + h * 0.5 * vec3(1.0, 1.0, 1.0) * 1.0, h) - h * 0.5;
@@ -178,14 +191,24 @@ void main(){
   vA = a; vC = col; vKind = k;
 }`;
 const AMB_FRAG = /* glsl */ `
-varying float vA; varying vec3 vC; varying float vKind;
+varying float vA; varying vec3 vC; varying float vKind; varying float vRot; varying float vFlip;
 void main(){
   vec2 c = gl_PointCoord * 2.0 - 1.0;
   float a;
+  vec3 col = vC;
   if (vKind > 3.5 && vKind < 4.5) a = (1.0 - smoothstep(0.0, 0.25, abs(c.x))) * (1.0 - smoothstep(0.6, 1.0, abs(c.y)));
+  else if (vKind > 5.5) {
+    // a tumbling leaf: rotated, squashed as it flips, with a midrib
+    float cs = cos(vRot), sn = sin(vRot);
+    vec2 q = vec2(c.x * cs - c.y * sn, c.x * sn + c.y * cs);
+    q.x /= max(0.15, vFlip);
+    float leaf = 1.0 - smoothstep(0.85, 1.0, length(vec2(q.x * 1.9, q.y)) + abs(q.y) * 0.25);
+    a = leaf;
+    col *= 0.75 + 0.35 * (1.0 - smoothstep(0.0, 0.08, abs(q.x))) + 0.2 * vFlip;
+  }
   else a = pow(max(0.0, 1.0 - length(c)), 2.0);
   if (a * vA < 0.01) discard;
-  gl_FragColor = vec4(vC, a * vA);
+  gl_FragColor = vec4(col, a * vA);
 }`;
 
 class AmbientField {
@@ -202,7 +225,7 @@ class AmbientField {
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     g.setAttribute('aRand', new THREE.BufferAttribute(rr, 4));
     g.boundingSphere = new THREE.Sphere(new THREE.Vector3(), 1e6);
-    this.uniforms = { uCenter: { value: new THREE.Vector3() }, uSize: { value: size }, uTime: TIME_UNIFORM, uKind: { value: kind }, uAmount: { value: 0 }, uScale: { value: 600 } };
+    this.uniforms = { uCenter: { value: new THREE.Vector3() }, uSize: { value: size }, uTime: TIME_UNIFORM, uKind: { value: kind }, uAmount: { value: 0 }, uScale: { value: 600 }, uNight: NIGHT_UNIFORM };
     this.mat = new THREE.ShaderMaterial({ uniforms: this.uniforms, vertexShader: AMB_VERT, fragmentShader: AMB_FRAG, transparent: true, depthWrite: false, blending: additive ? THREE.AdditiveBlending : THREE.NormalBlending });
     this.points = new THREE.Points(g, this.mat);
     this.points.frustumCulled = false;
@@ -247,7 +270,10 @@ export class FX {
       stars: new AmbientField(scene, 900, 60, 3),
       rain: new AmbientField(scene, 7000, 50, 4, false),
       snow: new AmbientField(scene, 3000, 50, 5, false),
+      leaves: new AmbientField(scene, 320, 44, 6, false),
     };
+    this._forestT = 0;
+    this._forest = 0;
     // pooled point lights for spells/explosions
     for (let i = 0; i < 6; i++) {
       const l = new VLight(0xffaa55, 0, 12, 2);
@@ -473,6 +499,12 @@ export class FX {
     A.stars.target = epoch === 2 ? 0.7 : 0;
     A.rain.target = weather.rain;
     A.snow.target = (cam.y > 120 && epoch !== 1 ? 0.5 : 0) + weather.snow;
+    this._forestT -= dt;
+    if (this._forestT <= 0) {
+      this._forestT = 0.5;
+      this._forest = forestMask(cam.x, cam.z);
+    }
+    A.leaves.target = epoch === 0 ? (0.12 + 0.88 * Math.min(1, this._forest * 1.4)) * (1 - weather.rain * 0.7) * (0.6 + Math.min(0.4, (weather.wind || 0) * 0.4)) : 0;
     const h = G.renderer.domElement.height;
     for (const k in A) A[k].update(dt, cam, h);
   }

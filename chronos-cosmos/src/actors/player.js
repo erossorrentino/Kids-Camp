@@ -1172,6 +1172,26 @@ export class Player {
         ud.glowMat.color.setHex(this.stance === 'wind' ? 0x8fe0ff : 0xffb36a);
       }
     }
+    // glance toward a locked foe or someone close by
+    let look = 0;
+    if (this.mode === 'ground' && !this.action) {
+      let tgt = this.lockTarget && !this.lockTarget.dead ? this.lockTarget.pos : null;
+      if (!tgt && G.npcs) {
+        let best = 25;
+        for (const n of G.npcs.list) {
+          if (!n.rig?.root.visible) continue;
+          const d2 = (n.pos.x - this.pos.x) ** 2 + (n.pos.z - this.pos.z) ** 2;
+          if (d2 < best) { best = d2; tgt = n.pos; }
+        }
+      }
+      if (tgt) {
+        let a = Math.atan2(tgt.x - this.pos.x, tgt.z - this.pos.z) - this.yaw;
+        a = Math.atan2(Math.sin(a), Math.cos(a));
+        if (Math.abs(a) < 1.6) look = Math.max(-0.9, Math.min(0.9, a));
+      }
+    }
+    this.lookYaw = (this.lookYaw || 0) + (look - (this.lookYaw || 0)) * Math.min(1, dt * 4);
+    if (Math.abs(this.lookYaw) > 0.01) addJ(P, 'head', 0, this.lookYaw * 0.75, 0);
     rig.apply(P);
     // place rig
     rig.root.position.copy(this.pos);

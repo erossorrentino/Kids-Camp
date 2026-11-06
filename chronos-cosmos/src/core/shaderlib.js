@@ -53,6 +53,24 @@ float epochRing(vec3 wp){ float d = distance(wp.xz, uShiftCenter.xz); float w = 
 
 // Shared uniforms (plain objects so they are shared by reference across
 // every cloned material uniform set; see patchFogChunks).
+// Soft rim light for characters and creatures, tinted by the sky each frame.
+export const RIM_UNIFORM = { value: { x: 0.5, y: 0.6, z: 0.8 } };
+export function addRim(mat, strength = 0.32) {
+  const prev = mat.onBeforeCompile;
+  mat.onBeforeCompile = (sh, r) => {
+    prev?.(sh, r);
+    sh.uniforms.uRim = RIM_UNIFORM;
+    sh.fragmentShader = 'uniform vec3 uRim;\n' + sh.fragmentShader.replace(
+      '#include <emissivemap_fragment>',
+      `#include <emissivemap_fragment>
+      float rimF = 1.0 - clamp(dot(normalize(vViewPosition), normal), 0.0, 1.0);
+      totalEmissiveRadiance += uRim * (rimF * rimF * rimF) * ${strength.toFixed(2)};`,
+    );
+  };
+  mat.customProgramCacheKey = () => 'rim' + strength.toFixed(2);
+  return mat;
+}
+
 export const SHARED = {
   sunDir: { x: 0.3, y: 0.8, z: 0.2 },
   sunColor: { x: 1, y: 0.9, z: 0.7 },

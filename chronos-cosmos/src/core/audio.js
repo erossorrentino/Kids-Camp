@@ -330,6 +330,13 @@ export class Audio {
         this.osc('sine', 300, t, 0.3, out, 0.15, 0.002, 1500);
         break;
       case 'enemyDie':
+      case 'yip':
+        // a small fox bark: two bright chirps
+        for (let i = 0; i < 2; i++) {
+          this.osc('triangle', 820 * p, t + i * 0.16, 0.09, out, 0.12, 0.005, 1350 * p);
+          this.osc('sine', 1650 * p, t + i * 0.16, 0.06, out, 0.04, 0.005, 2100 * p);
+        }
+        break;
       case 'whimper':
         this.osc('sine', 300, t, 0.6, out, 0.15, 0.01, 100);
         for (let i = 0; i < 4; i++) this.osc('sine', NOTE(84 + i * 3), t + 0.2 + i * 0.06, 0.4, out, 0.04);
@@ -533,6 +540,14 @@ export class Audio {
         this.osc('sine', NOTE(84 + [0, 2, 4, 7, 9][Math.floor(Math.random() * 5)]), t, 2.5, out, 0.025, 0.05);
       } else if (ep === 1 && Math.random() < 0.3) {
         this.noiseBurst(t, 0.3, out, 0.08, 'bandpass', 300, 2);
+      } else if (ep === 1 && Math.random() < 0.18) {
+        // a far-off crow over the ash plains
+        const n = 2 + Math.floor(Math.random() * 2);
+        for (let i = 0; i < n; i++) this.osc('sawtooth', 560 + Math.random() * 60, t + i * 0.34, 0.2, out, 0.012, 0.01, 380);
+      } else if (ep === 0 && night > 0.6 && Math.random() < 0.12) {
+        // an owl, two soft hoots
+        this.osc('sine', 390, t, 0.32, out, 0.03, 0.04, 350);
+        this.osc('sine', 380, t + 0.5, 0.55, out, 0.03, 0.05, 330);
       }
     }
     if (night > 0.5 && ep !== 1) {

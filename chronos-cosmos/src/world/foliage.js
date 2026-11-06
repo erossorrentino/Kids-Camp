@@ -75,6 +75,9 @@ const GRASS_VERT_MAIN = /* glsl */ `
   }
   float hs = mix(hN, hO, k);
   float bh = uBladeH * (0.55 + aRand.y * 0.9) * hs * keep * fade;
+  // blades right in front of the lens would fill the screen: shrink them away
+  float camD = distance(vec3(wxz.x, h + 0.35, wxz.y), cameraPosition);
+  bh *= smoothstep(0.9, 3.2, camD);
   float y = position.y;
   vY = y;
   float ang = aRand.x * 6.2831;

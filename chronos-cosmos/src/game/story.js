@@ -63,7 +63,7 @@ export class Story {
     });
     N({
       id: 'maren', name: 'Elder Maren', title: 'Village Elder', epochs: [0], x: cx + 2.5, z: cz + 1.5, elder: true, voice: 0.8,
-      rig: { colors: { skin: 0xd8b090, cloth: 0x5a4a3a, cloth2: 0x4a3a2a, hair: 0xd8d8d8 }, hairStyle: 'bun', robe: 0x6a4a3a, pauldrons: false },
+      rig: { colors: { skin: 0xd8b090, cloth: 0x5a4a3a, cloth2: 0x4a3a2a, hair: 0xbcb6ac }, hairStyle: 'bun', robe: 0x6a4a3a, pauldrons: false },
       dialogue: () => (!this.S.flags.talked_maren ? 'maren_intro' : G.quests.stepId('main1') === 'thanks' ? 'maren_thanks' : this.S.flags.told_lyra && !this.S.flags.maren_shards ? 'maren_shards' : 'maren_idle'),
       schedule: [day({ x: cx + 2.5, z: cz + 1.5 }, 'idle', 6, 21), { from: 21, to: 6, act: 'sleep' }],
       barks: ['Time is a river, child. Mind the current.', 'The well water tastes of stars tonight.'],

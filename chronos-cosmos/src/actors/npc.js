@@ -332,6 +332,22 @@ export class NPC {
       if (this.strikeT > clip.duration) this.strikeT = 0;
     }
     if (this.def.elder) { addJ(P, 'spine', 0.25, 0, 0); addJ(P, 'head', -0.15, 0, 0); }
+    // glance at the player when they come close
+    const pl = G.player;
+    let want = 0;
+    if (pl && speed < 0.15) {
+      const dx = pl.pos.x - this.pos.x, dz = pl.pos.z - this.pos.z;
+      if (dx * dx + dz * dz < 49) {
+        let a = Math.atan2(dx, dz) - this.yaw;
+        a = Math.atan2(Math.sin(a), Math.cos(a));
+        if (Math.abs(a) < 1.9) want = Math.max(-1.05, Math.min(1.05, a));
+      }
+    }
+    this.lookAtPlayer += (want - this.lookAtPlayer) * Math.min(1, dt * 3.5);
+    if (Math.abs(this.lookAtPlayer) > 0.01) {
+      addJ(P, 'head', 0, this.lookAtPlayer * 0.7, 0);
+      addJ(P, 'neck', 0, this.lookAtPlayer * 0.3, 0);
+    }
     this.rig.apply(P);
     this.rig.root.position.copy(this.pos);
     this.rig.root.rotation.y = this.yaw;

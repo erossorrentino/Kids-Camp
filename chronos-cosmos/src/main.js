@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { G } from './core/G.js';
-import { patchFogChunks, TIME_UNIFORM, PLAYER_UNIFORM, WIND_UNIFORM, WET_UNIFORM } from './core/shaderlib.js';
+import { patchFogChunks, TIME_UNIFORM, PLAYER_UNIFORM, WIND_UNIFORM, WET_UNIFORM, RIM_UNIFORM } from './core/shaderlib.js';
 import { createRenderer, QUALITY, QUALITY_ORDER } from './core/renderer.js';
 import { LightPool } from './core/lights.js';
 import { createTextures, radialTexture } from './core/textures.js';
@@ -16,6 +16,10 @@ import { World } from './world/world.js';
 import { START } from './world/worldmap.js';
 import { FX } from './fx/fx.js';
 import { WeaponTrail } from './fx/trails.js';
+import { Life } from './fx/life.js';
+import { Echoes, Feats } from './game/echoes.js';
+import { Fox } from './game/companion.js';
+import { PhotoMode } from './ui/photo.js';
 import { Combat } from './combat/combat.js';
 import { Magic } from './combat/magic.js';
 import { Player } from './actors/player.js';
@@ -136,6 +140,7 @@ async function boot() {
   G.world = new World();
   G.fx = new FX(scene);
   G.trails = new WeaponTrail(scene);
+  G.life = new Life(scene);
   G.combat = new Combat();
   G.slowmo = (s, d) => G.combat.slowmo(s, d);
   G.magic = new Magic();
@@ -169,6 +174,14 @@ async function boot() {
   G.tutorial = new Tutorial();
   G.input.canLock = () => G.state === 'play' && !G.ui.blocking && !G.cutscene.active;
   G.touch = new TouchControls();
+  G.echoes = new Echoes(scene);
+  G.feats = new Feats();
+  G.fox = new Fox(scene);
+  G.photo = new PhotoMode();
+  G.renderNow = () => {
+    if (G.usePost) G.post.composer.render(0);
+    else G.renderer.render(G.scene, G.camera);
+  };
 
   const sx = START.x, sz = START.z;
   G.player.spawn(sx, terrain.heightAt(sx, sz) + 0.1, sz);
@@ -218,12 +231,19 @@ let last = performance.now();
 const manual = params.has('manual');
 function startLoop() {
   G.state = G.state || 'title';
+  let errors = 0;
   const frame = (fixedDt) => {
+    // schedule first so one bad frame can never stop the game
+    if (!manual) requestAnimationFrame(() => frame());
     const now = performance.now();
     const rdt = fixedDt || Math.min(0.05, (now - last) / 1000);
     last = now;
-    step(rdt);
-    if (!manual) requestAnimationFrame(() => frame());
+    try {
+      step(rdt);
+    } catch (e) {
+      if (errors++ < 5) console.error(e);
+      try { G.input.endFrame(); } catch (e2) {}
+    }
   };
   window.__cc_step = (n = 1, dt = 1 / 30) => {
     for (let i = 0; i < n; i++) {
@@ -286,6 +306,9 @@ function step(rdt) {
     G.build?.update?.(dt);
     G.rift?.update?.(dt * worldScale, dt * playerScale);
     G.bosses?.update?.(dt);
+    G.echoes?.update(dt);
+    G.fox?.update(dt * worldScale);
+    G.feats?.update(rdt);
   }
   if (playing) G.tutorial?.update(paused ? 0 : dt, rdt);
   G.touch?.update(rdt);
@@ -294,6 +317,7 @@ function step(rdt) {
     if (!paused) G.content?.update?.(rdt * 0.5, 1);
   }
   G.cutscene?.update?.(rdt);
+  G.photo?.update(rdt);
   G.fx.update(dt * worldScale);
   // camera
   if (G.state === 'title') G.ui?.titleCamera?.(rdt);
@@ -313,6 +337,12 @@ function step(rdt) {
   G.veg.update(cam);
   G.water.update(rdt, G.atmo, G.weather?.state);
   G.fx.updateAmbient(rdt, cam, G.game.inPocket ? 3 : G.epochs.current, G.atmo.state.night || 0, G.weather?.state || { rain: 0, ash: 0, snow: 0 });
+  G.life?.update(paused || !playing ? 0 : dt * worldScale, rdt);
+  // rim light follows the sky colour, a little stronger at dusk and night
+  const hc = G.atmo.hemi.color;
+  RIM_UNIFORM.value.x = Math.min(1.2, hc.r * 0.9 + 0.08);
+  RIM_UNIFORM.value.y = Math.min(1.2, hc.g * 0.9 + 0.08);
+  RIM_UNIFORM.value.z = Math.min(1.2, hc.b * 0.9 + 0.12);
   // post uniforms
   const gr = G.post.grade.uniforms;
   _sun.copy(G.atmo.uniforms.uSunDir.value).multiplyScalar(2000).add(cam).project(G.camera);

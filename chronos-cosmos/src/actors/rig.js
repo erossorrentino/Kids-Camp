@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { G } from '../core/G.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { addRim } from '../core/shaderlib.js';
 
 // ---------------------------------------------------------------------------
 // Procedural humanoid rig. Poses are flat Float32Arrays of joint eulers so
@@ -377,6 +378,7 @@ export class Rig {
     mk('thighR', j.hips, -0.1, -0.04, 0);
     mk('shinR', j.thighR, 0, -0.45, 0);
     mk('footR', j.shinR, 0, -0.44, 0);
+    mk('eyes', j.head, 0, 0.104, 0.097);
 
     const M = (col, o = {}) => mat(col, { ...o, unique });
     const skin = M(c.skin, { rough: 0.6 });
@@ -414,18 +416,44 @@ export class Rig {
     // belt
     add(j.hips, new THREE.TorusGeometry(0.135, 0.025, 6, 16), leather, 0, 0.06, 0, 1.15 * B, 0.85 * B, 1).rotation.x = Math.PI / 2;
     add(j.neck, capsule(0.05, 0.06), skin, 0, 0.02, 0);
-    // head
-    const headGeo = new THREE.SphereGeometry(0.115, 16, 12);
-    const head = add(j.head, headGeo, skin, 0, 0.1, 0.0, 0.92, 1.05, 1);
+    // head: a rounded skull with a softer chin
+    const headGeo = new THREE.SphereGeometry(0.115, 18, 14);
+    const head = add(j.head, headGeo, skin, 0, 0.1, 0.0, 0.9, 1.04, 0.98);
     this.headMesh = head;
-    if (build !== 'golem' && build !== 'wraith') {
-      const eyeM = opts.glowEyes ? M(opts.glowEyes, { emissive: opts.glowEyes, emissiveIntensity: 4 }) : M(c.eyes, { rough: 0.3 });
-      add(j.head, new THREE.SphereGeometry(0.018, 8, 6), eyeM, 0.042, 0.115, 0.098);
-      add(j.head, new THREE.SphereGeometry(0.018, 8, 6), eyeM, -0.042, 0.115, 0.098);
-      add(j.head, new THREE.ConeGeometry(0.018, 0.04, 6), skin, 0, 0.085, 0.112).rotation.x = Math.PI / 2;
+    const human = build !== 'golem' && build !== 'wraith' && !opts.glowEyes;
+    if (human) {
+      // ears
+      for (const sx of [1, -1]) add(j.head, new THREE.SphereGeometry(0.026, 8, 6), skin, sx * 0.1, 0.095, -0.005, 0.45, 1, 0.75);
+      // eyes live on their own bone so they can blink
+      const eyeBone = j.eyes;
+      const white = M(0xf3ede4, { rough: 0.35 });
+      let hsh = 0;
+      for (const ch of String(opts.name || c.hair)) hsh = (hsh * 31 + ch.charCodeAt(0)) >>> 0;
+      const irisCol = c.iris || [0x5a3a22, 0x2f5f8f, 0x3d6b3a, 0x6b4a26, 0x4a4a5a][hsh % 5];
+      const iris = M(irisCol, { rough: 0.25 });
+      const pupil = M(0x0a0808, { rough: 0.2 });
+      for (const sx of [1, -1]) {
+        add(eyeBone, new THREE.SphereGeometry(0.019, 10, 8), white, sx * 0.039, 0, 0, 1.2, 0.92, 0.55);
+        add(eyeBone, new THREE.SphereGeometry(0.0115, 10, 8), iris, sx * 0.039, 0, 0.0088, 1, 1.05, 0.45);
+        add(eyeBone, new THREE.SphereGeometry(0.0055, 8, 6), pupil, sx * 0.039, 0, 0.0125, 1, 1, 0.4);
+        // brows
+        const brow = add(j.head, new THREE.BoxGeometry(0.036, 0.008, 0.012), hair, sx * 0.041, 0.134, 0.103);
+        brow.rotation.z = sx * -0.14;
+        brow.rotation.x = -0.25;
+      }
+      // nose and mouth
+      add(j.head, new THREE.SphereGeometry(0.016, 8, 6), skin, 0, 0.083, 0.112, 0.8, 1.1, 1);
+      const lip = M(new THREE.Color(c.skin).multiplyScalar(0.62).lerp(new THREE.Color(0x8a3a34), 0.35).getHex(), { rough: 0.5 });
+      add(j.head, new THREE.BoxGeometry(0.034, 0.0065, 0.01), lip, 0, 0.054, 0.1);
+      add(j.head, new THREE.BoxGeometry(0.03, 0.006, 0.008), lip, 0, 0.049, 0.098, 1, 1, 1);
     } else {
-      const eyeM = M(opts.glowEyes || 0xff6622, { emissive: opts.glowEyes || 0xff6622, emissiveIntensity: 5 });
-      add(j.head, new THREE.BoxGeometry(0.16, 0.025, 0.02), eyeM, 0, 0.11, 0.1);
+      const eyeM = M(opts.glowEyes || 0xff6622, { emissive: opts.glowEyes || 0xff6622, emissiveIntensity: build === 'golem' || build === 'wraith' ? 5 : 4 });
+      if (build === 'golem' || build === 'wraith') add(j.head, new THREE.BoxGeometry(0.16, 0.025, 0.02), eyeM, 0, 0.11, 0.1);
+      else {
+        add(j.head, new THREE.SphereGeometry(0.019, 8, 6), eyeM, 0.04, 0.112, 0.098, 1.2, 0.8, 0.6);
+        add(j.head, new THREE.SphereGeometry(0.019, 8, 6), eyeM, -0.04, 0.112, 0.098, 1.2, 0.8, 0.6);
+        add(j.head, new THREE.SphereGeometry(0.016, 8, 6), skin, 0, 0.083, 0.112, 0.8, 1.1, 1);
+      }
     }
     // hair / hood / helm
     if (opts.helm) {
@@ -436,13 +464,35 @@ export class Rig {
       add(j.head, new THREE.SphereGeometry(0.15, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.7), M(opts.hood, { side: THREE.DoubleSide, rough: 0.9 }), 0, 0.11, -0.015, 1, 1.08, 1.08);
     } else if (opts.hairStyle !== 'none') {
       const hs = opts.hairStyle || 'short';
-      add(j.head, new THREE.SphereGeometry(0.125, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), hair, 0, 0.115, -0.01, 1, 1.05, 1.08);
+      // cap tipped back so the hairline sits on the forehead, not over the eyes
+      const cap = add(j.head, new THREE.SphereGeometry(0.124, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.6), hair, 0, 0.112, -0.012, 0.98, 1.06, 1.06);
+      cap.rotation.x = -0.62;
+      // a swept fringe: a shell over the forehead with a jagged lower edge
+      const fr = new THREE.SphereGeometry(0.127, 18, 4, Math.PI * 0.08, Math.PI * 0.84, Math.PI * 0.1, Math.PI * (hs === 'short' || hs === 'beard' ? 0.27 : 0.31));
+      const fp = fr.attributes.position;
+      let minY = 1;
+      for (let i = 0; i < fp.count; i++) minY = Math.min(minY, fp.getY(i));
+      for (let i = 0; i < fp.count; i++) {
+        if (fp.getY(i) < minY + 1e-4) {
+          const ang = Math.atan2(fp.getZ(i), -fp.getX(i));
+          fp.setY(i, fp.getY(i) + (Math.round(ang * 9) % 2 ? 0.012 : -0.004) + Math.abs(fp.getX(i)) * 0.12);
+        }
+      }
+      fr.computeVertexNormals();
+      fr.rotateY(-0.12);
+      add(j.head, fr, hair, 0, 0.11, -0.006, 0.97, 1.05, 1.04);
+      // sides over the ears
+      for (const sx of [1, -1]) add(j.head, new THREE.SphereGeometry(0.05, 10, 8), hair, sx * 0.082, 0.112, -0.028, 0.48, 1.45, 1.35);
       if (hs === 'long' || hs === 'tail') {
         const tail = add(j.head, capsule(0.05, hs === 'long' ? 0.22 : 0.18), hair, 0, -0.0, -0.11, hs === 'long' ? 1.8 : 1, 1, 0.8);
         tail.rotation.x = 0.25;
+        if (hs === 'tail') add(j.head, new THREE.TorusGeometry(0.03, 0.01, 6, 12), leather, 0, 0.07, -0.13).rotation.x = Math.PI / 2 + 0.25;
       }
       if (hs === 'bun') add(j.head, new THREE.SphereGeometry(0.06, 10, 8), hair, 0, 0.2, -0.08);
-      if (hs === 'beard') add(j.head, new THREE.SphereGeometry(0.08, 10, 8), hair, 0, 0.03, 0.06, 1.1, 0.9, 0.8);
+      if (hs === 'beard') {
+        add(j.head, new THREE.SphereGeometry(0.08, 12, 8), hair, 0, 0.025, 0.05, 1.1, 0.95, 0.85);
+        add(j.head, new THREE.BoxGeometry(0.06, 0.012, 0.02), hair, 0, 0.066, 0.105);
+      }
     }
     if (opts.hat) {
       add(j.head, new THREE.CylinderGeometry(0.22, 0.22, 0.02, 16), M(opts.hat), 0, 0.17, 0);
@@ -471,7 +521,7 @@ export class Rig {
     }
     if (build === 'hero' || build === 'knight') {
       // chest strap + plate
-      add(j.chest, new THREE.BoxGeometry(0.05, 0.36, 0.25), leather, 0, 0.12, 0, 1, 1, 1).rotation.z = 0.55;
+      add(j.chest, new THREE.TorusGeometry(0.17, 0.017, 6, 28).rotateX(Math.PI / 2).scale(1.2 * B, 1, 0.86 * B), leather, 0, 0.1, 0).rotation.z = 0.62;
       if (build === 'knight') add(j.chest, capsule(0.17, 0.1), metal, 0, 0.12, 0.02, 1.15 * B, 1, 0.85 * B);
     }
     if (build === 'golem') {
@@ -548,6 +598,7 @@ export class Rig {
         emissiveIntensity: key === 'glow' ? ref.emissiveIntensity : 1,
         map: key === 'metal' ? G.tex?.metal.map || null : null,
       });
+      if (key !== 'glow') addRim(mat, key === 'metal' ? 0.14 : 0.22);
       const mesh = new THREE.SkinnedMesh(merged, mat);
       mesh.castShadow = key !== 'glow';
       mesh.receiveShadow = true;
@@ -611,6 +662,17 @@ export class Rig {
       g.rotation.set(p[i * 3], p[i * 3 + 1], p[i * 3 + 2]);
     }
     j.hips.position.set(p[OFF] * this.s, (0.95 + p[OFF + 1]) * this.s, p[OFF + 2] * this.s);
+    // blinking: a quick squash of the eye bone every few seconds
+    const now = performance.now() * 0.001;
+    if (this._blinkAt === undefined) this._blinkAt = now + 0.5 + Math.random() * 4;
+    let lid = 1;
+    const b = now - this._blinkAt;
+    if (b > 0) {
+      if (b < 0.14) lid = Math.max(0.06, Math.abs(b - 0.07) / 0.07);
+      else this._blinkAt = now + (Math.random() < 0.15 ? 0.25 : 2 + Math.random() * 4);
+    }
+    if (this.eyesShut) lid = 0.06;
+    j.eyes.scale.y = lid;
   }
 
   setFlash(v, color = 0xffffff) {
