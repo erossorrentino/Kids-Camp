@@ -1,0 +1,15 @@
+{
+  "name": "chronos-cosmos",
+  "version": "1.0.0",
+  "description": "Chronos & Cosmos: an open-world action RPG where you shift between three Ages of time. Runs in the browser.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "build:dev": "node build.mjs --dev"
+  },
+  "dependencies": {
+    "esbuild": "0.21.5",
+    "three": "0.160.0"
+  }
+}
