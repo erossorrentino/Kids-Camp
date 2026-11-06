@@ -126,10 +126,24 @@ export class Input {
       { passive: true },
     );
     document.addEventListener('pointerlockchange', () => {
+      const was = this.locked;
       this.locked = document.pointerLockElement === this.canvas;
+      if (this.locked) {
+        // a lock request granted after we already let go (e.g. a cutscene began)
+        if (!this.lockWanted) this._release();
+      } else if (was) {
+        // the lock ended without us asking while play wanted it: the player's Esc
+        const ours = this.selfExit;
+        this.selfExit = false;
+        if (!ours && this.lockWanted) {
+          this.lockWanted = false;
+          this.onUserUnlock?.();
+        }
+      }
     });
     document.addEventListener('pointerlockerror', () => {
       this.locked = false;
+      this.lockWanted = false;
       this.lockFailed = true;
       // browsers refuse a re-lock right after Esc; allow retrying shortly after
       clearTimeout(this._lfT);
@@ -141,7 +155,8 @@ export class Input {
   }
 
   requestLock() {
-    if (this.lockFailed) return;
+    if (this.lockFailed || this.lastDevice === 'touch') return;
+    this.lockWanted = true;
     try {
       const p = this.canvas.requestPointerLock && this.canvas.requestPointerLock();
       if (p && p.catch) p.catch(() => {});
@@ -150,9 +165,17 @@ export class Input {
     }
   }
   exitLock() {
+    this.lockWanted = false;
+    if (document.pointerLockElement) this._release();
+  }
+  _release() {
+    // remember that we released the mouse ourselves (not the player's Esc)
+    this.selfExit = true;
     try {
-      if (document.pointerLockElement) document.exitPointerLock();
-    } catch (e) {}
+      document.exitPointerLock();
+    } catch (e) {
+      this.selfExit = false;
+    }
   }
 
   down(action) {

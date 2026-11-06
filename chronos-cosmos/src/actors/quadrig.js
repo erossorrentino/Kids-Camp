@@ -1,47 +1,52 @@
 import * as THREE from 'three';
 import { G } from '../core/G.js';
-import { mat } from './rig.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 // Four-legged creature rig: wolves, cinder hounds and the Duskhorn mount.
 export class QuadRig {
   constructor(o = {}) {
     const s = (this.s = o.scale || 1);
     this.root = new THREE.Group();
-    this.body = new THREE.Group();
-    this.root.add(this.body);
-    const unique = !!o.uniqueMats;
-    const fur = mat(o.color || 0x5a4a3a, { rough: 0.95, unique, map: G.tex?.cloth.map });
-    const fur2 = mat(o.color2 || 0x3a2e24, { rough: 0.95, unique });
-    const eye = mat(o.eyes || 0x110a05, { emissive: o.glowEyes || 0x000000, emissiveIntensity: o.glowEyes ? 4 : 0, unique });
-    this.materials = [fur, fur2];
+    const bones = (this.bones = []);
+    const bone = (parent, x = 0, y = 0, z = 0) => {
+      const b = new THREE.Bone();
+      b.position.set(x, y, z);
+      parent.add(b);
+      bones.push(b);
+      return b;
+    };
+    this.body = bone(this.root);
+    const fur = { color: new THREE.Color(o.color || 0x5a4a3a) };
+    const fur2 = { color: new THREE.Color(o.color2 || 0x3a2e24) };
+    const eye = { color: new THREE.Color(o.eyes || 0x110a05), glow: o.glowEyes };
+    const am = { color: new THREE.Color(o.antlerColor || 0xe8dcc0), glow: o.antlerGlow };
+    const mm = { color: new THREE.Color(o.mane || 0x2a1e18) };
     const len = o.length || 1.0;
     const hh = (this.hipH = (o.legLen || 0.62) * s);
     this.body.position.y = hh;
+    // Parts are recorded against their bone and merged into skinned meshes
+    // (one per material family) at the end: ~3 draw calls per creature.
+    const parts = [];
     const add = (parent, geo, m, x = 0, y = 0, z = 0) => {
-      const mesh = new THREE.Mesh(geo, m);
-      mesh.position.set(x * s, y * s, z * s);
-      mesh.castShadow = true;
-      parent.add(mesh);
-      return mesh;
+      const proxy = new THREE.Object3D();
+      proxy.position.set(x * s, y * s, z * s);
+      parts.push({ parent, geo, m, proxy });
+      return proxy;
     };
     const torso = add(this.body, new THREE.CapsuleGeometry(0.22 * (o.girth || 1), len * 0.9, 4, 10), fur);
     torso.rotation.x = Math.PI / 2;
-    torso.scale.set(s, s, s * 1.0);
-    add(this.body, new THREE.SphereGeometry(0.235 * (o.girth || 1), 10, 8), fur, 0, 0.02, len * 0.4).scale.set(s, s * 1.0, s * 1.05);
-    // neck + head
-    this.neck = new THREE.Group();
-    this.neck.position.set(0, 0.12 * s, len * 0.55 * s);
-    this.body.add(this.neck);
+    torso.scale.set(s, s, s);
+    add(this.body, new THREE.SphereGeometry(0.235 * (o.girth || 1), 10, 8), fur, 0, 0.02, len * 0.4).scale.set(s, s, s * 1.05);
+    this.neck = bone(this.body, 0, 0.12 * s, len * 0.55 * s);
     add(this.neck, new THREE.CapsuleGeometry(0.12, 0.28, 4, 8), fur, 0, 0.12, 0.08).rotation.x = -0.7;
-    this.head = new THREE.Group();
-    this.head.position.set(0, 0.28 * s, 0.2 * s);
-    this.neck.add(this.head);
-    add(this.head, new THREE.SphereGeometry(0.14, 10, 8), fur, 0, 0, 0).scale.set(s, s * 0.9, s * 1.1);
+    parts[parts.length - 1].proxy.scale.setScalar(s);
+    this.head = bone(this.neck, 0, 0.28 * s, 0.2 * s);
+    add(this.head, new THREE.SphereGeometry(0.14, 10, 8), fur).scale.set(s, s * 0.9, s * 1.1);
     const snout = add(this.head, new THREE.CylinderGeometry(0.06, 0.09, 0.26, 8), fur2, 0, -0.03, 0.18);
     snout.rotation.x = Math.PI / 2;
     snout.scale.setScalar(s);
-    this.jaw = add(this.head, new THREE.BoxGeometry(0.1, 0.04, 0.22), fur2, 0, -0.08, 0.13);
-    this.jaw.scale.setScalar(s);
+    this.jaw = bone(this.head, 0, -0.08 * s, 0.13 * s);
+    add(this.jaw, new THREE.BoxGeometry(0.1, 0.04, 0.22), fur2).scale.setScalar(s);
     for (const sx of [-1, 1]) {
       add(this.head, new THREE.SphereGeometry(0.022, 6, 5), eye, 0.065 * sx, 0.04, 0.1).scale.setScalar(s);
       if (o.ears !== false) {
@@ -50,13 +55,9 @@ export class QuadRig {
         ear.scale.setScalar(s);
       }
       if (o.antlers) {
-        const am = mat(o.antlerColor || 0xe8dcc0, { emissive: o.antlerGlow || 0x000000, emissiveIntensity: o.antlerGlow ? 1.6 : 0, rough: 0.5 });
-        const a = new THREE.Group();
-        a.position.set(0.06 * sx * s, 0.12 * s, -0.02 * s);
+        const a = bone(this.head, 0.06 * sx * s, 0.12 * s, -0.02 * s);
         a.rotation.z = -0.5 * sx;
-        this.head.add(a);
-        const main = add(a, new THREE.CylinderGeometry(0.012, 0.022, 0.5, 5), am, 0, 0.25, 0);
-        main.scale.setScalar(s);
+        add(a, new THREE.CylinderGeometry(0.012, 0.022, 0.5, 5), am, 0, 0.25, 0).scale.setScalar(s);
         for (let k = 0; k < 3; k++) {
           const tine = add(a, new THREE.CylinderGeometry(0.008, 0.014, 0.22, 4), am, 0.04 * sx, 0.15 + k * 0.12, 0.04);
           tine.rotation.set(0.7, 0, -0.6 * sx);
@@ -64,41 +65,65 @@ export class QuadRig {
         }
       }
     }
-    if (o.mane) {
-      const mm = mat(o.mane, { rough: 1 });
-      for (let i = 0; i < 5; i++) add(this.neck, new THREE.SphereGeometry(0.08, 6, 5), mm, 0, 0.22 - i * 0.02, -0.05 + i * 0.07).scale.set(s * 0.8, s * 1.2, s);
-    }
+    if (o.mane) for (let i = 0; i < 5; i++) add(this.neck, new THREE.SphereGeometry(0.08, 6, 5), mm, 0, 0.22 - i * 0.02, -0.05 + i * 0.07).scale.set(s * 0.8, s * 1.2, s);
     // legs: FL FR BL BR
     this.legs = [];
     const lx = 0.14, lzF = len * 0.4, lzB = -len * 0.38;
     const legDefs = [[lx, lzF, 0], [-lx, lzF, 0.5], [lx, lzB, 0.5], [-lx, lzB, 0]];
     for (const [x, z, ph] of legDefs) {
-      const hip = new THREE.Group();
-      hip.position.set(x * s, -0.02 * s, z * s);
-      this.body.add(hip);
+      const hip = bone(this.body, x * s, -0.02 * s, z * s);
       const upperLen = hh * 0.52, lowerLen = hh * 0.52;
-      const up = add(hip, new THREE.CapsuleGeometry(0.055 * (o.girth || 1), upperLen / s - 0.08, 3, 6), fur, 0, -upperLen / 2 / s, 0);
-      up.scale.setScalar(s);
-      const knee = new THREE.Group();
-      knee.position.y = -upperLen;
-      hip.add(knee);
-      const lo = add(knee, new THREE.CapsuleGeometry(0.035, lowerLen / s - 0.06, 3, 6), fur2, 0, -lowerLen / 2 / s, 0);
-      lo.scale.setScalar(s);
+      add(hip, new THREE.CapsuleGeometry(0.055 * (o.girth || 1), upperLen / s - 0.08, 3, 6), fur, 0, -upperLen / 2 / s, 0).scale.setScalar(s);
+      const knee = bone(hip, 0, -upperLen, 0);
+      add(knee, new THREE.CapsuleGeometry(0.035, lowerLen / s - 0.06, 3, 6), fur2, 0, -lowerLen / 2 / s, 0).scale.setScalar(s);
       add(knee, new THREE.SphereGeometry(0.045, 6, 5), fur2, 0, -lowerLen / s, 0.02).scale.setScalar(s);
       this.legs.push({ hip, knee, ph, front: z > 0 });
     }
-    // tail
-    this.tail = new THREE.Group();
-    this.tail.position.set(0, 0.06 * s, -len * 0.55 * s);
-    this.body.add(this.tail);
+    this.tail = bone(this.body, 0, 0.06 * s, -len * 0.55 * s);
     const tl = add(this.tail, new THREE.CapsuleGeometry(0.05, o.tailLen || 0.4, 3, 6), fur2, 0, 0, -(o.tailLen || 0.4) / 2);
     tl.rotation.x = Math.PI / 2;
     tl.scale.setScalar(s);
-    if (o.flame) {
-      this.flame = true;
-    }
+    this.finalize(parts, o);
     this.phase = 0;
     this.flash = 0;
+  }
+
+  finalize(parts, o) {
+    this.root.updateMatrixWorld(true);
+    const groups = { base: [], glow: [] };
+    const index = new Map(this.bones.map((b, i) => [b, i]));
+    const tmp = new THREE.Matrix4();
+    for (const p of parts) {
+      p.proxy.updateMatrix();
+      tmp.multiplyMatrices(p.parent.matrixWorld, p.proxy.matrix);
+      const g = p.geo.index ? p.geo.toNonIndexed() : p.geo.clone();
+      for (const k of Object.keys(g.attributes)) if (k !== 'position' && k !== 'normal') g.deleteAttribute(k);
+      g.applyMatrix4(tmp);
+      const n = g.attributes.position.count;
+      const si = new Uint16Array(n * 4), sw = new Float32Array(n * 4), cc = new Float32Array(n * 3);
+      const bi = index.get(p.parent) || 0;
+      for (let i = 0; i < n; i++) { si[i * 4] = bi; sw[i * 4] = 1; cc[i * 3] = p.m.color.r; cc[i * 3 + 1] = p.m.color.g; cc[i * 3 + 2] = p.m.color.b; }
+      g.setAttribute('skinIndex', new THREE.Uint16BufferAttribute(si, 4));
+      g.setAttribute('skinWeight', new THREE.Float32BufferAttribute(sw, 4));
+      g.setAttribute('color', new THREE.Float32BufferAttribute(cc, 3));
+      groups[p.m.glow ? 'glow' : 'base'].push({ g, glow: p.m.glow });
+    }
+    const skeleton = new THREE.Skeleton(this.bones);
+    this.materials = [];
+    for (const key of ['base', 'glow']) {
+      const list = groups[key];
+      if (!list.length) continue;
+      const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: key === 'glow' ? 0.4 : 0.92, metalness: 0 });
+      if (key === 'glow') { mat.emissive = new THREE.Color(list[0].glow); mat.emissiveIntensity = 2.2; }
+      const mesh = new THREE.SkinnedMesh(mergeGeometries(list.map((x) => x.g)), mat);
+      mesh.castShadow = key === 'base';
+      mesh.receiveShadow = true;
+      this.root.add(mesh);
+      mesh.bind(skeleton);
+      mesh.boundingSphere = new THREE.Sphere(new THREE.Vector3(0, this.hipH, 0), 1.6 * this.s);
+      if (key === 'base') this.materials.push(mat);
+    }
+    this.root.updateMatrixWorld(true);
   }
   setFlash(v, color = 0xffffff) {
     for (const m of this.materials) {

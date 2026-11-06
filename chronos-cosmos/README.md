@@ -22,8 +22,15 @@ downloads. Click **New Journey**, then click the game to capture the mouse.
 Fonts load from Google Fonts when you're online and fall back to system
 fonts offline.
 
-Phones and tablets get on-screen controls and start on Low graphics.
-A gamepad works too.
+It also runs on **phones, tablets and Chromebooks**. Open the same file
+in Chrome or Safari, tap **New Journey** and turn the phone sideways. On
+touch screens the game goes full screen (where the browser allows it) and
+shows on-screen controls. A gamepad works too.
+
+The game picks its graphics level from the device: Mobile on phones, Low
+on Chromebooks and tablets, High on desktops. If the frame rate stays
+below about 26 fps it steps down by itself, at most twice. You can always
+set it yourself in Settings.
 
 ## Controls
 
@@ -46,6 +53,23 @@ A gamepad works too.
 | Build mode | B | |
 | Call your mount | H | D-pad ↓ |
 | Map · Journal · Inventory · Menu | M · J · I · Esc | Back · Start |
+
+### Touch controls
+
+| Action | Touch |
+|--------|-------|
+| Move | Drag anywhere on the left side (a stick appears under your thumb). Push it all the way to run |
+| Look | Drag on the right side. A quick tap there also strikes |
+| Attack · block · parry | **Strike** · **Guard** (tap Guard as the gold glint flashes to parry) |
+| Dodge · jump · glide | **Dodge** · **Jump** (tap Jump in mid-air to glide) |
+| Spell (hold for the greater spell) · weave | **Spell** · **Weave** |
+| Next element · lock on | **Elem** · **Lock** |
+| Talk · open · tame | **Use** |
+| Healing draught | **Heal** |
+| Shift Age (tap) · Age wheel (hold, then push the stick) | **Age** |
+| Menu · map · build · stance | Buttons along the top left |
+
+In dialogue, tap the text to continue and tap a reply to choose it.
 
 ## How the original design maps to the game
 
@@ -110,7 +134,13 @@ Everything is generated in code. There are no image, model or audio files.
 - Procedural, skinned characters with cloth-simulated capes, weapon trails,
   particles and dynamic lights.
 
-Four quality presets (Low to Ultra) are in Settings.
+Five quality presets are in Settings. **Mobile** and **Low** skip the
+post-processing chain and shadows, render at a lower resolution, use
+cheaper terrain, water and sky shaders, and draw less grass and fewer
+trees. **Medium**, **High** and **Ultra** add bloom, god rays, shadows and
+more foliage. Dynamic lights go through a small fixed pool (2 to 8 real
+lights by preset) that follows the camera. That keeps the cost flat and
+avoids shader recompiles when torches and spells appear.
 
 ## Audio
 
@@ -158,7 +188,10 @@ The game was developed and checked in headless Chromium with software
 WebGL. That covers loading, every system, a scripted playthrough of the
 full main story (all four acts, the final boss's phase shifts and the
 ending), the boss, rift, building-collapse and mount flows, and
-screenshots of each Age. It hasn't been measured on real GPUs yet. In the
-busiest views it renders about 150–230 draw calls and ~2.6M triangles per
-frame at High. If it stutters on your machine, use Medium or Low in
-Settings.
+screenshots of each Age. Phones were checked with Playwright's iPhone 13
+emulation (touch input, Mobile preset, about 165 draw calls and 0.6M
+triangles per frame) and Chromebooks with a ChromeOS user agent at
+1366×768 (Low preset, about 110 draw calls). It hasn't been measured on
+real hardware yet. At High the busiest views render about 150–230 draw
+calls and ~2.6M triangles per frame. If it stutters on your device, pick
+a lower preset in Settings.

@@ -42,13 +42,12 @@ export class Tutorial {
     document.addEventListener('visibilitychange', () => {
       if (document.hidden && G.state === 'play' && !G.ui.menuOpen && !G.cutscene.active && !G.dialogue.active && !G.rift?.picking) G.ui.openMenu('map');
     });
-    document.addEventListener('pointerlockchange', () => {
-      const lostLock = !document.pointerLockElement;
-      if (lostLock && G.state === 'play' && !G.ui.blocking && !G.cutscene.active && !G.build?.active && !G.rift?.picking && !G.input.lockFailed) {
+    G.input.onUserUnlock = () => {
+      if (G.state === 'play' && !G.ui.blocking && !G.cutscene.active && !G.build?.active && !G.rift?.picking) {
         // the browser swallows the Esc that released the mouse: open the menu for it
-        setTimeout(() => { if (!document.pointerLockElement && !G.ui.menuOpen && G.state === 'play' && !G.ui.blocking) G.ui.openMenu(G.ui.tab || 'map'); }, 50);
+        setTimeout(() => { if (!document.pointerLockElement && !G.input.lockWanted && !G.ui.menuOpen && G.state === 'play' && !G.ui.blocking) G.ui.openMenu(G.ui.tab || 'map'); }, 50);
       }
-    });
+    };
   }
 
   hint(id) {

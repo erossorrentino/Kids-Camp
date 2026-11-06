@@ -96,6 +96,7 @@ export class Cutscene {
     this.el.classList.remove('on');
     this.el.querySelector('.sub').classList.remove('show');
     G.hud.root.classList.remove('in-cutscene');
+    if (G.input.lastDevice === 'kbm' && !G.dialogue?.active) G.input.requestLock();
     G.cam.smoothTarget.copy(G.player.pos);
     G.cam.curDist = G.cam.dist;
     const cb = this.onDone;

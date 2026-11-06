@@ -2,7 +2,7 @@
 
 | Project | What it is | Start here |
 |---------|------------|------------|
-| **Chronos & Cosmos** | Open-world action RPG in the browser: shift between three Ages of time, climb, glide, fight, build, tame mounts, run rifts. Fully playable. | [`chronos-cosmos/`](chronos-cosmos/README.md) · open `chronos-cosmos/dist/index.html` |
+| **Chronos & Cosmos** | Open-world action RPG in the browser: shift between three Ages of time, climb, glide, fight, build, tame mounts, run rifts. Plays on desktop, phone and Chromebook (touch controls included). | [`chronos-cosmos/`](chronos-cosmos/README.md) · open `chronos-cosmos/dist/index.html` |
 | **Crime City** | Unity project scaffold for a GTA-style crime game (scripts and data, needs the Unity Editor) | below |
 
 ---

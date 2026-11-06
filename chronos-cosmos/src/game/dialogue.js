@@ -141,6 +141,7 @@ export class Dialogue {
     this.el.hidden = true;
     G.ui.blocking = false;
     G.hud.root.classList.remove('in-dialogue');
+    if (G.input.lastDevice === 'kbm') G.input.requestLock();
     G.cam.stopShot();
     G.cam.smoothTarget.copy(G.player.pos).add(new THREE.Vector3(0, 1.5, 0));
     const done = this.dlg && this.dlg.onEnd;
