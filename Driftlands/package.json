@@ -1,0 +1,17 @@
+{
+  "name": "driftlands",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Driftlands - a sky-island airship adventure (Three.js)",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node test/smoke.mjs"
+  },
+  "dependencies": {
+    "three": "0.170.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.24.0"
+  }
+}
