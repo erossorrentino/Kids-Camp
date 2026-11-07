@@ -197,6 +197,14 @@ export const FEATS = [
   { id: 'echo1', name: 'Echo Seeker', desc: 'Find your first Echo.', check: (S) => (S.flags.echoes || []).length >= 1 },
   { id: 'echo15', name: 'Echo Hunter', desc: 'Find 15 Echoes.', check: (S) => (S.flags.echoes || []).length >= 15 },
   { id: 'echo30', name: 'Keeper of Echoes', desc: `Find all ${ECHO_TOTAL} Echoes.`, check: (S) => (S.flags.echoes || []).length >= ECHO_TOTAL },
+  {
+    id: 'summit', name: 'Top of the World', desc: 'Climb to the top of the Chrono Spire.',
+    check: () => {
+      const t = G.content?.spireTop, P = G.player;
+      return !!t && P.grounded && P.pos.y > t.y - 0.6 && Math.hypot(P.pos.x - t.x, P.pos.z - t.z) < 8;
+    },
+    reward: () => { G.player.gainXP(150); G.after(1.5, () => G.hud.toast('The whole of Aeloria stretches out below. Jump and glide down!', 'tip')); },
+  },
   { id: 'sky', name: 'Head in the Clouds', desc: 'Stand on ground more than 200 m high.', check: () => G.player.grounded && G.player.pos.y > 200 },
   { id: 'photo', name: 'Snapshot', desc: 'Save a picture in Photo Mode.', check: (S) => (S.stats.photos || 0) >= 1 },
   { id: 'shards', name: 'Shardbearer', desc: 'Reclaim all three Shards.', check: (S) => !!(S.inv.shardDawn && S.inv.shardEmber && S.inv.shardStar) },
@@ -225,6 +233,7 @@ export class Feats {
       if (ok) {
         got[f.id] = true;
         G.hud.toast(`Feat unlocked: ${f.name}`, 'feat');
+        try { f.reward?.(); } catch (e) {}
         G.audio?.sfx('unlock');
         break; // one per second keeps the toasts readable
       }

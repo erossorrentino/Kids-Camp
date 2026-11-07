@@ -117,6 +117,17 @@ In dialogue, tap the text to continue and tap a reply to choose it.
   day/night cycle with weather per Age (rain, storms, ashfall, ember storms,
   meteor showers, auroras).
 
+## Climbing
+
+Walk into almost anything to climb it: cliffs, walls, houses, trees, towers.
+Climbing drains stamina, so tall towers have places to rest. The Chrono
+Spire has golden rings every ten metres in every Age, and the observatory
+has a stone band halfway up. At the top of the Spire is a balcony with a
+golden spire you can climb to the tip, and from there you can glide down
+across the lake. Roofs are walkable slopes, the observatory has a balcony
+around a dome you can stand on, and you vault onto knee-to-chest-high
+ledges automatically.
+
 ## Extras
 
 - **Pip the fox.** A fox naps under the trees near where you wake up. Walk
@@ -129,7 +140,7 @@ In dialogue, tap the text to continue and tap a reply to choose it.
   Age, and each one only shows in its own Age. Close by you'll hear a soft
   chime and see sparkles. Every five found makes the Echoes resonate,
   which raises max health or stamina, or grants skill points.
-- **Feats.** Nineteen achievements in their own menu tab, for things like
+- **Feats.** Twenty achievements in their own menu tab, for things like
   parrying, building, rift runs, taming, Echo hunting and finishing the
   story.
 - **Photo mode** (V, or **Photo** in the menu). Time freezes and the HUD

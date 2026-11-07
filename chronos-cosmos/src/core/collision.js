@@ -54,12 +54,20 @@ export class CollisionWorld {
     };
     return this._insert(c);
   }
+  // Vertical cylinder; give opts.rTop for a tapered one (r is the bottom radius).
   addCyl(x, z, y0, y1, r, opts = {}) {
+    const rTop = opts.rTop ?? r;
     const c = {
-      type: 'cyl', x, z, y: (y0 + y1) / 2, r, bound: r, top: y1, bottom: y0, active: true,
+      type: 'cyl', x, z, y: (y0 + y1) / 2, r: Math.max(r, rTop), r0: r, r1: rTop, taper: rTop !== r, bound: Math.max(r, rTop), top: y1, bottom: y0, active: true,
       climbable: opts.climbable !== false, tag: opts.tag || null, owner: opts.owner || null, dome: opts.dome || 0,
     };
     return this._insert(c);
+  }
+  // radius of a (possibly tapered) cylinder at height y
+  radiusAt(c, y) {
+    if (!c.taper) return c.r;
+    const u = THREE.MathUtils.clamp((y - c.bottom) / (c.top - c.bottom), 0, 1);
+    return c.r0 + (c.r1 - c.r0) * u;
   }
   move(c, x, y, z) {
     this.remove(c);
@@ -108,8 +116,9 @@ export class CollisionWorld {
       return c.top;
     }
     const d = Math.hypot(x - c.x, z - c.z);
-    if (d > c.r + pad) return null;
-    if (c.dome) return c.top - c.dome * (d / c.r) * (d / c.r);
+    const rt = c.taper ? c.r1 : c.r;
+    if (d > rt + pad) return null;
+    if (c.dome) return c.top - c.dome * (d / rt) * (d / rt);
     return c.top;
   }
 
@@ -137,7 +146,15 @@ export class CollisionWorld {
     for (let iter = 0; iter < 2; iter++) {
       for (const c of list) {
         if (c.top <= pos.y + step || c.bottom >= pos.y + height) continue;
-        if (c.ramp && c.top <= pos.y + 1.1) continue;
+        if (c.ramp) {
+          // a slope is walkable wherever its surface (at the nearest point of
+          // its footprint) is no higher than a comfortable step
+          const [rlx, rlz] = this._toLocal(c, pos.x, pos.z);
+          const qz = THREE.MathUtils.clamp(rlz, -c.hz, c.hz);
+          const u = THREE.MathUtils.clamp((qz * c.ramp + c.hz) / (2 * c.hz), 0, 1);
+          const surf = c.bottom + (c.top - c.bottom) * u;
+          if (surf <= pos.y + Math.max(step, 0.45) && Math.abs(rlx) <= c.hx + radius) continue;
+        }
         if (c.type === 'box') {
           const [lx, lz] = this._toLocal(c, pos.x, pos.z);
           const cx = THREE.MathUtils.clamp(lx, -c.hx, c.hx);
@@ -162,7 +179,8 @@ export class CollisionWorld {
         } else {
           const dx = pos.x - c.x, dz = pos.z - c.z;
           const d = Math.hypot(dx, dz);
-          const rr = radius + c.r;
+          // tapered walls: use the radius at chest height (clamped to the span we overlap)
+          const rr = radius + (c.taper ? this.radiusAt(c, Math.max(pos.y + step, Math.min(pos.y + 0.9, c.top))) : c.r);
           if (d >= rr) continue;
           const nx = d > 1e-5 ? dx / d : 1, nz = d > 1e-5 ? dz / d : 0;
           pos.x = c.x + nx * rr;
@@ -249,7 +267,8 @@ export class CollisionWorld {
     let best = null;
     if (a > 1e-8) {
       const b = 2 * (ox * d.x + oz * d.z);
-      const cc = ox * ox + oz * oz - c.r * c.r;
+      const rm = c.taper ? (c.r0 + c.r1) / 2 : c.r;
+      const cc = ox * ox + oz * oz - rm * rm;
       const disc = b * b - 4 * a * cc;
       if (disc >= 0) {
         const t = (-b - Math.sqrt(disc)) / (2 * a);
@@ -265,7 +284,8 @@ export class CollisionWorld {
         const t = (y - o.y) / d.y;
         if (t < 0 || t > maxT || (best && t > best.t)) continue;
         const x = ox + d.x * t, z = oz + d.z * t;
-        if (x * x + z * z <= c.r * c.r) best = { t, n: new THREE.Vector3(0, s, 0) };
+        const rc = c.taper ? (s > 0 ? c.r1 : c.r0) : c.r;
+        if (x * x + z * z <= rc * rc) best = { t, n: new THREE.Vector3(0, s, 0) };
       }
     }
     return best;

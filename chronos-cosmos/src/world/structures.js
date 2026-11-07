@@ -132,7 +132,7 @@ export class Builder {
     const circ = Math.PI * 2 * Math.max(rt, rb);
     for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * circ / TEX_SCALE, uv.getY(i) * h / TEX_SCALE);
     this._add(mat, g, x, y + h / 2, z, o.rx || 0, o.ry || 0, o.rz || 0);
-    if (o.collide !== false) this.cols.push({ type: 'cyl', x, z, y0: y, y1: y + h, r: Math.max(rt, rb) * 0.95, climbable: o.climbable !== false, tag: o.tag || 'stone' });
+    if (o.collide !== false) this.cols.push({ type: 'cyl', x, z, y0: y, y1: y + h, r: rb * 0.95, rTop: rt * 0.95, climbable: o.climbable !== false, tag: o.tag || 'stone' });
     return this;
   }
   cone(mat, r, h, x, y, z, seg = 12, o = {}) {
@@ -193,7 +193,14 @@ export class Builder {
       r.translate(0, h - 0.02, 0);
       this._add(wood, r, x, y, z, 0, ry);
     }
-    this.cols.push({ type: 'box', x, y: y + h * 0.35, z, hx: (w / 2) * 0.95, hy: h * 0.35, hz: (d / 2) * 0.6, ry, climbable: true, tag: 'wood' });
+    // two walkable slopes from the wall line up to the ridge, matching the
+    // visible roof (which is already a little above the eave at the walls)
+    const cs = Math.cos(ry), sn = Math.sin(ry);
+    const y0 = y + (h * over) / D, y1 = y + h;
+    for (const sz of [-1, 1]) {
+      const lz = (sz * d) / 4;
+      this.cols.push({ type: 'box', x: x + sn * lz, y: (y0 + y1) / 2, z: z + cs * lz, hx: (w / 2) * 0.98, hy: (y1 - y0) / 2, hz: d / 4, ry, climbable: true, tag: 'wood', ramp: -sz });
+    }
     return this;
   }
   // gable end wall: a triangle, or a pentagon when the wall rises a little
@@ -237,7 +244,7 @@ export class Builder {
     for (const c of this.cols) {
       let col;
       if (c.type === 'box') col = G.collision.addBox(c.x, c.y, c.z, c.hx, c.hy, c.hz, c.ry, { climbable: c.climbable, tag: c.tag, ramp: c.ramp });
-      else col = G.collision.addCyl(c.x, c.z, c.y0, c.y1, c.r, { climbable: c.climbable, tag: c.tag });
+      else col = G.collision.addCyl(c.x, c.z, c.y0, c.y1, c.r, { climbable: c.climbable, tag: c.tag, rTop: c.rTop, dome: c.dome });
       if (c.bounce) col.bounce = true;
       cols.push(col);
     }

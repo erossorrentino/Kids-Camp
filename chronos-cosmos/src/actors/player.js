@@ -120,6 +120,7 @@ export class Player {
 
   // ------------------------------------------------------------------ stats
   useStamina(a) {
+    if (!Number.isFinite(a)) return;
     this.stamina = Math.max(0, this.stamina - a);
     this.staminaDelay = 0.9;
     if (this.stamina <= 0.01) this.exhausted = true;
@@ -177,6 +178,8 @@ export class Player {
       this.stamina = Math.min(this.maxStamina, this.stamina + regen * dt);
       if (this.exhausted && this.stamina > this.maxStamina * 0.35) this.exhausted = false;
     }
+    // never let a bad value lock stamina for good
+    if (!Number.isFinite(this.stamina)) this.stamina = this.maxStamina || 100;
     const manaRegen = (this.skills.has('flow') ? 11 : 7.5) + (G.game?.companionPerk === 'lyra' ? 3 : 0);
     this.mana = Math.min(this.maxMana, this.mana + manaRegen * dt);
     if (this.imbue) {
@@ -323,6 +326,23 @@ export class Player {
     // steep terrain handling
     const terrain = G.terrain;
     terrain.normalAt(this.pos.x, this.pos.z, _n);
+    // vault onto knee-to-chest-high ledges instead of getting stuck against them
+    if (hasInput && this.mode === 'ground' && !this.action && res.wall && !res.wall.ramp) {
+      const rise = res.wall.top - this.pos.y;
+      if (rise > 0.5 && rise <= 1.35) {
+        const into = -(dir.x * res.wallNormal.x + dir.z * res.wallNormal.z) / (dir.length() || 1);
+        if (into > 0.5) {
+          const nx = this.pos.x - res.wallNormal.x * 0.55, nz = this.pos.z - res.wallNormal.z * 0.55;
+          const g = col.groundAt(nx, nz, res.wall.top + 0.1, this.radius, 0.3);
+          if (Math.abs(g.h - res.wall.top) < 0.15 && !col.pointInside(nx, g.h + 1.0, nz)) {
+            this.pos.set(nx, g.h + 0.02, nz);
+            this.vel.set(0, 0, 0);
+            this.startAction({ type: 'mantle', clip: this.clips.mantle, dur: 0.36 });
+            return;
+          }
+        }
+      }
+    }
     // climbing triggers
     if (hasInput && this.mode !== 'climb' && !this.action && this.canUseStamina(4) && !this.crouching) {
       if (res.wall && res.wall.climbable && res.wall.top > this.pos.y + 1.3) {
@@ -474,7 +494,7 @@ export class Player {
     const iv = inp.moveVec;
     const up = -iv.y, side = iv.x;
     const moving = Math.abs(up) + Math.abs(side) > 0.1;
-    const wet = G.weather ? G.weather.rain : 0;
+    const wet = G.weather?.state?.rain || 0;
     const drain = (moving ? (up > 0 ? 9 : 6) : 1.5) * (this.skills.has('mountaineer') ? 0.7 : 1) * (1 + wet * 0.8);
     this.useStamina(drain * dt);
     if (this.stamina <= 0 || inp.hit('crouch')) {

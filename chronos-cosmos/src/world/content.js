@@ -88,8 +88,20 @@ function buildHearthmere() {
     // observatory tower
     const ty = H(towerX, towerZ);
     b.cyl(MATS.stone, 3.4, 3.8, 14, towerX, ty - 0.5, towerZ, 16, { tag: 'stone' });
-    b.cyl(MATS.stone, 3.9, 3.9, 0.6, towerX, ty + 13.5, towerZ, 16);
+    // a stone band halfway up: a ledge to catch your breath on the climb
+    b.cyl(MATS.stoneDark, 4.45, 4.3, 0.5, towerX, ty + 6.4, towerZ, 20, { tag: 'stone' });
+    // a walkable balcony ring around the dome, with railing posts
+    b.cyl(MATS.stone, 4.9, 4.6, 0.6, towerX, ty + 13.5, towerZ, 20);
+    for (let i = 0; i < 20; i++) {
+      const a = (i / 20) * Math.PI * 2;
+      b.box(MATS.woodDark, 0.12, 0.9, 0.12, towerX + Math.sin(a) * 4.7, ty + 14.1, towerZ + Math.cos(a) * 4.7, a, { collide: false });
+    }
+    const rail = new THREE.TorusGeometry(4.7, 0.05, 4, 48);
+    rail.rotateX(Math.PI / 2);
+    b.geo(MATS.woodDark, rail, towerX, ty + 15.0, towerZ);
     b.sphere(MATS.bronze, 3.3, towerX, ty + 14, towerZ, { half: true, seg: 20 });
+    // the dome is solid and rounded: you can climb it and stand on top
+    b.collider({ type: 'cyl', x: towerX, z: towerZ, y0: ty + 14.1, y1: ty + 17.25, r: 3.15, dome: 2.6, climbable: true, tag: 'metal' });
     b.cyl(MATS.bronze, 0.35, 0.5, 4, towerX + 1.5, ty + 15.5, towerZ, 10, { rz: -0.9, collide: false });
     for (let i = 0; i < 4; i++) {
       const a = (i / 4) * Math.PI * 2 + 0.4;
@@ -136,6 +148,7 @@ function buildHearthmere() {
     const wx = cx + 62, wz = cz - 28, wy = H(wx, wz);
     b.cyl(MATS.plaster, 2.2, 3.2, 11, wx, wy - 0.5, wz, 12, { tag: 'stone' });
     b.cone(MATS.thatch, 3.0, 3.2, wx, wy + 10.5, wz, 12);
+    b.collider({ type: 'cyl', x: wx, z: wz, y0: wy + 10.5, y1: wy + 13.6, r: 2.85, rTop: 0.32, climbable: true, tag: 'wood' });
     b.box(MATS.woodDark, 1.0, 2.0, 0.2, wx, wy, wz + 3.0, 0, { collide: false });
     const built = b.build();
     finishSite(site, built, [0]);
@@ -278,7 +291,8 @@ function buildKestrel() {
       const tx = cx + sx * S, tz = cz + sz * S, ty = H(tx, tz);
       for (const [ox, oz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) b.box(MATS.woodDark, 0.3, 8, 0.3, tx + ox * 1.2, ty - 0.5, tz + oz * 1.2, 0, { collide: false });
       b.box(MATS.wood, 3.2, 0.3, 3.2, tx, ty + 7, tz, 0);
-      b.roof(MATS.woodDark, 3.4, 3.4, 1.2, tx, ty + 9, tz, 0, 0.2);
+      for (const [ox, oz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) b.box(MATS.woodDark, 0.2, 2.3, 0.2, tx + ox * 1.45, ty + 7.3, tz + oz * 1.45, 0, { collide: false });
+      b.roof(MATS.woodDark, 3.4, 3.4, 1.2, tx, ty + 9.6, tz, 0, 0.2);
       b.collider({ type: 'box', x: tx, y: ty + 3.5, z: tz, hx: 1.3, hy: 3.6, hz: 1.3, ry: 0, climbable: true, tag: 'wood' });
     }
     for (let i = 0; i < 6; i++) {
@@ -342,9 +356,15 @@ function buildSpire() {
     const b = new Builder('spire-bloom');
     base(b, MATS.marble, MATS.gold);
     b.cyl(MATS.marble, 7.5, 8.5, 8, x, y, z, 24, { tag: 'stone' });
-    b.cyl(MATS.gold, 7.7, 7.7, 0.6, x, y + 8, z, 24, { collide: false });
+    b.cyl(MATS.gold, 8.6, 8.6, 0.6, x, y + 7.9, z, 24, { tag: 'metal' });
     b.cyl(MATS.marble, 4.0, 7.0, 84, x, y + 8.5, z, 24, { tag: 'stone' });
-    for (let i = 0; i < 8; i++) b.cyl(MATS.gold, 6.9 - i * 0.36, 6.9 - i * 0.36, 0.6, x, y + 16 + i * 10, z, 24, { collide: false });
+    // gold rings every ten metres are ledges to rest on during the climb
+    const towerR = (hh) => 7.0 - 3.0 * (hh - 8.5) / 84;
+    for (let i = 0; i < 8; i++) {
+      const hy = 16 + i * 10;
+      const R = towerR(hy) + 1.05;
+      b.cyl(MATS.gold, R, R - 0.25, 0.6, x, y + hy, z, 32, { tag: 'metal' });
+    }
     for (let i = 0; i < 8; i++) {
       const a = (i / 8) * Math.PI * 2;
       b.box(MATS.runeGold, 0.18, 60, 0.5, x + Math.sin(a) * 5.75, y + 14, z + Math.cos(a) * 5.75, a, { collide: false, rz: 0 });
@@ -352,9 +372,20 @@ function buildSpire() {
     for (let i = 0; i < 4; i++) {
       const a = (i / 4) * Math.PI * 2 + Math.PI / 4;
       b.box(MATS.marble, 2.2, 30, 2.2, x + Math.sin(a) * 7.5, y + 8, z + Math.cos(a) * 7.5, a, { tag: 'stone' });
-      b.cone(MATS.gold, 1.6, 5, x + Math.sin(a) * 7.5, y + 38, z + Math.cos(a) * 7.5, 4);
+      // a flat-topped gold cap you can stand on
+      b.cyl(MATS.gold, 0.55, 1.45, 3.2, x + Math.sin(a) * 7.5, y + 38, z + Math.cos(a) * 7.5, 4, { ry: a + Math.PI / 4, tag: 'metal' });
     }
-    b.cone(MATS.gold, 4.2, 14, x, y + 92.5, z, 24);
+    // the summit: a balcony around a slimmer golden spire you can climb to the tip
+    b.cyl(MATS.gold, 5.6, 5.2, 0.5, x, y + 92.0, z, 40, { tag: 'metal' });
+    for (let i = 0; i < 28; i++) {
+      const a = (i / 28) * Math.PI * 2;
+      b.box(MATS.gold, 0.14, 1.0, 0.14, x + Math.sin(a) * 5.35, y + 92.5, z + Math.cos(a) * 5.35, a, { collide: false });
+    }
+    const topRail = new THREE.TorusGeometry(5.35, 0.07, 5, 64);
+    topRail.rotateX(Math.PI / 2);
+    b.geo(MATS.gold, topRail, x, y + 93.5, z);
+    b.cyl(MATS.gold, 0.3, 2.5, 13, x, y + 92.5, z, 24, { tag: 'metal' });
+    content.spireTop = { x, z, y: y + 92.5 };
     // archway
     b.box(MATS.gold, 3.6, 5.5, 0.6, x, y, z + 8.3, 0, { collide: false });
     b.box(MATS.window, 2.6, 4.4, 0.65, x, y, z + 8.35, 0, { collide: false });
@@ -389,7 +420,14 @@ function buildSpire() {
     const b = new Builder('spire-ash');
     base(b, MATS.stoneDark, MATS.bronze);
     b.cyl(MATS.stoneDark, 7.5, 8.5, 8, x, y, z, 24, { tag: 'stone' });
+    b.cyl(MATS.bronze, 8.6, 8.6, 0.6, x, y + 7.9, z, 24, { tag: 'metal' });
     b.cyl(MATS.stoneDark, 5.0, 7.0, 52, x, y + 8.5, z, 24, { tag: 'stone' });
+    // cracked bronze bands left from better days: ledges to rest on
+    for (let i = 0; i < 5; i++) {
+      const hy = 16 + i * 10;
+      const R = 7.0 - 2.0 * (hy - 8.5) / 52 + 1.0;
+      b.cyl(MATS.bronze, R, R - 0.25, 0.6, x, y + hy, z, 28, { tag: 'metal' });
+    }
     // jagged broken top
     const rng = mulberry32(44);
     for (let i = 0; i < 10; i++) {
@@ -446,12 +484,20 @@ function buildSpire() {
     // floating tower segments + cosmic heart
     const segs = new THREE.Group();
     segs.position.set(x, y, z);
+    // nine drifting drums with 1.5 m gaps, each a little narrower than the one
+    // below so there is a lip to stand on: solid, so you can climb the stack
+    const segCols = [];
     for (let i = 0; i < 9; i++) {
-      const m = new THREE.Mesh(new THREE.CylinderGeometry(6.2 - i * 0.3, 6.6 - i * 0.3, 7, 24), MATS.marbleStar);
+      const rr = 6.4 - i * 0.45;
+      const m = new THREE.Mesh(new THREE.CylinderGeometry(rr, rr, 9, 24), MATS.marbleStar);
       m.position.y = 12 + i * 10.5;
       m.castShadow = true;
       m.userData.baseY = m.position.y;
       segs.add(m);
+      const col = G.collision.addCyl(x, z, y + m.position.y - 4.5, y + m.position.y + 4.5, rr * 0.97, { climbable: true, tag: 'stone' });
+      col.active = false;
+      m.userData.col = col;
+      segCols.push(col);
     }
     const vortex = new THREE.Mesh(new THREE.SphereGeometry(5, 32, 16), MATS.heartStar);
     vortex.position.y = 116;
@@ -462,10 +508,18 @@ function buildSpire() {
     segs.add(glow);
     built.group.add(segs);
     content.anims.push((dt, t) => {
-      if (!built.group.visible) return;
+      // the starlight bridge later wraps this group in a parent that is the one
+      // shown or hidden, so look up the whole chain
+      let on = true;
+      for (let o = built.group; o; o = o.parent) if (!o.visible) { on = false; break; }
+      for (const col of segCols) col.active = on;
+      if (!on) return;
       segs.children.forEach((c, i) => {
         if (c.userData.baseY !== undefined) {
-          c.position.y = c.userData.baseY + Math.sin(t * 0.5 + i) * 1.2;
+          // all drums drift together so the gaps between them stay climbable
+          c.position.y = c.userData.baseY + Math.sin(t * 0.5) * 0.5;
+          const col = c.userData.col;
+          if (col && Math.abs(col.y - (y + c.position.y)) > 0.02) G.collision.move(col, x, y + c.position.y, z);
           c.rotation.y += dt * 0.1 * (i % 2 ? 1 : -1);
           c.rotation.z = Math.sin(t * 0.3 + i) * 0.04;
         }
