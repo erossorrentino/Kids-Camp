@@ -40,6 +40,8 @@ export class Dialogue {
     this.dlg = d;
     this.npc = npc || null;
     this.active = true;
+    this.age = 0;
+    this.textEl.textContent = '';
     G.ui.blocking = true;
     G.input.exitLock();
     this.el.hidden = false;
@@ -87,21 +89,33 @@ export class Dialogue {
     this.titleEl.textContent = node.title || (this.npc && speaker === this.npc.name ? this.npc.title : '');
     this.el.classList.toggle('narration', !speaker);
     const text = typeof node.t === 'function' ? node.t(this.S) : node.t;
-    this.full = text || '';
-    this.typing = 0;
-    this.textEl.textContent = '';
+    this.choices = (node.choices || []).filter((c) => !c.cond || c.cond(this.S));
     this.choicesEl.innerHTML = '';
     this.nextEl.hidden = true;
-    this.choices = (node.choices || []).filter((c) => !c.cond || c.cond(this.S));
+    this.rendered = false;
+    this.sel = 0;
+    this.choiceT = 0;
+    if (!text && this.choices.length) {
+      // a reply-only node: keep the last line on screen and offer the replies now
+      this.full = this.textEl.textContent || '';
+      this.typing = this.full.length;
+      this.renderChoices();
+    } else {
+      this.full = text || '';
+      this.typing = 0;
+      this.textEl.textContent = '';
+    }
     this.waiting = true;
     if (speaker && this.npc && speaker === this.npc.name) this.npc.talkPulse = 1;
   }
 
   renderChoices() {
+    this.rendered = true;
     this.choicesEl.innerHTML = '';
     this.choices.forEach((c, i) => {
       const b = document.createElement('button');
-      b.className = 'dlg-choice' + (c.tag ? ' tag-' + c.tag.toLowerCase() : '');
+      b.className = 'dlg-choice' + (c.tag ? ' tag-' + c.tag.toLowerCase() : '') + (i === this.sel ? ' sel' : '');
+      b.addEventListener('pointerenter', () => this.setSel(i));
       b.innerHTML = `<span class="n">${i + 1}</span>${c.tag ? `<span class="tag">${c.tag}</span>` : ''}<span class="t">${typeof c.t === 'function' ? c.t(this.S) : c.t}</span>`;
       b.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -110,6 +124,13 @@ export class Dialogue {
       this.choicesEl.appendChild(b);
     });
     this.nextEl.hidden = this.choices.length > 0;
+  }
+
+  setSel(i) {
+    const n = this.choices.length;
+    if (!n) return;
+    this.sel = (i + n) % n;
+    this.choicesEl.querySelectorAll('.dlg-choice').forEach((b, k) => b.classList.toggle('sel', k === this.sel));
   }
 
   pick(i) {
@@ -196,9 +217,20 @@ export class Dialogue {
       if (this.typing >= this.full.length) this.renderChoices();
       if (Math.random() < dt * 14 && this.npc) G.audio?.sfx('blip', { pitch: this.npc.def.voice || 1 });
     }
+    // make sure the replies always appear once the line is fully shown
+    if (!this.rendered && this.typing >= this.full.length) this.renderChoices();
     const inp = G.input;
-    if (inp.hit('interact') || inp.hit('confirm') || inp.hit('jump')) this.advance();
-    for (let i = 0; i < Math.min(9, this.choices.length); i++) if (inp.hit('el' + (i + 1))) this.pick(i);
+    this.age += dt;
+    // ignore the key press that opened the conversation
+    const go = this.age > 0.12 && (inp.hit('interact') || inp.hit('confirm') || inp.hit('jump'));
+    if (this.rendered && this.choices.length) {
+      this.choiceT += dt;
+      // W/S, arrows or the d-pad move the highlight; E, Enter, Space or A pick it
+      if (inp.hit('forward') || inp.hit('epoch')) this.setSel(this.sel - 1);
+      if (inp.hit('back') || inp.hit('whistle')) this.setSel(this.sel + 1);
+      if (go && this.choiceT > 0.3) return this.pick(this.sel);
+    } else if (go) this.advance();
+    for (let i = 0; i < Math.min(9, this.choices.length); i++) if (inp.hit('el' + (i + 1))) return this.pick(i);
     if (inp.mousePressed.left && !this.choices.length && this.typing >= this.full.length) {/* handled by click */}
   }
 }

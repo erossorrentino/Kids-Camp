@@ -159,7 +159,7 @@ body { font-family: var(--font-ui); font-size: 15px; -webkit-font-smoothing: ant
 .dialogue.narration .dlg-text { font-family: var(--font-display); font-style: italic; font-size: 21px; color: #e8dcc0; }
 .dlg-choices { display: flex; flex-direction: column; gap: 6px; margin-top: 14px; }
 .dlg-choice { all: unset; cursor: pointer; display: flex; gap: 10px; align-items: baseline; padding: 8px 14px; background: rgba(15,18,36,.7); border-left: 2px solid rgba(224,196,132,.3); font-size: 16.5px; color: var(--text); transition: background .15s, border-color .15s, transform .15s; }
-.dlg-choice:hover, .dlg-choice:focus-visible { background: rgba(40,44,80,.85); border-left-color: var(--brass); transform: translateX(4px); outline: none; }
+.dlg-choice:hover, .dlg-choice:focus-visible, .dlg-choice.sel { background: rgba(40,44,80,.85); border-left-color: var(--brass); transform: translateX(4px); outline: none; }
 .dlg-choice .n { color: var(--brass); font-weight: 800; }
 .dlg-choice .tag { font: 700 11px var(--font-sc); letter-spacing: .1em; color: #c9b6ff; text-transform: uppercase; }
 .dlg-choice.tag-covenant .tag, .dlg-choice.tag-firm .tag { color: #9fb4ff; } .dlg-choice.tag-verdant .tag, .dlg-choice.tag-kind .tag { color: #a8f0c8; }

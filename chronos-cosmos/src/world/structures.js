@@ -145,36 +145,69 @@ export class Builder {
     this._add(mat, g, x, y, z, 0, 0, 0, o.sx || 1, o.sy || 1, o.sz || 1);
     return this;
   }
-  // gable roof: ridge along local X
-  roof(mat, w, d, h, x, y, z, ry = 0, over = 0.35) {
+  // gable roof: ridge along local X, slopes facing -Z and +Z, trimmed with
+  // fascia boards on the eaves, verge boards on the gable ends and a ridge cap
+  roof(mat, w, d, h, x, y, z, ry = 0, over = 0.35, trim = true) {
     const W = w / 2 + over, D = d / 2 + over;
+    // counter-clockwise from outside, so the outer faces are the visible ones
     const pos = [
-      // two slopes
-      -W, 0, -D, W, 0, -D, W, h, 0, -W, 0, -D, W, h, 0, -W, h, 0,
-      -W, 0, D, -W, h, 0, W, h, 0, -W, 0, D, W, h, 0, W, 0, D,
-      // underside
-      -W, 0, -D, W, 0, D, W, 0, -D, -W, 0, -D, -W, 0, D, W, 0, D,
+      // -Z slope
+      -W, 0, -D, W, h, 0, W, 0, -D, -W, 0, -D, -W, h, 0, W, h, 0,
+      // +Z slope
+      -W, 0, D, W, h, 0, -W, h, 0, -W, 0, D, W, 0, D, W, h, 0,
+      // underside (soffit) facing down
+      -W, 0, -D, W, 0, -D, W, 0, D, -W, 0, -D, W, 0, D, -W, 0, D,
     ];
     const slope = Math.hypot(h, D);
+    const u = w / TEX_SCALE, v = slope / TEX_SCALE;
     const uvs = [
-      0, 0, w / TEX_SCALE, 0, w / TEX_SCALE, slope / TEX_SCALE, 0, 0, w / TEX_SCALE, slope / TEX_SCALE, 0, slope / TEX_SCALE,
-      0, 0, 0, slope / TEX_SCALE, w / TEX_SCALE, slope / TEX_SCALE, 0, 0, w / TEX_SCALE, slope / TEX_SCALE, w / TEX_SCALE, 0,
-      0, 0, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1,
+      0, 0, u, v, u, 0, 0, 0, 0, v, u, v,
+      0, 0, u, v, 0, v, 0, 0, u, 0, u, v,
+      0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1,
     ];
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     g.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
     g.computeVertexNormals();
     this._add(mat, g, x, y, z, 0, ry);
-    // gable triangles (wall material handled by caller)
+    if (trim) {
+      const wood = MATS.woodDark;
+      const ang = Math.atan2(h, D);
+      for (const sz of [-1, 1]) {
+        // fascia board along the eave
+        const f = new THREE.BoxGeometry(2 * W + 0.1, 0.16, 0.09);
+        f.translate(0, -0.05, sz * (D + 0.02));
+        this._add(wood, f, x, y, z, 0, ry);
+        // verge boards up both gable edges
+        for (const sx of [-1, 1]) {
+          const b = new THREE.BoxGeometry(0.1, 0.16, slope + 0.08);
+          b.rotateX(sz * ang);
+          b.translate(sx * (W + 0.03), h / 2 - 0.02, (sz * D) / 2);
+          this._add(wood, b, x, y, z, 0, ry);
+        }
+      }
+      // ridge cap: a small triangular beam along the top
+      const r = new THREE.CylinderGeometry(0.17, 0.17, 2 * W + 0.12, 3);
+      r.rotateY(-Math.PI / 6); // one edge up once laid along X
+      r.rotateZ(Math.PI / 2);
+      r.translate(0, h - 0.02, 0);
+      this._add(wood, r, x, y, z, 0, ry);
+    }
     this.cols.push({ type: 'box', x, y: y + h * 0.35, z, hx: (w / 2) * 0.95, hy: h * 0.35, hz: (d / 2) * 0.6, ry, climbable: true, tag: 'wood' });
     return this;
   }
-  gable(mat, w, h, x, y, z, ry) {
+  // gable end wall: a triangle, or a pentagon when the wall rises a little
+  // (shoulder) to meet a roof that overhangs the walls
+  gable(mat, w, h, x, y, z, ry, shoulder = 0) {
     const g = new THREE.BufferGeometry();
-    const pos = [-w / 2, 0, 0, w / 2, 0, 0, 0, h, 0];
+    const hw = w / 2, sh = shoulder;
+    const pos = shoulder > 0
+      ? [-hw, 0, 0, hw, 0, 0, hw, sh, 0, -hw, 0, 0, hw, sh, 0, 0, h, 0, -hw, 0, 0, 0, h, 0, -hw, sh, 0]
+      : [-hw, 0, 0, hw, 0, 0, 0, h, 0];
+    const uv = [];
+    for (let i = 0; i < pos.length; i += 3) uv.push((pos[i] + hw) / TEX_SCALE, pos[i + 1] / TEX_SCALE);
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-    g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, w / TEX_SCALE, 0, w / 2 / TEX_SCALE, h / TEX_SCALE], 2));
+    g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     g.computeVertexNormals();
     const g2 = g.clone();
     this._add(mat, g, x, y, z, 0, ry);
@@ -311,8 +344,13 @@ export function house(b, x, y, z, ry, o = {}) {
     // roof
     const rh = 1.8 + d * 0.15;
     b.roof(o.roof || MATS.roof, w, d, rh, x, y + 0.4 + h, z, ry + Math.PI / 2 * 0, 0.45);
-    b.gable(wallMat, d, rh, ...L(w / 2, 0), y + 0.4 + h, ry + Math.PI / 2);
-    b.gable(wallMat, d, rh, ...L(-w / 2, 0), y + 0.4 + h, ry - Math.PI / 2);
+    // gable walls close the triangular ends under the roof (gable takes x, y, z)
+    for (const sx of [1, -1]) {
+      const [gx, gz] = L(sx * w / 2, 0);
+      // the roof overhangs by 0.45, so at the wall line its underside is already this high
+      const shoulder = (rh * 0.45) / (d / 2 + 0.45);
+      b.gable(wallMat, d, rh, gx, y + 0.4 + h, gz, ry + Math.PI / 2, shoulder * 0.97);
+    }
     // chimney
     if (o.chimney !== false) {
       const [cx, cz] = L(w * 0.28, -d * 0.15);
@@ -363,6 +401,8 @@ export function tent(b, x, y, z, ry, mat, size = 1) {
   const W = w / 2, D = d / 2;
   const pos = [-W, 0, -D, 0, h, -D, 0, h, D, -W, 0, -D, 0, h, D, -W, 0, D, W, 0, -D, W, 0, D, 0, h, D, W, 0, -D, 0, h, D, 0, h, -D,
     -W, 0, -D, W, 0, -D, 0, h, -D];
+  // the triangles above are listed clockwise; flip them so the cloth faces outwards
+  for (let i = 0; i < pos.length; i += 9) for (let k = 0; k < 3; k++) [pos[i + 3 + k], pos[i + 6 + k]] = [pos[i + 6 + k], pos[i + 3 + k]];
   g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
   g.setAttribute('uv', new THREE.Float32BufferAttribute(pos.map((v, i) => (i % 3 === 0 ? v * 0.4 : v * 0.4)).filter((_, i) => i % 3 !== 2), 2));
   g.computeVertexNormals();

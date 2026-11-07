@@ -173,7 +173,7 @@ export class Game {
       this.currentInteractable = G.world.nearestInteractable(P.pos);
       if (P.mode === 'mounted' && this.currentInteractable && !this.currentInteractable.mountOk) this.currentInteractable = null;
     }
-    if (inp.hit('interact') && this.currentInteractable && !G.ui?.blocking) {
+    if (inp.hit('interact') && this.currentInteractable && !G.ui?.blocking && !G.cutscene?.active) {
       const it = this.currentInteractable;
       it.action(it);
     }
