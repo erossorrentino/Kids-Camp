@@ -186,6 +186,7 @@ export class UI {
   }
 
   openMenu(tab) {
+    if (!this.menuOpen) this._invScroll = 0;
     this.menuOpen = true;
     this.paused = G.state === 'play';
     this.blocking = true;
@@ -349,7 +350,7 @@ export class UI {
     const S = G.game.state;
     const P = G.player;
     const wrap = el('div', 'inv-wrap');
-    const stats = el('div', 'inv-stats', `
+    const stats = el('div', 'inv-stats inv-card', `
       <h3>Wayfarer · Level ${P.level}</h3>
       <dl>
         <dt>Health</dt><dd>${Math.ceil(P.hp)} / ${P.maxHp}</dd>
@@ -361,8 +362,8 @@ export class UI {
         <dt>Star Motes</dt><dd>${S.motes}</dd>
       </dl>`);
     wrap.appendChild(stats);
-    const right = el('div', 'inv-right');
-    const sec = (title) => { const s = el('div', 'inv-sec'); s.appendChild(el('h4', '', title)); right.appendChild(s); return s; };
+    // every section is a card: a grid on big screens, a swipeable row on small ones
+    const sec = (title) => { const s = el('div', 'inv-sec inv-card'); s.appendChild(el('h4', '', title)); wrap.appendChild(s); return s; };
     const mats = sec('Materials');
     const grid = el('div', 'item-grid');
     for (const id of MATERIALS) grid.appendChild(this.itemCell(id, S.inv[id] || 0));
@@ -413,8 +414,69 @@ export class UI {
       sl.appendChild(el('div', 'spell' + (un ? '' : ' locked'), `<img alt="" src="${icon('el' + i)}"><div><b>${un ? s.name : '???'}</b><span>${un ? `Tap Q · ${s.cost} aether. Hold Q: ${s.big} · ${s.bigCost}. ${s.desc}` : 'Not yet awakened.'}</span></div>`));
     });
     sp.appendChild(sl);
-    wrap.appendChild(right);
-    this.body.appendChild(wrap);
+    const shell = el('div', 'inv-shell');
+    shell.appendChild(wrap);
+    shell.appendChild(el('button', 'inv-nav prev', '‹'));
+    shell.appendChild(el('button', 'inv-nav next', '›'));
+    shell.appendChild(el('div', 'inv-dots'));
+    this.body.appendChild(shell);
+    this.setupCarousel(shell, wrap);
+  }
+
+  // Sideways scrolling for the inventory cards: swipe, trackpad, mouse wheel,
+  // mouse drag, the arrow buttons, or left/right on keyboard and gamepad.
+  setupCarousel(shell, wrap) {
+    const prev = shell.querySelector('.prev'), next = shell.querySelector('.next'), dots = shell.querySelector('.inv-dots');
+    const cards = [...wrap.children];
+    dots.innerHTML = cards.map(() => '<i></i>').join('');
+    const step = () => (cards[0] ? cards[0].getBoundingClientRect().width : 300) + 12;
+    const sideways = () => wrap.scrollWidth > wrap.clientWidth + 2;
+    const update = () => {
+      shell.classList.toggle('scrolls', sideways());
+      const i = Math.min(cards.length - 1, Math.round(wrap.scrollLeft / step()));
+      [...dots.children].forEach((d, k) => d.classList.toggle('on', k === i));
+      prev.disabled = wrap.scrollLeft <= 2;
+      next.disabled = wrap.scrollLeft >= wrap.scrollWidth - wrap.clientWidth - 2;
+      this._invScroll = wrap.scrollLeft;
+    };
+    const go = (dir) => wrap.scrollBy({ left: dir * step(), behavior: 'smooth' });
+    this.invScroll = go;
+    prev.onclick = () => go(-1);
+    next.onclick = () => go(1);
+    wrap.addEventListener('scroll', update, { passive: true });
+    // a plain mouse wheel scrolls sideways, unless the card under it can still scroll down/up
+    wrap.addEventListener('wheel', (e) => {
+      if (!sideways() || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+      const card = e.target.closest('.inv-card');
+      if (card && card.scrollHeight > card.clientHeight + 2) {
+        const atTop = card.scrollTop <= 0, atBottom = card.scrollTop + card.clientHeight >= card.scrollHeight - 1;
+        if (!(e.deltaY < 0 && atTop) && !(e.deltaY > 0 && atBottom)) return;
+      }
+      wrap.scrollLeft += e.deltaY;
+      e.preventDefault();
+    }, { passive: false });
+    // drag with the mouse like a touch swipe
+    let drag = null;
+    wrap.addEventListener('pointerdown', (e) => {
+      if (e.pointerType !== 'mouse' || e.button !== 0 || !sideways() || e.target.closest('button')) return;
+      drag = { x: e.clientX, s: wrap.scrollLeft, id: e.pointerId };
+      wrap.setPointerCapture(e.pointerId);
+      wrap.style.scrollSnapType = 'none';
+    });
+    wrap.addEventListener('pointermove', (e) => {
+      if (drag && e.pointerId === drag.id) wrap.scrollLeft = drag.s - (e.clientX - drag.x);
+    });
+    const end = (e) => {
+      if (!drag || e.pointerId !== drag.id) return;
+      drag = null;
+      wrap.style.scrollSnapType = '';
+      wrap.scrollTo({ left: Math.round(wrap.scrollLeft / step()) * step(), behavior: 'smooth' });
+    };
+    wrap.addEventListener('pointerup', end);
+    wrap.addEventListener('pointercancel', end);
+    // keep your place when the tab re-renders (using an item, equipping gear)
+    if (this._invScroll) wrap.scrollLeft = this._invScroll;
+    requestAnimationFrame(update);
   }
   itemCell(id, n, wide) {
     const it = ITEMS[id];
@@ -704,6 +766,10 @@ export class UI {
     }
     if (this.menuOpen) {
       if (inp.lastDevice === 'pad' && inp.hit('sprint')) return this.closeMenu();
+      if (this.tab === 'inventory' && this.invScroll) {
+        if (inp.hit('left') || inp.hit('prevEl')) this.invScroll(-1);
+        if (inp.hit('right') || inp.hit('nextEl')) this.invScroll(1);
+      }
       for (const [k, t] of [['map', 'map'], ['journal', 'journal'], ['inventory', 'inventory']]) if (inp.hit(k)) { if (this.tab === t) this.closeMenu(); else this.setTab(t); }
       return;
     }
