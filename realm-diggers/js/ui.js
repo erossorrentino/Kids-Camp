@@ -45,6 +45,7 @@ const UI = {
     $('mods-close').onclick = () => Game.closeUI();
     $('guide-close').onclick = () => (this.guideFromTitle ? this.showTitle() : Game.closeUI());
     $('travel-close').onclick = () => Game.closeUI();
+    $('trade-close').onclick = () => Game.closeUI();
     $('settings-done').onclick = () => { Settings.save(); Sound.applyVolume(); this.show(this.settingsBack); if (this.settingsBack === 'scr-pause') Game.applySettings(); };
     $('d-respawn').onclick = () => Game.respawn();
     $('guide-tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; this.guideTab = b.dataset.t; this.renderGuide(); });
@@ -177,6 +178,14 @@ const UI = {
       if (mx < 0 || mz < 0 || mx > 128 || mz > 128) continue;
       ctx.fillStyle = m.isBoss ? '#ff5ad8' : m.def.hostile === 1 ? '#ff4a4a' : '#ffffff';
       ctx.fillRect(mx - 2, mz - 2, 4, 4);
+    }
+    for (const v of Game.villages || []) {
+      let vx = (v.x - p.x) * 2, vz = (v.z - p.z) * 2;
+      const vl = Math.hypot(vx, vz); if (vl > 54) { vx *= 54 / vl; vz *= 54 / vl; }
+      ctx.save(); ctx.translate(64 + vx, 64 + vz);
+      ctx.fillStyle = '#ffc24b'; ctx.strokeStyle = '#2a1800'; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(-6, 0); ctx.lineTo(0, -6); ctx.lineTo(6, 0); ctx.lineTo(6, 6); ctx.lineTo(-6, 6); ctx.closePath(); ctx.fill(); ctx.stroke();
+      ctx.restore();
     }
     if (Game.geode) {
       let gx = (Game.geode.x + .5 - p.x) * 2, gz = (Game.geode.z + .5 - p.z) * 2;
@@ -504,7 +513,7 @@ const UI = {
       const kind = d => d.hostile === 1 ? ['hostile', 'Dangerous'] : d.hostile === 2 ? ['neutral', 'Fights back'] : ['friendly', 'Friendly'];
       const hint = d => {
         const realms = mobRealms(d.key), where = realms.length >= REALMS.length ? 'any realm' : realms.map(r => r.name).join(', ');
-        const bits = [`Lives in ${where}.`];
+        const bits = [d.village ? 'Lives in villages in Greenhollow, Frostveil, Sugarland and Dino Valley. Tap one to trade!' : `Lives in ${where}.`];
         if (d.when === 'night') bits.push('Comes out at night and in dark caves.'); else if (d.when === 'day') bits.push('Out in the daytime.');
         if (d.swim) bits.push('Swims in water.'); else if (d.cruise) bits.push('Floats high in the sky.'); else if (d.fly) bits.push('Flies.');
         if (d.shy) bits.push('Shy: runs away fast!');
@@ -547,6 +556,27 @@ const UI = {
     const list = $('travel-list');
     list.innerHTML = REALMS.map(r => this.realmCardHTML(r, true)).join('');
     list.onclick = e => { const b = e.target.closest('[data-go]'); if (b) { Game.closeUI(); Game.travelTo(b.dataset.go, 'gate'); } };
+  },
+  openTrade(m) {
+    this.show('scr-trade');
+    const role = VILLAGER_ROLES[m.variant];
+    $('trade-title').textContent = role;
+    $('trade-face').src = mobPreview(m.def, false, 96, m.variant);
+    $('trade-greet').textContent = ['Fresh food for fair trades!', 'Need metal? I can help.', 'Shiny gems, best prices!', 'Off to other realms? I have just the thing.', 'I sense mods hiding in these geodes...'][m.variant];
+    this.renderTrade(m);
+  },
+  renderTrade(m) {
+    const list = $('trade-list'), inv = Game.player.inv;
+    list.innerHTML = '';
+    TRADES[m.variant].forEach(([give, get], i) => {
+      const id = idOf(get[0]), have = Game.creative || give.every(([k, n]) => countIng(inv, k) >= n);
+      const el = document.createElement('div'); el.className = 'recipe' + (have ? '' : ' no');
+      const gives = give.map(([k, n]) => { const c = countIng(inv, k); return `<span class="ing${c < n && !Game.creative ? ' lack' : ''}"><img src="${ingIcon(k)}" alt="">${ingName(k)} ${Math.min(c, n)}/${n}</span>`; }).join('');
+      el.innerHTML = `<img class="out" src="${iconURL(id)}" alt=""><div><div class="rname">${itemName(id)}${get[1] > 1 ? ' ×' + get[1] : ''}</div><div class="ings"><span class="muted">You give:</span> ${gives}</div></div><div class="acts"><button class="btn small primary" data-k="1">Trade</button><button class="btn small" data-k="5">×5</button></div>`;
+      for (const b of el.querySelectorAll('button')) { b.disabled = !have; b.onclick = () => { for (let k = 0; k < +b.dataset.k; k++) if (!Game.trade(m, i)) break; this.renderTrade(m); this.updateHotbar(); }; }
+      el.querySelector('.out').addEventListener('pointerenter', () => this.showTip(id)); el.querySelector('.out').addEventListener('pointerleave', () => this.hideTip());
+      list.appendChild(el);
+    });
   },
   showDeath(msg) { $('death-msg').textContent = msg || "Don't worry, you keep all your stuff."; this.show('scr-death'); },
 };

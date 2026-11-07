@@ -301,6 +301,21 @@ mobDef('starhorn', { name: 'Starhorn', hp: 14, speed: 2.4, w: 0.6, h: 1.8, shy: 
 mobDef('modling', { name: 'Modling', hp: 3, speed: 4.2, w: 0.4, h: 0.4, fly: true, hover: 2.5, shy: 10, lifetime: 80, givesMod: true, drops: [], when: 'any', group: [1, 1], weight: 0.5, pitch: 3,
   models: V(() => { const P = flyer({ s: .24, body: '#ffffff', wing: .3, wingCol: '#ff8ad8', glowWings: true, tailGlow: '#fff07a', eye: '#5a3aff' }); P[0].em = true; return P; }) });
 
+// ---- villagers (spawned by villages, not randomly) ----
+function villagerModel(i) {
+  const [cl, hat, legs] = [['#4a8a3a', '#e2c26a', '#2a4a22'], ['#c85a2a', '#3a3a40', '#4a3020'], ['#7a4ac8', '#5a2a9a', '#3a2060'], ['#3a6ac8', '#8a6238', '#283a60'], ['#e85aa8', '#7a3ac8', '#6a2a5a']][i];
+  const b = biped({ legH: .42, legW: .18, bodyW: .58, bodyH: .6, bodyD: .4, armW: .16, armH: .52, headS: .52, body: cl, legs, arms: cl, head: '#f0c49a', eye: '#2a1a10' });
+  const top = b.top, piv = b.piv, P = b.P;
+  P.push(part(0, b.hy - .13, .265, .18, .04, .02, '#9a4a3a', 'head', piv));
+  if (i === 0) P.push(part(0, top + .03, 0, .84, .05, .84, hat, 'head', piv), part(0, top + .12, 0, .5, .14, .5, hat, 'head', piv));
+  if (i === 1) P.push(part(0, top + .06, 0, .56, .12, .56, hat, 'head', piv), part(0, top + .01, .32, .5, .04, .14, hat, 'head', piv), part(0, .72, .21, .42, .46, .02, '#5a3a24'));
+  if (i === 2) P.push(part(0, top + .05, 0, .6, .1, .6, hat, 'head', piv), part(0, top + .18, 0, .38, .16, .38, hat, 'head', piv), part(0, top + .32, 0, .18, .14, .18, hat, 'head', piv), part(0, top + .14, .2, .1, .1, .02, '#ffe45a', 'head', piv, true));
+  if (i === 3) P.push(part(0, top + .03, 0, .9, .04, .9, hat, 'head', piv), part(0, top + .13, 0, .54, .16, .54, hat, 'head', piv), part(0, top + .07, 0, .56, .04, .56, '#c83a3a', 'head', piv), part(.2, .9, -.22, .3, .4, .14, '#7a5a3a'));
+  if (i === 4) P.push(part(0, top + .06, 0, .58, .12, .58, hat, 'head', piv), part(0, top + .2, 0, .3, .2, .3, hat, 'head', piv), part(0, top + .36, 0, .14, .14, .14, '#fff07a', 'head', piv, true));
+  return P;
+}
+mobDef('villager', { name: 'Villager', hp: 20, speed: 1.0, w: 0.6, h: 1.7, trader: true, village: true, drops: [], when: 'any', weight: 0, pitch: 1.1, models: V(villagerModel, 5) });
+
 // ---------------- Mob ----------------
 let _mobId = 1;
 class Mob {
@@ -348,9 +363,12 @@ class Mob {
         if (this.shootCD <= 0 && dist3 < 20) { this.shootCD = d.ranged.rate * (0.8 + Math.random() * 0.4); Projectiles.fire(this, d.ranged); }
       } else if (dist > d.w / 2 * d.scale + 0.5) { mvx = dx / dist; mvz = dz / dist; speed *= 1.2; }
       if (!d.ranged && dist3 < (d.w / 2) * d.scale + 1.1 && Math.abs(dy) < this.h * d.scale + 0.5 && this.attackCD <= 0) { this.attackCD = 1.1; Game.hurtPlayer(d.dmg, this); }
+    } else if (d.trader && dist3 < 4) {
+      this.yaw = Math.atan2(dx, dz); this.wander = null;
     } else {
       this.timer -= dt;
       if (this.timer <= 0) { this.timer = 2 + Math.random() * 4; this.wander = Math.random() < 0.6 ? Math.random() * 6.28 : null; }
+      if (this.homePos && Math.hypot(this.x - this.homePos[0], this.z - this.homePos[1]) > 12) { this.wander = Math.atan2(this.homePos[0] - this.x, this.homePos[1] - this.z); this.timer = Math.max(this.timer, 1.5); }
       if (this.wander !== null) { mvx = Math.sin(this.wander); mvz = Math.cos(this.wander); speed *= 0.5; this.yaw = this.wander; }
     }
     if (d.contact && dist3 < d.w / 2 + 0.7 && this.attackCD <= 0 && !friendly) { this.attackCD = 1; Game.hurtPlayer(d.contact, this); }
@@ -661,10 +679,10 @@ function drawBoss(batch, bs, t) {
 
 // ---------------- creature pictures for the Creature Log ----------------
 const MOB_PREVIEW = {};
-function mobPreview(def, dark, size = 96) {
-  const key = def.key + (dark ? ':d' : '') + size;
+function mobPreview(def, dark, size = 96, variant = 0) {
+  const key = def.key + (dark ? ':d' : '') + size + ':' + variant;
   if (MOB_PREVIEW[key]) return MOB_PREVIEW[key];
-  const parts = def.models[0], sc = def.scale || 1;
+  const parts = def.models[variant] || def.models[0], sc = def.scale || 1;
   const yaw = 2.45, cy = Math.cos(yaw), sy = Math.sin(yaw), pit = 0.38, cp = Math.cos(pit), sp = Math.sin(pit);
   const FACES = [[4, 5, 6, 7, 0.88], [1, 0, 3, 2, 0.72], [5, 1, 2, 6, 0.66], [0, 4, 7, 3, 0.8], [7, 6, 2, 3, 1], [0, 1, 5, 4, 0.5]];
   const faces = []; let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;

@@ -40,8 +40,10 @@ const ACHIEVEMENTS = [
   { id: 'spot10', name: 'Creature Spotter', desc: 'Find 10 different creatures (see the Creatures tab).' },
   { id: 'spot30', name: 'Wildlife Expert', desc: 'Find 30 different creatures.' },
   { id: 'modling', name: 'Mod Catcher', desc: 'Catch a sparkly Modling.' },
+  { id: 'village', name: 'Neighbors', desc: 'Find a village.' },
+  { id: 'trade', name: 'Fair Trade', desc: 'Trade with a villager.' },
 ];
-const GOAL_CHAIN = ['wood', 'bench', 'woodpick', 'stonepick', 'furnace', 'iron', 'firstmod', 'ironpick', 'realm_emberdeep', 'realm_frostveil', 'realm_skyreach', 'realm_hollowdeep', 'realm_coralabyss', 'realm_sugarland', 'realm_lunara', 'realm_dinovalley', 'allgems', 'realm_prismara', 'boss'];
+const GOAL_CHAIN = ['wood', 'bench', 'woodpick', 'stonepick', 'furnace', 'iron', 'firstmod', 'village', 'ironpick', 'realm_emberdeep', 'realm_frostveil', 'realm_skyreach', 'realm_hollowdeep', 'realm_coralabyss', 'realm_sugarland', 'realm_lunara', 'realm_dinovalley', 'allgems', 'realm_prismara', 'boss'];
 const GOAL_TEXT = {
   wood: 'Hold click on a tree trunk to chop a log.',
   bench: 'Press E. Craft Planks, then a Workbench.',
@@ -50,6 +52,7 @@ const GOAL_TEXT = {
   furnace: 'Craft a Furnace from 8 Cobblestone.',
   iron: 'Find Iron Ore (tan spots in stone) and smelt it next to a Furnace.',
   firstmod: 'Mine ore or a sparkly Mod Geode to find a Mod.',
+  village: 'Find a village: follow the yellow house on your map, then tap a villager to trade.',
   ironpick: 'Craft an Iron Pickaxe.',
   allgems: 'Collect a Realm Gem from each of the 8 other realms (mine their special ore).',
   boss: 'Defeat the Prism Guardian in the center of Prismara.',
@@ -207,7 +210,7 @@ const Game = {
     this.save.realm = this.realm.key;
     this.world = new World(this.realm, this.save.seed, this.getEdits(this.realm.key));
     this.hookWorld(this.world);
-    this.pal = null; this.geode = null;
+    this.pal = null; this.geode = null; this.villages = []; this.villageSpawned = {}; this.villageKilled = {};
     Mobs.clear(); Projectiles.list = []; Particles.list = []; this.barrels = []; this.boss = null; this.xrayList = []; this.xrayT = 0; this.rocket = null; this.mining = null;
     UI.bossBar(null);
     let spawn = null;
@@ -384,6 +387,8 @@ const Game = {
     return this.player.inv.some(s => !s || (s.id === id && s.n < d.stack));
   },
   heldDef() { const s = this.player.inv[this.player.sel]; return s ? itemDef(s.id) : null; },
+  // only real tools count as tools (blocks also have a 'tool' field: the tool that mines them best)
+  heldTool() { const d = this.heldDef(); return d && !d.isBlock && d.tool ? d : null; },
   craft(r) {
     const inv = this.player.inv, id = idOf(r.out);
     if (!this.creative) {
@@ -584,7 +589,7 @@ const Game = {
     if (playing && !this.travel) {
       this.updatePal(dt);
       this.discT -= dt; if (this.discT <= 0) { this.discT = 0.4; this.updateDiscovery(); }
-      this.geodeT -= dt; if (this.geodeT <= 0) { this.geodeT = 1; this.updateGeode(); }
+      this.geodeT -= dt; if (this.geodeT <= 0) { this.geodeT = 1; this.updateGeode(); this.updateVillages(); }
     }
     for (const k in this.abilityCD) if (this.abilityCD[k] > 0) this.abilityCD[k] -= dt;
     if (this.xrayT > 0) { this.xrayT -= dt; this.xrayScanT -= dt; if (this.xrayScanT <= 0) this.scanXray(); }
@@ -815,7 +820,7 @@ const Game = {
         this.mining.snd -= dt;
         if (this.mining.snd <= 0) { this.mining.snd = 0.24; Sound.play('dig', t.id); UI.swing(); if (Math.random() < 0.5) Particles.blockBreak(t.x + (t.nx * 0.5), t.y + (t.ny * 0.5), t.z + (t.nz * 0.5), t.id); }
         if (this.mining.prog >= 1) { this.breakBlock(t.x, t.y, t.z); this.mining = null; }
-      } else if (tapL) UI.toast("That block can't be broken.");
+      } else if (tapL) UI.toast('Use a Bucket to scoop up liquids.');
     } else this.mining = null;
     if (Input.tapAttack && !t && !this.targetMob) UI.swing();
     if (Input.tapUse) this.useCD = 0;
@@ -824,7 +829,7 @@ const Game = {
     if (useNow) { this.useCD = 0.27; this.use(); }
   },
   attack(m, dir) {
-    const S = this.stats, d = this.heldDef(), p = this.player;
+    const S = this.stats, d = this.heldTool(), p = this.player;
     let dmg = (d && d.dmg) ? d.dmg : 1;
     dmg += S.strength;
     if (!p.onGround && p.vy < -1) dmg *= 1.5;
@@ -838,7 +843,7 @@ const Game = {
     const d = BLOCKS[id];
     if (!d || d.unbreakable) return Infinity;
     if (this.creative) return 0;
-    const tool = this.heldDef(), S = this.stats;
+    const tool = this.heldTool(), S = this.stats;
     let speed = 1;
     const right = tool && tool.tool && tool.tool === d.tool;
     if (right) speed = tool.speed;
@@ -847,12 +852,13 @@ const Game = {
     if (d.tier && (!right || tool.tier < d.tier)) t *= 3.3;
     if (S.widedig >= 2) t *= 1 - 0.2 * (S.widedig - 1);
     if (this.player.headInWater && !S.gills) t *= 2;
+    if (!Number.isFinite(t)) t = d.hard * 1.5;
     return Math.max(0.05, t);
   },
   canHarvest(id) {
     const d = BLOCKS[id];
     if (!d.tier) return true;
-    const tool = this.heldDef();
+    const tool = this.heldTool();
     return !!(tool && tool.tool === d.tool && tool.tier >= d.tier);
   },
   getDrops(id) {
@@ -956,6 +962,7 @@ const Game = {
   },
   use() {
     const p = this.player, held = p.inv[p.sel], hd = held ? itemDef(held.id) : null, t = this.target;
+    if (this.targetMob && this.targetMob.def.trader && !this.targetMob.dead) { this.openTrade(this.targetMob); return; }
     if (t && !this.targetMob) {
       const bd = BLOCKS[t.id];
       if (bd.interact && !(p.sneaking && held && isPlaceable(held.id))) { if (this.interactBlock(t, bd, held)) return; }
@@ -1251,6 +1258,7 @@ const Game = {
         if (n > 0) this.addItem(id, n);
       }
     }
+    if (m.home) this.villageKilled[m.home] = this.t;
     if (fromPlayer && d.givesMod) {
       Particles.burst(m.x, m.y + .3, m.z, [1, 0.6, 1], 30, 5, 0.1, true);
       this.grantMod(rollMod(2, this.realm, 30, 1, this.save.mods));
@@ -1297,6 +1305,48 @@ const Game = {
     best.damage([0, 2, 3, 5][S.pal], true);
     for (let i = 0; i <= 12; i++) { const f = i / 12; Particles.add(q.x + (ex - q.x) * f, q.y + (ey - q.y) * f, q.z + (ez - q.z) * f, 0, 0, 0, 0.25, 0.05, 0.6, 1, 0.9, 1, 0, true); }
     Sound.play('zap');
+  },
+  updateVillages() {
+    const p = this.player, w = this.world;
+    this.villages = villagesNear(w.G, this.realm, p.x, p.z, 260).sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z)).slice(0, 3);
+    const seen = this.save.villages || (this.save.villages = []);
+    for (const v of this.villages) {
+      const d = Math.hypot(v.x - p.x, v.z - p.z);
+      if (d > 70 || !w.isLoaded(v.x, v.z) || !w.isLoaded(v.x + 8, v.z + 8) || !w.isLoaded(v.x - 8, v.z - 8)) continue;
+      if (!seen.includes(v.key) && d < 40) {
+        seen.push(v.key);
+        UI.popup('You found a village!', 'Welcome, neighbor', 'Tap a villager to trade. Houses have beds, Workbenches and Furnaces.', '🏘️', '#ffc24b', 4500);
+        Sound.play('achieve'); this.achieve('village');
+      }
+      if (Mobs.list.some(m => m.home === v.key)) continue;
+      if (this.villageKilled[v.key] && this.t - this.villageKilled[v.key] < 90) continue;
+      const rnd = mulberry32(v.seed ^ 77), n = 4 + Math.floor(rnd() * 2), start = Math.floor(rnd() * 5);
+      const spots = [[3.5, 0.5], [-3.5, 2.5], [0.5, 3.5], [2.5, -3.5], [-3.5, -3.5]];
+      for (let i = 0; i < n; i++) {
+        const [ox, oz] = spots[i], x = v.x + ox, z = v.z + oz;
+        let y = v.h + 1;
+        for (let k = 0; k < 6 && boxCollides(w, x, y, z, 0.6, 1.7); k++) y++;
+        const m = new Mob(MOBS.villager, x, y + 0.01, z);
+        m.variant = (start + i) % 5; m.home = v.key; m.homePos = [v.x, v.z];
+        Mobs.list.push(m);
+      }
+    }
+  },
+  openTrade(m) {
+    this.tradeWith = m;
+    this.state = 'ui';
+    this.releaseLock();
+    Input.mouseL = Input.mouseR = Input.btnMine = Input.btnBuild = false;
+    UI.openTrade(m);
+  },
+  trade(m, idx) {
+    const [give, get] = TRADES[m.variant][idx], inv = this.player.inv, id = idOf(get[0]);
+    if (!this.creative && !give.every(([k, n]) => countIng(inv, k) >= n)) return false;
+    if (!this.hasRoomFor(id)) { UI.toast('Inventory full!', '#ff5a5a'); return false; }
+    if (!this.creative) for (const [k, n] of give) takeIng(inv, k, n);
+    this.addItem(id, get[1]);
+    Sound.play('craft'); this.achieve('trade');
+    return true;
   },
   updateGeode() {
     const R = this.stats.geodeR, p = this.player;

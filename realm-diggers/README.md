@@ -39,7 +39,7 @@ to fast-travel to any realm you've already discovered.
 
 | Realm | What it's like | How to get there |
 |---|---|---|
-| **Greenhollow** | Home: meadows, forests, deserts, snowy peaks, oceans, caves | You start here |
+| **Greenhollow** | Home: meadows, forests, deserts, snowy peaks, oceans, caves, villages | You start here |
 | **Emberdeep** | Lava seas, ashstone spires, glowing cinder trees | Craft an **Ember Key**, hold it and jump into lava |
 | **Frostveil** | Snowfields, giant ice spikes, auroras, slippery ice | Build a hollow **Ice frame** (hole 2 wide, 3 tall) and use a **Frost Crystal** on it |
 | **Skyreach** | Floating islands over a sea of clouds | Build a tower in Greenhollow and climb **above the clouds** (height 124+) |
@@ -77,6 +77,11 @@ Finding 15 different mods unlocks a 5th slot, and beating the final boss unlocks
 
 - **Survival** (health, hunger, air, monsters at night) and **Creative** (fly, every block, no damage).
   Monsters can be set to Peaceful, Easy or Normal.
+- **Villages** in Greenhollow (oak, desert and snowy styles), Frostveil (ice), Sugarland (candy) and Dino
+  Valley (mud huts): houses with beds, Workbenches and Furnaces, a well, lamp posts, berry farms, and
+  villagers who **trade**. The Farmer, Smith, Gem Trader, Explorer (Conch Shells and Fossils for reaching
+  realms) and Mystic (Mod Geodes) each have their own offers. There is always a village near your
+  starting point, and villages show as a yellow house on the minimap.
 - Crafting list that shows exactly what you're missing, with Workbench and Furnace stations.
 - A **Materials** browser (in the crafting panel and the Realm Guide): pick any material to see where
   to find it and everything you can make with it. Tap an ingredient in any recipe to jump to it, and

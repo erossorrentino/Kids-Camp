@@ -71,6 +71,18 @@ rec('time_clock', 1, [['fossil', 1], ['gold_ingot', 2], ['copper_ingot', 4]], 'b
 rec('star_key', 1, REALM_GEMS.map(g => [g, 1]), 'bench', 'realm');
 rec('realm_gate', 1, [['obsidian', 4], ['gold_ingot', 2], ['glass', 1]], 'bench', 'realm');
 
+// ============================================================
+// Villager trades: [give list, get]
+// ============================================================
+const VILLAGER_ROLES = ['Farmer', 'Smith', 'Gem Trader', 'Explorer', 'Mystic'];
+const TRADES = [
+  [[[['berries', 4]], ['apple', 2]], [[['raw_meat', 2]], ['cooked_meat', 2]], [[['raw_fish', 2]], ['cooked_fish', 2]], [[['wool', 3], ['planks', 3]], ['bed', 1]]],
+  [[[['coal', 6]], ['iron_ingot', 1]], [[['iron_ingot', 3]], ['bucket', 1]], [[['iron_ingot', 5]], ['gold_ingot', 1]], [[['cobble', 16]], ['furnace', 1]]],
+  [[[['gold_ingot', 4]], ['ruby', 1]], [[['gold_ingot', 4]], ['sapphire', 1]], [[['iron_ingot', 8]], ['gold_ingot', 2]], [[['ruby', 1]], ['gold_ingot', 3]]],
+  [[[['gold_ingot', 3]], ['conch', 1]], [[['iron_ingot', 6]], ['fossil', 1]], [[['gold_ingot', 1]], ['homeward_charm', 2]], [[['coal', 5], ['sand', 4]], ['boom_barrel', 2]]],
+  [[[['gold_ingot', 8]], ['mod_geode', 1]], [[['ruby', 3]], ['mod_geode', 1]], [[['apple', 4]], ['candy', 4]], [[['sapphire', 2]], ['frost_crystal', 1]]],
+];
+
 const RECIPE_CATS = [['all', 'All'], ['basics', 'Basics'], ['tools', 'Tools'], ['smelt', 'Smelting'], ['blocks', 'Blocks'], ['paint', 'Paint'], ['food', 'Food'], ['realm', 'Realm Items'], ['materials', 'Materials']];
 
 function ingMatches(key, id) {

@@ -120,6 +120,138 @@ function treePalm(c, x, y, z, rnd) {
 }
 
 // ============================================================
+// Villages: a plaza with a well, houses, farms and paths.
+// Placement is deterministic per 170-block cell, so every chunk agrees.
+// ============================================================
+const VILLAGE_CELL = 170;
+const VILLAGE_THEMES = {
+  oak: { found: 'cobble', floor: 'planks', wall: 'planks', corner: 'oak_log', roofs: ['bricks', 'paint_red', 'paint_blue', 'stone_bricks', 'paint_green'], path: 'gravel', farm: 'grass', crop: 'berry_bush' },
+  desert: { found: 'sandstone', floor: 'sandstone', wall: 'sandstone', corner: 'oak_log', roofs: ['paint_orange', 'paint_yellow', 'bricks'], path: 'gravel', farm: 'grass', crop: 'berry_bush' },
+  snow: { found: 'cobble', floor: 'planks', wall: 'planks', corner: 'pine_log', roofs: ['snow', 'stone_bricks', 'paint_blue'], path: 'gravel', farm: 'grass', crop: 'berry_bush' },
+  ice: { found: 'packed_ice', floor: 'planks', wall: 'packed_ice', corner: 'blue_ice', roofs: ['snow', 'paint_white'], path: 'gravel', farm: 'grass', crop: 'berry_bush' },
+  candy: { found: 'chocolate', floor: 'chocolate', wall: 'cake', corner: 'candy_cane', roofs: ['icing', 'lolli_red', 'lolli_blue', 'paint_pink'], path: 'chocolate', farm: 'frosting', crop: 'gumdrop' },
+  jungle: { found: 'mud', floor: 'planks', wall: 'mud', corner: 'jungle_log', roofs: ['jungle_leaves'], path: 'gravel', farm: 'jungle_grass', crop: 'berry_bush' },
+};
+const _villages = new WeakMap();
+function villageCenter(G, realm, gx, gz) {
+  const V = realm.village; if (!V) return null;
+  let m = _villages.get(G); if (!m) { m = new Map(); _villages.set(G, m); }
+  const k = gx * 100003 + gz;
+  if (m.has(k)) return m.get(k);
+  let v = null;
+  if (ihash(gx, 901, gz, G.seed) < (gx === 0 && gz === 0 ? 1 : V.chance)) {
+    for (let t = 0; t < 12 && !v; t++) {
+      const x = gx * VILLAGE_CELL + 30 + Math.floor(ihash(gx, 910 + t, gz, G.seed) * (VILLAGE_CELL - 60));
+      const z = gz * VILLAGE_CELL + 30 + Math.floor(ihash(gx, 930 + t, gz, G.seed) * (VILLAGE_CELL - 60));
+      const col = V.column(G, x, z);
+      if (!col.ok) continue;
+      let lo = col.h, hi = col.h, ok = true;
+      for (let a = 0; a < 8 && ok; a++) {
+        const s = V.column(G, Math.round(x + Math.cos(a * 0.785) * 15), Math.round(z + Math.sin(a * 0.785) * 15));
+        if (!s.ok) ok = false; lo = Math.min(lo, s.h); hi = Math.max(hi, s.h);
+      }
+      if (ok && hi - lo <= 8) v = { x, z, h: col.h, theme: col.theme, seed: (ihash(gx, 950, gz, G.seed) * 4294967296) >>> 0, key: realm.key + ':' + gx + ',' + gz };
+    }
+  }
+  m.set(k, v);
+  return v;
+}
+function villagesNear(G, realm, x, z, r) {
+  if (!realm.village) return [];
+  const out = [];
+  for (let gz = Math.floor((z - r) / VILLAGE_CELL); gz <= Math.floor((z + r) / VILLAGE_CELL); gz++)
+    for (let gx = Math.floor((x - r) / VILLAGE_CELL); gx <= Math.floor((x + r) / VILLAGE_CELL); gx++) {
+      const v = villageCenter(G, realm, gx, gz);
+      if (v && Math.hypot(v.x - x, v.z - z) <= r) out.push(v);
+    }
+  return out;
+}
+const nearVillage = (G, realm, x, z, r) => villagesNear(G, realm, x, z, r).length > 0;
+function villageLayout(G, realm, v) {
+  if (v.layout) return v.layout;
+  const rnd = mulberry32(v.seed), V = realm.village, P = VILLAGE_THEMES[v.theme];
+  const n = 5 + Math.floor(rnd() * 3), a0 = rnd() * Math.PI * 2, items = [];
+  for (let i = 0; i < n; i++) {
+    const a = a0 + i * (Math.PI * 2 / n) + (rnd() - .5) * 0.25, r = 13 + rnd() * 3;
+    const x = Math.round(v.x + Math.cos(a) * r), z = Math.round(v.z + Math.sin(a) * r);
+    const dx = v.x - x, dz = v.z - z;
+    const side = Math.abs(dx) > Math.abs(dz) ? (dx > 0 ? 'E' : 'W') : (dz > 0 ? 'S' : 'N');
+    const col = V.column(G, x, z);
+    items.push({ type: (i === 1 || i === 5) ? 'farm' : 'house', x, z, h: col.h, ok: col.ok && Math.abs(col.h - v.h) <= 6, side, roof: P.roofs[Math.floor(rnd() * P.roofs.length)] });
+  }
+  v.layout = items;
+  return items;
+}
+function buildVillages(c, G, realm) {
+  for (const v of villagesNear(G, realm, c.cx * 16 + 8, c.cz * 16 + 8, 36)) buildVillage(c, G, realm, v);
+}
+function buildVillage(c, G, realm, v) {
+  const V = realm.village, P = VILLAGE_THEMES[v.theme], id = k => B[k];
+  const colH = (x, z) => V.column(G, x, z).h;
+  const touches = (x, z, r) => !(x + r < c.cx * 16 || x - r > c.cx * 16 + 15 || z + r < c.cz * 16 || z - r > c.cz * 16 + 15);
+  // flatten ground under a footprint to height fy and clear above it
+  const pad = (x, z, half, fy, top, clearTo) => {
+    for (let dz = -half; dz <= half; dz++) for (let dx = -half; dx <= half; dx++) {
+      const X = x + dx, Z = z + dz;
+      if (!inChunk(c, X, Z)) continue;
+      const ch = colH(X, Z);
+      for (let y = Math.min(ch, fy - 1); y < fy; y++) wset(c, X, y, Z, id(P.found), 0);
+      wset(c, X, fy, Z, top, 0);
+      for (let y = fy + 1; y <= Math.max(ch + 1, fy + clearTo); y++) wset(c, X, y, Z, 0, 0);
+    }
+  };
+  const h = v.h;
+  if (touches(v.x, v.z, 6)) {
+    pad(v.x, v.z, 5, h, id(P.path), 5);
+    for (let dz = -2; dz <= 1; dz++) for (let dx = -2; dx <= 1; dx++) {
+      const X = v.x + dx, Z = v.z + dz, edge = dx === -2 || dx === 1 || dz === -2 || dz === 1;
+      if (edge) { wset(c, X, h, Z, id(P.found), 0); wset(c, X, h + 1, Z, id(P.found), 0); }
+      else for (let y = h - 3; y <= h; y++) wset(c, X, y, Z, B.water, 0);
+      wset(c, X, h + 4, Z, id(P.roofs[0]), 0);
+    }
+    for (const [dx, dz] of [[-2, -2], [1, -2], [-2, 1], [1, 1]]) for (let y = h + 2; y <= h + 3; y++) wset(c, v.x + dx, y, v.z + dz, id(P.corner), 0);
+    for (const [dx, dz] of [[-5, -5], [5, -5], [-5, 5], [5, 5]]) { for (let y = h + 1; y <= h + 3; y++) wset(c, v.x + dx, y, v.z + dz, id(P.corner), 0); wset(c, v.x + dx, h + 4, v.z + dz, B.lantern, 0); }
+  }
+  for (const it of villageLayout(G, realm, v)) {
+    if (!it.ok) continue;
+    // path from the plaza to the building
+    const dx = it.x - v.x, dz = it.z - v.z, dist = Math.hypot(dx, dz);
+    if (touches((it.x + v.x) / 2, (it.z + v.z) / 2, dist / 2 + 2)) for (let t = 6; t < dist - 3; t += 0.5) {
+      const X = Math.round(v.x + dx * t / dist), Z = Math.round(v.z + dz * t / dist);
+      if (!inChunk(c, X, Z)) continue;
+      const ph = colH(X, Z);
+      wset(c, X, ph, Z, id(P.path), 0); wset(c, X, ph + 1, Z, 0, 0); wset(c, X, ph + 2, Z, 0, 0);
+    }
+    if (!touches(it.x, it.z, 5)) continue;
+    const fy = it.h;
+    if (it.type === 'farm') {
+      pad(it.x, it.z, 3, fy, id(P.farm), 4);
+      for (let a = -3; a <= 3; a++) for (let b = -3; b <= 3; b++) {
+        const X = it.x + a, Z = it.z + b;
+        if (Math.abs(a) === 3 || Math.abs(b) === 3) wset(c, X, fy, Z, id(P.corner), 0);
+        else if (b === 0) wset(c, X, fy, Z, B.water, 0);
+        else wset(c, X, fy + 1, Z, id(P.crop), 0);
+      }
+      continue;
+    }
+    // house: 7x7, door facing the plaza
+    const rot = { S: (a, b) => [a, b], N: (a, b) => [-a, -b], E: (a, b) => [b, -a], W: (a, b) => [-b, a] }[it.side];
+    const local = new Map();
+    const at = (a, b, y, block) => { const [rx, rz] = rot(a, b); local.set(rx + ',' + y + ',' + rz, block); };
+    pad(it.x, it.z, 3, fy, id(P.floor), 8);
+    for (let a = -3; a <= 3; a++) for (let b = -3; b <= 3; b++) {
+      const edge = Math.abs(a) === 3 || Math.abs(b) === 3, corner = Math.abs(a) === 3 && Math.abs(b) === 3;
+      for (let y = fy + 1; y <= fy + 3; y++) if (edge) at(a, b, y, corner ? id(P.corner) : id(P.wall));
+      for (let k = 0; k < 4; k++) if (Math.abs(a) <= 3 - k && Math.abs(b) <= 3 - k) at(a, b, fy + 4 + k, id(it.roof));
+    }
+    at(0, 3, fy + 1, 0); at(0, 3, fy + 2, 0);
+    at(-3, 0, fy + 2, B.glass); at(3, 0, fy + 2, B.glass); at(0, -3, fy + 2, B.glass);
+    at(-2, -2, fy + 1, B.bed); at(2, -2, fy + 1, B.workbench); at(1, -2, fy + 1, B.furnace); at(0, 0, fy + 3, B.lantern);
+    for (const [k, block] of local) { const [lx, y, lz] = k.split(',').map(Number); wset(c, it.x + lx, y, it.z + lz, block, 0); }
+  }
+}
+
+// ============================================================
 // Realm definitions
 // ============================================================
 const OCEAN = 0, FROZEN = 1, BEACH = 2, PEAK = 3, MOUNTAIN = 4, SNOWY = 5, DESERT = 6, FOREST = 7, PLAINS = 8;
@@ -167,12 +299,13 @@ const GH_CARVE = hostSet('stone', 'dirt', 'grass', 'sand', 'gravel', 'sandstone'
 realm({
   key: 'greenhollow', name: 'Greenhollow', color: '#5fbf4a', gem: null,
   tagline: 'Your home world',
-  desc: 'Rolling meadows, forests, deserts, snowy peaks and deep caves full of ore.',
+  desc: 'Rolling meadows, forests, deserts, snowy peaks, deep caves full of ore, and villages with friendly traders.',
   how: 'You start here. Step on any Realm Gate to come back home.',
   hint: 'Home sweet home.',
   sky: { mode: 'cycle', day: ['#5a9cf0', '#bfe0ff'], night: ['#04060f', '#111a30'], sunset: '#ff9a5a', stars: 1, sun: 1, moon: 1, clouds: 1, cloudY: 118, cloudColor: '#ffffff' },
   ambient: 0.05, sunMin: 0.2, gravity: 1, weather: 'rain', platform: 'cobble', spawnXZ: [0, 0], spawnMode: 'top',
   music: { root: 60, scale: [0, 2, 4, 7, 9], tempo: 0.42, wave: 'triangle' },
+  village: { chance: 0.75, column(G, x, z) { const c = ghColumn(G, x, z); return { h: c.h, ok: [PLAINS, FOREST, DESERT, SNOWY].includes(c.bio) && c.h > GH_SEA + 1 && c.h < 84, theme: c.bio === DESERT ? 'desert' : c.bio === SNOWY ? 'snow' : 'oak' }; } },
   mobs: ['fluffalo', 'boar', 'bunny', 'gloomling', 'spitter', 'shimmerwing', 'bramble_fox', 'shade_bat', 'golden_hopbun', 'modling'], tier: 0,
   makeGen: seed => makeG(seed, 0),
   gen(c, G) {
@@ -233,6 +366,7 @@ realm({
     }
     // trees
     forCells(c, 5, 3, 11, s, (wx, wz, h, rnd) => {
+      if (nearVillage(G, this, wx, wz, 26)) return;
       const col = ghColumn(G, wx, wz);
       if (col.h <= GH_SEA + 1 || col.h > 110) return;
       const ch = { [FOREST]: 0.78, [PLAINS]: 0.07, [SNOWY]: 0.3, [MOUNTAIN]: 0.1, [BEACH]: 0.04 }[col.bio] || 0;
@@ -245,7 +379,7 @@ realm({
     });
     // occasional surface lava pools
     forCells(c, 72, 5, 31, s, (wx, wz, h, rnd) => {
-      if (h > 0.3) return;
+      if (h > 0.3 || nearVillage(G, this, wx, wz, 34)) return;
       const col = ghColumn(G, wx, wz);
       if (col.h <= GH_SEA + 3 || (col.bio !== PLAINS && col.bio !== DESERT && col.bio !== MOUNTAIN)) return;
       const r = 2 + rnd() * 2, lvl = col.h;
@@ -256,6 +390,7 @@ realm({
         for (let y = lvl + 1; y < lvl + 6; y++) wset(c, X, y, Z, 0, 0);
       }
     });
+    buildVillages(c, G, this);
   },
 });
 
@@ -341,6 +476,7 @@ realm({
   sky: { mode: 'fixed', time: 0.08, day: ['#14244e', '#8fb8e0'], stars: 0.7, aurora: 1, sun: 1, clouds: 0 },
   ambient: 0.12, sunMin: 0.78, sunTint: [0.88, 0.95, 1.08], gravity: 1, weather: 'snow', platform: 'packed_ice', spawnXZ: [0, 0], spawnMode: 'top',
   music: { root: 72, scale: [0, 2, 4, 7, 11], tempo: 0.7, wave: 'sine' },
+  village: { chance: 0.6, column(G, x, z) { const h = fvHeight(G, x, z); return { h, ok: h > FV_SEA + 1 && h < 80, theme: 'ice' }; } },
   mobs: ['penguin', 'frost_wisp', 'yeti', 'frost_fox', 'tusker', 'modling'], tier: 1,
   makeGen: seed => makeG(seed, 2),
   gen(c, G) {
@@ -371,7 +507,7 @@ realm({
       if (h > FV_SEA && gget(c, x, h, z) === B.snow && ihash(bx + x, 2, bz + z, s) < 0.03 && gget(c, x, h + 1, z) === 0) gset(c, x, h + 1, z, B.tall_grass);
     }
     forCells(c, 14, 3, 13, s, (wx, wz, h, rnd) => {
-      if (h > 0.3) return;
+      if (h > 0.3 || nearVillage(G, this, wx, wz, 28)) return;
       const gh = fvHeight(G, wx, wz); if (gh <= FV_SEA + 1) return;
       const sh = 7 + Math.floor(rnd() * 16), r0 = 1 + rnd() * 1.6;
       for (let y = 0; y < sh; y++) {
@@ -380,10 +516,11 @@ realm({
       }
     });
     forCells(c, 7, 3, 14, s, (wx, wz, h, rnd) => {
-      if (h > 0.4) return;
+      if (h > 0.4 || nearVillage(G, this, wx, wz, 26)) return;
       const gh = fvHeight(G, wx, wz); if (gh <= FV_SEA + 1) return;
       treePine(c, wx, gh + 1, wz, rnd, B.pine_log, B.frost_leaves);
     });
+    buildVillages(c, G, this);
   },
 });
 
@@ -668,6 +805,7 @@ realm({
   sky: { mode: 'fixed', time: 0.22, day: ['#86c8ff', '#ffd6ef'], stars: 0, sun: 1, rainbow: 1, clouds: 1, cloudY: 112, cloudColor: '#ffd0ec' },
   ambient: 0.2, sunMin: 1, sunTint: [1.05, 0.98, 1.02], gravity: 1, weather: 'sparkles', platform: 'icing', spawnXZ: [0, 0], spawnMode: 'top',
   music: { root: 67, scale: [0, 2, 4, 5, 7, 9], tempo: 0.32, wave: 'square' },
+  village: { chance: 0.6, column(G, x, z) { const h = suHeight(G, x, z); return { h, ok: h > SU_MILK + 1 && h < 78, theme: 'candy' }; } },
   mobs: ['gummy_bear', 'jelly_slime', 'puffmallow', 'modling'], tier: 1,
   makeGen: seed => makeG(seed, 7),
   gen(c, G) {
@@ -704,7 +842,7 @@ realm({
       if (r < 0.04) gset(c, x, h + 1, z, B.gumdrop); else if (r < 0.07) gset(c, x, h + 1, z, B.flower_red); else if (r < 0.085) gset(c, x, h + 1, z, B.flower_yellow);
     }
     forCells(c, 8, 3, 18, s, (wx, wz, h, rnd) => {
-      if (h > 0.55) return;
+      if (h > 0.55 || nearVillage(G, this, wx, wz, 26)) return;
       const gh = suHeight(G, wx, wz); if (gh <= SU_MILK + 1) return;
       if (rnd() < 0.5) {
         const th = 5 + Math.floor(rnd() * 4), dir = rnd() < 0.5 ? [1, 0] : [0, 1];
@@ -724,6 +862,7 @@ realm({
         }
       }
     });
+    buildVillages(c, G, this);
   },
 });
 
@@ -757,6 +896,7 @@ realm({
   sky: { mode: 'cycle', day: ['#5aa2d8', '#dcecc4'], night: ['#040a08', '#0c1a14'], sunset: '#ffa85a', stars: 1, sun: 1, moon: 1, clouds: 1, cloudY: 118, cloudColor: '#f4f8ee' },
   ambient: 0.05, sunMin: 0.2, gravity: 1, weather: null, platform: 'mud', spawnXZ: [0, 0], spawnMode: 'top', fogScale: 0.85,
   music: { root: 50, scale: [0, 3, 5, 7, 10], tempo: 0.45, wave: 'triangle', drums: true },
+  village: { chance: 0.6, column(G, x, z) { const c = dvColumn(G, x, z); return { h: c.h, ok: c.h > DV_SEA + 1 && c.h < 82 && c.volc === 0, theme: 'jungle' }; } },
   mobs: ['raptor', 'hornback', 'treetop', 'kingjaw', 'glidewing', 'spikeback', 'modling'], tier: 2,
   makeGen: seed => makeG(seed, 8),
   gen(c, G) {
@@ -793,7 +933,7 @@ realm({
       else if (r < 0.3) gset(c, x, h + 1, z, B.flower_red); else if (r < 0.31) gset(c, x, h + 1, z, B.berry_bush);
     }
     forCells(c, 6, 5, 19, s, (wx, wz, h, rnd) => {
-      if (h > 0.55) return;
+      if (h > 0.55 || nearVillage(G, this, wx, wz, 26)) return;
       const col = dvColumn(G, wx, wz); if (col.h <= DV_SEA + 1 || col.volc > 0.1) return;
       const th = 8 + Math.floor(rnd() * 7), top = col.h + th;
       for (let i = 1; i <= th; i++) wset(c, wx, col.h + i, wz, B.jungle_log, 0);
@@ -810,6 +950,7 @@ realm({
         }
       }
     });
+    buildVillages(c, G, this);
   },
 });
 

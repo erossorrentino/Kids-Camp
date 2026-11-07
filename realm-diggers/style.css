@@ -222,6 +222,13 @@ input { font: inherit; background: var(--ink); color: var(--text); border: 2px s
 #guide-mats { max-height: 60vh; overflow: auto; padding-right: 4px; }
 @media (max-width: 760px) { .mat-wrap.wide { grid-template-columns: 1fr; } .mat-wrap.wide .mat-detail { order: 0; } }
 
+/* trading */
+.trade-panel { max-width: 560px; }
+.trade-who { display: flex; align-items: center; gap: 12px; }
+.trade-who img { width: 72px; height: 72px; background: rgba(0, 0, 0, .25); border-radius: 6px; }
+.trade-who p { margin: 2px 0 0; font-size: 13px; }
+#trade-list { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+
 /* creature log */
 .creature-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; max-height: 60vh; overflow: auto; padding-right: 4px; }
 .ccard { display: flex; gap: 10px; align-items: flex-start; background: var(--panel-2); border: 2px solid var(--line); border-radius: 6px; padding: 8px; min-width: 0; }
