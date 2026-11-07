@@ -75,6 +75,12 @@ Finding 15 different mods unlocks a 5th slot, and beating the final boss unlocks
 - **Survival** (health, hunger, air, monsters at night) and **Creative** (fly, every block, no damage).
   Monsters can be set to Peaceful, Easy or Normal.
 - Crafting list that shows exactly what you're missing, with Workbench and Furnace stations.
+- A **Materials** browser (in the crafting panel and the Realm Guide): pick any material to see where
+  to find it and everything you can make with it. Tap an ingredient in any recipe to jump to it, and
+  hover an item to see what it makes.
+- Every block can be broken. Tough ones (Worldstone, Obsidian, Guardian Stone) need a Ruby Pickaxe to
+  break quickly, and the game tells you which pickaxe you need. Buckets scoop up and pour water, lava
+  and chocolate milk. You can even craft your own Realm Gate.
 - Wood → Stone → Iron → Ruby → Prismatic tools, plus armor.
 - 24 original creatures, from Fluffalos and Hopbuns to Gloomlings, Raptors, Yetis and Kingjaws.
 - Boom Barrels (light one with an Igniter, then run), Bounce Pads, Scaffolding, Lanterns, beds,

@@ -779,7 +779,14 @@ const Game = {
     // mining
     const t = this.target;
     if ((held || (this.creative && tapL)) && t && !this.targetMob) {
-      if (!this.mining || this.mining.x !== t.x || this.mining.y !== t.y || this.mining.z !== t.z || this.mining.id !== t.id) this.mining = { x: t.x, y: t.y, z: t.z, id: t.id, prog: 0, snd: 0 };
+      if (!this.mining || this.mining.x !== t.x || this.mining.y !== t.y || this.mining.z !== t.z || this.mining.id !== t.id) {
+        this.mining = { x: t.x, y: t.y, z: t.z, id: t.id, prog: 0, snd: 0 };
+        const bd = BLOCKS[t.id];
+        if (!this.creative && bd.tier && !this.canHarvest(t.id) && (this.hintId !== t.id || this.t - this.hintT > 8)) {
+          this.hintId = t.id; this.hintT = this.t;
+          UI.toast(`${bd.name} is tough! ${TIER_NEED[bd.tier][0].toUpperCase() + TIER_NEED[bd.tier].slice(1)} breaks it fast and lets you collect it.`, '#ff9a5a');
+        }
+      }
       this.lastNormal = [t.nx, t.ny, t.nz];
       const bt2 = this.breakTime(t.id);
       if (this.creative) {
@@ -851,7 +858,7 @@ const Game = {
     w.setBlock(x, y, z, WLOG[id] ? B.water : 0);
     Particles.blockBreak(x, y, z, id);
     if (!extra) Sound.play('break', id);
-    if (id === B.cracked_worldstone) UI.popup('A rift opens!', 'Jump in!', 'Something glows far below...', '🕳️', '#c47aff');
+    if ((id === B.cracked_worldstone || id === B.worldstone) && y === 0) UI.popup('A rift opens!', 'Jump in!', this.realm.key === 'greenhollow' ? 'Something glows far below...' : 'Below is the void. Falling brings you back to the start.', '🕳️', '#c47aff');
     if (!this.creative) {
       if (this.canHarvest(id)) {
         for (const [did, n] of this.getDrops(id)) this.addItem(did, n);
@@ -938,10 +945,34 @@ const Game = {
         return;
       }
     }
+    if (hd && hd.bucket !== undefined) { this.useBucket(held, hd); return; }
     if (hd && hd.food) { this.eat(held, hd); return; }
     if (hd && hd.use) { this.useItem(held, hd); return; }
     if (held && held.id === I.ember_key) { UI.toast('Hold the Ember Key and jump into lava!', '#ff6a2a'); return; }
     if (held && isPlaceable(held.id) && t && !this.targetMob) this.placeBlock(t, held);
+  },
+  useBucket(stack, d) {
+    const p = this.player, w = this.world, eye = this.eye(), dir = this.viewDir(), reach = this.creative ? 8 : 5.2;
+    if (d.bucket === 0) {
+      const hit = w.raycast(eye[0], eye[1], eye[2], dir[0], dir[1], dir[2], reach, id => id > 0);
+      if (!hit || !LIQ[hit.id]) { UI.toast('Point the bucket at water, lava or chocolate milk.'); return; }
+      const filled = [0, I.water_bucket, I.lava_bucket, I.choco_bucket][LIQ[hit.id]];
+      w.setBlock(hit.x, hit.y, hit.z, 0);
+      Sound.play('splash'); Particles.blockBreak(hit.x, hit.y, hit.z, hit.id);
+      if (stack.n <= 1) p.inv[p.sel] = { id: filled, n: 1 };
+      else { if (!this.creative) stack.n--; this.addItem(filled, 1); }
+    } else {
+      const t = this.target;
+      if (!t || this.targetMob) { UI.toast('Point at a block to pour next to it.'); return; }
+      let x = t.x + t.nx, y = t.y + t.ny, z = t.z + t.nz;
+      if (REPL[t.id] && !LIQ[t.id]) { x = t.x; y = t.y; z = t.z; }
+      const cur = w.blockAt(x, y, z);
+      if ((cur && !REPL[cur]) || y < 0 || y >= HEIGHT) return;
+      w.setBlock(x, y, z, d.bucket);
+      Sound.play('splash');
+      if (!this.creative) p.inv[p.sel] = { id: I.bucket, n: 1 };
+    }
+    UI.swing(); UI.updateHotbar();
   },
   interactBlock(t, bd, held) {
     const p = this.player;
@@ -1206,6 +1237,10 @@ const Game = {
     if (r === 'greenhollow' && p.y > 124) { UI.toast('You climbed above the clouds!', '#ffd25a'); this.travelTo('skyreach', 'climb'); return; }
     if (r === 'greenhollow' && p.y < -3) { this.travelTo('hollowdeep', 'rift'); return; }
     if (this.realm.fallOut && p.y < -18) { UI.toast('You fell off the sky islands...', '#ffd25a'); this.travelTo(this.realm.fallOut, 'fall'); return; }
+    if (p.y < -30) {
+      const sp = this.realmSpawn(r); p.x = sp[0]; p.y = sp[1]; p.z = sp[2]; p.vx = p.vy = p.vz = 0; p.fallStart = p.y;
+      UI.toast('You fell out of the world! Back to the start.', '#c47aff'); Sound.play('portal'); return;
+    }
     const held = p.inv[p.sel];
     if (p.inLava && held && held.id === I.ember_key) { this.travelTo(r === 'emberdeep' ? 'greenhollow' : 'emberdeep', 'lava'); return; }
     const body = w.blockAt(Math.floor(p.x), Math.floor(p.y + 0.6), Math.floor(p.z));
@@ -1242,7 +1277,7 @@ const Game = {
       const X = bx + dx, Y = by + dy, Z = bz + dz, id = w.blockAt(X, Y, Z);
       if (!id) continue;
       const d = BLOCKS[id];
-      if (d.unbreakable || LIQ[id] || id === B.obsidian || id === B.guardian_stone) continue;
+      if (d.unbreakable || LIQ[id] || id === B.obsidian || id === B.guardian_stone || id === B.worldstone || id === B.realm_gate) continue;
       if (id === B.boom_barrel) { w.setBlock(X, Y, Z, 0); this.barrels.push({ x: X + .5, y: Y, z: Z + .5, vx: 0, vy: 3, vz: 0, w: .98, h: .98, fuse: 0.3 + Math.random() * 0.5, fuseSnd: 1 }); continue; }
       w.setBlock(X, Y, Z, WLOG[id] ? B.water : 0);
       if (!this.creative && Math.random() < 0.3) for (const [did, n] of this.getDrops(id)) this.addItem(did, n);

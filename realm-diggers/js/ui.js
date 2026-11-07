@@ -351,10 +351,13 @@ const UI = {
     const d = itemDef(id); if (!d) return;
     let extra = '';
     if (d.food) extra += `<div class="muted">Food +${d.food / 2} 🍗 (use to eat)</div>`;
-    if (d.tool) extra += `<div class="muted">${d.tool === 'sword' ? 'Damage ' + d.dmg : 'Mining power ' + d.speed}</div>`;
+    if (d.tool && !d.isBlock) extra += `<div class="muted">${d.tool === 'sword' ? 'Damage ' + d.dmg : 'Mining power ' + d.speed}</div>`;
+    if (d.isBlock && (d.tool || d.tier)) extra += `<div class="muted">Best tool: ${{ pick: 'Pickaxe', axe: 'Axe', shovel: 'Shovel' }[d.tool] || 'Any'}${d.tier ? ` (collect it with ${TIER_NEED[d.tier]})` : ''}</div>`;
     if (d.armor) extra += `<div class="muted">Blocks ${Math.round(d.armor * 100)}% of damage</div>`;
     if (d.gem) extra += `<div class="muted">Realm Gem of ${REALM[d.gem].name}</div>`;
     if (d.desc) extra += `<div class="muted">${d.desc}</div>`;
+    const makes = [...new Set(recipesUsingItem(id).map(r => itemName(idOf(r.out))))];
+    if (makes.length) extra += `<div class="tipmakes">Makes: ${makes.slice(0, 5).join(', ')}${makes.length > 5 ? ` and ${makes.length - 5} more` : ''}</div>`;
     const t = $('tooltip'); t.innerHTML = `<b>${d.name}</b>${extra}`; t.hidden = false; this.moveTooltip();
   },
   hideTip() { $('tooltip').hidden = true; },
@@ -363,25 +366,59 @@ const UI = {
     const tabs = $('craft-tabs');
     tabs.innerHTML = RECIPE_CATS.map(([k, n]) => `<button data-c="${k}" class="${k === this.craftCat ? 'on' : ''}">${n}</button>`).join('');
     tabs.onclick = e => { const b = e.target.closest('button'); if (!b) return; this.craftCat = b.dataset.c; this.renderCrafting(); };
+    const list = $('craft-list');
+    list.innerHTML = '';
+    list.onclick = e => { const m = e.target.closest('[data-mat]'); if (m) { this.craftCat = 'materials'; this.matSel = m.dataset.mat; this.renderCrafting(); list.scrollTop = 0; } };
+    if (this.craftCat === 'materials') { this.renderMaterials(list, true); return; }
     const inv = [...Game.player.inv];
-    const st = this.stations, list = $('craft-list');
     const recs = RECIPES.filter(r => this.craftCat === 'all' || r.cat === this.craftCat);
     recs.sort((a, b) => (canCraft(inv, b) ? 1 : 0) - (canCraft(inv, a) ? 1 : 0));
-    list.innerHTML = '';
-    for (const r of recs) {
-      const outId = idOf(r.out), have = canCraft(inv, r) || Game.creative;
-      const stOk = !r.st || st[r.st] || Game.creative;
-      const el = document.createElement('div'); el.className = 'recipe' + (have && stOk ? '' : ' no');
-      const ings = r.in.map(([k, n]) => { const c = countIng(inv, k); return `<span class="ing${c < n && !Game.creative ? ' lack' : ''}"><img src="${ingIcon(k)}" alt="">${ingName(k)} ${Math.min(c, n)}/${n}</span>`; }).join('');
-      const need = r.st ? `<span class="need">${r.st === 'bench' ? 'Needs a Workbench nearby' : 'Needs a Furnace nearby'}${stOk ? ' ✓' : ''}</span>` : '';
-      el.innerHTML = `<img class="out" src="${iconURL(outId)}" alt=""><div><div class="rname">${itemName(outId)}${r.n > 1 ? ' ×' + r.n : ''}</div><div class="ings">${ings}</div>${need}</div><div class="acts"><button class="btn small primary" data-k="1">Craft</button><button class="btn small" data-k="5">×5</button></div>`;
-      for (const b of el.querySelectorAll('button')) {
-        b.disabled = !(have && stOk);
-        b.onclick = () => { for (let k = 0; k < +b.dataset.k; k++) if (!Game.craft(r)) break; this.renderInventory(); this.renderCrafting(); };
-      }
-      el.addEventListener('pointerenter', () => this.showTip(outId)); el.addEventListener('pointerleave', () => this.hideTip());
-      list.appendChild(el);
+    for (const r of recs) list.appendChild(this.recipeRow(r, inv, true));
+  },
+  // one recipe row; interactive rows get Craft buttons
+  recipeRow(r, inv, interactive) {
+    const st = this.stations || {}, playing = !!Game.save && !Game.titleMode, creative = playing && Game.creative;
+    const outId = idOf(r.out), have = canCraft(inv, r) || creative;
+    const stOk = !r.st || st[r.st] || creative;
+    const el = document.createElement('div'); el.className = 'recipe' + (!playing || (have && stOk) ? '' : ' no') + (interactive ? '' : ' ro');
+    const ings = r.in.map(([k, n]) => {
+      const c = countIng(inv, k), count = playing ? ` ${Math.min(c, n)}/${n}` : ` ×${n}`;
+      return `<span class="ing${playing && c < n && !creative ? ' lack' : ''}" data-mat="${k}" title="See how to get ${ingName(k)}"><img src="${ingIcon(k)}" alt="">${ingName(k)}${count}</span>`;
+    }).join('');
+    const need = r.st ? `<span class="need">${r.st === 'bench' ? 'Needs a Workbench nearby' : 'Needs a Furnace nearby'}${interactive && stOk ? ' ✓' : ''}</span>` : '';
+    el.innerHTML = `<img class="out" src="${iconURL(outId)}" alt=""><div><div class="rname">${itemName(outId)}${r.n > 1 ? ' ×' + r.n : ''}</div><div class="ings">${ings}</div>${need}</div>` +
+      (interactive ? `<div class="acts"><button class="btn small primary" data-k="1">Craft</button><button class="btn small" data-k="5">×5</button></div>` : '');
+    if (interactive) for (const b of el.querySelectorAll('button')) {
+      b.disabled = !(have && stOk);
+      b.onclick = () => { for (let k = 0; k < +b.dataset.k; k++) if (!Game.craft(r)) break; this.renderInventory(); this.renderCrafting(); };
     }
+    el.querySelector('.out').addEventListener('pointerenter', () => this.showTip(outId)); el.querySelector('.out').addEventListener('pointerleave', () => this.hideTip());
+    return el;
+  },
+  // Materials browser: pick a material, see how to get it and everything it makes
+  renderMaterials(box, interactive, wide) {
+    const inv = Game.save && !Game.titleMode ? [...Game.player.inv] : [];
+    const groups = materialList();
+    const all = groups.flatMap(g => g[1]);
+    if (!this.matSel || !all.includes(this.matSel)) this.matSel = all.find(k => countIng(inv, k) > 0) || all[0];
+    const key = this.matSel, have = countIng(inv, key), recs = recipesUsing(key);
+    const wrap = document.createElement('div'); wrap.className = 'mat-wrap' + (wide ? ' wide' : '');
+    const det = document.createElement('div'); det.className = 'mat-detail';
+    det.innerHTML = `<div class="mat-head"><img src="${ingIcon(key)}" alt=""><div><h3>${ingName(key)}</h3><span class="muted">${inv.length ? (have ? `You have ${have}` : "You don't have any yet") : ''}</span></div></div>
+      <div class="mat-label">How to get it</div><ul class="mat-src">${materialSources(key).map(t => `<li>${t}</li>`).join('')}</ul>
+      <div class="mat-label">What you can make with it (${recs.length})</div>`;
+    const rl = document.createElement('div'); rl.className = 'mat-recipes';
+    for (const r of recs) rl.appendChild(this.recipeRow(r, inv, interactive));
+    det.appendChild(rl);
+    const gl = document.createElement('div'); gl.className = 'mat-groups';
+    gl.innerHTML = `<div class="mat-label">Pick a material</div>` + groups.map(([name, keys]) => `<div class="mat-group"><div class="mat-gname">${name}</div><div class="mat-chips">${keys.map(k => {
+      const c = countIng(inv, k);
+      return `<button class="mat-chip${c ? ' have' : ''}${k === key ? ' sel' : ''}" data-pick="${k}" title="${ingName(k)}" aria-label="${ingName(k)}"><img src="${ingIcon(k)}" alt="">${c ? `<span class="n">${c > 999 ? '999+' : c}</span>` : ''}</button>`;
+    }).join('')}</div></div>`).join('');
+    gl.onclick = e => { const b = e.target.closest('[data-pick]'); if (!b) return; this.matSel = b.dataset.pick; Sound.play('click'); this.renderMaterials(box, interactive, wide); box.scrollTop = 0; };
+    wrap.appendChild(det); wrap.appendChild(gl);
+    box.innerHTML = ''; box.appendChild(wrap);
+    box.onclick = e => { const m = e.target.closest('[data-mat]'); if (m) { this.matSel = m.dataset.mat; this.renderMaterials(box, interactive, wide); box.scrollTop = 0; } };
   },
 
   // ---------- mods ----------
@@ -448,6 +485,9 @@ const UI = {
     const body = $('guide-body');
     if (this.guideTab === 'realms') {
       body.innerHTML = `<div class="realm-grid">${REALMS.map(r => this.realmCardHTML(r, false)).join('')}</div>`;
+    } else if (this.guideTab === 'materials') {
+      body.innerHTML = '<p class="muted">Pick a material to see where to find it and everything you can make with it. Tap an ingredient to jump to it.</p><div id="guide-mats"></div>';
+      this.renderMaterials($('guide-mats'), false, true);
     } else if (this.guideTab === 'goals') {
       const ach = Game.save ? Game.save.achievements : [];
       body.innerHTML = `<p class="muted">${ach.length} of ${ACHIEVEMENTS.length} goals complete.</p><div class="goals">${ACHIEVEMENTS.map(a => `<div class="goal${ach.includes(a.id) ? ' done' : ''}"><span class="ck">${ach.includes(a.id) ? '✓' : ''}</span><div><b>${a.name}</b><div class="muted">${a.desc}</div></div></div>`).join('')}</div>`;
@@ -468,7 +508,8 @@ const UI = {
         <div><h3>Getting started</h3><table>
           <tr><td>1</td><td>Hold to chop a tree trunk for logs</td></tr><tr><td>2</td><td>Open your inventory (E) and craft Planks, then a Workbench</td></tr>
           <tr><td>3</td><td>Place the Workbench and craft a Wooden Pickaxe next to it</td></tr><tr><td>4</td><td>Mine stone, make stone tools and a Furnace</td></tr>
-          <tr><td>5</td><td>Dig for ore. Sparkly Mod Geodes give you mods!</td></tr><tr><td>6</td><td>Read the Realms tab to find all 10 worlds</td></tr></table></div></div>`;
+          <tr><td>5</td><td>Dig for ore. Sparkly Mod Geodes give you mods!</td></tr><tr><td>6</td><td>Read the Realms tab to find all 10 worlds</td></tr>
+          <tr><td>Stuck?</td><td>The Materials tab shows where every material comes from and what it makes</td></tr></table></div></div>`;
     }
   },
   openTravel() {

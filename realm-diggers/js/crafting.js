@@ -26,6 +26,7 @@ rec('iron_armor', 1, [['iron_ingot', 8]], 'bench', 'tools');
 rec('ruby_armor', 1, [['ruby', 8]], 'bench', 'tools');
 rec('prism_armor', 1, [['prism_shard', 8]], 'bench', 'tools');
 rec('igniter', 1, [['iron_ingot', 1], ['coal', 1]], 'bench', 'tools');
+rec('bucket', 1, [['iron_ingot', 3]], 'bench', 'tools');
 // Smelting
 rec('iron_ingot', 1, [['iron_ore', 1]], 'furnace', 'smelt');
 rec('copper_ingot', 1, [['copper_ore', 1]], 'furnace', 'smelt');
@@ -68,8 +69,9 @@ rec('dream_bed', 1, [['bed', 1], ['gold_ingot', 2], ['group:flower', 3]], 'bench
 rec('moon_rocket', 1, [['iron_ingot', 8], ['glass', 2], ['coal', 6], ['boom_barrel', 1]], 'bench', 'realm');
 rec('time_clock', 1, [['fossil', 1], ['gold_ingot', 2], ['copper_ingot', 4]], 'bench', 'realm');
 rec('star_key', 1, REALM_GEMS.map(g => [g, 1]), 'bench', 'realm');
+rec('realm_gate', 1, [['obsidian', 4], ['gold_ingot', 2], ['glass', 1]], 'bench', 'realm');
 
-const RECIPE_CATS = [['all', 'All'], ['basics', 'Basics'], ['tools', 'Tools'], ['smelt', 'Smelting'], ['blocks', 'Blocks'], ['paint', 'Paint'], ['food', 'Food'], ['realm', 'Realm Items']];
+const RECIPE_CATS = [['all', 'All'], ['basics', 'Basics'], ['tools', 'Tools'], ['smelt', 'Smelting'], ['blocks', 'Blocks'], ['paint', 'Paint'], ['food', 'Food'], ['realm', 'Realm Items'], ['materials', 'Materials']];
 
 function ingMatches(key, id) {
   if (key.startsWith('group:')) { const d = itemDef(id); return !!d && d.group === key.slice(6); }
@@ -98,4 +100,74 @@ function takeIng(inv, key, n) {
     const t = Math.min(n, s.n); s.n -= t; n -= t;
     if (s.n <= 0) inv[i] = null;
   }
+}
+
+// ============================================================
+// Materials: how to get each crafting material and what it makes
+// ============================================================
+const MATERIAL_GROUPS = [
+  ['Wood & stone', ['group:log', 'planks', 'stick', 'cobble', 'stone', 'sand', 'glass', 'clay', 'snow', 'ice', 'cactus', 'obsidian']],
+  ['Ores & metals', ['coal', 'copper_ore', 'copper_ingot', 'iron_ore', 'iron_ingot', 'iron_block', 'gold_ore', 'gold_ingot', 'gold_block', 'ruby', 'ruby_block', 'sapphire']],
+  ['Creatures & plants', ['wool', 'bone', 'slime_ball', 'raw_meat', 'raw_fish', 'dino_meat', 'berries', 'group:flower', 'flower_red', 'flower_yellow', 'flower_blue', 'cotton_candy']],
+  ['Made by crafting', ['torch', 'bed', 'boom_barrel']],
+  ['Realm treasures', ['fossil', ...REALM_GEMS, 'prism_shard']],
+];
+function materialList() {
+  const used = new Set();
+  for (const r of RECIPES) for (const [k] of r.in) used.add(k);
+  const groups = MATERIAL_GROUPS.map(([name, keys]) => [name, keys.filter(k => used.has(k))]);
+  const listed = new Set(groups.flatMap(g => g[1]));
+  const rest = [...used].filter(k => !listed.has(k));
+  if (rest.length) groups.push(['Other', rest]);
+  return groups.filter(g => g[1].length);
+}
+function recipesUsing(key) { return RECIPES.filter(r => r.in.some(([k]) => k === key)); }
+function recipesUsingItem(id) { return RECIPES.filter(r => r.in.some(([k]) => ingMatches(k, id))); }
+
+// Which realms each block shows up in (sampled once from the real generators)
+let _blockRealms = null;
+function blockRealms() {
+  if (_blockRealms) return _blockRealms;
+  _blockRealms = {};
+  const spots = [[0, 0], [7, 3], [-6, 9], [19, -8], [3, 28], [-17, -15], [30, 30], [-30, 12]];
+  for (const r of REALMS) {
+    const G = r.makeGen(424242), seen = new Uint8Array(256);
+    for (const [cx, cz] of spots) { const c = new Chunk(cx, cz); r.gen(c, G); const b = c.blocks; for (let i = 0; i < b.length; i++) seen[b[i]] = 1; }
+    for (let id = 1; id < 256; id++) if (seen[id]) (_blockRealms[id] = _blockRealms[id] || []).push(r.key);
+  }
+  return _blockRealms;
+}
+const TIER_NEED = ['', 'any Pickaxe', 'a Stone Pickaxe', 'an Iron Pickaxe', 'a Ruby Pickaxe', 'a Prismatic Pickaxe'];
+function realmsText(keys) {
+  if (!keys || !keys.length || keys.length >= REALMS.length - 1) return '';
+  if (keys.length > 3) return ' in many realms';
+  return ' in ' + keys.map(k => REALM[k].name).join(', ');
+}
+function materialSources(key) {
+  if (key === 'group:log') return ['Chop any tree trunk: Oak, Birch, Pine, Jungle, Palm, Skywood, Charwood or Candy Cane.'];
+  if (key === 'group:flower') return ['Pick any flower: Red Tulip, Sunny Daisy, Bluebell, Starpetal or Star Flower.'];
+  const out = [], id = idOf(key), br = blockRealms();
+  for (const r of RECIPES.filter(r => r.out === key)) {
+    const ings = r.in.map(([k, n]) => `${n} ${ingName(k)}`).join(' + ');
+    out.push(r.st === 'furnace' ? `Smelt ${ings} in a Furnace.` : `Craft from ${ings}${r.st === 'bench' ? ' at a Workbench' : ''}.`);
+  }
+  const crafted = out.length > 0, srcs = [];
+  for (const b of BLOCKS) {
+    if (!b.drop || b.render === R_NONE) continue;
+    const drops = typeof b.drop === 'function' ? [b.drop(0), b.drop(0.999)] : [b.drop];
+    if (!drops.includes(key)) continue;
+    if (b.key === key && crafted && !br[b.id]) continue;
+    srcs.push({ b, sometimes: typeof b.drop === 'function' && drops[1] !== key });
+  }
+  if (srcs.length) {
+    const names = srcs.slice(0, 4).map(s => s.b.name + (s.sometimes ? ' (sometimes)' : ''));
+    const tier = Math.max(...srcs.map(s => (s.b.tool === 'pick' ? s.b.tier : 0)));
+    const realms = [...new Set(srcs.flatMap(s => br[s.b.id] || []))];
+    const verb = srcs.every(s => s.b.tool === 'axe') ? 'Chop' : srcs.every(s => s.b.render === R_CROSS || s.b.leaves) ? 'Break' : 'Mine';
+    out.push(`${verb} ${names.join(', ')}${srcs.length > 4 ? ' and more' : ''}${realmsText(realms)}${tier ? ` (needs ${TIER_NEED[tier]})` : ''}.`);
+  }
+  const mobs = Object.values(MOBS).filter(m => m.drops.some(d => d[0] === key));
+  if (mobs.length) out.push('Dropped by ' + mobs.map(m => m.name).join(', ') + '.');
+  if (!out.length) out.push('Keep exploring to find it!');
+  return out;
 }

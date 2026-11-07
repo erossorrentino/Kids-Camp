@@ -37,7 +37,7 @@ block('grass', 'Grass Block', { tex: ['grass_top', 'dirt', 'grass_side'], hard: 
 block('dirt', 'Dirt', { hard: .5, tool: 'shovel', cat: 'nature' });
 block('stone', 'Stone', { hard: 1.5, tool: 'pick', tier: 1, drop: 'cobble' });
 block('cobble', 'Cobblestone', { hard: 2, tool: 'pick', tier: 1 });
-block('worldstone', 'Worldstone', { unbreakable: true, hard: 999, cat: null, drop: null });
+block('worldstone', 'Worldstone', { hard: 12, tool: 'pick', tier: 4, cat: 'building' });
 block('cracked_worldstone', 'Cracked Worldstone', { tex: 'worldstone_cracked', hard: 5, tool: 'pick', tier: 3, drop: null, emissive: true, light: [0.75, 0.35, 1, 6], cat: null });
 block('sand', 'Sand', { hard: .5, tool: 'shovel', cat: 'nature' });
 block('sandstone', 'Sandstone', { tex: ['sandstone_top', 'sandstone_top', 'sandstone_side'], hard: 1, tool: 'pick', tier: 1 });
@@ -95,7 +95,7 @@ block('iron_block', 'Iron Block', { hard: 3, tool: 'pick', tier: 2 });
 block('gold_block', 'Gold Block', { hard: 3, tool: 'pick', tier: 3 });
 block('ruby_block', 'Ruby Block', { hard: 3, tool: 'pick', tier: 3 });
 block('obsidian', 'Obsidian', { hard: 8, tool: 'pick', tier: 4 });
-block('realm_gate', 'Realm Gate', { tex: ['gate_top', 'gate_bottom', 'gate_side'], unbreakable: true, hard: 999, interact: 'gate', emissive: true, light: [0.6, 0.8, 1, 9], cat: null, drop: null });
+block('realm_gate', 'Realm Gate', { tex: ['gate_top', 'gate_bottom', 'gate_side'], hard: 3, tool: 'pick', interact: 'gate', emissive: true, light: [0.6, 0.8, 1, 9], cat: 'special' });
 block('frost_portal', 'Frost Portal', { render: R_GLASS, solid: false, emissive: true, light: [0.5, 0.9, 1, 8], hard: .2, drop: null, cat: null, portal: 'frostveil' });
 block('moon_rocket', 'Moon Rocket', { tex: ['rocket_top', 'rocket_bottom', 'rocket_side'], hard: 1, interact: 'rocket', cat: 'special' });
 block('bounce_pad', 'Bounce Pad', { hard: .3, bounce: 1, cat: 'special' });
@@ -173,7 +173,7 @@ block('prism_grass', 'Prism Grass', { tex: ['prismgrass_top', 'prism_stone', 'pr
 const CRYSTALS = [['red', '#ff5a6e', [1, .35, .4]], ['orange', '#ffa24a', [1, .6, .25]], ['yellow', '#ffe45a', [1, .95, .4]], ['green', '#5affa0', [.35, 1, .55]], ['blue', '#5ab4ff', [.35, .65, 1]], ['purple', '#c46aff', [.75, .4, 1]]];
 for (const [c, , l] of CRYSTALS) block('crystal_' + c, c[0].toUpperCase() + c.slice(1) + ' Crystal', { render: R_GLASS, emissive: true, light: [l[0], l[1], l[2], 8], hard: 1, tool: 'pick', cat: 'light' });
 block('starstone_ore', 'Starstone Ore', { hard: 4, tool: 'pick', tier: 4, drop: 'prism_shard', ore: { chance: 0.25, tier: 3 }, cat: 'ores' });
-block('guardian_stone', 'Guardian Stone', { hard: 20, tool: 'pick', tier: 4, cat: 'realm' });
+block('guardian_stone', 'Guardian Stone', { hard: 10, tool: 'pick', tier: 4, cat: 'realm' });
 plant('star_flower', 'Star Flower', { emissive: true, light: [0.8, 0.7, 1, 5], group: 'flower', cat: 'realm' });
 
 // ---------------- Items ----------------
@@ -223,6 +223,10 @@ item('frost_crystal', 'Frost Crystal', { icon: ['crystal', '#9ae8ff'], stack: 16
 item('time_clock', 'Time Clock', { icon: ['clock'], use: 'clock', stack: 1, desc: 'Use it to travel back to Dino Valley.' });
 item('star_key', 'Star Key', { icon: ['star'], use: 'starkey', stack: 1, desc: 'Use it to open the way to Prismara.' });
 item('homeward_charm', 'Homeward Charm', { icon: ['charm'], use: 'charm', stack: 16, desc: 'Use it to go home to Greenhollow.' });
+item('bucket', 'Bucket', { icon: ['bucket', null], stack: 16, bucket: 0, desc: 'Use it on water, lava or chocolate milk to scoop it up.' });
+item('water_bucket', 'Water Bucket', { icon: ['bucket', '#3a8ae8'], stack: 1, bucket: B.water, desc: 'Use it to pour water.' });
+item('lava_bucket', 'Lava Bucket', { icon: ['bucket', '#ff6a1a'], stack: 1, bucket: B.lava, desc: 'Use it to pour lava. Careful!' });
+item('choco_bucket', 'Chocolate Milk Bucket', { icon: ['bucket', '#7a4a2c'], stack: 1, bucket: B.choco_milk, desc: 'Use it to pour chocolate milk.' });
 item('igniter', 'Igniter', { icon: ['igniter'], stack: 1, desc: 'Use it on a Boom Barrel. Then run!' });
 item('crown', 'Crown of Realms', { icon: ['crown'], stack: 1, desc: 'Proof you beat the Prism Guardian!' });
 // Tools
@@ -694,6 +698,7 @@ const ICON_SHAPES = {
   },
   axe: (s, c) => { s.line(2.5, 13.5, 10.5, 5.5, STICK, 2); s.poly([[7, 3], [10, 1], [14, 5], [12, 8], [9, 7]], c); },
   shovel: (s, c) => { s.line(2.5, 13.5, 9.5, 6.5, STICK, 2); s.poly([[9, 6], [11, 2], [14, 2], [14, 5], [10, 7]], c); },
+  bucket: (s, c) => { s.line(3.5, 5, 8, 1.5, '#8a8e96'); s.line(8, 1.5, 12.5, 5, '#8a8e96'); s.poly([[3, 5], [13, 5], [11.5, 14.5], [4.5, 14.5]], '#b8bcc6'); s.poly([[4, 6], [12, 6], [11.6, 8], [4.4, 8]], c || '#5a5e66'); },
   sword: (s, c) => { s.line(5, 11, 13.5, 2.5, c, 2); s.set(14, 1.5, c); s.line(3, 8, 8, 13, '#6a4a2a', 1); s.line(2, 14, 4.5, 11.5, STICK, 2); },
 };
 
