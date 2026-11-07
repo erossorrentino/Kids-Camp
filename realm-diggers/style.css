@@ -100,6 +100,13 @@ button { font: inherit; color: inherit; }
 .tb.big { width: 76px; height: 76px; font-size: 30px; }
 .tb.small { width: 44px; height: 44px; font-size: 15px; font-family: var(--display); }
 .tb.on { background: rgba(255, 194, 75, .45); border-color: var(--gold); }
+.tb.act { width: 70px; height: 70px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; line-height: 1; }
+.tb.act span { font-size: 26px; }
+.tb.act small { font-family: var(--display); font-size: 12px; letter-spacing: .04em; }
+.tb.mine { border-color: #ffb36a; background: rgba(120, 60, 10, .5); }
+.tb.build { border-color: #7ae08a; background: rgba(20, 90, 40, .5); }
+.tb.act.on { background: rgba(255, 194, 75, .55); border-color: var(--gold); transform: scale(.94); }
+#t-abil { position: absolute; bottom: calc(100% + 10px); right: 0; display: flex; gap: 8px; }
 #t-top { position: absolute; top: calc(150px + env(safe-area-inset-top, 0px)); right: calc(14px + env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 8px; }
 #t-right { position: absolute; right: calc(20px + env(safe-area-inset-right, 0px)); bottom: calc(100px + env(safe-area-inset-bottom, 0px)); display: grid; grid-template-columns: repeat(2, auto); gap: 10px; align-items: end; justify-items: center; }
 #t-jump { grid-column: 2; }
@@ -257,6 +264,7 @@ body.touch #hand { display: none; }
   #t-top { top: calc(10px + env(safe-area-inset-top, 0px)); right: calc(150px + env(safe-area-inset-right, 0px)); flex-direction: row; }
   #joy { bottom: calc(70px + env(safe-area-inset-bottom, 0px)); }
   #t-right { bottom: calc(70px + env(safe-area-inset-bottom, 0px)); }
+  #t-abil { bottom: auto; top: 13px; right: calc(100% + 10px); flex-direction: row; }
 }
 @media (prefers-reduced-motion: reduce) {
   #realm-card, #popup, .toast, #hand.swing { animation-duration: .01s; }

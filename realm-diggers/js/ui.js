@@ -50,7 +50,7 @@ const UI = {
     $('guide-tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; this.guideTab = b.dataset.t; this.renderGuide(); });
     document.addEventListener('pointermove', e => { this.mx = e.clientX; this.my = e.clientY; this.moveCursorItem(); this.moveTooltip(); });
     for (const s of document.querySelectorAll('.screen')) s.addEventListener('contextmenu', e => e.preventDefault());
-    Touch.init();
+    TouchPad.init();
   },
   show(id) {
     for (const s of document.querySelectorAll('.screen')) s.hidden = s.id !== id;
@@ -461,9 +461,9 @@ const UI = {
           <tr><td>E</td><td>Inventory &amp; crafting</td></tr><tr><td>M</td><td>Mods</td></tr><tr><td>G</td><td>Realm Guide</td></tr>
           <tr><td>X / R / F</td><td>Mod powers (X-Ray, Blink, Roar)</td></tr><tr><td>Esc</td><td>Pause</td></tr></table></div>
         <div><h3>Touch</h3><table>
-          <tr><td>Left stick</td><td>Walk</td></tr><tr><td>Drag right side</td><td>Look around</td></tr>
-          <tr><td>⛏ / 🧱 button</td><td>Switch between Mine mode and Build mode</td></tr>
-          <tr><td>Hold on screen</td><td>Mine mode: dig. Build mode: place or use</td></tr><tr><td>Tap on screen</td><td>Hit creatures / place blocks</td></tr>
+          <tr><td>Left stick</td><td>Walk</td></tr><tr><td>Drag the screen</td><td>Look around (aim with the + in the middle)</td></tr>
+          <tr><td>⛏ Mine (hold)</td><td>Dig the block you aim at, hit creatures</td></tr>
+          <tr><td>🧱 Build (tap)</td><td>Place a block, eat food, use items and blocks. Hold to keep placing</td></tr>
           <tr><td>⤒ / ⤓</td><td>Jump and sneak (fly up/down in Creative)</td></tr><tr><td>Tap hotbar</td><td>Pick an item</td></tr></table></div>
         <div><h3>Getting started</h3><table>
           <tr><td>1</td><td>Hold to chop a tree trunk for logs</td></tr><tr><td>2</td><td>Open your inventory (E) and craft Planks, then a Workbench</td></tr>
@@ -483,8 +483,8 @@ const UI = {
 // ============================================================
 // Touch controls
 // ============================================================
-const Touch = {
-  joy: null, look: null, mode: 'mine', sneak: false,
+const TouchPad = {
+  joy: null, look: null, sneak: false,
   init() {
     const area = $('touch-area');
     area.addEventListener('touchstart', e => this.start(e), { passive: false });
@@ -497,9 +497,19 @@ const Touch = {
       b.addEventListener('touchend', e => { e.preventDefault(); Input.keyUp(key); b.classList.remove('on'); }, { passive: false });
     };
     hold('t-jump', 'Space');
+    // Mine: hold to dig the block in the crosshair or hit a creature
+    // Build: tap to place a block / eat / use; keep holding to keep placing
+    const action = (id, flag, onPress) => {
+      const b = $(id);
+      const up = e => { e.preventDefault(); Input[flag] = false; b.classList.remove('on'); };
+      b.addEventListener('touchstart', e => { e.preventDefault(); Sound.init(); Input[flag] = true; b.classList.add('on'); if (onPress) onPress(); }, { passive: false });
+      b.addEventListener('touchend', up, { passive: false });
+      b.addEventListener('touchcancel', up, { passive: false });
+    };
+    action('t-mine', 'btnMine', () => { Input.tapAttack = true; });
+    action('t-build', 'btnBuild', () => { Input.tapUse = true; });
     const tap = (id, fn) => $(id).addEventListener('touchstart', e => { e.preventDefault(); Sound.init(); fn(); }, { passive: false });
     tap('t-sneak', () => { this.sneak = !this.sneak; $('t-sneak').classList.toggle('on', this.sneak); if (this.sneak) Input.keyDown('ShiftLeft'); else Input.keyUp('ShiftLeft'); });
-    tap('t-mode', () => { this.mode = this.mode === 'mine' ? 'build' : 'mine'; $('t-mode').textContent = this.mode === 'mine' ? '⛏' : '🧱'; UI.toast(this.mode === 'mine' ? 'Mine mode: hold to dig' : 'Build mode: tap to place or use'); });
     tap('t-inv', () => Game.toggleUI('inv'));
     tap('t-mods', () => Game.toggleUI('mods'));
     tap('t-guide', () => Game.toggleUI('guide'));
@@ -515,7 +525,7 @@ const Touch = {
         this.joy = { id: t.identifier, x: t.clientX, y: t.clientY };
         const j = $('joy'); j.style.left = (t.clientX - 65) + 'px'; j.style.top = (t.clientY - 65) + 'px'; j.style.bottom = 'auto';
       } else if (!this.look) {
-        this.look = { id: t.identifier, x: t.clientX, y: t.clientY, sx: t.clientX, sy: t.clientY, t: performance.now(), moved: 0, held: false };
+        this.look = { id: t.identifier, x: t.clientX, y: t.clientY };
       }
     }
   },
@@ -530,7 +540,6 @@ const Touch = {
       } else if (this.look && t.identifier === this.look.id) {
         const dx = t.clientX - this.look.x, dy = t.clientY - this.look.y;
         this.look.x = t.clientX; this.look.y = t.clientY;
-        this.look.moved += Math.abs(dx) + Math.abs(dy);
         Game.look(dx * 0.0065, dy * 0.0065);
       }
     }
@@ -541,16 +550,7 @@ const Touch = {
       if (this.joy && t.identifier === this.joy.id) {
         this.joy = null; Input.joy.x = 0; Input.joy.y = 0; $('joy-knob').style.transform = '';
         const j = $('joy'); j.style.left = ''; j.style.top = ''; j.style.bottom = '';
-      } else if (this.look && t.identifier === this.look.id) {
-        const quick = performance.now() - this.look.t < 260 && this.look.moved < 14;
-        if (quick) { if (this.mode === 'mine') Input.tapAttack = true; else Input.tapUse = true; }
-        this.look = null; Input.touchHold = false;
-      }
+      } else if (this.look && t.identifier === this.look.id) this.look = null;
     }
-  },
-  update() {
-    if (this.look && !this.look.held && performance.now() - this.look.t > 260 && this.look.moved < 30) this.look.held = true;
-    Input.touchHold = !!(this.look && this.look.held);
-    Input.touchMode = this.mode;
   },
 };

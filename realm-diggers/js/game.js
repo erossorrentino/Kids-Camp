@@ -7,7 +7,7 @@ const DAY_LEN = 600; // seconds for a full day/night in cycle realms
 
 const Input = {
   keys: {}, pressed: new Set(), mouseL: false, mouseR: false, clickL: false, clickR: false, locked: false, everLocked: false,
-  dragLook: false, dragging: false, joy: { x: 0, y: 0 }, touchHold: false, tapAttack: false, tapUse: false, touchMode: 'mine',
+  dragLook: false, dragging: false, joy: { x: 0, y: 0 }, btnMine: false, btnBuild: false, tapAttack: false, tapUse: false,
   keyDown(code) { if (!this.keys[code]) this.pressed.add(code); this.keys[code] = true; },
   keyUp(code) { this.keys[code] = false; },
   consume(code) { if (this.pressed.has(code)) { this.pressed.delete(code); return true; } return false; },
@@ -414,7 +414,7 @@ const Game = {
       if (this.state === 'playing' && ['Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Tab', 'ControlLeft'].includes(e.code)) e.preventDefault();
     });
     window.addEventListener('keyup', e => Input.keyUp(e.code));
-    window.addEventListener('blur', () => { Input.keys = {}; Input.mouseL = Input.mouseR = false; });
+    window.addEventListener('blur', () => { Input.keys = {}; Input.mouseL = Input.mouseR = Input.btnMine = Input.btnBuild = false; });
     cv.addEventListener('mousedown', e => {
       Sound.init();
       if (this.state !== 'playing' || Settings.touchOn()) return;
@@ -561,7 +561,6 @@ const Game = {
     const p = this.player;
     this.t += dt;
     if (this.save) this.save.playTime += dt;
-    Touch.update();
     if (this.travel) this.updateTravel(dt);
     if (playing || this.state === 'ui') {
       if (this.realm.sky.mode === 'cycle') this.time = (this.time + dt / DAY_LEN) % 1;
@@ -772,8 +771,7 @@ const Game = {
     const bt = hit ? hit.t : Infinity;
     this.target = hit && bt < mobT ? hit : null;
     this.targetMob = mob && mobT <= bt ? mob : null;
-    const touchMine = Input.touchHold && Input.touchMode === 'mine';
-    const touchBuild = Input.touchHold && Input.touchMode === 'build';
+    const touchMine = Input.btnMine, touchBuild = Input.btnBuild;
     const held = (Input.mouseL && !Input.dragging) || touchMine;
     const tapL = (Input.clickL && !Input.dragLook) || Input.tapAttack;
     // attack creatures
@@ -794,6 +792,7 @@ const Game = {
       } else if (tapL) UI.toast("That block can't be broken.");
     } else this.mining = null;
     if (Input.tapAttack && !t && !this.targetMob) UI.swing();
+    if (Input.tapUse) this.useCD = 0;
     // use / place
     const useNow = Input.clickR || Input.tapUse || ((Input.mouseR || touchBuild) && this.useCD <= 0);
     if (useNow) { this.useCD = 0.27; this.use(); }

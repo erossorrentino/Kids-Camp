@@ -21,9 +21,9 @@ art (every texture is painted by code), sounds, and music.
 | Keyboard & mouse | Touch | Action |
 |---|---|---|
 | W A S D | Left stick | Walk |
-| Mouse (click the game first) | Drag the right side | Look around |
-| Hold left click | Mine mode: hold the screen | Mine blocks, hit creatures |
-| Right click | Build mode: tap | Place blocks, eat, use items and blocks |
+| Mouse (click the game first) | Drag the screen (aim with the + in the middle) | Look around |
+| Hold left click | Hold the ⛏ **Mine** button | Mine blocks, hit creatures |
+| Right click | Tap the 🧱 **Build** button (hold to keep placing) | Place blocks, eat, use items and blocks |
 | Space (double-tap in Creative) | ⤒ | Jump / swim / fly |
 | Shift | ⤓ | Sneak (won't fall off edges) / fly down |
 | Ctrl or double-tap W | Push the stick all the way | Sprint |
