@@ -168,12 +168,12 @@ export class UI {
     m.innerHTML = `
       <div class="menu-frame">
         <header class="menu-head">
+          <button class="back" aria-label="Back to the game"><span class="arr">‹</span> Back</button>
           <nav class="tabs">
             <button data-tab="map">Map</button><button data-tab="inventory">Inventory</button><button data-tab="crafting">Crafting</button>
             <button data-tab="journal">Journal</button><button data-tab="skills">Skills</button><button data-tab="feats">Feats</button><button data-tab="settings">Settings</button><button data-tab="controls">Controls</button>
           </nav>
           <button class="photo-btn" title="Photo Mode (V)">Photo</button>
-          <button class="close" aria-label="Close menu">✕</button>
         </header>
         <section class="menu-body"></section>
       </div>`;
@@ -182,7 +182,7 @@ export class UI {
     this.body = m.querySelector('.menu-body');
     m.querySelectorAll('.tabs button').forEach((b) => (b.onclick = () => this.setTab(b.dataset.tab)));
     m.querySelector('.photo-btn').onclick = () => G.photo?.open();
-    m.querySelector('.close').onclick = () => this.closeMenu();
+    m.querySelector('.back').onclick = () => this.closeMenu();
   }
 
   openMenu(tab) {
@@ -703,6 +703,7 @@ export class UI {
       return;
     }
     if (this.menuOpen) {
+      if (inp.lastDevice === 'pad' && inp.hit('sprint')) return this.closeMenu();
       for (const [k, t] of [['map', 'map'], ['journal', 'journal'], ['inventory', 'inventory']]) if (inp.hit(k)) { if (this.tab === t) this.closeMenu(); else this.setTab(t); }
       return;
     }
