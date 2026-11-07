@@ -129,7 +129,7 @@ const Game = {
     this.save = this.newSaveData(name, mode, seed);
     if (mode === 'creative') {
       const hot = ['grass', 'stone_bricks', 'planks', 'glass', 'torch', 'paint_red', 'paint_blue', 'boom_barrel', 'bounce_pad'];
-      hot.forEach((k, i) => { this.save.inv[i] = { id: idOf(k), n: 64 }; });
+      hot.forEach((k, i) => { this.save.inv[i] = { id: idOf(k), n: itemDef(idOf(k)).stack }; });
       this.save.inv[9] = { id: I.igniter, n: 1 };
     }
     this.edits = {};

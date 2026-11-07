@@ -3,6 +3,8 @@
 // Blocks, items, procedural pixel textures and icons
 // ============================================================
 
+// Same items stack up to this many in one slot (tools, armor and keys don't stack)
+const MAX_STACK = 100;
 const R_NONE = 0, R_CUBE = 1, R_CUTOUT = 2, R_CROSS = 3, R_LIQUID = 4, R_GLASS = 5;
 const B = {};          // block key -> id
 const BLOCKS = [];     // id -> def
@@ -15,7 +17,7 @@ function block(key, name, o = {}) {
   const r = o.render || R_CUBE;
   const base = { id, key, name, render: r, solid: true, opaque: true, hard: 1, tool: null, tier: 0, drop: key,
     light: null, emissive: false, liquid: 0, climb: false, wlog: false, slip: 1, bounce: 0, soft: false, hurt: 0,
-    replace: false, ore: null, interact: null, cat: 'building', unbreakable: false, sky: 2, sway: false, isBlock: true, stack: 64 };
+    replace: false, ore: null, interact: null, cat: 'building', unbreakable: false, sky: 2, sway: false, isBlock: true, stack: MAX_STACK };
   if (r === R_CROSS) Object.assign(base, { solid: false, opaque: false, sky: 0, hard: 0.05, sway: true, cat: 'nature' });
   if (r === R_CUTOUT) Object.assign(base, { opaque: false, sky: 1 });
   if (r === R_GLASS) Object.assign(base, { opaque: false, sky: 0 });
@@ -181,7 +183,7 @@ let _nextItem = 256;
 function item(key, name, o = {}) {
   const id = _nextItem++;
   I[key] = id;
-  ITEMS[id] = Object.assign({ id, key, name, stack: 64, isBlock: false }, o);
+  ITEMS[id] = Object.assign({ id, key, name, stack: MAX_STACK, isBlock: false }, o);
   return ITEMS[id];
 }
 item('stick', 'Stick', { icon: ['stick'] });
@@ -202,7 +204,7 @@ item('sugar_crystal', 'Sugar Crystal', { icon: ['gem', '#ff8ad8'], gem: 'sugarla
 item('amber', 'Amber', { icon: ['drop', '#ffa21f'], gem: 'dinovalley' });
 item('prism_shard', 'Prism Shard', { icon: ['prism'] });
 item('pearl', 'Pearl', { icon: ['pearl'] });
-item('conch', 'Conch Shell', { icon: ['shell'], use: 'conch', stack: 16 });
+item('conch', 'Conch Shell', { icon: ['shell'], use: 'conch', stack: MAX_STACK });
 item('fossil', 'Fossil', { icon: ['fossil'] });
 item('bone', 'Bone', { icon: ['bone'] });
 item('slime_ball', 'Slime Ball', { icon: ['slime'] });
@@ -219,11 +221,11 @@ item('dino_meat', 'Dino Drumstick', { icon: ['meat', '#d8504a'], food: 4 });
 item('cooked_dino', 'Dino Roast', { icon: ['meat', '#9a4a20'], food: 10 });
 // Realm travel items
 item('ember_key', 'Ember Key', { icon: ['key', '#ff7a2a'], stack: 1, desc: 'Hold it and jump into lava!' });
-item('frost_crystal', 'Frost Crystal', { icon: ['crystal', '#9ae8ff'], stack: 16, desc: 'Use it on an Ice frame (2 wide, 3 tall inside).' });
+item('frost_crystal', 'Frost Crystal', { icon: ['crystal', '#9ae8ff'], stack: MAX_STACK, desc: 'Use it on an Ice frame (2 wide, 3 tall inside).' });
 item('time_clock', 'Time Clock', { icon: ['clock'], use: 'clock', stack: 1, desc: 'Use it to travel back to Dino Valley.' });
 item('star_key', 'Star Key', { icon: ['star'], use: 'starkey', stack: 1, desc: 'Use it to open the way to Prismara.' });
-item('homeward_charm', 'Homeward Charm', { icon: ['charm'], use: 'charm', stack: 16, desc: 'Use it to go home to Greenhollow.' });
-item('bucket', 'Bucket', { icon: ['bucket', null], stack: 16, bucket: 0, desc: 'Use it on water, lava or chocolate milk to scoop it up.' });
+item('homeward_charm', 'Homeward Charm', { icon: ['charm'], use: 'charm', stack: MAX_STACK, desc: 'Use it to go home to Greenhollow.' });
+item('bucket', 'Bucket', { icon: ['bucket', null], stack: MAX_STACK, bucket: 0, desc: 'Use it on water, lava or chocolate milk to scoop it up.' });
 item('water_bucket', 'Water Bucket', { icon: ['bucket', '#3a8ae8'], stack: 1, bucket: B.water, desc: 'Use it to pour water.' });
 item('lava_bucket', 'Lava Bucket', { icon: ['bucket', '#ff6a1a'], stack: 1, bucket: B.lava, desc: 'Use it to pour lava. Careful!' });
 item('choco_bucket', 'Chocolate Milk Bucket', { icon: ['bucket', '#7a4a2c'], stack: 1, bucket: B.choco_milk, desc: 'Use it to pour chocolate milk.' });

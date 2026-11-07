@@ -82,6 +82,8 @@ Finding 15 different mods unlocks a 5th slot, and beating the final boss unlocks
   break quickly, and the game tells you which pickaxe you need. Buckets scoop up and pour water, lava
   and chocolate milk. You can even craft your own Realm Gate.
 - Wood → Stone → Iron → Ruby → Prismatic tools, plus armor.
+- The same blocks and items stack up to 100 per slot; different items never share a slot. Tools,
+  armor, keys and filled buckets don't stack.
 - 24 original creatures, from Fluffalos and Hopbuns to Gloomlings, Raptors, Yetis and Kingjaws.
 - Boom Barrels (light one with an Igniter, then run), Bounce Pads, Scaffolding, Lanterns, beds,
   and 9 colors of Paint Blocks.

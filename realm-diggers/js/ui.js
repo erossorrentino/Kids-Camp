@@ -356,6 +356,7 @@ const UI = {
     if (d.armor) extra += `<div class="muted">Blocks ${Math.round(d.armor * 100)}% of damage</div>`;
     if (d.gem) extra += `<div class="muted">Realm Gem of ${REALM[d.gem].name}</div>`;
     if (d.desc) extra += `<div class="muted">${d.desc}</div>`;
+    extra += `<div class="muted">${d.stack > 1 ? `Stacks up to ${d.stack}` : "Doesn't stack"}</div>`;
     const makes = [...new Set(recipesUsingItem(id).map(r => itemName(idOf(r.out))))];
     if (makes.length) extra += `<div class="tipmakes">Makes: ${makes.slice(0, 5).join(', ')}${makes.length > 5 ? ` and ${makes.length - 5} more` : ''}</div>`;
     const t = $('tooltip'); t.innerHTML = `<b>${d.name}</b>${extra}`; t.hidden = false; this.moveTooltip();
