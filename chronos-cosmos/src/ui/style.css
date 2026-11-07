@@ -519,3 +519,17 @@ html.touching .buildbar .bb-title span { display: none; }
 .feat span:not(.ic) { display: block; color: var(--text-dim); font-size: 13px; }
 .toast.feat { color: #ffe39a; border-color: rgba(243,198,107,.6); }
 .toast.echo { color: #bff4ff; }
+
+/* ---------------------------------------------------------------- trials & combos */
+.trial-banner { position: absolute; top: calc(19% + var(--safe-t)); left: 50%; transform: translateX(-50%); padding: 8px 18px; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; font-size: 17px; color: var(--text); text-align: center; white-space: nowrap; pointer-events: none; }
+.trial-banner[hidden] { display: none; }
+.trial-banner b { color: var(--brass); font-family: var(--font-display); font-size: 20px; margin-right: 6px; }
+.trial-banner small { display: block; font-size: 12px; color: var(--text-dim); }
+.trial-banner .count { display: block; font: 700 46px var(--font-display); color: #fff3d6; }
+.trial-banner .medal.gold { color: #ffd86b; } .trial-banner .medal.silver { color: #dfe6ee; } .trial-banner .medal.bronze { color: #e0a070; }
+.combo { position: absolute; right: calc(28px + var(--safe-r)); top: 38%; font: italic 600 18px var(--font-display); color: #ffe8b0; text-shadow: 0 2px 8px rgba(0,0,0,.6); pointer-events: none; }
+.combo[hidden] { display: none; }
+.combo b { font-size: 40px; color: #fff; margin-right: 6px; }
+.combo.pop { animation: combopop .25s ease-out; }
+@keyframes combopop { 0% { transform: scale(1.35); } 100% { transform: scale(1); } }
+html.touching .combo { top: 22%; }

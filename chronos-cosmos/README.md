@@ -128,6 +128,24 @@ across the lake. Roofs are walkable slopes, the observatory has a balcony
 around a dome you can stand on, and you vault onto knee-to-chest-high
 ledges automatically.
 
+## Fun stuff
+
+- **Ziplines** run from the Chrono Spire summit across the lake (228 m), from
+  the observatory balcony to the village square, and from each pillar top
+  into the valley. Press E at the top anchor. Space lets go early, and
+  Space again glides.
+- **Sliding.** While running, press C (or tap Dodge going downhill on touch)
+  to belly-slide. Hills speed you up, you can steer and jump, and sliding
+  into small foes bowls them over.
+- **Bounce mushrooms.** Giant red mushrooms (glowing blue in the Age of
+  Stars) grow in forests and meadows. Land on one to fly high, then glide.
+- **Ring Trials** with bronze, silver and gold medals and saved best times:
+  Meadow Dash (run or ride) near where you wake up, Dawnwatch Plunge (glide
+  from the pillar) and Spire Dive (glide from the Spire summit). Press E
+  right after a run to try again.
+- **Combo counter.** Chained hits show a combo, and every 10, 25 and 50
+  hits restores Aether.
+
 ## Extras
 
 - **Pip the fox.** A fox naps under the trees near where you wake up. Walk
@@ -140,7 +158,7 @@ ledges automatically.
   Age, and each one only shows in its own Age. Close by you'll hear a soft
   chime and see sparkles. Every five found makes the Echoes resonate,
   which raises max health or stamina, or grants skill points.
-- **Feats.** Twenty achievements in their own menu tab, for things like
+- **Feats.** Twenty-five achievements in their own menu tab, for things like
   parrying, building, rift runs, taming, Echo hunting and finishing the
   story.
 - **Photo mode** (V, or **Photo** in the menu). Time freezes and the HUD
@@ -175,8 +193,15 @@ Everything is generated in code. There are no image, model or audio files.
   (eyes with irises, brows, a swept fringe) that blink. A soft rim light
   tinted by the sky separates them from the scenery. Weapon trails are
   smoothed into curved, fading ribbons.
+- Cloud shadows drift across the land with the wind, and light caustics
+  dance on lake and river beds.
 - The volcano crater has lava that crusts into dark plates with glowing
   seams. The floating isles have crystal stalactites and hanging roots.
+
+A dynamic-resolution governor lowers the render scale a step at a time
+(down to 60%) when frames run long, and raises it again when there is
+headroom. Every Age's materials are compiled while loading, so the first
+time shift doesn't stutter.
 
 Five quality presets are in Settings. **Mobile** and **Low** skip the
 post-processing chain and shadows, render at a lower resolution, use

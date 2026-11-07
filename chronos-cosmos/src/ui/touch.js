@@ -199,7 +199,12 @@ export class TouchControls {
     set('guard', build ? 'Remove' : 'Guard');
     set('elem', build ? 'Next' : 'Elem');
     set('stance', build ? 'Rotate' : 'Stance');
-    set('dodge', ride ? 'Spur' : 'Dodge');
+    let slide = false;
+    if (!ride && G.trav?.canSlide(P)) {
+      const n = G.terrain.normalAt(P.pos.x, P.pos.z, this._n || (this._n = P.pos.clone()));
+      slide = n.y < 0.97 && n.x * P.vel.x + n.z * P.vel.z > 0.8;
+    }
+    set('dodge', ride ? 'Spur' : slide ? 'Slide' : 'Dodge');
     const it = G.game.currentInteractable;
     const useLbl = ride && !it ? 'Dismount' : it ? (it.verb || 'Use').trim().split(' ')[0] : 'Use';
     set('use', useLbl);

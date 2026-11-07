@@ -75,7 +75,11 @@ export const SHARED = {
   sunDir: { x: 0.3, y: 0.8, z: 0.2 },
   sunColor: { x: 1, y: 0.9, z: 0.7 },
   fogParams: { x: 0.0022, y: 0.012, z: 0, w: 0.6 }, // density, height falloff, base height, sun scatter
+  cloudShadow: { x: 0, y: 0, z: 0, w: 0.4 }, // strength, drift x, drift z, coverage
+  water: { value: 0 }, // current water level (for caustics)
 };
+export const CLOUD_SHADOW_UNIFORM = { value: SHARED.cloudShadow };
+export const WATER_LEVEL_UNIFORM = SHARED.water;
 
 export const EPOCH_UNIFORMS = {
   uEpochNew: { value: 0 },
@@ -94,6 +98,7 @@ export function fogUniforms() {
     uFogSunDir: { value: SHARED.sunDir },
     uFogSunColor: { value: SHARED.sunColor },
     uFogParams: { value: SHARED.fogParams },
+    uCloudShadow: CLOUD_SHADOW_UNIFORM,
   };
 }
 
@@ -113,6 +118,13 @@ export function patchFogChunks() {
   uniform vec3 uFogSunDir;
   uniform vec3 uFogSunColor;
   uniform vec4 uFogParams;
+  uniform vec4 uCloudShadow;
+  float csHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+  float csNoise(vec2 p) {
+    vec2 i = floor(p), f = fract(p);
+    f = f * f * (3.0 - 2.0 * f);
+    return mix(mix(csHash(i), csHash(i + vec2(1.0, 0.0)), f.x), mix(csHash(i + vec2(0.0, 1.0)), csHash(i + vec2(1.0, 1.0)), f.x), f.y);
+  }
   #ifdef FOG_EXP2
     uniform float fogDensity;
   #else
@@ -122,6 +134,14 @@ export function patchFogChunks() {
 #endif`;
   THREE.ShaderChunk.fog_fragment = `#ifdef USE_FOG
   {
+    // soft cloud shadows drifting across everything below them
+    if (uCloudShadow.x > 0.001) {
+      vec2 cp = vFogWorldPos.xz * 0.0062 + uCloudShadow.yz;
+      float cn = csNoise(cp) * 0.62 + csNoise(cp * 2.7 + 7.1) * 0.38;
+      float cover = uCloudShadow.w;
+      float cs = smoothstep(0.63 - cover * 0.2, 0.71 - cover * 0.2, cn) * uCloudShadow.x;
+      gl_FragColor.rgb *= 1.0 - cs;
+    }
     vec3 fr = vFogWorldPos - cameraPosition;
     float fdist = length(fr);
     vec3 fdir = fr / max(fdist, 1e-4);

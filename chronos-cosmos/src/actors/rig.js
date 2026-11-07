@@ -11,7 +11,7 @@ import { addRim } from '../core/shaderlib.js';
 export const J = ['hips', 'spine', 'chest', 'neck', 'head', 'shL', 'armL', 'foreL', 'handL', 'shR', 'armR', 'foreR', 'handR', 'thighL', 'shinL', 'footL', 'thighR', 'shinR', 'footR'];
 export const JI = Object.fromEntries(J.map((n, i) => [n, i]));
 export const POSE_LEN = J.length * 3 + 3; // + hips offset xyz
-const OFF = J.length * 3;
+export const OFF = J.length * 3;
 
 export function newPose() {
   return new Float32Array(POSE_LEN);

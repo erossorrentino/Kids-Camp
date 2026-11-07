@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { G, WORLD_SIZE, HALF_WORLD } from '../core/G.js';
 import { worldHeight, biomeMasks } from './worldmap.js';
-import { GLSL_NOISE, GLSL_EPOCH, EPOCH_UNIFORMS, TIME_UNIFORM, WET_UNIFORM, NIGHT_UNIFORM, addCompileHook, cheapDefine } from '../core/shaderlib.js';
+import { GLSL_NOISE, GLSL_EPOCH, EPOCH_UNIFORMS, TIME_UNIFORM, WET_UNIFORM, NIGHT_UNIFORM, WATER_LEVEL_UNIFORM, addCompileHook, cheapDefine } from '../core/shaderlib.js';
 
 export const SEG = 400; // cells per side
 export const N = SEG + 1; // vertices per side
@@ -146,6 +146,7 @@ export class Terrain {
       uTime: TIME_UNIFORM,
       uWet: WET_UNIFORM,
       uNight: NIGHT_UNIFORM,
+      uWaterY: WATER_LEVEL_UNIFORM,
       ...EPOCH_UNIFORMS,
     };
     addCompileHook(mat, (shader) => {
@@ -171,7 +172,7 @@ export class Terrain {
 }
 
 const TERRAIN_FRAG_PARS = /* glsl */ `
-uniform sampler2D uMask; uniform vec4 uWorld; uniform float uTime; uniform float uWet; uniform float uNight;
+uniform sampler2D uMask; uniform vec4 uWorld; uniform float uTime; uniform float uWet; uniform float uNight; uniform float uWaterY;
 varying vec3 vWPos; varying vec3 vWNrm;
 ${GLSL_NOISE}
 ${GLSL_EPOCH}
@@ -289,6 +290,18 @@ const TERRAIN_FRAG_COLOR = /* glsl */ `
   tBump = mix(sN.bump, sO.bump, k);
   float ring = epochRing(vWPos);
   tEmissive += mix(vec3(1.0, 0.75, 0.3), vec3(0.3, 0.8, 1.0), 0.5 + 0.5 * sin(vWPos.x * 0.05)) * ring * 3.5;
+#ifndef CHEAP
+  // dancing caustics on lake and river beds
+  float wd = uWaterY - vWPos.y;
+  if (wd > 0.0 && wd < 14.0) {
+    vec2 q = vWPos.xz * 0.42;
+    float c1 = vnoise(q + vec2(uTime * 0.35, uTime * 0.22));
+    float c2 = vnoise(q * 1.6 - vec2(uTime * 0.27, -uTime * 0.18) + 3.7);
+    float caust = pow(max(0.0, 1.0 - abs(c1 - c2) * 3.2), 5.0);
+    float df = smoothstep(0.0, 0.6, wd) * (1.0 - smoothstep(5.0, 14.0, wd));
+    tEmissive += diffuseColor.rgb * caust * df * 1.6 * (1.0 - uNight);
+  }
+#endif
 }
 `;
 

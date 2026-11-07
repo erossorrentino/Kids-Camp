@@ -216,6 +216,16 @@ export class Player {
     if (inp.up('sprint')) this.sprintHeld = 0;
     this.sprinting = inp.down('sprint') && this.sprintHeld >= 0.24 && hasInput && this.canUseStamina(1) && !this.blocking;
 
+    // crouch while running (or dodge while running downhill) to slide
+    if (G.trav && !G.ui?.blocking && G.trav.canSlide(this)) {
+      G.terrain.normalAt(this.pos.x, this.pos.z, _n);
+      const downhill = _n.x * this.vel.x + _n.z * this.vel.z > 0.8;
+      if (inp.hit('crouch') || (dodgeTap && downhill && _n.y < 0.97)) {
+        G.trav.startSlide(this);
+        this.animate(dt, inMag);
+        return;
+      }
+    }
     if (inp.hit('crouch') && this.mode === 'ground' && !G.ui?.blocking) this.crouching = !this.crouching;
     if (this.sprinting) this.crouching = false;
 
@@ -239,6 +249,14 @@ export class Player {
         break;
       case 'swim':
         this.updateSwim(dt, dir, hasInput);
+        break;
+      case 'zip':
+        if (this.zip && G.trav) G.trav.updateZip(this, dt);
+        else this.mode = 'air';
+        break;
+      case 'slide':
+        if (this.slide && G.trav) G.trav.updateSlide(this, dt, dir, hasInput);
+        else this.mode = 'ground';
         break;
     }
 
@@ -1087,6 +1105,9 @@ export class Player {
       const lean = this.climb.kind === 'terrain' ? Math.asin(Math.min(1, Math.max(0, n.y))) : 0;
       rig.body.rotation.x = lean * 0.9;
       rig.body.position.z = -0.05;
+    } else if ((this.mode === 'zip' || this.mode === 'slide') && G.trav) {
+      Anim.idle(P, t, false);
+      G.trav.pose(this, P, t);
     } else if (this.mode === 'glide') {
       const turn = (G.input.moveVec.x || 0);
       Anim.glide(P, t, turn);

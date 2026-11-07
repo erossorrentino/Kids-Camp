@@ -164,9 +164,10 @@ export function createRenderer(container) {
 
   const post = { composer, renderPass, bloom, grade, output, fxaa, grain };
 
+  // G.resScale (0.6..1) is set by the dynamic-resolution governor in main.js
   function resize() {
     const q = QUALITY[G.settings.quality] || QUALITY.high;
-    const pr = Math.min(Math.min(window.devicePixelRatio || 1, q.maxDpr || 2) * q.pixelRatio, 2);
+    const pr = Math.min(Math.min(window.devicePixelRatio || 1, q.maxDpr || 2) * q.pixelRatio, 2) * (G.resScale || 1);
     const w = window.innerWidth, h = window.innerHeight;
     renderer.setPixelRatio(pr);
     renderer.setSize(w, h);
@@ -197,6 +198,7 @@ export function createRenderer(container) {
     });
   }
 
+  G.resize = resize;
   G.renderer = renderer;
   G.scene = scene;
   G.camera = camera;

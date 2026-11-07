@@ -19,6 +19,12 @@ const HINTS = {
   fox: 'A little fox is napping under the trees. Walk up and press E to befriend it.',
   echo: 'A glowing Echo is close by. Thirty are hidden across the three Ages, and each one only shows in its own Age.',
   photo: 'Press V for Photo Mode: freeze time, strike a pose and save a picture.',
+  zip: 'Wheee! Press Space to let go early, and Space again in mid-air to glide.',
+  slide: 'Sliding! Steer with the stick, jump with Space, press C to stop. Sliding into foes knocks them flying.',
+  slideTip: 'Tip: while running, press C to slide. It is fastest down hills.',
+  mushroom: 'Giant mushrooms are bouncy. Jump on one to fly high, then glide.',
+  trialGlide: 'Ring Trial! Wait for the countdown, then jump off and glide through every ring.',
+  trialRun: 'Ring Trial! Run (or ride) through every ring before time runs out.',
   tower: 'Towers can be climbed: walk into a wall to grab it. Rest on ledges and rings to refill stamina, then glide down from the top with Space.',
 };
 
@@ -36,6 +42,12 @@ const TOUCH_HINTS = {
   mount: 'Walk slowly up to a Duskhorn and tap Use to try to tame it.',
   fox: 'A little fox is napping under the trees. Walk up and tap Use to befriend it.',
   photo: 'Open the Menu and tap Photo for Photo Mode: freeze time, strike a pose and save a picture.',
+  zip: 'Wheee! Tap Jump to let go early, and Jump again in mid-air to glide.',
+  slide: 'Sliding! Steer with the stick, tap Jump to leap. Sliding into foes knocks them flying.',
+  slideTip: 'Tip: while running down a hill, tap Slide to belly-slide.',
+  mushroom: 'Giant mushrooms are bouncy. Jump on one to fly high, then glide.',
+  trialGlide: 'Ring Trial! Wait for the countdown, then jump off and glide through every ring.',
+  trialRun: 'Ring Trial! Run (or ride) through every ring before time runs out.',
   tower: 'Towers can be climbed: push the stick into a wall to grab it. Rest on ledges and rings to refill stamina, then tap Jump at the top to glide down.',
 };
 
@@ -112,6 +124,8 @@ export class Tutorial {
     if ((P.skillPoints || 0) > 0) this.hint('skills');
     if (G.mounts && G.mounts.list.some((m) => m.visibleNow() && !m.tamed && m.pos.distanceTo(P.pos) < 30)) this.hint('mount');
     if (G.fox && !S.flags.fox && G.fox.pos.distanceTo(P.pos) < 14) this.hint('fox');
+    if (G.trav?.mushrooms?.some((m) => Math.hypot(m.x - P.pos.x, m.z - P.pos.z) < 14) && G.epochs.current !== 1) this.hint('mushroom');
+    if (P.sprinting && P.mode === 'ground' && S.stats.kills >= 1) { G.terrain.normalAt(P.pos.x, P.pos.z, this._n || (this._n = P.pos.clone())); if (this._n.y < 0.95) this.hint('slideTip'); }
     const sp = G.content?.spire, obs = G.content?.hearthmere?.obs;
     if ((sp && Math.hypot(sp.x - P.pos.x, sp.z - P.pos.z) < 26) || (obs && Math.hypot(obs.x - P.pos.x, obs.z - 4 - P.pos.z) < 9)) this.hint('tower');
     if (G.echoes && G.echoes.nearestUnfound(P.pos, 30)) this.hint('echo');

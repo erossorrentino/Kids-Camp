@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { G } from './core/G.js';
-import { patchFogChunks, TIME_UNIFORM, PLAYER_UNIFORM, WIND_UNIFORM, WET_UNIFORM, RIM_UNIFORM } from './core/shaderlib.js';
+import { patchFogChunks, TIME_UNIFORM, PLAYER_UNIFORM, WIND_UNIFORM, WET_UNIFORM, RIM_UNIFORM, SHARED } from './core/shaderlib.js';
 import { createRenderer, QUALITY, QUALITY_ORDER } from './core/renderer.js';
 import { LightPool } from './core/lights.js';
 import { createTextures, radialTexture } from './core/textures.js';
@@ -20,6 +20,7 @@ import { Life } from './fx/life.js';
 import { Echoes, Feats } from './game/echoes.js';
 import { Fox } from './game/companion.js';
 import { PhotoMode } from './ui/photo.js';
+import { Traversal } from './game/traversal.js';
 import { Combat } from './combat/combat.js';
 import { Magic } from './combat/magic.js';
 import { Player } from './actors/player.js';
@@ -178,6 +179,8 @@ async function boot() {
   G.feats = new Feats();
   G.fox = new Fox(scene);
   G.photo = new PhotoMode();
+  G.trav = new Traversal(scene);
+  G.trav.build();
   G.renderNow = () => {
     if (G.usePost) G.post.composer.render(0);
     else G.renderer.render(G.scene, G.camera);
@@ -192,10 +195,15 @@ async function boot() {
   setLoad(0.96, 'Preparing shaders…');
   await nextFrame();
   // compile materials up front so the first seconds of play don't stutter
+  // compile every Age's materials now (hidden variants included) so the
+  // first time shift does not stutter
+  const hidden = [];
+  scene.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
   try {
-    if (renderer.compileAsync) await Promise.race([renderer.compileAsync(scene, camera), new Promise((r) => setTimeout(r, 8000))]);
+    if (renderer.compileAsync) await Promise.race([renderer.compileAsync(scene, camera), new Promise((r) => setTimeout(r, 12000))]);
     else renderer.compile(scene, camera);
   } catch (e) {}
+  for (const o of hidden) o.visible = false;
   setLoad(1, 'Ready');
 
   window.__cc = { G, THREE };
@@ -232,6 +240,22 @@ const manual = params.has('manual');
 function startLoop() {
   G.state = G.state || 'title';
   let errors = 0;
+  // dynamic resolution: drop the render scale a notch when frames run long,
+  // creep back up when there is headroom (never in scripted/manual runs)
+  const dyn = { t: 0, n: 0, sum: 0, calm: 0 };
+  G.resScale = 1;
+  const govern = (dt) => {
+    if (manual || G.state !== 'play' || document.hidden || dt <= 0 || dt >= 0.05) return;
+    dyn.t += dt; dyn.n++; dyn.sum += dt;
+    if (dyn.t < 1) return;
+    const ms = (dyn.sum / dyn.n) * 1000;
+    dyn.t = dyn.n = dyn.sum = 0;
+    let next = G.resScale;
+    if (ms > 22 && G.resScale > 0.6) { next = Math.max(0.6, G.resScale - 0.1); dyn.calm = 0; }
+    else if (ms < 15.5 && G.resScale < 1) { if (++dyn.calm >= 3) { next = Math.min(1, G.resScale + 0.05); dyn.calm = 0; } }
+    else dyn.calm = 0;
+    if (next !== G.resScale) { G.resScale = next; G.resize?.(); }
+  };
   const frame = (fixedDt) => {
     // schedule first so one bad frame can never stop the game
     if (!manual) requestAnimationFrame(() => frame());
@@ -240,6 +264,7 @@ function startLoop() {
     last = now;
     try {
       step(rdt);
+      if (!fixedDt) govern(rdt);
     } catch (e) {
       if (errors++ < 5) console.error(e);
       try { G.input.endFrame(); } catch (e2) {}
@@ -308,6 +333,7 @@ function step(rdt) {
     G.bosses?.update?.(dt);
     G.echoes?.update(dt);
     G.fox?.update(dt * worldScale);
+    G.trav?.update(dt);
     G.feats?.update(rdt);
   }
   if (playing) G.tutorial?.update(paused ? 0 : dt, rdt);
@@ -338,6 +364,19 @@ function step(rdt) {
   G.water.update(rdt, G.atmo, G.weather?.state);
   G.fx.updateAmbient(rdt, cam, G.game.inPocket ? 3 : G.epochs.current, G.atmo.state.night || 0, G.weather?.state || { rain: 0, ash: 0, snow: 0 });
   G.life?.update(paused || !playing ? 0 : dt * worldScale, rdt);
+  // cloud shadows drift with the wind; caustics need the water level
+  {
+    const cs = SHARED.cloudShadow;
+    const sunY = G.atmo.uniforms.uSunDir.value.y;
+    const day = Math.max(0, Math.min(1, (sunY + 0.02) * 5));
+    const cover = Math.min(0.9, (G.atmo.uniforms.uCloud?.value ?? 0.4) * 0.9 + (G.weather?.state.cloud || 0) * 0.3);
+    cs.x = G.cheap || G.game.inPocket ? 0 : 0.4 * day * (G.epochs.current === 1 ? 0.6 : 1);
+    cs.w = cover;
+    const wv = WIND_UNIFORM.value;
+    cs.y += wv.x * rdt * 0.0035;
+    cs.z += wv.y * rdt * 0.0035;
+    SHARED.water.value = G.water.level;
+  }
   // rim light follows the sky colour, a little stronger at dusk and night
   const hc = G.atmo.hemi.color;
   RIM_UNIFORM.value.x = Math.min(1.2, hc.r * 0.9 + 0.08);

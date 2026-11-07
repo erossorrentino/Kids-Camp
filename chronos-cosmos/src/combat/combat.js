@@ -128,6 +128,7 @@ export class Combat {
 
   damageEnemy(e, dmg, o = {}) {
     if (e.dead || e.invuln) return 0;
+    if (o.source === G.player && dmg > 0 && dmg < 9000) G.trav?.onHit();
     let mult = 1;
     let label = null;
     const st = e.status;
