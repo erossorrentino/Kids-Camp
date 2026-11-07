@@ -1,3 +1,12 @@
+# Kids Camp projects
+
+| Project | Folder | What it is |
+|---|---|---|
+| **Realm Diggers** | [`realm-diggers/`](realm-diggers/) | A playable browser block-building game: mining, crafting, 36 collectible mods and 10 realms to discover. Open `realm-diggers/index.html` to play. |
+| **Crime City** | `Assets/`, `tools/` | A Unity open-world game foundation (described below). |
+
+---
+
 # Crime City (working title)
 
 An open-world crime game in the GTA tradition: steal cars, plan and run

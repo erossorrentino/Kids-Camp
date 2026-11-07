@@ -116,7 +116,7 @@ const Game = {
   },
   deleteSlot(i) {
     const st = safeStorage();
-    if (st) { st.removeItem(this.storageKey(i)); st.removeItem('rd_meta_' + i); }
+    if (st) try { st.removeItem(this.storageKey(i)); st.removeItem('rd_meta_' + i); } catch (e) { /* ignore */ }
     delete this.mem[i];
   },
   newSaveData(name, mode, seed) {
@@ -217,6 +217,7 @@ const Game = {
     this.world.generateArea(spawn[0], spawn[2], 2);
     const p = this.player;
     p.x = spawn[0]; p.y = spawn[1]; p.z = spawn[2]; p.vx = p.vy = p.vz = 0; p.fallStart = p.y; p.flying = this.creative && p.flying;
+    p.inLava = p.headInLava = p.inWater = p.headInWater = p.climbing = false; p.air = 10;
     if (!this.save.discovered.includes(this.realm.key)) {
       this.save.discovered.push(this.realm.key);
       this.achieve('realm_' + this.realm.key);
@@ -1195,7 +1196,7 @@ const Game = {
     const myth = MODS.filter(m => m.rarity === 5 && (this.save.mods[m.key] || 0) < 3);
     setTimeout(() => { if (myth.length) this.grantMod(myth[Math.floor(Math.random() * myth.length)].key); }, 2500);
     this.achieve('boss');
-    UI.popup('Victory!', 'Champion of Realms', 'You defeated the Prism Guardian! A 6th mod slot is now unlocked.', '👑', '#ffc24b', 6000);
+    UI.popup('Victory!', 'Champion of Realms', 'You defeated the Prism Guardian! You unlocked an extra mod slot.', '👑', '#ffc24b', 6000);
     this.recomputeStats();
   },
 
