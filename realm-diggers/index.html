@@ -24,7 +24,7 @@
     <div id="coords"></div>
     <div id="goal"><span class="label">Goal</span><span id="goal-text"></span></div>
   </div>
-  <div id="minimap-wrap"><canvas id="minimap" width="128" height="128"></canvas><div id="clock"></div></div>
+  <div id="minimap-wrap"><canvas id="minimap" width="128" height="128"></canvas><div id="clock"></div><div id="geode-hint" hidden></div></div>
   <div id="bossbar" hidden><div id="boss-name">Prism Guardian</div><div class="track"><div id="boss-fill"></div></div></div>
   <div id="toasts"></div>
   <div id="realm-card" hidden><div class="eyebrow">Now entering</div><div class="name"></div><div class="tag"></div></div>
@@ -57,6 +57,7 @@
       <button class="tb small" id="t-ab-x" hidden>X</button>
       <button class="tb small" id="t-ab-r" hidden>R</button>
       <button class="tb small" id="t-ab-f" hidden>F</button>
+      <button class="tb small" id="t-ab-q" hidden>Q</button>
     </div>
     <button class="tb act build" id="t-build" aria-label="Build: place blocks, eat, use things"><span>🧱</span><small>Build</small></button>
     <button class="tb act mine" id="t-mine" aria-label="Mine: dig blocks, hit creatures"><span>⛏</span><small>Mine</small></button>
@@ -152,6 +153,7 @@
     <div class="panel-head"><h2>Realm Guide</h2><button class="btn small ghost" id="guide-close">Close (G)</button></div>
     <div class="tabs" id="guide-tabs">
       <button data-t="realms" class="on">Realms</button>
+      <button data-t="creatures">Creatures</button>
       <button data-t="materials">Materials</button>
       <button data-t="goals">Goals</button>
       <button data-t="controls">Controls</button>

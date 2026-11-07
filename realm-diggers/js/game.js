@@ -37,6 +37,9 @@ const ACHIEVEMENTS = [
   { id: 'mods10', name: 'Mod Collector', desc: 'Find 10 different Mods.' },
   { id: 'legendary', name: 'Legendary!', desc: 'Find a Legendary Mod.' },
   { id: 'mythic', name: 'Mythical', desc: 'Find a Mythic Mod.' },
+  { id: 'spot10', name: 'Creature Spotter', desc: 'Find 10 different creatures (see the Creatures tab).' },
+  { id: 'spot30', name: 'Wildlife Expert', desc: 'Find 30 different creatures.' },
+  { id: 'modling', name: 'Mod Catcher', desc: 'Catch a sparkly Modling.' },
 ];
 const GOAL_CHAIN = ['wood', 'bench', 'woodpick', 'stonepick', 'furnace', 'iron', 'firstmod', 'ironpick', 'realm_emberdeep', 'realm_frostveil', 'realm_skyreach', 'realm_hollowdeep', 'realm_coralabyss', 'realm_sugarland', 'realm_lunara', 'realm_dinovalley', 'allgems', 'realm_prismara', 'boss'];
 const GOAL_TEXT = {
@@ -55,7 +58,7 @@ const GOAL_TEXT = {
 const Game = {
   state: 'boot', slot: 0, save: null, world: null, realm: REALMS[0], player: null, stats: computeStats([], {}),
   creative: false, titleMode: true, time: 0.15, t: 0, rain: 0, raining: false, rainT: 200,
-  edits: {}, abilityCD: { X: 0, R: 0, F: 0 }, xrayT: 0, xrayScanT: 0, xrayList: [],
+  edits: {}, abilityCD: { X: 0, R: 0, F: 0, Q: 0 }, pal: null, geode: null, windReady: 0, discT: 0, geodeT: 0, xrayT: 0, xrayScanT: 0, xrayList: [],
   barrels: [], boss: null, rocket: null, travel: null, shake: 0, hurtFlash: 0,
   mining: null, attackCD: 0, useCD: 0, autosaveT: 30, hudT: 0, mmT: 0, lightT: 0, lights: [], frameN: 0, mem: {},
   batches: null,
@@ -122,7 +125,7 @@ const Game = {
   newSaveData(name, mode, seed) {
     return { v: 1, name, mode, seed, created: Date.now(), playTime: 0, realm: 'greenhollow', pos: null, yaw: 0, pitch: 0, hp: 20, food: 20,
       inv: new Array(36).fill(null), armor: null, mods: {}, equipped: [], discovered: ['greenhollow'], gems: [], seen: [], achievements: [],
-      realms: {}, time: 0.04, bedSpawn: null, bossDefeated: false, counters: { kills: 0, placed: 0 } };
+      realms: {}, creatures: [], time: 0.04, bedSpawn: null, bossDefeated: false, counters: { kills: 0, placed: 0 } };
   },
   newGame(slot, name, mode, seed) {
     this.slot = slot;
@@ -204,6 +207,7 @@ const Game = {
     this.save.realm = this.realm.key;
     this.world = new World(this.realm, this.save.seed, this.getEdits(this.realm.key));
     this.hookWorld(this.world);
+    this.pal = null; this.geode = null;
     Mobs.clear(); Projectiles.list = []; Particles.list = []; this.barrels = []; this.boss = null; this.xrayList = []; this.xrayT = 0; this.rocket = null; this.mining = null;
     UI.bossBar(null);
     let spawn = null;
@@ -389,6 +393,7 @@ const Game = {
     if (!this.hasRoomFor(id)) { UI.toast('Inventory full!', '#ff5a5a'); return false; }
     if (!this.creative) for (const [k, n] of r.in) takeIng(inv, k, n);
     this.addItem(id, r.n);
+    if (!this.creative && this.stats.crafty && Math.random() < this.stats.crafty && this.hasRoomFor(id)) { this.addItem(id, r.n); UI.toast('Crafty Hands: you made double!', RARITY[1].color, iconURL(id)); }
     Sound.play('craft');
     const ach = { workbench: 'bench', wood_pickaxe: 'woodpick', stone_pickaxe: 'stonepick', torch: 'torch', furnace: 'furnace', iron_ingot: 'iron', iron_pickaxe: 'ironpick' }[r.out];
     if (ach) this.achieve(ach);
@@ -478,7 +483,7 @@ const Game = {
     else if (code === 'KeyM') this.toggleUI('mods');
     else if (code === 'KeyG') this.toggleUI('guide');
     else if (code.startsWith('Digit')) { const n = +code.slice(5); if (n >= 1 && n <= 9) { this.player.sel = n - 1; UI.updateHotbar(); } }
-    else if (code === 'KeyX' || code === 'KeyR' || code === 'KeyF') this.ability(code.slice(3));
+    else if (code === 'KeyX' || code === 'KeyR' || code === 'KeyF' || code === 'KeyQ') this.ability(code.slice(3));
   },
   look(dx, dy) {
     const p = this.player, s = Settings.data.sensitivity;
@@ -576,6 +581,11 @@ const Game = {
       }
     }
     Particles.update(dt);
+    if (playing && !this.travel) {
+      this.updatePal(dt);
+      this.discT -= dt; if (this.discT <= 0) { this.discT = 0.4; this.updateDiscovery(); }
+      this.geodeT -= dt; if (this.geodeT <= 0) { this.geodeT = 1; this.updateGeode(); }
+    }
     for (const k in this.abilityCD) if (this.abilityCD[k] > 0) this.abilityCD[k] -= dt;
     if (this.xrayT > 0) { this.xrayT -= dt; this.xrayScanT -= dt; if (this.xrayScanT <= 0) this.scanXray(); }
     this.attackCD -= dt; this.useCD -= dt;
@@ -633,6 +643,7 @@ const Game = {
     if (p.speedBoost > 0) { speed *= 1.35; p.speedBoost -= dt; }
     let slip = p.onGround ? ub.slip : 1;
     if (S.iceskates && p.onGround && (ub.slip < 1 || under === B.snow)) { speed *= 1.35 + 0.22 * S.iceskates; slip = Math.max(slip, 0.4); }
+    if (p.onLiquid) speed *= 1 + 0.18 * (Math.max(S.waterwalk, S.magmastride) - 1);
     if (p.flying) speed = (this.creative ? 10.9 : 6.5 + 2.5 * S.fly) * (p.sprinting ? 1.8 : 1);
     else if (p.inWater) speed = (2.7 + (S.dolphin ? 2 + S.dolphin * 0.9 : 0)) * (p.sprinting ? 1.3 : 1);
     else if (p.inLava) speed = S.fireproof >= 2 ? 3.2 : 1.5;
@@ -644,12 +655,13 @@ const Game = {
     const grav = 28 * this.gravity();
     const jumpV = 8.65 * S.jump;
     const fb = w.blockAt(Math.floor(p.x), Math.floor(p.y + 0.1), Math.floor(p.z)), bb = w.blockAt(Math.floor(p.x), Math.floor(p.y + 1), Math.floor(p.z));
-    p.climbing = !p.flying && (CLIMB[fb] === 1 || CLIMB[bb] === 1);
+    p.wallClimb = !p.flying && S.wallclimb && (p.hitX || p.hitZ) && fwd > 0.2 && !CLIMB[fb] && !CLIMB[bb];
+    p.climbing = !p.flying && (CLIMB[fb] === 1 || CLIMB[bb] === 1 || p.wallClimb);
     if (p.flying) {
       let vy = 0; if (K.Space) vy += 1; if (K.ShiftLeft || K.ShiftRight) vy -= 1;
       p.vy += (vy * (this.creative ? 9 : 7) - p.vy) * Math.min(1, 10 * dt);
     } else if (p.climbing) {
-      if (K.Space || fwd > 0.2) p.vy = 3.4; else if (p.sneaking) p.vy = 0; else p.vy = Math.max(p.vy - grav * dt, -2.5);
+      if (K.Space || fwd > 0.2) p.vy = p.wallClimb ? 3 + S.wallclimb * 0.8 : 3.4; else if (p.sneaking) p.vy = 0; else p.vy = Math.max(p.vy - grav * dt, -2.5);
     } else if (p.inWater || p.inLava) {
       p.vy -= grav * 0.12 * dt;
       if (K.Space) p.vy = Math.min(p.vy + 22 * dt, (p.hitX || p.hitZ) ? 5.5 : 3.8);
@@ -675,6 +687,12 @@ const Game = {
     const wasGround = p.onGround;
     p.impact = 0;
     physMove(w, p, dx, p.vy * dt, dz);
+    // Water Strider / Magma Stride: stand on the surface of liquids
+    p.onLiquid = false;
+    if ((S.waterwalk || S.magmastride) && !p.sneaking && !p.flying && p.vy <= 0.5) {
+      const ly = Math.floor(p.y - 0.05), lq = LIQ[w.blockAt(Math.floor(p.x), ly, Math.floor(p.z))], up = w.blockAt(Math.floor(p.x), Math.floor(p.y + 0.4), Math.floor(p.z));
+      if ((((lq === 1 || lq === 3) && S.waterwalk) || (lq === 2 && S.magmastride)) && !LIQ[up] && p.y - ly > 0.6) { p.y = ly + 0.9; p.vy = 0; p.onGround = true; p.onLiquid = true; }
+    }
     if (Settings.data.autoJump && p.onGround && (p.hitX || p.hitZ) && len > 0.3 && !p.sneaking && this.t > p.autoJumpT) {
       const fx = Math.floor(p.x + Math.sign(wx) * 0.6), fz = Math.floor(p.z + Math.sign(wz) * 0.6), fy = Math.floor(p.y);
       if (!w.solidAt(fx, fy + 1, fz) && !w.solidAt(fx, fy + 2, fz)) { p.vy = jumpV; p.autoJumpT = this.t + 0.25; }
@@ -758,11 +776,12 @@ const Game = {
     const p = this.player, w = this.world;
     if (p.dead) return;
     const eye = this.eye(), dir = this.viewDir();
-    const reach = this.creative ? 8 : 5.2;
+    const reach = (this.creative ? 8 : 5.2) + this.stats.reach;
     const hit = w.raycast(eye[0], eye[1], eye[2], dir[0], dir[1], dir[2], reach, id => id > 0 && !LIQ[id]);
     let mob = null, mobT = Infinity;
     const cands = this.boss ? [...Mobs.list, this.boss] : Mobs.list;
     for (const m of cands) {
+      if (m.dead) continue;
       const sc = m.def.scale || 1, hw = m.w * sc / 2;
       if (Math.abs(m.x - p.x) > 12 || Math.abs(m.z - p.z) > 12) continue;
       const t = this.rayAABB(eye, dir, m.x - hw, m.y, m.z - hw, m.x + hw, m.y + m.h * sc, m.z + hw);
@@ -811,6 +830,7 @@ const Game = {
     if (!p.onGround && p.vy < -1) dmg *= 1.5;
     m.damage(dmg, true, dir[0] * 5, dir[2] * 5);
     if (S.flamefist) m.burnT = 2 + S.flamefist;
+    if (S.lifesteal && Math.random() < S.lifesteal && p.hp < this.maxHp()) { p.hp = Math.min(this.maxHp(), p.hp + 1); Particles.burst(p.x, p.y + 1.2, p.z, [1, 0.35, 0.5], 5, 1.5, 0.06, true); }
     UI.swing();
     p.hungerAcc += 0.03;
   },
@@ -838,7 +858,7 @@ const Game = {
   getDrops(id) {
     const d = BLOCKS[id], S = this.stats;
     let drop = d.drop;
-    if (typeof drop === 'function') drop = drop(Math.random());
+    if (typeof drop === 'function') drop = drop(Math.random() * ((S.greenthumb && (d.leaves || d.render === R_CROSS)) ? [1, 0.45, 0.3, 0.2][S.greenthumb] : 1));
     if (!drop) return [];
     let out = idOf(drop), n = 1;
     if (S.autosmelt) {
@@ -1009,9 +1029,10 @@ const Game = {
   eat(stack, d) {
     const p = this.player, S = this.stats;
     if (p.food >= 20 && p.hp >= this.maxHp() && !d.speedBoost) { UI.toast("You're full!"); return; }
-    p.food = Math.min(20, p.food + d.food * (S.sweettooth ? 2 : 1));
+    p.food = Math.min(20, p.food + d.food * (S.sweettooth ? 2 : 1) * (S.greenthumb >= 2 && d.plant ? 2 : 1));
     if (S.sweettooth >= 2) p.hp = Math.min(this.maxHp(), p.hp + (S.sweettooth - 1) * 2);
     if (d.speedBoost) p.speedBoost = d.speedBoost;
+    if (S.sugarrush) p.speedBoost = Math.max(p.speedBoost, S.sugarrush);
     if (!this.creative) { stack.n--; if (stack.n <= 0) p.inv[p.sel] = null; }
     Sound.play('eat'); this.achieve('eat'); UI.updateHotbar(); UI.swing();
   },
@@ -1104,6 +1125,14 @@ const Game = {
       p.x = tx; p.y = ty; p.z = tz; p.vy = 0; p.fallStart = ty;
       Particles.burst(p.x, p.y + 1, p.z, [0.85, 0.6, 1], 20, 4, 0.1, true);
       cd.R = 2.5; Sound.play('blink');
+    } else if (k === 'Q') {
+      if (!S.frostbolt) { UI.toast('You need the Frost Bolt mod.'); return; }
+      if (cd.Q > 0) return;
+      cd.Q = 1.1;
+      const eye = this.eye(), dir = this.viewDir(), sp = 24;
+      Projectiles.list.push({ x: eye[0] + dir[0] * 0.6, y: eye[1] + dir[1] * 0.6 - 0.1, z: eye[2] + dir[2] * 0.6, vx: dir[0] * sp, vy: dir[1] * sp, vz: dir[2] * sp,
+        dmg: [0, 6, 9, 12][S.frostbolt], c: [0.7, 0.95, 1], life: 2, size: 0.18, fromPlayer: true, freeze: 2 + S.frostbolt });
+      Sound.play('shoot'); UI.swing();
     } else if (k === 'F') {
       if (!S.roar) { UI.toast('You need the Mega Roar mod.'); return; }
       if (cd.F > 0) { UI.toast(`Roar recharging (${Math.ceil(cd.F)}s)`); return; }
@@ -1181,7 +1210,13 @@ const Game = {
     }
     this.hurtFlash = 0.9; this.shake = Math.max(this.shake, 0.2);
     Sound.play('hurt');
-    if (p.hp <= 0) this.die(cause);
+    if (S.thorns && src && src.damage && !src.dead) src.damage(S.thorns, true);
+    if (p.hp <= 0 && S.extralife && this.t >= this.windReady) {
+      const wait = [0, 180, 120, 90][S.extralife];
+      p.hp = [0, 6, 10, this.maxHp()][S.extralife]; this.windReady = this.t + wait; p.hurtCD = 1.5;
+      UI.popup('Second Wind!', 'You bounced back!', `Ready again in ${wait} seconds.`, '🌟', RARITY[4].color, 2500);
+      Sound.play('levelup'); Particles.burst(p.x, p.y + 1, p.z, [1, 0.9, 0.4], 30, 5, 0.1, true);
+    } else if (p.hp <= 0) this.die(cause);
   },
   die(cause) {
     const p = this.player;
@@ -1212,10 +1247,70 @@ const Game = {
         let n = a + Math.floor(Math.random() * (b - a + 1));
         let id = idOf(k);
         if (this.stats.autosmelt >= 2) { const cooked = { raw_meat: 'cooked_meat', raw_fish: 'cooked_fish', dino_meat: 'cooked_dino' }[k]; if (cooked) id = idOf(cooked); }
+        if (this.stats.critter && d.hostile !== 1 && Math.random() < this.stats.critter) n *= 2;
         if (n > 0) this.addItem(id, n);
       }
     }
+    if (fromPlayer && d.givesMod) {
+      Particles.burst(m.x, m.y + .3, m.z, [1, 0.6, 1], 30, 5, 0.1, true);
+      this.grantMod(rollMod(2, this.realm, 30, 1, this.save.mods));
+      this.achieve('modling');
+    }
     if (fromPlayer && d.hostile === 1) { this.save.counters.kills++; if (this.save.counters.kills >= 10) this.achieve('hunter'); }
+  },
+  // ---------------- creature log, pocket pal, geode finder ----------------
+  updateDiscovery() {
+    if (!this.save || this.player.dead) return;
+    const seen = this.save.creatures || (this.save.creatures = []);
+    const eye = this.eye(), dir = this.viewDir();
+    for (const m of Mobs.list) {
+      if (seen.includes(m.def.key)) continue;
+      const dx = m.x - eye[0], dy = m.y + m.h * 0.5 * (m.def.scale || 1) - eye[1], dz = m.z - eye[2], d = Math.hypot(dx, dy, dz) || 1;
+      if (d > 26 || (dx * dir[0] + dy * dir[1] + dz * dir[2]) / d < 0.55) continue;
+      if (this.world.raycast(eye[0], eye[1], eye[2], dx / d, dy / d, dz / d, d - 1, id => OPAQUE[id] === 1)) continue;
+      seen.push(m.def.key);
+      UI.toast(`New creature found: ${m.def.name}! (${seen.length}/${Object.keys(MOBS).length})`, '#7ad04a', mobPreview(m.def, false, 48));
+      Sound.play('achieve');
+      if (seen.length >= 10) this.achieve('spot10');
+      if (seen.length >= 30) this.achieve('spot30');
+    }
+  },
+  updatePal(dt) {
+    const S = this.stats, p = this.player;
+    if (!S.pal || p.dead) { this.pal = null; return; }
+    if (!this.pal) this.pal = { x: p.x, y: p.y + 2, z: p.z, t: 0, cd: 1 };
+    const q = this.pal; q.t += dt;
+    const a = q.t * 1.3, tx = p.x + Math.cos(a) * 1.1, tz = p.z + Math.sin(a) * 1.1, ty = p.y + 2.1 + Math.sin(q.t * 2.2) * 0.2;
+    if (Math.hypot(tx - q.x, ty - q.y, tz - q.z) > 10) { q.x = tx; q.y = ty; q.z = tz; }
+    const k = Math.min(1, dt * 5); q.x += (tx - q.x) * k; q.y += (ty - q.y) * k; q.z += (tz - q.z) * k;
+    q.cd -= dt;
+    if (q.cd > 0) return;
+    let best = null, bd = 8;
+    for (const m of this.boss ? [...Mobs.list, this.boss] : Mobs.list) {
+      if (m.dead || !(m.def.hostile === 1 || m.angry || m.isBoss)) continue;
+      const d = Math.hypot(m.x - q.x, m.y + m.h / 2 - q.y, m.z - q.z);
+      if (d < bd) { bd = d; best = m; }
+    }
+    if (!best) { q.cd = 0.3; return; }
+    q.cd = [0, 1.5, 1.2, 0.9][S.pal];
+    const ex = best.x, ey = best.y + best.h * (best.def.scale || 1) * 0.5, ez = best.z;
+    best.damage([0, 2, 3, 5][S.pal], true);
+    for (let i = 0; i <= 12; i++) { const f = i / 12; Particles.add(q.x + (ex - q.x) * f, q.y + (ey - q.y) * f, q.z + (ez - q.z) * f, 0, 0, 0, 0.25, 0.05, 0.6, 1, 0.9, 1, 0, true); }
+    Sound.play('zap');
+  },
+  updateGeode() {
+    const R = this.stats.geodeR, p = this.player;
+    if (!R) { this.geode = null; return; }
+    let best = null, bd = R;
+    const cx = Math.floor(p.x / 16), cz = Math.floor(p.z / 16), cr = Math.ceil(R / 16);
+    for (let dz = -cr; dz <= cr; dz++) for (let dx = -cr; dx <= cr; dx++) {
+      const c = this.world.chunk(cx + dx, cz + dz);
+      if (!c || !c.geodes) continue;
+      for (const g of c.geodes) { const d = Math.hypot(g[0] + .5 - p.x, g[1] + .5 - p.y, g[2] + .5 - p.z); if (d < bd) { bd = d; best = g; } }
+    }
+    const was = this.geode;
+    this.geode = best ? { x: best[0], y: best[1], z: best[2], d: bd } : null;
+    if (best && (!was || was.x !== best[0] || was.y !== best[1] || was.z !== best[2])) UI.toast('Geode Finder: a Mod Geode is nearby! Check your map.', RARITY[2].color, iconURL(B.mod_geode));
   },
   onBossDeath(b) {
     this.boss = null; UI.bossBar(null);
@@ -1363,6 +1458,7 @@ const Game = {
     const p = this.player, w = this.world, out = [];
     const held = p.inv[p.sel];
     if (held && held.id < 256 && LIGHTR[held.id] > 0) { const L = BLOCKS[held.id].light; out.push([eye[0], eye[1] - 0.3, eye[2], L[3] * 0.85, L[0], L[1], L[2], -1]); }
+    if (this.pal) out.push([this.pal.x, this.pal.y, this.pal.z, 5, 0.6, 1, 0.85, -1]);
     if (this.stats.glow) out.push([eye[0], eye[1], eye[2], 7 + this.stats.glow * 2.5, 0.85, 0.9, 1, -1]);
     const cand = [];
     const cx = Math.floor(eye[0] / 16), cz = Math.floor(eye[2] / 16);
@@ -1408,6 +1504,12 @@ const Game = {
     Bt.ents.reset(); Bt.parts.reset(); Bt.lines.reset(); Bt.xray.reset(); Bt.echo.reset();
     for (const m of Mobs.list) { if (Math.abs(m.x - p.x) < 90 && Math.abs(m.z - p.z) < 90) drawMob(Bt.ents, m, t); }
     if (this.boss) drawBoss(Bt.ents, this.boss, t);
+    if (this.pal) {
+      const q = this.pal, s = 0.13, fl = Math.sin(t * 22) * 0.08;
+      Bt.ents.box(q.x - s, q.y - s, q.z - s, q.x + s, q.y + s, q.z + s, 0.7, 1, 0.85, 1, 1, true);
+      Bt.ents.box(q.x - s - 0.22, q.y + fl, q.z - 0.07, q.x - s, q.y + 0.03 + fl, q.z + 0.1, 1, 1, 1, 1, 1, true);
+      Bt.ents.box(q.x + s, q.y + fl, q.z - 0.07, q.x + s + 0.22, q.y + 0.03 + fl, q.z + 0.1, 1, 1, 1, 1, 1, true);
+    }
     for (const b of this.barrels) { const f = Math.sin(b.fuse * 18) > 0; Bt.ents.box(b.x - .49, b.y, b.z - .49, b.x + .49, b.y + .98, b.z + .49, f ? 1 : 0.85, f ? 1 : 0.25, f ? 1 : 0.2, 1, 1, f); }
     for (const q of Particles.list) {
       const s = q.size, a = q.a * Math.min(1, q.life / q.max * 2), h = s * (q.tall || 1);

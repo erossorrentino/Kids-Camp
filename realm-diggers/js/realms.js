@@ -173,7 +173,7 @@ realm({
   sky: { mode: 'cycle', day: ['#5a9cf0', '#bfe0ff'], night: ['#04060f', '#111a30'], sunset: '#ff9a5a', stars: 1, sun: 1, moon: 1, clouds: 1, cloudY: 118, cloudColor: '#ffffff' },
   ambient: 0.05, sunMin: 0.2, gravity: 1, weather: 'rain', platform: 'cobble', spawnXZ: [0, 0], spawnMode: 'top',
   music: { root: 60, scale: [0, 2, 4, 7, 9], tempo: 0.42, wave: 'triangle' },
-  mobs: ['fluffalo', 'boar', 'bunny', 'gloomling', 'spitter'], tier: 0,
+  mobs: ['fluffalo', 'boar', 'bunny', 'gloomling', 'spitter', 'shimmerwing', 'bramble_fox', 'shade_bat', 'golden_hopbun', 'modling'], tier: 0,
   makeGen: seed => makeG(seed, 0),
   gen(c, G) {
     const bx = c.cx * 16, bz = c.cz * 16, s = G.seed, bl = c.blocks;
@@ -272,7 +272,7 @@ realm({
   ambient: 0.32, sunMin: 0.6, sunTint: [1, 0.72, 0.6], gravity: 1, weather: 'embers', platform: 'obsidian', spawnXZ: [0, 0], spawnMode: 'top',
   fogScale: 0.75,
   music: { root: 45, scale: [0, 1, 4, 5, 7, 8, 10], tempo: 0.55, wave: 'sawtooth' },
-  mobs: ['cinder_slime', 'fire_imp', 'ember_beetle'], tier: 1,
+  mobs: ['cinder_slime', 'fire_imp', 'ember_beetle', 'cinder_golem', 'emberling', 'modling'], tier: 1,
   makeGen: seed => makeG(seed, 1),
   gen(c, G) {
     const bx = c.cx * 16, bz = c.cz * 16, s = G.seed, bl = c.blocks, TOP = new Int16Array(256), H = new Int16Array(256);
@@ -341,7 +341,7 @@ realm({
   sky: { mode: 'fixed', time: 0.08, day: ['#14244e', '#8fb8e0'], stars: 0.7, aurora: 1, sun: 1, clouds: 0 },
   ambient: 0.12, sunMin: 0.78, sunTint: [0.88, 0.95, 1.08], gravity: 1, weather: 'snow', platform: 'packed_ice', spawnXZ: [0, 0], spawnMode: 'top',
   music: { root: 72, scale: [0, 2, 4, 7, 11], tempo: 0.7, wave: 'sine' },
-  mobs: ['penguin', 'frost_wisp', 'yeti'], tier: 1,
+  mobs: ['penguin', 'frost_wisp', 'yeti', 'frost_fox', 'tusker', 'modling'], tier: 1,
   makeGen: seed => makeG(seed, 2),
   gen(c, G) {
     const bx = c.cx * 16, bz = c.cz * 16, s = G.seed, bl = c.blocks, TOP = new Int16Array(256), H = new Int16Array(256);
@@ -413,7 +413,7 @@ realm({
   ambient: 0.2, sunMin: 1, sunTint: [1.05, 1, 0.9], gravity: 0.85, weather: 'sparkles', platform: 'cloud', spawnXZ: [0, 0], spawnMode: 'top',
   voidBelow: true, fallOut: 'greenhollow',
   music: { root: 67, scale: [0, 2, 4, 6, 7, 9, 11], tempo: 0.5, wave: 'sine' },
-  mobs: ['puffbird', 'storm_sprite'], tier: 1,
+  mobs: ['puffbird', 'storm_sprite', 'sky_whale', 'modling'], tier: 1,
   makeGen: seed => makeG(seed, 3),
   gen(c, G) {
     const bx = c.cx * 16, bz = c.cz * 16, s = G.seed, bl = c.blocks;
@@ -464,7 +464,7 @@ realm({
   ambient: 0.07, sunMin: 0, gravity: 1, weather: 'spores', platform: 'gloomstone', spawnXZ: [0, 0], spawnMode: 'bottom',
   hasCeiling: true, fogFar: 70,
   music: { root: 48, scale: [0, 2, 3, 7, 8], tempo: 0.8, wave: 'triangle' },
-  mobs: ['gloomcrawler', 'glowbug', 'gloomling'], tier: 2,
+  mobs: ['gloomcrawler', 'glowbug', 'gloomling', 'shroomling', 'shade_bat', 'modling'], tier: 2,
   makeGen: seed => makeG(seed, 4),
   gen(c, G) {
     const bx = c.cx * 16, bz = c.cz * 16, s = G.seed, bl = c.blocks;
@@ -556,7 +556,7 @@ realm({
   sky: { mode: 'fixed', time: 0.18, day: ['#000006', '#07071a'], stars: 1.2, sun: 1, planet: 1, clouds: 0 },
   ambient: 0.14, sunMin: 0.95, sunTint: [0.95, 0.97, 1.05], gravity: 0.34, weather: null, platform: 'moonrock', spawnXZ: [0, 0], spawnMode: 'top',
   music: { root: 62, scale: [0, 2, 4, 6, 8, 10], tempo: 0.75, wave: 'sine' },
-  mobs: ['moon_hopper', 'zorbling'], tier: 2,
+  mobs: ['moon_hopper', 'zorbling', 'crater_crab', 'modling'], tier: 2,
   makeGen: seed => makeG(seed, 5),
   gen(c, G) {
     const bx = c.cx * 16, bz = c.cz * 16, s = G.seed, bl = c.blocks, TOP = new Int16Array(256), H = new Int16Array(256);
@@ -603,7 +603,7 @@ realm({
   sky: { mode: 'cycle', day: ['#3a8ee8', '#aeeaf2'], night: ['#020818', '#0a1a30'], sunset: '#ff8a7a', stars: 1, sun: 1, moon: 1, clouds: 1, cloudY: 118, cloudColor: '#ffffff' },
   ambient: 0.06, sunMin: 0.22, gravity: 1, weather: null, platform: 'sand', spawnXZ: [0, 0], spawnMode: 'top', waterBreathing: true,
   music: { root: 62, scale: [0, 2, 3, 5, 7, 9, 10], tempo: 0.55, wave: 'triangle' },
-  mobs: ['fish', 'shark', 'turtle', 'jellyfish'], tier: 1,
+  mobs: ['fish', 'shark', 'turtle', 'jellyfish', 'octopus', 'modling'], tier: 1,
   makeGen: seed => makeG(seed, 6),
   gen(c, G) {
     const bx = c.cx * 16, bz = c.cz * 16, s = G.seed, bl = c.blocks, TOP = new Int16Array(256), H = new Int16Array(256);
@@ -668,7 +668,7 @@ realm({
   sky: { mode: 'fixed', time: 0.22, day: ['#86c8ff', '#ffd6ef'], stars: 0, sun: 1, rainbow: 1, clouds: 1, cloudY: 112, cloudColor: '#ffd0ec' },
   ambient: 0.2, sunMin: 1, sunTint: [1.05, 0.98, 1.02], gravity: 1, weather: 'sparkles', platform: 'icing', spawnXZ: [0, 0], spawnMode: 'top',
   music: { root: 67, scale: [0, 2, 4, 5, 7, 9], tempo: 0.32, wave: 'square' },
-  mobs: ['gummy_bear', 'jelly_slime'], tier: 1,
+  mobs: ['gummy_bear', 'jelly_slime', 'puffmallow', 'modling'], tier: 1,
   makeGen: seed => makeG(seed, 7),
   gen(c, G) {
     const bx = c.cx * 16, bz = c.cz * 16, s = G.seed, bl = c.blocks, TOP = new Int16Array(256), H = new Int16Array(256);
@@ -757,7 +757,7 @@ realm({
   sky: { mode: 'cycle', day: ['#5aa2d8', '#dcecc4'], night: ['#040a08', '#0c1a14'], sunset: '#ffa85a', stars: 1, sun: 1, moon: 1, clouds: 1, cloudY: 118, cloudColor: '#f4f8ee' },
   ambient: 0.05, sunMin: 0.2, gravity: 1, weather: null, platform: 'mud', spawnXZ: [0, 0], spawnMode: 'top', fogScale: 0.85,
   music: { root: 50, scale: [0, 3, 5, 7, 10], tempo: 0.45, wave: 'triangle', drums: true },
-  mobs: ['raptor', 'hornback', 'treetop', 'kingjaw'], tier: 2,
+  mobs: ['raptor', 'hornback', 'treetop', 'kingjaw', 'glidewing', 'spikeback', 'modling'], tier: 2,
   makeGen: seed => makeG(seed, 8),
   gen(c, G) {
     const bx = c.cx * 16, bz = c.cz * 16, s = G.seed, bl = c.blocks, TOP = new Int16Array(256), H = new Int16Array(256);
@@ -830,7 +830,7 @@ realm({
   sky: { mode: 'fixed', time: 0.1, day: ['#140832', '#c870e8'], stars: 1, nebula: 1, sun: 1, clouds: 0 },
   ambient: 0.24, sunMin: 0.65, sunTint: [0.95, 0.85, 1.1], gravity: 0.9, weather: 'sparkles', platform: 'prism_stone', spawnXZ: [0, 46], spawnMode: 'top',
   music: { root: 64, scale: [0, 2, 4, 5, 7, 9, 10], tempo: 0.38, wave: 'triangle' },
-  mobs: ['crystal_golem', 'prism_moth'], tier: 3,
+  mobs: ['crystal_golem', 'prism_moth', 'starhorn', 'modling'], tier: 3,
   makeGen: seed => makeG(seed, 9),
   gen(c, G) {
     const bx = c.cx * 16, bz = c.cz * 16, s = G.seed, bl = c.blocks, TOP = new Int16Array(256), H = new Int16Array(256);

@@ -226,7 +226,7 @@ class World {
       padHO[col] = src.hO[ci]; padHA[col] = src.hA[ci];
     }
     nO = 0; nT = 0;
-    const lights = [];
+    const lights = [], geodes = [];
     const bx = c.cx * 16, bz = c.cz * 16;
     const maxY = Math.min(c.maxY + 1, HEIGHT - 1);
     for (let y = 0; y <= maxY; y++) for (let z = 0; z < 16; z++) for (let x = 0; x < 16; x++) {
@@ -234,6 +234,7 @@ class World {
       const id = padB[p];
       if (!id) continue;
       const rt = RENDER[id];
+      if (id === B.mod_geode) geodes.push([bx + x, y, bz + z]);
       if (LIGHTR[id] > 0 && lights.length < 48) {
         if (LIQ[id] === 2) { if (this.lavaLights && padB[p + PADY] === 0 && ((x * 7 + z * 3 + y) & 3) === 0) lights.push([bx + x + .5, y + 1, bz + z + .5, id]); }
         else lights.push([bx + x + .5, y + .5, bz + z + .5, id]);
@@ -281,6 +282,7 @@ class World {
         }
       }
     }
+    c.geodes = geodes;
     c.lights = lights.map(l => { const d = BLOCKS[l[3]].light; return [l[0], l[1], l[2], d[3], d[0], d[1], d[2]]; });
     if (this.onMesh) this.onMesh(c, VB_O.subarray(0, nO), VB_T.subarray(0, nT));
   }

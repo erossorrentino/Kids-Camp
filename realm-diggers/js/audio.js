@@ -82,6 +82,7 @@ const Sound = {
       case 'blink': this.tone(1500, 0.2, 'sine', 0.12, 0.25); this.tone(600, 0.2, 'sine', 0.08, 3, 0.05); break;
       case 'xray': this.tone(400, 0.5, 'sine', 0.08, 3); break;
       case 'shoot': this.tone(700, 0.15, 'square', 0.05, 0.4); break;
+      case 'zap': this.tone(1700, 0.09, 'square', 0.035, 0.45); break;
       case 'jump': break;
       case 'bounce': this.tone(300, 0.2, 'sine', 0.12, 2.5); break;
       case 'death': [440, 370, 311, 262].forEach((f, i) => this.tone(f, 0.3, 'triangle', 0.12, 0, i * 0.18)); break;

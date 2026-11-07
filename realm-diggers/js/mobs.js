@@ -233,6 +233,74 @@ mobDef('crystal_golem', { name: 'Crystal Golem', hostile: 1, hp: 30, speed: 2.0,
 mobDef('prism_moth', { name: 'Prism Moth', hp: 4, speed: 1.8, w: 0.5, h: 0.4, fly: true, hover: 3, drops: [], when: 'any', group: [1, 3], weight: 8, pitch: 2.2,
   models: V(i => flyer({ s: .26, body: '#e8e0ff', wing: .45, wingCol: ['#ff8ad8', '#8ad8ff', '#ffe08a'][i], glowWings: true }), 3) });
 
+// ---- more creatures to find ----
+function foxModel(body, legs, tip) {
+  const q = quad({ legH: .22, legW: .12, bodyW: .34, bodyH: .3, bodyL: .62, head: [.32, .28, .3], headY: .12, body, legs });
+  q.P.push(part(0, q.hy - .06, q.hz + .18, .14, .1, .12, '#f4ece0', 'head', q.piv), part(-.1, q.hy + .18, q.hz - .04, .08, .12, .05, body, 'head', q.piv), part(.1, q.hy + .18, q.hz - .04, .08, .12, .05, body, 'head', q.piv),
+    part(0, q.by + .05, -.47, .14, .14, .36, body, 'tail', [0, q.by, -.31]), part(0, q.by + .05, -.69, .14, .14, .1, tip, 'tail', [0, q.by, -.31]));
+  return q.P;
+}
+mobDef('shimmerwing', { name: 'Shimmerwing', hp: 2, speed: 1.4, w: 0.4, h: 0.3, fly: true, hover: 2, flap: 0.6, drops: [], when: 'day', group: [2, 4], weight: 7, pitch: 2.6,
+  models: V(i => flyer({ s: .16, body: '#2a2a3a', wing: .34, wingCol: ['#ff7ad8', '#7ad8ff', '#ffd84a'][i], glowWings: true }), 3) });
+mobDef('bramble_fox', { name: 'Bramble Fox', hp: 6, speed: 2.8, w: 0.45, h: 0.6, shy: 6, drops: [['berries', 0, 1, 1]], on: ['grass'], group: [1, 2], weight: 6, pitch: 1.7,
+  models: V(() => foxModel('#e2762a', '#3a2a20', '#f4ece0')) });
+mobDef('frost_fox', { name: 'Frost Fox', hp: 6, speed: 2.8, w: 0.45, h: 0.6, shy: 6, drops: [['raw_meat', 0, 1, 1]], on: ['snow', 'grass_snow'], group: [1, 2], weight: 6, pitch: 1.8,
+  models: V(() => foxModel('#eef2f8', '#b8c4d4', '#a8d0ff')) });
+mobDef('shade_bat', { name: 'Shade Bat', hostile: 1, hp: 6, speed: 3.2, w: 0.5, h: 0.4, dmg: 2, fly: true, hover: 3, flap: 1.4, drops: [['coal', 0, 1, 1]], when: 'night', group: [1, 2], weight: 3, pitch: 2.8,
+  models: V(() => flyer({ s: .3, body: '#2a2238', wing: .45, wingCol: '#3a2e52', eye: '#ff4a6a', glowEye: true })) });
+mobDef('golden_hopbun', { name: 'Golden Hopbun', hp: 4, speed: 3.6, w: 0.4, h: 0.5, shy: 9, drops: [['gold_ingot', 1, 2, 1]], on: ['grass'], group: [1, 1], weight: 0.6, pitch: 2,
+  models: V(() => { const q = quad({ legH: .1, legW: .1, bodyW: .3, bodyH: .28, bodyL: .42, head: [.26, .26, .26], headY: .12, body: '#ffd23f' });
+    q.P.push(part(-.06, q.hy + .24, q.hz - .02, .06, .26, .05, '#ffe27a', 'head', q.piv), part(.06, q.hy + .24, q.hz - .02, .06, .26, .05, '#ffe27a', 'head', q.piv), part(0, q.by + .05, -.24, .12, .12, .08, '#fff8d8', null, null, true));
+    return q.P; }) });
+mobDef('cinder_golem', { name: 'Cinder Golem', hostile: 1, hp: 36, speed: 1.6, w: 1.0, h: 2.4, dmg: 6, fireproof: true, drops: [['coal', 2, 3, 1], ['fire_opal', 1, 1, .15]], when: 'any', group: [1, 1], weight: 3, pitch: 0.4,
+  models: V(() => { const b = biped({ legH: .8, legW: .34, bodyW: 1.0, bodyH: 1.0, bodyD: .6, armW: .32, armH: 1.0, headS: .55, body: '#2e2422', legs: '#241a18', head: '#3a2a26', eye: '#ff9a2a', glow: true });
+    b.P.push(part(.2, 1.35, .31, .32, .06, .02, '#ff6a1a', null, null, true), part(-.25, 1.05, .31, .06, .34, .02, '#ff6a1a', null, null, true), part(.05, 1.0, .31, .4, .05, .02, '#ffb03a', null, null, true), part(0, 1.3, -.31, .5, .06, .02, '#ff6a1a', null, null, true));
+    return b.P; }) });
+mobDef('emberling', { name: 'Emberling', hp: 4, speed: 1.6, w: 0.35, h: 0.5, fly: true, hover: 2, fireproof: true, drops: [['coal', 1, 1, .5]], when: 'any', group: [2, 3], weight: 6, pitch: 2.4,
+  models: V(() => [part(0, .3, 0, .3, .3, .3, '#ffb03a', 'bob', null, true), part(0, .52, 0, .16, .2, .16, '#ff6a1a', 'bob', null, true), part(0, .66, 0, .07, .1, .07, '#fff07a', 'bob', null, true),
+    part(-.07, .33, .16, .05, .06, .02, '#3a1a0a', 'bob'), part(.07, .33, .16, .05, .06, .02, '#3a1a0a', 'bob')]) });
+mobDef('tusker', { name: 'Woolly Tusker', hostile: 2, hp: 30, speed: 1.2, w: 1.3, h: 1.9, dmg: 5, drops: [['wool', 2, 3, 1], ['raw_meat', 2, 3, 1]], on: ['snow'], group: [1, 2], weight: 4, pitch: 0.4,
+  models: V(() => { const q = quad({ legH: .7, legW: .34, bodyW: 1.2, bodyH: 1.0, bodyL: 1.6, head: [.7, .65, .55], headY: .05, body: '#8a6a4a', legs: '#6a5038' });
+    q.P.push(part(0, q.by + .56, 0, 1.1, .15, 1.4, '#a8845a'), part(0, q.hy - .38, q.hz + .24, .16, .55, .16, '#8a6a4a', 'head', q.piv), part(-.2, q.hy - .3, q.hz + .3, .08, .08, .42, '#f4ecd8', 'head', q.piv), part(.2, q.hy - .3, q.hz + .3, .08, .08, .42, '#f4ecd8', 'head', q.piv),
+      part(-.42, q.hy, q.hz - .1, .1, .42, .32, '#7a5a3a', 'head', q.piv), part(.42, q.hy, q.hz - .1, .1, .42, .32, '#7a5a3a', 'head', q.piv));
+    return q.P; }) });
+mobDef('sky_whale', { name: 'Sky Whale', hp: 60, speed: 1.2, w: 2.8, h: 2.2, fly: true, cruise: 10, flap: 0.22, drops: [['skyshard', 1, 1, .5]], when: 'any', group: [1, 1], weight: 2.5, pitch: 0.2,
+  models: V(() => [part(0, 1.2, 0, 2.6, 2.0, 5.5, '#7aa8e8', 'bob'), part(0, .26, .3, 2.2, .3, 4.6, '#e8f0ff', 'bob'), part(0, 1.25, -3.6, .6, .5, 1.7, '#6a98d8', 'tail', [0, 1.3, -2.75]),
+    part(0, 1.3, -4.5, 2.2, .15, .7, '#6a98d8', 'tail', [0, 1.3, -2.75]), part(-1.75, .9, 1.0, 1.5, .12, .8, '#6a98d8', 'wingL', [-1.3, .9, 1.0]), part(1.75, .9, 1.0, 1.5, .12, .8, '#6a98d8', 'wingR', [1.3, .9, 1.0]),
+    part(-1.31, 1.45, 1.9, .03, .2, .2, '#101828', 'bob'), part(1.31, 1.45, 1.9, .03, .2, .2, '#101828', 'bob'), part(-1.31, 1.05, 2.05, .03, .14, .3, '#ffa8c8', 'bob'), part(1.31, 1.05, 2.05, .03, .14, .3, '#ffa8c8', 'bob'),
+    part(0, 2.21, .8, .5, .03, .5, '#c8e8ff', 'bob', null, true)]) });
+mobDef('shroomling', { name: 'Shroomling', hp: 5, speed: 1.4, w: 0.5, h: 0.65, hop: true, hopV: 5, drops: [['glowshroom', 1, 1, 1]], on: ['deep_moss'], group: [2, 4], weight: 8, pitch: 2.2,
+  models: V(() => [part(0, .2, 0, .3, .4, .3, '#e8e0d0'), part(0, .52, 0, .62, .26, .62, '#3ad8ff', null, null, true), part(.14, .66, .14, .1, .03, .1, '#e8ffff', null, null, true),
+    part(-.18, .66, -.08, .1, .03, .1, '#e8ffff', null, null, true), part(-.07, .28, .16, .05, .07, .02, '#151515'), part(.07, .28, .16, .05, .07, .02, '#151515')]) });
+mobDef('crater_crab', { name: 'Crater Crab', hostile: 2, hp: 10, speed: 1.8, w: 0.8, h: 0.5, dmg: 2, drops: [['moon_cheese', 1, 1, 1], ['moonstone', 1, 1, .12]], on: ['regolith', 'lunar_ice'], group: [1, 3], weight: 7, pitch: 1.4,
+  models: V(() => { const P = [part(0, .27, 0, .8, .3, .55, '#c8b8a8')];
+    for (let i = 0; i < 3; i++) for (const sx of [-1, 1]) { const z = -.15 + i * .15; P.push(part(sx * .55, .14, z, .3, .06, .06, '#a89888', (i + (sx > 0 ? 1 : 0)) % 2 ? 'swA' : 'swB', [sx * .4, .25, z])); }
+    for (const sx of [-1, 1]) P.push(part(sx * .32, .3, .42, .22, .16, .26, '#e85a3a', sx < 0 ? 'legA' : 'legB', [sx * .32, .3, .3]), part(sx * .12, .5, .22, .05, .16, .05, '#c8b8a8'), part(sx * .12, .6, .22, .08, .08, .08, '#111111'));
+    return P; }) });
+mobDef('octopus', { name: 'Inkwell Octopus', hp: 6, speed: 1.4, w: 0.6, h: 0.8, swim: true, drops: [['pearl', 1, 1, .15]], when: 'any', group: [1, 2], weight: 6, pitch: 1.6,
+  models: V(() => { const P = [part(0, .5, 0, .6, .6, .6, '#c85ab8'), part(-.15, .55, .31, .1, .1, .02, '#111111'), part(.15, .55, .31, .1, .1, .02, '#111111')];
+    for (const [x, z] of [[-.18, -.18], [.18, -.18], [-.18, .18], [.18, .18]]) P.push(part(x, .12, z, .1, .45, .1, '#b84aa8', 'tail', [x, .3, z]));
+    return P; }) });
+mobDef('puffmallow', { name: 'Puffmallow', hp: 8, speed: 1.3, w: 0.8, h: 1.1, drops: [['cotton_candy', 1, 2, 1]], on: ['frosting', 'icing'], group: [2, 3], weight: 8, pitch: 1.3,
+  models: V(() => { const q = quad({ legH: .3, legW: .16, bodyW: .8, bodyH: .65, bodyL: .95, head: [.42, .4, .36], headY: .15, body: '#fff4fa', legs: '#ffb8d8', headCol: '#ffc8e0' });
+    q.P.push(part(0, q.by + .38, 0, .7, .15, .8, '#ffffff'), part(-.24, q.hy + .2, q.hz - .05, .12, .1, .08, '#ffb8d8', 'head', q.piv), part(.24, q.hy + .2, q.hz - .05, .12, .1, .08, '#ffb8d8', 'head', q.piv));
+    return q.P; }) });
+mobDef('glidewing', { name: 'Glidewing', hp: 10, speed: 2.2, w: 0.7, h: 0.5, fly: true, hover: 7, flap: 0.5, dino: true, drops: [['dino_meat', 1, 1, .5]], when: 'any', group: [1, 2], weight: 5, pitch: 1.2,
+  models: V(() => [part(0, .3, 0, .3, .25, .7, '#a87a5a', 'bob'), part(0, .38, .48, .22, .18, .3, '#a87a5a', 'bob'), part(0, .36, .74, .08, .06, .34, '#e8c87a', 'bob'), part(0, .52, .38, .06, .22, .28, '#d85a3a', 'bob'),
+    part(-.77, .35, 0, 1.24, .04, .5, '#8a5a3a', 'wingL', [-.15, .35, 0]), part(.77, .35, 0, 1.24, .04, .5, '#8a5a3a', 'wingR', [.15, .35, 0]), part(-.1, .42, .6, .04, .05, .05, '#111111', 'bob'), part(.1, .42, .6, .04, .05, .05, '#111111', 'bob')]) });
+mobDef('spikeback', { name: 'Spikeback', hostile: 2, hp: 32, speed: 1.0, w: 1.1, h: 1.6, dmg: 5, dino: true, drops: [['dino_meat', 2, 3, 1]], on: ['jungle_grass', 'mud'], group: [1, 2], weight: 5, pitch: 0.5,
+  models: V(() => { const q = quad({ legH: .55, legW: .32, bodyW: 1.0, bodyH: .85, bodyL: 1.8, head: [.4, .38, .45], headY: -.2, body: '#6a8a5a', legs: '#5a7a4a' });
+    for (let i = 0; i < 4; i++) q.P.push(part(0, q.by + .62 + (i % 2) * .08, -.6 + i * .4, .1, .45, .35, '#d86a3a'));
+    q.P.push(part(0, q.by, -1.25, .25, .25, .8, '#6a8a5a', 'tail', [0, q.by, -.9]), part(-.18, q.by + .1, -1.5, .3, .06, .06, '#e8e0c8', 'tail', [0, q.by, -.9]), part(.18, q.by + .1, -1.5, .3, .06, .06, '#e8e0c8', 'tail', [0, q.by, -.9]));
+    return q.P; }) });
+mobDef('starhorn', { name: 'Starhorn', hp: 14, speed: 2.4, w: 0.6, h: 1.8, shy: 7, drops: [['prism_shard', 1, 2, 1]], on: ['prism_grass'], group: [1, 2], weight: 2, pitch: 1.5,
+  models: V(() => { const q = quad({ legH: .8, legW: .16, bodyW: .5, bodyH: .55, bodyL: 1.2, head: [.32, .36, .55], headY: .55, body: '#f4f0ff', legs: '#e0d8f4' });
+    q.P.push(part(0, q.by + .42, .5, .26, .62, .3, '#f4f0ff'), part(0, q.by + .62, .38, .08, .55, .45, '#ff8ad8'), part(0, q.hy + .3, q.hz + .1, .07, .34, .07, '#7ae8ff', 'head', q.piv, true),
+      part(0, q.by + .12, -.72, .12, .5, .12, '#c8a0ff', 'tail', [0, q.by + .3, -.6]));
+    return q.P; }) });
+mobDef('modling', { name: 'Modling', hp: 3, speed: 4.2, w: 0.4, h: 0.4, fly: true, hover: 2.5, shy: 10, lifetime: 80, givesMod: true, drops: [], when: 'any', group: [1, 1], weight: 0.5, pitch: 3,
+  models: V(() => { const P = flyer({ s: .24, body: '#ffffff', wing: .3, wingCol: '#ff8ad8', glowWings: true, tailGlow: '#fff07a', eye: '#5a3aff' }); P[0].em = true; return P; }) });
+
 // ---------------- Mob ----------------
 let _mobId = 1;
 class Mob {
@@ -243,6 +311,7 @@ class Mob {
     this.variant = Math.floor(Math.random() * def.models.length);
     this.timer = Math.random() * 2; this.wander = null; this.attackCD = 1; this.shootCD = 1 + Math.random() * 2; this.hopT = Math.random();
     this.hurtT = 0; this.fleeT = 0; this.angry = false; this.walk = 0; this.moveAmt = 0; this.age = 0; this.burnT = 0; this.burnTick = 0; this.lavaT = 0; this.dryT = 0;
+    this.homeY = y + (def.cruise || 0); this.frozenT = 0;
   }
   damage(amount, fromPlayer, kx = 0, kz = 0) {
     if (this.dead) return;
@@ -257,6 +326,8 @@ class Mob {
     const d = this.def, w = Game.world, p = Game.player, realm = Game.realm;
     this.age += dt;
     if (this.hurtT > 0) this.hurtT -= dt;
+    if (d.lifetime && this.age > d.lifetime) { this.dead = true; this.despawned = true; Particles.burst(this.x, this.y + .3, this.z, [1, .8, 1], 14, 3, 0.08, true); return; }
+    if (this.frozenT > 0) { this.frozenT -= dt; return; }
     if (this.attackCD > 0) this.attackCD -= dt;
     this.shootCD -= dt;
     if (this.burnT > 0) { this.burnT -= dt; this.burnTick -= dt; if (this.burnTick <= 0) { this.burnTick = 0.8; this.damage(1 + Game.stats.flamefist * 0.5, true); Particles.burst(this.x, this.y + this.h / 2, this.z, [1, .5, .1], 4, 1.5, 0.1, true); } }
@@ -267,6 +338,7 @@ class Mob {
     const fb = w.blockAt(Math.floor(this.x), Math.floor(this.y + 0.2), Math.floor(this.z));
     this.inWater = LIQ[fb] === 1 || LIQ[fb] === 3 || WLOG[fb] === 1; this.inLava = LIQ[fb] === 2;
     let mvx = 0, mvz = 0, speed = d.speed;
+    if (d.shy && dist3 < d.shy && !p.dead) this.fleeT = Math.max(this.fleeT, 1.5);
     if (this.fleeT > 0) {
       this.fleeT -= dt; const a = Math.atan2(-dx, -dz); mvx = Math.sin(a); mvz = Math.cos(a); speed *= 1.7; this.yaw = a;
     } else if (hostile) {
@@ -285,7 +357,7 @@ class Mob {
     const g = 26 * realm.gravity;
     if (d.fly) {
       const gy = groundBelow(w, this.x, this.y, this.z, 16);
-      let ty = hostile ? p.y + 1.6 + (d.ranged ? 1.5 : 0) : gy + (d.hover || 3) + Math.sin(this.age * 0.7 + this.uid) * 1.2;
+      let ty = hostile ? p.y + 1.6 + (d.ranged ? 1.5 : 0) : (d.cruise ? this.homeY : gy + (d.hover || 3)) + Math.sin(this.age * 0.7 + this.uid) * 1.2;
       this.vy += clamp(ty - this.y, -3, 3) * 3 * dt; this.vy *= Math.pow(0.4, dt);
       this.vx = mvx * speed; this.vz = mvz * speed;
       physMove(w, this, this.vx * dt, this.vy * dt, this.vz * dt);
@@ -362,12 +434,14 @@ const Mobs = {
     const realm = Game.realm, p = Game.player, w = Game.world;
     if (!realm.mobs || p.dead) return;
     let hostileN = 0, passiveN = 0;
-    for (const m of this.list) { if (m.def.hostile === 1) hostileN++; else passiveN++; }
+    const perType = {};
+    for (const m of this.list) { if (m.def.hostile === 1) hostileN++; else passiveN++; perType[m.def.key] = (perType[m.def.key] || 0) + 1; }
     const sun = Game.sunLevel();
     const peaceful = Settings.data.difficulty === 'peaceful';
     const defs = realm.mobs.map(k => MOBS[k]).filter(d => {
       if (d.hostile === 1 && (peaceful || hostileN >= 9)) return false;
       if (d.hostile !== 1 && passiveN >= 12) return false;
+      if ((perType[d.key] || 0) >= (d.weight <= 2.5 ? 1 : d.hostile === 1 ? 4 : 6)) return false;
       return true;
     });
     if (!defs.length) return;
@@ -431,6 +505,16 @@ const Projectiles = {
       b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt; b.life -= dt;
       if (Math.random() < 0.5) Particles.add(b.x, b.y, b.z, 0, 0.3, 0, 0.35, 0.08, b.c[0], b.c[1], b.c[2], 0.8, 0, true);
       if (w.solidAt(Math.floor(b.x), Math.floor(b.y), Math.floor(b.z))) { b.life = 0; Particles.burst(b.x, b.y, b.z, b.c, 6, 2, 0.08, true); continue; }
+      if (b.fromPlayer) {
+        for (const m of Game.boss ? [...Mobs.list, Game.boss] : Mobs.list) {
+          const hw = m.w * (m.def.scale || 1) / 2 + 0.2;
+          if (m.dead || Math.abs(b.x - m.x) > hw || Math.abs(b.z - m.z) > hw || b.y < m.y - 0.2 || b.y > m.y + m.h * (m.def.scale || 1) + 0.2) continue;
+          b.life = 0; m.damage(b.dmg, true, b.vx * 0.2, b.vz * 0.2);
+          if (b.freeze && !m.isBoss) m.frozenT = b.freeze;
+          Particles.burst(b.x, b.y, b.z, b.c, 12, 3, 0.09, true); break;
+        }
+        continue;
+      }
       if (!p.dead && Math.abs(b.x - p.x) < 0.5 && Math.abs(b.z - p.z) < 0.5 && b.y > p.y && b.y < p.y + 1.8) {
         b.life = 0; Game.hurtPlayer(b.dmg, null); Particles.burst(b.x, b.y, b.z, b.c, 8, 2.5, 0.08, true);
       }
@@ -529,8 +613,8 @@ function drawMob(batch, m, t) {
       case 'legB': ang = -swing; axis = 0; break;
       case 'head': ang = Math.sin(t * 1.7 + m.uid) * 0.06; axis = 0; break;
       case 'tail': ang = Math.sin(t * 4 + m.uid) * 0.35; axis = 1; break;
-      case 'wingL': ang = Math.sin(t * 14 + m.uid) * 0.7; axis = 2; break;
-      case 'wingR': ang = -Math.sin(t * 14 + m.uid) * 0.7; axis = 2; break;
+      case 'wingL': ang = Math.sin(t * 14 * (d.flap || 1) + m.uid) * 0.7; axis = 2; break;
+      case 'wingR': ang = -Math.sin(t * 14 * (d.flap || 1) + m.uid) * 0.7; axis = 2; break;
       case 'spin': ang = t * 2.5; axis = 1; break;
       case 'swA': ang = swing * 0.5; axis = 1; break;
       case 'swB': ang = -swing * 0.5; axis = 1; break;
@@ -552,6 +636,7 @@ function drawMob(batch, m, t) {
     }
     let r = pt.c[0], g = pt.c[1], b = pt.c[2];
     if (hurt) { r = Math.min(1, r * 0.6 + 0.6); g *= 0.5; b *= 0.5; }
+    else if (m.frozenT > 0) { r = r * 0.4 + 0.45; g = g * 0.4 + 0.6; b = Math.min(1, b * 0.4 + 0.75); }
     else if (burn) { r = Math.min(1, r + 0.3); g = Math.min(1, g + 0.1); }
     batch.faces(C, r, g, b, 1, sky, pt.em);
   }
@@ -573,3 +658,45 @@ function drawBoss(batch, bs, t) {
     batch.box(x - .3, y - .6, z - .3, x + .3, y + .6, z + .3, cc[0], cc[1], cc[2], 1, 1, true);
   }
 }
+
+// ---------------- creature pictures for the Creature Log ----------------
+const MOB_PREVIEW = {};
+function mobPreview(def, dark, size = 96) {
+  const key = def.key + (dark ? ':d' : '') + size;
+  if (MOB_PREVIEW[key]) return MOB_PREVIEW[key];
+  const parts = def.models[0], sc = def.scale || 1;
+  const yaw = 2.45, cy = Math.cos(yaw), sy = Math.sin(yaw), pit = 0.38, cp = Math.cos(pit), sp = Math.sin(pit);
+  const FACES = [[4, 5, 6, 7, 0.88], [1, 0, 3, 2, 0.72], [5, 1, 2, 6, 0.66], [0, 4, 7, 3, 0.8], [7, 6, 2, 3, 1], [0, 1, 5, 4, 0.5]];
+  const faces = []; let x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+  for (const pt of parts) {
+    const hw = pt.w / 2, hh = pt.h / 2, hd = pt.d / 2;
+    const C = [[-hw, -hh, -hd], [hw, -hh, -hd], [hw, hh, -hd], [-hw, hh, -hd], [-hw, -hh, hd], [hw, -hh, hd], [hw, hh, hd], [-hw, hh, hd]].map(([ox, oy, oz]) => {
+      const x = (pt.x + ox) * sc, y = (pt.y + oy) * sc, z = (pt.z + oz) * sc;
+      const rx = x * cy + z * sy, rz = -x * sy + z * cy;
+      return [rx, y * cp - rz * sp, y * sp + rz * cp];
+    });
+    for (const f of FACES) {
+      const q = [C[f[0]], C[f[1]], C[f[2]], C[f[3]]];
+      const area = (q[1][0] - q[0][0]) * (q[2][1] - q[0][1]) - (q[2][0] - q[0][0]) * (q[1][1] - q[0][1]);
+      if (area <= 0) continue;
+      faces.push({ q, z: (q[0][2] + q[1][2] + q[2][2] + q[3][2]) / 4, c: pt.c, sh: pt.em ? 1.1 : f[4] });
+      for (const p of q) { x0 = Math.min(x0, p[0]); x1 = Math.max(x1, p[0]); y0 = Math.min(y0, p[1]); y1 = Math.max(y1, p[1]); }
+    }
+  }
+  faces.sort((a, b) => a.z - b.z);
+  const cv = document.createElement('canvas'); cv.width = cv.height = size;
+  const ctx = cv.getContext('2d');
+  const k = (size * 0.84) / Math.max(x1 - x0, y1 - y0, 0.01), ox = size / 2 - (x0 + x1) / 2 * k, oy = size / 2 + (y0 + y1) / 2 * k;
+  ctx.lineJoin = 'round';
+  for (const f of faces) {
+    ctx.beginPath();
+    f.q.forEach((p, i) => { const X = ox + p[0] * k, Y = oy - p[1] * k; if (i) ctx.lineTo(X, Y); else ctx.moveTo(X, Y); });
+    ctx.closePath();
+    const col = dark ? [0.13, 0.16, 0.3] : f.c.map(v => Math.min(1, v * f.sh));
+    ctx.fillStyle = rgbHex(col.map(v => v * 255)); ctx.fill();
+    ctx.strokeStyle = rgbHex(col.map(v => v * 255 * 0.7)); ctx.lineWidth = 1; ctx.stroke();
+  }
+  return (MOB_PREVIEW[key] = cv.toDataURL());
+}
+// which realms each creature lives in
+function mobRealms(key) { return REALMS.filter(r => r.mobs.includes(key)); }

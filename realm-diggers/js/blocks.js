@@ -209,8 +209,8 @@ item('fossil', 'Fossil', { icon: ['fossil'] });
 item('bone', 'Bone', { icon: ['bone'] });
 item('slime_ball', 'Slime Ball', { icon: ['slime'] });
 // Food
-item('apple', 'Apple', { icon: ['apple'], food: 4 });
-item('berries', 'Berries', { icon: ['berries'], food: 2 });
+item('apple', 'Apple', { icon: ['apple'], food: 4, plant: true });
+item('berries', 'Berries', { icon: ['berries'], food: 2, plant: true });
 item('raw_meat', 'Raw Meat', { icon: ['meat', '#e05a5a'], food: 3 });
 item('cooked_meat', 'Roast Meat', { icon: ['meat', '#a8582a'], food: 8 });
 item('raw_fish', 'Raw Fish', { icon: ['fish', '#8ab4d8'], food: 2 });

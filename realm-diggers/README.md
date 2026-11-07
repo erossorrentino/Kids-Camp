@@ -1,7 +1,7 @@
 # Realm Diggers
 
 A block-building and mining adventure that runs in any modern web browser.
-Dig deep, build big, collect rare **mods**, and discover **10 different realms**,
+Dig deep, build big, collect **50 rare mods**, find **46 creatures**, and discover **10 different realms**,
 each with its own landscape, creatures, music, and its own secret way in.
 
 It's an original game in the block-sandbox genre: its own name, world, creatures,
@@ -29,7 +29,7 @@ art (every texture is painted by code), sounds, and music.
 | Ctrl or double-tap W | Push the stick all the way | Sprint |
 | 1-9, mouse wheel | Tap the hotbar | Pick an item |
 | E / M / G | 🎒 / ✦ / 📖 | Inventory & crafting / Mods / Realm Guide |
-| X / R / F | Extra buttons | Mod powers: X-Ray, Blink, Roar |
+| X / R / F / Q | Extra buttons | Mod powers: X-Ray, Blink, Roar, Frost Bolt |
 | Esc | ⏸ | Pause |
 
 ## The 10 realms
@@ -55,18 +55,21 @@ Each realm (except home and Prismara) has a special ore that drops its **Realm G
 ## Mods
 
 Mods are rare power-ups found while mining. Any ore can drop one, and sparkly
-**Mod Geodes** always do. There are **36 mods** in 6 rarities
+**Mod Geodes** always do. There are **50 mods** in 6 rarities
 (Common, Uncommon, Rare, Epic, Legendary, Mythic):
 
 - Found anywhere: Swift Feet, Spring Legs, Quick Pick, Lucky Miner, Tough Skin, Night Eyes,
   Iron Stomach, Treefeller, Regeneration, Feather Fall, Double Jump, Forge Touch, Mighty Arm,
-  Vein Miner, Big Dig, **X-Ray Vision**, **Jetpack**
-- Only found in one realm: Fireproof & Flame Fist (Emberdeep), Ice Path & Ice Skates (Frostveil),
-  Glider & **Cloud Walker** (Skyreach), Glow Aura & Echo Sense (Hollow Deep), Moon Boots &
-  **Meteor Stomp** (Lunara), Gills & Dolphin Kick (Coral Abyss), Sweet Tooth & Bubblegum Bounce
-  (Sugarland), Dino Buddy & **Mega Roar** (Dino Valley)
+  Vein Miner, Big Dig, Crafty Hands, Spiky Armor, Long Arms, Heart Snatcher, Geode Finder,
+  **Pocket Pal** (a floating buddy that zaps monsters), **Second Wind**, **X-Ray Vision**, **Jetpack**
+- Only found in one realm: Green Thumb & Critter Charm (Greenhollow), Fireproof, Flame Fist &
+  Magma Stride (Emberdeep), Ice Path, Ice Skates & **Frost Bolt** (Frostveil), Glider & **Cloud Walker**
+  (Skyreach), Glow Aura & Echo Sense (Hollow Deep), Moon Boots & **Meteor Stomp** (Lunara), Gills,
+  Dolphin Kick & Water Strider (Coral Abyss), Sweet Tooth, Bubblegum Bounce & Sugar Rush (Sugarland),
+  Dino Buddy, Raptor Claws & **Mega Roar** (Dino Valley)
 - Mythic, only in Prismara: Prism Blink, Realm Master, Rainbow Luck
 
+Catch a sparkly **Modling** (a rare, shy flying creature in every realm) to win a mod too.
 Finding a mod you already own **levels it up** (up to III). You can equip 4 at a time.
 Finding 15 different mods unlocks a 5th slot, and beating the final boss unlocks another.
 
@@ -84,7 +87,9 @@ Finding 15 different mods unlocks a 5th slot, and beating the final boss unlocks
 - Wood → Stone → Iron → Ruby → Prismatic tools, plus armor.
 - The same blocks and items stack up to 100 per slot; different items never share a slot. Tools,
   armor, keys and filled buckets don't stack.
-- 24 original creatures, from Fluffalos and Hopbuns to Gloomlings, Raptors, Yetis and Kingjaws.
+- 46 original creatures to find, from Fluffalos, Bramble Foxes and Puffmallows to Gloomlings, Raptors,
+  Yetis, Woolly Tuskers, a giant Sky Whale and the rare Starhorn. The **Creature Log** (Realm Guide)
+  fills in each one when you spot it and gives hints for the ones you haven't found yet.
 - Boom Barrels (light one with an Igniter, then run), Bounce Pads, Scaffolding, Lanterns, beds,
   and 9 colors of Paint Blocks.
 - An always-visible **Goal** that walks new players from their first log all the way to the final boss.

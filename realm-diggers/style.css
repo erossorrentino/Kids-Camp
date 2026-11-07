@@ -222,6 +222,18 @@ input { font: inherit; background: var(--ink); color: var(--text); border: 2px s
 #guide-mats { max-height: 60vh; overflow: auto; padding-right: 4px; }
 @media (max-width: 760px) { .mat-wrap.wide { grid-template-columns: 1fr; } .mat-wrap.wide .mat-detail { order: 0; } }
 
+/* creature log */
+.creature-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; max-height: 60vh; overflow: auto; padding-right: 4px; }
+.ccard { display: flex; gap: 10px; align-items: flex-start; background: var(--panel-2); border: 2px solid var(--line); border-radius: 6px; padding: 8px; min-width: 0; }
+.ccard.found { border-color: rgba(122, 208, 74, .55); }
+.ccard img { width: 72px; height: 72px; flex: none; background: rgba(0, 0, 0, .25); border-radius: 4px; }
+.cinfo { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.cinfo b { font-family: var(--display); font-size: 17px; font-weight: 600; }
+.cinfo p { margin: 0; font-size: 12px; line-height: 1.4; }
+.ctag { align-self: flex-start; font-family: var(--display); font-size: 11px; padding: 1px 7px; border-radius: 3px; background: #2a3158; }
+.ctag.friendly { background: #2c6a3a; } .ctag.neutral { background: #7a5a1a; } .ctag.hostile { background: #8a2a32; }
+#geode-hint { font-family: var(--display); font-size: 12px; background: rgba(8, 10, 24, .7); border: 1px solid #ff5ae0; padding: 2px 8px; border-radius: 3px; max-width: 170px; text-align: center; }
+
 /* mods */
 .equipped-wrap { display: flex; gap: 10px; align-items: center; margin: 10px 0; flex-wrap: wrap; }
 .equipped-wrap .label { font-family: var(--display); color: var(--gold); text-transform: uppercase; letter-spacing: .1em; font-size: 13px; }

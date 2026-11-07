@@ -36,9 +36,20 @@ mod('veinminer', 'Vein Miner', 3, null, '⛓️', ['Mine whole ore veins (6)', '
 mod('widedig', 'Big Dig', 3, null, '💥', ['Mine a 3x3 area', 'Mine a 3x3 area, 20% faster', 'Mine a 3x3 area, 40% faster']);
 mod('xray', 'X-Ray Vision', 4, null, '🔍', ['Press X: see ores through walls (12 blocks)', 'Press X: see ores (18 blocks)', 'Press X: see ores (24 blocks)'], { active: 'X' });
 mod('jetpack', 'Jetpack', 4, null, '🚀', ['Hold Jump in the air to fly up (2s fuel)', 'Hold Jump in the air (4s fuel)', 'Hold Jump in the air (7s fuel)']);
+mod('crafty', 'Crafty Hands', 1, null, '🧰', ['20% chance to craft double', '35% chance to craft double', '50% chance to craft double']);
+mod('thorns', 'Spiky Armor', 1, null, '🌵', ['Monsters that hit you take 2 damage', 'Monsters that hit you take 4 damage', 'Monsters that hit you take 6 damage']);
+mod('reach', 'Long Arms', 1, null, '🙌', ['Reach 1 block farther', 'Reach 2 blocks farther', 'Reach 3 blocks farther']);
+mod('lifesteal', 'Heart Snatcher', 2, null, '💘', ['Hits sometimes heal you', 'Hits often heal you', 'Hits usually heal you']);
+mod('geodefinder', 'Geode Finder', 2, null, '🧭', ['Shows the nearest Mod Geode (24 blocks)', 'Shows the nearest Mod Geode (36 blocks)', 'Shows the nearest Mod Geode (48 blocks)']);
+mod('pocketpal', 'Pocket Pal', 3, null, '🧚', ['A floating buddy zaps monsters', 'Your buddy zaps harder and faster', 'Your buddy is a monster-zapping hero']);
+mod('extralife', 'Second Wind', 4, null, '🌟', ['Instead of fainting, bounce back once (every 3 min)', 'Bounce back stronger (every 2 min)', 'Bounce back at full power (every 90s)']);
 // --- realm exclusives
+mod('greenthumb', 'Green Thumb', 2, 'greenhollow', '🌱', ['Plants and leaves drop more apples and berries', 'Even more, and plant food fills you double', 'Fruit everywhere!']);
+mod('critter', 'Critter Charm', 1, 'greenhollow', '🐾', ['Friendly animals sometimes drop double', 'Friendly animals often drop double', 'Friendly animals always drop double']);
 mod('fireproof', 'Fireproof', 2, 'emberdeep', '🌋', ['Lava and fire do not hurt you', 'Lava and fire do not hurt you, swim faster in lava', 'Lava heals you!']);
-mod('flamefist', 'Flame Fist', 3, 'emberdeep', '🔥', ['Hits set monsters on fire', 'Hotter fire', 'Blazing fire']);
+mod('flamefist', 'Flame Fist', 3, 'emberdeep', '🥊', ['Hits set monsters on fire', 'Hotter fire', 'Blazing fire']);
+mod('magmastride', 'Magma Stride', 3, 'emberdeep', '👣', ['Walk on top of lava', 'Walk on lava, faster', 'Run across lava']);
+mod('frostbolt', 'Frost Bolt', 4, 'frostveil', '🧊', ['Press Q: shoot an ice bolt that freezes (6 damage)', 'Ice bolt does 9 damage', 'Ice bolt does 12 damage'], { active: 'Q' });
 mod('icepath', 'Ice Path', 2, 'frostveil', '❄️', ['Water freezes under your feet', 'Bigger ice path', 'Huge ice path']);
 mod('iceskates', 'Ice Skates', 3, 'frostveil', '⛸️', ['Zoom on ice and snow', 'Zoom faster on ice and snow', 'Super zoom on ice and snow']);
 mod('glider', 'Glider', 2, 'skyreach', '🪂', ['Hold Jump while falling to glide', 'Glide slower and farther', 'Glide like a bird']);
@@ -48,9 +59,12 @@ mod('echo', 'Echo Sense', 3, 'hollowdeep', '🦇', ['See creatures through walls
 mod('moonboots', 'Moon Boots', 2, 'lunara', '🌙', ['Low gravity everywhere', 'Even lower gravity', 'Floaty moon walk']);
 mod('meteor', 'Meteor Stomp', 4, 'lunara', '☄️', ['Big falls blast nearby monsters', 'Bigger blast', 'Massive blast']);
 mod('gills', 'Gills', 2, 'coralabyss', '🐟', ['Breathe underwater', 'Breathe underwater, see clearer', 'Breathe underwater, see clearly']);
+mod('waterwalk', 'Water Strider', 2, 'coralabyss', '🌊', ['Walk on top of water (sneak to swim)', 'Walk on water, faster', 'Run across water']);
 mod('dolphin', 'Dolphin Kick', 3, 'coralabyss', '🐬', ['Swim super fast', 'Swim faster', 'Swim fastest']);
 mod('sweettooth', 'Sweet Tooth', 2, 'sugarland', '🍭', ['Food fills you up double', 'Food also heals a heart', 'Food heals two hearts']);
+mod('sugarrush', 'Sugar Rush', 3, 'sugarland', '🧁', ['Eating gives you a speed boost', 'Longer speed boost', 'Huge speed boost']);
 mod('bounce', 'Bubblegum Bounce', 3, 'sugarland', '🎈', ['No fall damage, bouncy landings', 'Bouncier', 'Super bouncy']);
+mod('wallclimb', 'Raptor Claws', 2, 'dinovalley', '🦎', ['Climb walls by walking into them', 'Climb faster', 'Climb super fast']);
 mod('dinofriend', 'Dino Buddy', 3, 'dinovalley', '🦕', ['Dinosaurs will not attack you', 'Dinos and beasts are friendly', 'All animals love you']);
 mod('roar', 'Mega Roar', 4, 'dinovalley', '🦖', ['Press F: roar and scare monsters', 'Stronger roar', 'Earth-shaking roar'], { active: 'F' });
 mod('blink', 'Prism Blink', 5, 'prismara', '✨', ['Press R: teleport where you look (20 blocks)', 'Teleport up to 32 blocks', 'Teleport up to 48 blocks'], { active: 'R' });
@@ -118,5 +132,19 @@ function computeStats(equipped, owned) {
     blink: L('blink'), blinkR: [0, 20, 32, 48][L('blink')],
     bonusHearts: rm ? rm + 1 : 0,
     rainbow: L('rainbowluck'),
+    crafty: [0, 0.2, 0.35, 0.5][L('crafty')],
+    thorns: 2 * L('thorns'),
+    reach: L('reach'),
+    lifesteal: [0, 0.2, 0.35, 0.5][L('lifesteal')],
+    geodeR: [0, 24, 36, 48][L('geodefinder')],
+    pal: L('pocketpal'),
+    extralife: L('extralife'),
+    greenthumb: L('greenthumb'),
+    critter: [0, 0.4, 0.7, 1][L('critter')],
+    magmastride: L('magmastride'),
+    frostbolt: L('frostbolt'),
+    waterwalk: L('waterwalk'),
+    wallclimb: L('wallclimb'),
+    sugarrush: [0, 8, 12, 18][L('sugarrush')],
   };
 }

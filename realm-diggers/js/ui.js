@@ -106,7 +106,7 @@ const UI = {
       h += `<span class="modchip${cd ? ' cool' : ''}" style="--rc:${RARITY[m.rarity].color}" title="${m.name}">${m.icon}<small>${'I'.repeat(lv)}</small>${m.active ? `<kbd>${m.active}</kbd>` : ''}</span>`;
     }
     if (h !== this.last.modbar) { $('modbar').innerHTML = h; this.last.modbar = h; }
-    for (const [k, id] of [['X', 't-ab-x'], ['R', 't-ab-r'], ['F', 't-ab-f']]) {
+    for (const [k, id] of [['X', 't-ab-x'], ['R', 't-ab-r'], ['F', 't-ab-f'], ['Q', 't-ab-q']]) {
       const has = eq.some(e => MOD[e] && MOD[e].active === k);
       $(id).hidden = !has || !Settings.touchOn();
     }
@@ -121,6 +121,8 @@ const UI = {
     if (r.sky.mode === 'cycle') { const t = Game.time; const hrs = Math.floor((t * 24 + 6) % 24), mins = Math.floor(((t * 24 * 60) % 60)); clock = `${t < 0.5 ? '☀' : '☾'} ${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}`; }
     else clock = r.sky.mode === 'none' ? 'Underground' : 'Endless ' + (r.key === 'lunara' || r.key === 'prismara' ? 'night' : 'day');
     if (Game.rain > 0.5) clock += ' ☂';
+    const gh = Game.geode ? `🧭 Mod Geode: ${Math.round(Game.geode.d)} blocks${Game.geode.y + 0.5 < p.y - 2 ? ', below you' : Game.geode.y > p.y + 2 ? ', above you' : ''}` : '';
+    if (this.last.geode !== gh) { this.last.geode = gh; $('geode-hint').hidden = !gh; $('geode-hint').textContent = gh; }
     if (this.last.clock !== clock) { this.last.clock = clock; $('clock').textContent = clock; }
     const fuel = Game.stats.jetpack && !Game.creative;
     $('fuel').hidden = !fuel;
@@ -175,6 +177,14 @@ const UI = {
       if (mx < 0 || mz < 0 || mx > 128 || mz > 128) continue;
       ctx.fillStyle = m.isBoss ? '#ff5ad8' : m.def.hostile === 1 ? '#ff4a4a' : '#ffffff';
       ctx.fillRect(mx - 2, mz - 2, 4, 4);
+    }
+    if (Game.geode) {
+      let gx = (Game.geode.x + .5 - p.x) * 2, gz = (Game.geode.z + .5 - p.z) * 2;
+      const gl = Math.hypot(gx, gz); if (gl > 56) { gx *= 56 / gl; gz *= 56 / gl; }
+      const pulse = 4 + Math.sin(performance.now() / 180) * 1.5;
+      ctx.save(); ctx.translate(64 + gx, 64 + gz); ctx.rotate(Math.PI / 4);
+      ctx.fillStyle = '#ff5ae0'; ctx.fillRect(-pulse, -pulse, pulse * 2, pulse * 2); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.strokeRect(-pulse, -pulse, pulse * 2, pulse * 2);
+      ctx.restore();
     }
     ctx.save(); ctx.translate(64, 64); ctx.rotate(-p.yaw);
     ctx.fillStyle = '#ffc24b'; ctx.beginPath(); ctx.moveTo(0, -8); ctx.lineTo(6, 6); ctx.lineTo(0, 3); ctx.lineTo(-6, 6); ctx.closePath(); ctx.fill();
@@ -489,6 +499,25 @@ const UI = {
     } else if (this.guideTab === 'materials') {
       body.innerHTML = '<p class="muted">Pick a material to see where to find it and everything you can make with it. Tap an ingredient to jump to it.</p><div id="guide-mats"></div>';
       this.renderMaterials($('guide-mats'), false, true);
+    } else if (this.guideTab === 'creatures') {
+      const seen = (Game.save && Game.save.creatures) || [], all = Object.values(MOBS);
+      const kind = d => d.hostile === 1 ? ['hostile', 'Dangerous'] : d.hostile === 2 ? ['neutral', 'Fights back'] : ['friendly', 'Friendly'];
+      const hint = d => {
+        const realms = mobRealms(d.key), where = realms.length >= REALMS.length ? 'any realm' : realms.map(r => r.name).join(', ');
+        const bits = [`Lives in ${where}.`];
+        if (d.when === 'night') bits.push('Comes out at night and in dark caves.'); else if (d.when === 'day') bits.push('Out in the daytime.');
+        if (d.swim) bits.push('Swims in water.'); else if (d.cruise) bits.push('Floats high in the sky.'); else if (d.fly) bits.push('Flies.');
+        if (d.shy) bits.push('Shy: runs away fast!');
+        if (d.weight <= 1) bits.push('Very rare!'); else if (d.weight <= 2.5) bits.push('Rare.');
+        return bits.join(' ');
+      };
+      body.innerHTML = `<p class="muted">You've found <b>${seen.length} of ${all.length}</b> creatures. A creature counts as found when you get a good look at it. The Modling is extra special: catch one to win a mod!</p>
+        <div class="creature-grid">${all.map(d => {
+          const found = seen.includes(d.key), [cls, label] = kind(d);
+          const drops = d.givesMod ? 'A random mod!' : d.drops.length ? d.drops.map(x => itemName(idOf(x[0]))).join(', ') : 'Nothing';
+          return `<div class="ccard${found ? ' found' : ''}"><img src="${mobPreview(d, !found)}" alt=""><div class="cinfo"><b>${found ? d.name : '???'}</b>
+            <span class="ctag ${cls}">${found ? label : '?'}</span><p>${hint(d)}</p>${found ? `<p class="muted">Drops: ${drops}</p>` : ''}</div></div>`;
+        }).join('')}</div>`;
     } else if (this.guideTab === 'goals') {
       const ach = Game.save ? Game.save.achievements : [];
       body.innerHTML = `<p class="muted">${ach.length} of ${ACHIEVEMENTS.length} goals complete.</p><div class="goals">${ACHIEVEMENTS.map(a => `<div class="goal${ach.includes(a.id) ? ' done' : ''}"><span class="ck">${ach.includes(a.id) ? '✓' : ''}</span><div><b>${a.name}</b><div class="muted">${a.desc}</div></div></div>`).join('')}</div>`;
@@ -500,7 +529,7 @@ const UI = {
           <tr><td>Space</td><td>Jump / swim up (double-tap to fly in Creative)</td></tr><tr><td>Shift</td><td>Sneak (won't fall off edges) / fly down</td></tr>
           <tr><td>Ctrl or double-tap W</td><td>Sprint</td></tr><tr><td>1-9 / wheel</td><td>Pick hotbar slot</td></tr>
           <tr><td>E</td><td>Inventory &amp; crafting</td></tr><tr><td>M</td><td>Mods</td></tr><tr><td>G</td><td>Realm Guide</td></tr>
-          <tr><td>X / R / F</td><td>Mod powers (X-Ray, Blink, Roar)</td></tr><tr><td>Esc</td><td>Pause</td></tr></table></div>
+          <tr><td>X / R / F / Q</td><td>Mod powers (X-Ray, Blink, Roar, Frost Bolt)</td></tr><tr><td>Esc</td><td>Pause</td></tr></table></div>
         <div><h3>Touch</h3><table>
           <tr><td>Left stick</td><td>Walk</td></tr><tr><td>Drag the screen</td><td>Look around (aim with the + in the middle)</td></tr>
           <tr><td>⛏ Mine (hold)</td><td>Dig the block you aim at, hit creatures</td></tr>
@@ -559,6 +588,7 @@ const TouchPad = {
     tap('t-ab-x', () => Game.ability('X'));
     tap('t-ab-r', () => Game.ability('R'));
     tap('t-ab-f', () => Game.ability('F'));
+    tap('t-ab-q', () => Game.ability('Q'));
   },
   start(e) {
     e.preventDefault(); Sound.init();
