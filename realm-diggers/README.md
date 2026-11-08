@@ -1,0 +1,142 @@
+# Realm Diggers
+
+A block-building and mining adventure that runs in any modern web browser.
+Dig deep, build big, collect **50 rare mods**, find **46 creatures**, and discover **10 different realms**,
+each with its own landscape, creatures, music, and its own secret way in.
+
+It's an original game in the block-sandbox genre: its own name, world, creatures,
+art (every texture is painted by code), sounds, and music.
+
+## Play it
+
+- **Easiest:** open `index.html` in Chrome, Edge, Firefox or Safari. Nothing to install.
+- **One file to share:** run `python3 tools/build_single.py` and send `dist/realm-diggers.html`
+  to anyone. It's fully self-contained.
+- Works with keyboard + mouse, and on tablets and phones with on-screen touch controls.
+- Worlds save automatically in the browser. There are 3 save slots, so siblings or campers can
+  share one computer.
+
+## Controls
+
+| Keyboard & mouse | Touch | Action |
+|---|---|---|
+| W A S D | Left stick | Walk |
+| Mouse (click the game first) | Drag the screen (aim with the + in the middle) | Look around |
+| Hold left click | Hold the ⛏ **Mine** button | Mine blocks, hit creatures |
+| Right click | Tap the 🧱 **Build** button (hold to keep placing) | Place blocks |
+| Right click | Tap the ✋ **Use** button | Use workbenches, furnaces, beds, chests, gates and villagers; eat; use items |
+| Space (double-tap in Creative) | ⤒ | Jump / swim / fly |
+| Shift | ⤓ | Sneak (won't fall off edges) / fly down |
+| Ctrl or double-tap W | Push the stick all the way | Sprint |
+| 1-9, mouse wheel | Tap the hotbar | Pick what you're holding (it shows in your hand) |
+| E / M / G | 🎒 / ✦ / 📖 | Inventory & crafting / Mods / Realm Guide |
+| X / R / F / Q | Extra buttons | Mod powers: X-Ray, Blink, Roar, Frost Bolt |
+| Esc | ⏸ | Pause |
+
+## The 10 realms
+
+Every realm has a different way in. Each arrival point gets a **Realm Gate** you can use
+to fast-travel to any realm you've already discovered.
+
+| Realm | What it's like | How to get there |
+|---|---|---|
+| **Greenhollow** | Home: meadows, forests, deserts, snowy peaks, oceans, caves, villages | You start here |
+| **Emberdeep** | Lava seas, ashstone spires, glowing cinder trees | Craft an **Ember Key**, hold it and jump into lava |
+| **Frostveil** | Snowfields, giant ice spikes, auroras, slippery ice | Build a hollow **Ice frame** (hole 2 wide, 3 tall) and use a **Frost Crystal** on it |
+| **Skyreach** | Floating islands over a sea of clouds | Build a tower in Greenhollow and climb **above the clouds** (height 124+) |
+| **Hollow Deep** | A world with no sky: glowing mushrooms, crystal caves | Dig to the **bottom of the world** and break a glowing **Cracked Worldstone** |
+| **Lunara** | The moon: low gravity, craters, a view of home | Build and launch a **Moon Rocket** |
+| **Coral Abyss** | Coral reefs, kelp forests, palm islands (you can breathe here) | Find a **Conch Shell** on a beach and blow it **underwater** |
+| **Sugarland** | Frosting hills, candy canes, lollipop trees, chocolate milk lakes | Craft a **Dream Bed** and take a nap |
+| **Dino Valley** | Prehistoric jungle with volcanoes and dinosaurs | Dig up a **Fossil**, craft a **Time Clock**, use it |
+| **Prismara** | Rainbow crystal spires; home of the **Prism Guardian** boss | Collect all **8 Realm Gems**, craft the **Star Key** |
+
+Each realm (except home and Prismara) has a special ore that drops its **Realm Gem**.
+
+## Mods
+
+Mods are rare power-ups found while mining. Any ore can drop one, and sparkly
+**Mod Geodes** always do. There are **50 mods** in 6 rarities
+(Common, Uncommon, Rare, Epic, Legendary, Mythic):
+
+- Found anywhere: Swift Feet, Spring Legs, Quick Pick, Lucky Miner, Tough Skin, Night Eyes,
+  Iron Stomach, Treefeller, Regeneration, Feather Fall, Double Jump, Forge Touch, Mighty Arm,
+  Vein Miner, Big Dig, Crafty Hands, Spiky Armor, Long Arms, Heart Snatcher, Geode Finder,
+  **Pocket Pal** (a floating buddy that zaps monsters), **Second Wind**, **X-Ray Vision**, **Jetpack**
+- Only found in one realm: Green Thumb & Critter Charm (Greenhollow), Fireproof, Flame Fist &
+  Magma Stride (Emberdeep), Ice Path, Ice Skates & **Frost Bolt** (Frostveil), Glider & **Cloud Walker**
+  (Skyreach), Glow Aura & Echo Sense (Hollow Deep), Moon Boots & **Meteor Stomp** (Lunara), Gills,
+  Dolphin Kick & Water Strider (Coral Abyss), Sweet Tooth, Bubblegum Bounce & Sugar Rush (Sugarland),
+  Dino Buddy, Raptor Claws & **Mega Roar** (Dino Valley)
+- Mythic, only in Prismara: Prism Blink, Realm Master, Rainbow Luck
+
+Catch a sparkly **Modling** (a rare, shy flying creature in every realm) to win a mod too.
+Finding a mod you already own **levels it up** (up to III). You can equip 4 at a time.
+Finding 15 different mods unlocks a 5th slot, and beating the final boss unlocks another.
+
+## Everything else
+
+- **Survival** (health, hunger, air, monsters at night) and **Creative** (fly, every block, no damage).
+  Monsters can be set to Peaceful, Easy or Normal.
+- **Villages** in Greenhollow (oak, desert and snowy styles), Frostveil (ice), Sugarland (candy) and Dino
+  Valley (mud huts): houses with beds, Workbenches, Furnaces and a loot **Chest**, a well, lamp posts, berry farms, and
+  villagers who **trade**. The Farmer, Smith, Gem Trader, Explorer (Conch Shells and Fossils for reaching
+  realms) and Mystic (Mod Geodes) each have their own offers. There is always a village near your
+  starting point, and villages show as a yellow house on the minimap.
+- **Chests**: every village house has one full of loot (food, torches, ingots, gems, tools, sometimes a
+  Mod Geode, plus things that fit the village's style). Make your own from 8 Planks at a Workbench and
+  store up to 27 stacks in it. Tap an item, then tap where it should go (shift-click moves it straight
+  across, right-click takes half). Breaking a chest gives you everything inside; if your bag is too
+  full it stays put so nothing gets lost. Explosions can't destroy chests.
+- Crafting list that shows exactly what you're missing, with Workbench and Furnace stations.
+- A **Materials** browser (in the crafting panel and the Realm Guide): pick any material to see where
+  to find it and everything you can make with it. Tap an ingredient in any recipe to jump to it, and
+  hover an item to see what it makes.
+- Every block can be broken, and every block drops its item, even mined by hand (you can collect any
+  ore without a pickaxe). Harder blocks take longer, and stronger pickaxes are faster: Iron Ore takes
+  7.5s by hand, 3.1s with wood, 0.9s with stone, 0.6s with iron, 0.4s with ruby and 0.3s with
+  prismatic. Buckets scoop up and pour water, lava and chocolate milk. You can even craft a Realm Gate.
+- Beds are 2 blocks long (foot and pillow end) and low enough to jump onto. Sleep at night to skip it
+  and set your spawn point.
+- Monsters that come out at night (Gloomlings, Gloop Spitters, Shade Bats) catch fire when the sun
+  comes up, unless they hide in shade, caves or water.
+- You see your arm holding whatever you've picked: blocks as little 3D cubes, tools and items as
+  sprites, with swing and switch animations. A hint under the crosshair says what Use will do.
+- Wood → Stone → Iron → Ruby → Prismatic tools, plus armor.
+- The same blocks and items stack up to 100 per slot; different items never share a slot. Tools,
+  armor, keys and filled buckets don't stack.
+- 46 original creatures to find, from Fluffalos, Bramble Foxes and Puffmallows to Gloomlings, Raptors,
+  Yetis, Woolly Tuskers, a giant Sky Whale and the rare Starhorn. The **Creature Log** (Realm Guide)
+  fills in each one when you spot it and gives hints for the ones you haven't found yet.
+- Boom Barrels (light one with an Igniter, then run), Bounce Pads, Scaffolding, Lanterns, beds,
+  and 9 colors of Paint Blocks.
+- An always-visible **Goal** that walks new players from their first log all the way to the final boss.
+- Achievements, minimap, day/night cycle, rain, auroras, a rainbow, nebula skies, music for every realm.
+
+## Project layout
+
+```
+index.html          page + HUD/menu markup
+style.css           all UI styling
+js/util.js          math, noise, RNG helpers
+js/blocks.js        blocks, items, procedural textures and icons
+js/realms.js        the 10 realm generators and their look
+js/world.js         chunks, streaming, meshing, raycasting
+js/render.js        WebGL2 renderer and shaders
+js/mods.js          mod definitions, drop rolls, stat effects
+js/crafting.js      recipes
+js/audio.js         synthesized sound effects and music
+js/mobs.js          creatures, physics, projectiles, particles, boss
+js/ui.js            HUD, menus, inventory, touch controls
+js/game.js          player, interaction, saving, main loop
+tools/build_single.py   bundles everything into one HTML file
+```
+
+No libraries, no build step, no downloads: plain JavaScript and WebGL2.
+
+## Ideas for campers who want to change it
+
+- Add a block: copy a `block(...)` line in `js/blocks.js` and give it a texture in `TEXDEF`.
+- Add a recipe: one `rec(...)` line in `js/crafting.js`.
+- Invent a mod: add a `mod(...)` line in `js/mods.js` and use its level in `computeStats`.
+- Tweak a realm: every realm in `js/realms.js` has its own colors, gravity, music and generator.

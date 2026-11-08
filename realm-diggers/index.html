@@ -1,0 +1,228 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Realm Diggers</title>
+<meta name="description" content="Dig deep, build big, collect rare mods and discover 10 realms.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Pixelify+Sans:wght@400;600;700&family=Nunito:wght@600;800&display=swap">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<canvas id="gl"></canvas>
+<div id="fx-water" class="fx"></div>
+<div id="fx-lava" class="fx"></div>
+<div id="fx-hurt" class="fx"></div>
+<div id="fx-fade" class="fx"></div>
+
+<div id="hud" hidden>
+  <div id="crosshair"></div>
+  <div id="use-hint" hidden></div>
+  <div id="info">
+    <div id="realm-chip"><span class="dot"></span><span id="realm-name">Greenhollow</span></div>
+    <div id="coords"></div>
+    <div id="goal"><span class="label">Goal</span><span id="goal-text"></span></div>
+  </div>
+  <div id="minimap-wrap"><canvas id="minimap" width="128" height="128"></canvas><div id="clock"></div><div id="geode-hint" hidden></div></div>
+  <div id="bossbar" hidden><div id="boss-name">Prism Guardian</div><div class="track"><div id="boss-fill"></div></div></div>
+  <div id="toasts"></div>
+  <div id="realm-card" hidden><div class="eyebrow">Now entering</div><div class="name"></div><div class="tag"></div></div>
+  <div id="popup" hidden></div>
+  <div id="bottom">
+    <div id="modbar"></div>
+    <div id="item-name"></div>
+    <div id="bars">
+      <div id="hearts" class="iconrow"></div>
+      <div id="food" class="iconrow"></div>
+    </div>
+    <div id="air" class="iconrow"></div>
+    <div id="fuel" hidden><div id="fuel-fill"></div></div>
+    <div id="hotbar"></div>
+  </div>
+  <div id="hand"><img id="hand-img" alt=""></div>
+</div>
+
+<div id="touch" hidden>
+  <div id="touch-area"></div>
+  <div id="joy"><div id="joy-knob"></div></div>
+  <div id="t-top">
+    <button class="tb" id="t-inv" aria-label="Inventory">🎒</button>
+    <button class="tb" id="t-mods" aria-label="Mods">✦</button>
+    <button class="tb" id="t-guide" aria-label="Realm Guide">📖</button>
+    <button class="tb" id="t-pause" aria-label="Pause">⏸</button>
+  </div>
+  <div id="t-right">
+    <div id="t-abil">
+      <button class="tb small" id="t-ab-x" hidden>X</button>
+      <button class="tb small" id="t-ab-r" hidden>R</button>
+      <button class="tb small" id="t-ab-f" hidden>F</button>
+      <button class="tb small" id="t-ab-q" hidden>Q</button>
+    </div>
+    <button class="tb act use" id="t-use" aria-label="Use: open workbenches, beds, gates, trade, eat"><span>✋</span><small>Use</small></button>
+    <button class="tb act build" id="t-build" aria-label="Build: place blocks, eat, use things"><span>🧱</span><small>Build</small></button>
+    <button class="tb act mine" id="t-mine" aria-label="Mine: dig blocks, hit creatures"><span>⛏</span><small>Mine</small></button>
+    <button class="tb" id="t-sneak" aria-label="Sneak or fly down">⤓</button>
+    <button class="tb big" id="t-jump" aria-label="Jump">⤒</button>
+  </div>
+</div>
+
+<section id="scr-loading" class="screen solid" hidden>
+  <div class="loading"><div class="spinner"></div><div id="loading-text">Building the world…</div></div>
+</section>
+
+<section id="scr-title" class="screen" hidden>
+  <div class="title-wrap">
+    <h1 class="logo"><span class="l1">Realm</span><span class="l2">Diggers</span></h1>
+    <p class="tag">Dig deep. Build big. Collect rare mods. Discover 10 realms.</p>
+    <div id="slots"></div>
+    <div class="row center">
+      <button class="btn" id="btn-howto">How to play</button>
+      <button class="btn" id="btn-title-settings">Settings</button>
+    </div>
+    <p class="fineprint" id="storage-note"></p>
+  </div>
+</section>
+
+<section id="scr-new" class="screen" hidden>
+  <div class="panel narrow">
+    <h2>New world</h2>
+    <label class="field"><span>World name</span><input id="nw-name" maxlength="24" value="My World"></label>
+    <div class="field"><span>Game mode</span>
+      <div class="seg" id="nw-mode">
+        <button data-v="survival" class="on">Survival<small>Mine, craft, survive</small></button>
+        <button data-v="creative">Creative<small>Fly, build anything</small></button>
+      </div>
+    </div>
+    <div class="field"><span>Monsters</span>
+      <div class="seg" id="nw-diff">
+        <button data-v="peaceful">Peaceful</button>
+        <button data-v="easy" class="on">Easy</button>
+        <button data-v="normal">Normal</button>
+      </div>
+    </div>
+    <label class="field"><span>Seed (optional)</span><input id="nw-seed" maxlength="20" placeholder="Leave empty for a random world"></label>
+    <div class="row end">
+      <button class="btn ghost" id="nw-cancel">Back</button>
+      <button class="btn primary" id="nw-create">Create world</button>
+    </div>
+  </div>
+</section>
+
+<section id="scr-pause" class="screen" hidden>
+  <div class="panel narrow center-col">
+    <h2>Paused</h2>
+    <button class="btn primary wide" id="p-resume">Back to game</button>
+    <button class="btn wide" id="p-guide">Realm Guide</button>
+    <button class="btn wide" id="p-mods">Mods</button>
+    <button class="btn wide" id="p-settings">Settings</button>
+    <button class="btn ghost wide" id="p-quit">Save &amp; quit to title</button>
+  </div>
+</section>
+
+<section id="scr-inv" class="screen" hidden>
+  <div class="panel wide inv-panel">
+    <div class="inv-left">
+      <div class="panel-head"><h2>Inventory</h2><span class="stations" id="stations"></span></div>
+      <div id="inv-main" class="grid9"></div>
+      <div class="sep"></div>
+      <div id="inv-hot" class="grid9"></div>
+      <div class="armor-row"><span>Armor</span><div id="inv-armor"></div><span id="armor-val" class="muted"></span></div>
+    </div>
+    <div class="inv-right">
+      <div class="panel-head"><h2 id="craft-title">Crafting</h2><button class="btn small ghost" id="inv-close">Close (E)</button></div>
+      <div id="craft-tabs" class="tabs"></div>
+      <div id="craft-list"></div>
+    </div>
+  </div>
+</section>
+
+<section id="scr-mods" class="screen" hidden>
+  <div class="panel wide">
+    <div class="panel-head"><h2>Mods</h2><button class="btn small ghost" id="mods-close">Close (M)</button></div>
+    <p class="muted">Mods are rare power-ups you find while mining ore. Sparkly <b>Mod Geodes</b> always hold one. Find the same mod again to level it up. Each realm hides its own exclusive mods.</p>
+    <div class="equipped-wrap"><span class="label">Equipped</span><div id="mod-equipped"></div></div>
+    <div class="mods-body">
+      <div id="mod-grid"></div>
+      <div id="mod-detail"></div>
+    </div>
+  </div>
+</section>
+
+<section id="scr-guide" class="screen" hidden>
+  <div class="panel wide">
+    <div class="panel-head"><h2>Realm Guide</h2><button class="btn small ghost" id="guide-close">Close (G)</button></div>
+    <div class="tabs" id="guide-tabs">
+      <button data-t="realms" class="on">Realms</button>
+      <button data-t="creatures">Creatures</button>
+      <button data-t="materials">Materials</button>
+      <button data-t="goals">Goals</button>
+      <button data-t="controls">Controls</button>
+    </div>
+    <div id="guide-body"></div>
+  </div>
+</section>
+
+<section id="scr-travel" class="screen" hidden>
+  <div class="panel wide">
+    <div class="panel-head"><h2>Realm Gate</h2><button class="btn small ghost" id="travel-close">Close</button></div>
+    <p class="muted">Travel to any realm you have discovered. Undiscovered realms show how to find them.</p>
+    <div id="travel-list" class="realm-grid"></div>
+  </div>
+</section>
+
+<section id="scr-chest" class="screen" hidden>
+  <div class="panel chest-panel">
+    <div class="panel-head"><h2>Chest</h2><div class="chest-acts"><button class="btn small primary" id="chest-take">Take all</button><button class="btn small ghost" id="chest-close">Close</button></div></div>
+    <div id="chest-grid" class="grid9"></div>
+    <div class="chest-label">Your inventory <span class="muted">(tap an item, then tap where it should go)</span></div>
+    <div id="chest-inv" class="grid9"></div>
+    <div class="sep"></div>
+    <div id="chest-hot" class="grid9"></div>
+  </div>
+</section>
+
+<section id="scr-trade" class="screen" hidden>
+  <div class="panel narrow trade-panel">
+    <div class="panel-head"><div class="trade-who"><img id="trade-face" alt=""><div><h2 id="trade-title">Villager</h2><p class="muted" id="trade-greet"></p></div></div><button class="btn small ghost" id="trade-close">Close</button></div>
+    <div id="trade-list"></div>
+  </div>
+</section>
+
+<section id="scr-settings" class="screen" hidden>
+  <div class="panel narrow">
+    <h2>Settings</h2>
+    <div id="settings-body"></div>
+    <div class="row end"><button class="btn primary" id="settings-done">Done</button></div>
+  </div>
+</section>
+
+<section id="scr-death" class="screen red" hidden>
+  <div class="panel narrow center-col">
+    <h2>You fainted!</h2>
+    <p class="muted" id="death-msg">Don't worry, you keep all your stuff.</p>
+    <button class="btn primary wide" id="d-respawn">Respawn</button>
+  </div>
+</section>
+
+<section id="scr-error" class="screen solid" hidden>
+  <div class="panel narrow"><h2>Uh oh</h2><p id="error-msg">This device can't run the 3D view (WebGL2 is missing).</p></div>
+</section>
+
+<div id="cursor-item" hidden><img alt=""><span></span></div>
+<div id="tooltip" hidden></div>
+
+<script src="js/util.js"></script>
+<script src="js/blocks.js"></script>
+<script src="js/realms.js"></script>
+<script src="js/world.js"></script>
+<script src="js/render.js"></script>
+<script src="js/mods.js"></script>
+<script src="js/crafting.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/mobs.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/game.js"></script>
+</body>
+</html>
