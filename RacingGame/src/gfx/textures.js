@@ -645,3 +645,28 @@ export function leafTexture(kind = 'green') {
     return tex(c);
   });
 }
+
+// Grass tuft card: blades on transparent background (alpha-tested)
+export function grassTuftTexture(dry = false) {
+  return cached('tuft' + dry, () => {
+    const W = 128, H = 128, c = canvas(W, H), ctx = c.getContext('2d');
+    ctx.clearRect(0, 0, W, H);
+    const rng = new RNG(dry ? 5 : 3);
+    for (let i = 0; i < 70; i++) {
+      const x = rng.float(8, W - 8), h = rng.float(H * 0.35, H * 0.98), lean = rng.float(-18, 18);
+      const g = ctx.createLinearGradient(0, H, 0, H - h);
+      if (dry) { g.addColorStop(0, '#5a4e2c'); g.addColorStop(1, rng.chance(0.5) ? '#c8b46e' : '#a89a58'); }
+      else { g.addColorStop(0, '#22401a'); g.addColorStop(1, rng.chance(0.5) ? '#7fa64a' : '#5f8a36'); }
+      ctx.fillStyle = g;
+      const w = rng.float(2.2, 4.5);
+      ctx.beginPath();
+      ctx.moveTo(x - w, H);
+      ctx.quadraticCurveTo(x + lean * 0.3, H - h * 0.6, x + lean, H - h);
+      ctx.quadraticCurveTo(x + lean * 0.3 + w * 0.3, H - h * 0.6, x + w, H);
+      ctx.closePath();
+      ctx.fill();
+    }
+    const t = tex(c, { repeat: false });
+    return t;
+  });
+}

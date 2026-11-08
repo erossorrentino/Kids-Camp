@@ -1092,6 +1092,77 @@ export function buildTrackScene(track, env, quality, opts = {}) {
     group.add(im);
   }
 
+  // Grass tufts: instanced crossed cards on grass run-off and verges
+  const tuftBudget = Math.round({ 0: 0, 1: 9000, 2: 26000 }[quality.carDetail] * Math.min(1.5, scenery));
+  const grassy = (k) => k === 'grass' || k === 'drygrass';
+  const vergeGrassy = grassy(SC.near && SC.near !== SC.ground ? SC.near : SC.ground);
+  if (tuftBudget > 0 && (vergeGrassy || [...runoffKinds].some(grassy))) {
+    const dry = SC.ground === 'drygrass' || [...runoffKinds].includes('drygrass');
+    const tg = new THREE.BufferGeometry();
+    const pos = [], uv = [], nor = [], idx = [];
+    for (let k = 0; k < 2; k++) {
+      const a = k * Math.PI / 2, cx = Math.cos(a) * 0.32, cz = Math.sin(a) * 0.32;
+      const b = pos.length / 3;
+      pos.push(-cx, 0, -cz, cx, 0, cz, cx, 0.42, cz, -cx, 0.42, cz * -1);
+      pos[pos.length - 1] = -cz;
+      uv.push(0, 0, 1, 0, 1, 1, 0, 1);
+      for (let q = 0; q < 4; q++) nor.push(0, 1, 0);
+      idx.push(b, b + 1, b + 2, b, b + 2, b + 3);
+      idx.push(b, b + 2, b + 1, b, b + 3, b + 2); // back face, same upward normals (no dark flip)
+    }
+    tg.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    tg.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+    tg.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+    tg.setIndex(idx);
+    const tm = reg(new THREE.MeshStandardMaterial({ map: TX.grassTuftTexture(dry), alphaTest: 0.45, side: THREE.FrontSide, roughness: 0.95 }));
+    const spots = [];
+    const per = tuftBudget / (N * 2);
+    for (let i = 0; i < N && spots.length < tuftBudget; i++) {
+      for (const side of [1, -1]) {
+        const runK = side > 0 ? track.runL[i] : track.runR[i];
+        const barr = side > 0 ? track.barrierL[i] : track.barrierR[i];
+        const verge = side > 0 ? track.vergeL[i] : track.vergeR[i];
+        const curb = side > 0 ? track.curbL[i] : track.curbR[i];
+        const inner = track.hw[i] + (curb ? track.curbW + 0.6 : 0.8);
+        let n = per * (0.6 + rng.next() * 0.8);
+        while (n > 0) {
+          if (rng.next() > n) break;
+          n -= 1;
+          const onVerge = rng.next() < 0.45;
+          let d;
+          if (onVerge) { if (!vergeGrassy || verge < 1.5) continue; d = barr + 0.6 + rng.next() * (verge - 0.8); }
+          else { if (!grassy(runK) || barr - inner < 1.2) continue; d = inner + Math.pow(rng.next(), 0.7) * (barr - 0.4 - inner); }
+          const t = rng.next();
+          const j = (i + 1) % N;
+          const x = lerp(track.x[i], track.x[j], t), z = lerp(track.z[i], track.z[j], t);
+          const lx = track.lx[i], lz = track.lz[i];
+          const wx = x + lx * side * d, wz = z + lz * side * d;
+          const y = onVerge ? track.heightAt(i, t, side * barr) - 0.02 - (d - barr) / Math.max(1, verge) * 0.12 : track.heightAt(i, t, side * d) - 0.012;
+          spots.push([wx, y, wz]);
+        }
+      }
+    }
+    if (spots.length) {
+      const im = new THREE.InstancedMesh(tg, tm, spots.length);
+      const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), sc = new THREE.Vector3();
+      const col = new THREE.Color();
+      spots.forEach(([x, y, z], k) => {
+        q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), rng.next() * Math.PI);
+        const s0 = 0.55 + rng.next() * 0.7;
+        p.set(x, y, z); sc.set(s0, s0 * (0.7 + rng.next() * 0.7), s0);
+        m4.compose(p, q, sc);
+        im.setMatrixAt(k, m4);
+        const v = 0.8 + rng.next() * 0.35;
+        col.setRGB(v, v * (0.95 + rng.next() * 0.1), v * 0.9);
+        im.setColorAt(k, col);
+      });
+      im.receiveShadow = quality.shadows > 0;
+      im.castShadow = false;
+      group.add(im);
+      disposables.push(tg);
+    }
+  }
+
   // Floodlight poles (night circuits)
   if (night) {
     const poleG = new THREE.CylinderGeometry(0.12, 0.18, 1, 8);

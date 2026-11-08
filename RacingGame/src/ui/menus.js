@@ -176,6 +176,13 @@ export class UI {
   }
 
   controlsHtml() {
+    if (this.app.isTouch) {
+      return `<div class="controls touch-help">
+        <div><b>◀ ▶</b> buttons: steer</div><div><b>BRAKE</b>: slow down / reverse</div>
+        <div><b>GAS</b>: accelerate${this.profile.settings.assists.autoGas ? ' (Auto accelerate is ON)' : ''}</div><div><b>N2O</b>: nitro boost</div>
+        <div><b>CAM</b>: change camera</div><div><b>❚❚</b>: pause</div>
+        <div>Turn your phone sideways to race</div><div>🎮 Controllers work too</div></div>`;
+    }
     return `<div class="controls">
       <div><kbd>W</kbd>/<kbd>↑</kbd> Accelerate</div><div><kbd>S</kbd>/<kbd>↓</kbd> Brake / Reverse</div>
       <div><kbd>A</kbd><kbd>D</kbd>/<kbd>←</kbd><kbd>→</kbd> Steer</div><div><kbd>Space</kbd> Handbrake</div>
