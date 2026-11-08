@@ -42,6 +42,7 @@ const ACHIEVEMENTS = [
   { id: 'modling', name: 'Mod Catcher', desc: 'Catch a sparkly Modling.' },
   { id: 'village', name: 'Neighbors', desc: 'Find a village.' },
   { id: 'trade', name: 'Fair Trade', desc: 'Trade with a villager.' },
+  { id: 'loot', name: 'Treasure Hunter', desc: 'Loot a chest in a village.' },
 ];
 const GOAL_CHAIN = ['wood', 'bench', 'woodpick', 'stonepick', 'furnace', 'iron', 'firstmod', 'village', 'ironpick', 'realm_emberdeep', 'realm_frostveil', 'realm_skyreach', 'realm_hollowdeep', 'realm_coralabyss', 'realm_sugarland', 'realm_lunara', 'realm_dinovalley', 'allgems', 'realm_prismara', 'boss'];
 const GOAL_TEXT = {
@@ -128,7 +129,7 @@ const Game = {
   newSaveData(name, mode, seed) {
     return { v: 1, name, mode, seed, created: Date.now(), playTime: 0, realm: 'greenhollow', pos: null, yaw: 0, pitch: 0, hp: 20, food: 20,
       inv: new Array(36).fill(null), armor: null, mods: {}, equipped: [], discovered: ['greenhollow'], gems: [], seen: [], achievements: [],
-      realms: {}, creatures: [], time: 0.04, bedSpawn: null, bossDefeated: false, counters: { kills: 0, placed: 0 } };
+      realms: {}, creatures: [], chests: {}, time: 0.04, bedSpawn: null, bossDefeated: false, counters: { kills: 0, placed: 0 } };
   },
   newGame(slot, name, mode, seed) {
     this.slot = slot;
@@ -480,7 +481,7 @@ const Game = {
       return;
     }
     if (this.state === 'ui') {
-      if ((code === 'KeyE' && UI.screen === 'scr-inv') || (code === 'KeyM' && UI.screen === 'scr-mods') || (code === 'KeyG' && UI.screen === 'scr-guide')) this.closeUI();
+      if ((code === 'KeyE' && (UI.screen === 'scr-inv' || UI.screen === 'scr-chest')) || (code === 'KeyM' && UI.screen === 'scr-mods') || (code === 'KeyG' && UI.screen === 'scr-guide')) this.closeUI();
       return;
     }
     if (this.state !== 'playing') return;
@@ -883,6 +884,7 @@ const Game = {
     if (!id) return;
     const d = BLOCKS[id];
     if (d.unbreakable) return;
+    if (id === B.chest && !this.emptyChestInto(x, y, z)) return;
     w.setBlock(x, y, z, WLOG[id] ? B.water : 0);
     if (d.pair) for (const [ox, oz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (w.blockAt(x + ox, y, z + oz) === B[d.pair]) { w.setBlock(x + ox, y, z + oz, 0); break; }
     Particles.blockBreak(x, y, z, id);
@@ -993,7 +995,7 @@ const Game = {
     if (!t) return '';
     if (held && held.id === I.frost_crystal && (t.id === B.ice || t.id === B.packed_ice || t.id === B.blue_ice)) return 'Open a Frost Portal';
     const d = BLOCKS[t.id];
-    const what = { craft: 'open crafting', bed: this.realm.sky.mode === 'cycle' ? 'sleep and set your spawn' : 'set your spawn', dreambed: 'take a dreamy nap', gate: 'travel to a realm', rocket: 'blast off!', eat: 'eat some cake',
+    const what = { chest: 'open it', craft: 'open crafting', bed: this.realm.sky.mode === 'cycle' ? 'sleep and set your spawn' : 'set your spawn', dreambed: 'take a dreamy nap', gate: 'travel to a realm', rocket: 'blast off!', eat: 'eat some cake',
       barrel: held && held.id === I.igniter ? 'light it, then run!' : '' }[d.interact];
     return what ? `${d.name}: ${what}` : '';
   },
@@ -1046,6 +1048,7 @@ const Game = {
         if (held && held.id === I.igniter) { this.world.setBlock(t.x, t.y, t.z, 0); this.barrels.push({ x: t.x + 0.5, y: t.y, z: t.z + 0.5, vx: 0, vy: 0, vz: 0, w: 0.98, h: 0.98, fuse: 3, fuseSnd: 0 }); Sound.play('fuse'); UI.toast('RUN!', '#ff5a5a'); return true; }
         if (!(held && isPlaceable(held.id))) UI.toast('Use an Igniter on a Boom Barrel to light it.');
         return false;
+      case 'chest': this.openChest(t.x, t.y, t.z); return true;
       case 'eat':
         if (p.food < 20 || this.creative) { this.world.setBlock(t.x, t.y, t.z, 0); p.food = Math.min(20, p.food + 3); Sound.play('eat'); this.achieve('eat'); Particles.blockBreak(t.x, t.y, t.z, t.id); return true; }
         return false;
@@ -1103,6 +1106,7 @@ const Game = {
     }
     w.setBlock(x, y, z, id);
     if (pairKey) w.setBlock(px2, y, pz2, B[pairKey]);
+    if (id === B.chest) this.chestStore()[x + ',' + y + ',' + z] = new Array(27).fill(null);
     Sound.play('place', id); UI.swing();
     if (!this.creative) { held.n--; if (held.n <= 0) p.inv[p.sel] = null; UI.updateHotbar(); }
     this.save.counters.placed++;
@@ -1335,6 +1339,39 @@ const Game = {
     for (let i = 0; i <= 12; i++) { const f = i / 12; Particles.add(q.x + (ex - q.x) * f, q.y + (ey - q.y) * f, q.z + (ez - q.z) * f, 0, 0, 0, 0.25, 0.05, 0.6, 1, 0.9, 1, 0, true); }
     Sound.play('zap');
   },
+  // ---------------- chests ----------------
+  chestStore() { const c = this.save.chests || (this.save.chests = {}); return c[this.realm.key] || (c[this.realm.key] = {}); },
+  getChest(x, y, z) {
+    const store = this.chestStore(), key = x + ',' + y + ',' + z;
+    if (!store[key]) {
+      // never opened: a village chest, so fill it with loot (same loot for this seed and spot)
+      const v = villagesNear(this.world.G, this.realm, x, z, 40)[0];
+      const rnd = mulberry32((ihash(x, y, z, this.save.seed ^ 0x51ed) * 4294967296) >>> 0);
+      store[key] = v ? rollChestLoot(rnd, v.theme) : new Array(27).fill(null);
+    }
+    return store[key];
+  },
+  openChest(x, y, z) {
+    const items = this.getChest(x, y, z);
+    this.chestAt = [x, y, z];
+    this.state = 'ui'; this.releaseLock();
+    Input.mouseL = Input.mouseR = Input.btnMine = Input.btnBuild = false;
+    Sound.play('chest');
+    if (villagesNear(this.world.G, this.realm, x, z, 40).length && items.some(Boolean)) this.achieve('loot');
+    UI.openChest(items);
+  },
+  // breaking a chest hands you what's inside; it stays if you have no room for everything
+  emptyChestInto(x, y, z) {
+    const items = this.getChest(x, y, z);
+    for (let i = 0; i < items.length; i++) {
+      const s = items[i]; if (!s) continue;
+      const left = this.addItem(s.id, s.n);
+      if (left > 0) { s.n = left; UI.toast('Make room in your inventory to pick up the rest of the chest.', '#ff9a5a'); return false; }
+      items[i] = null;
+    }
+    delete this.chestStore()[x + ',' + y + ',' + z];
+    return true;
+  },
   updateVillages() {
     const p = this.player, w = this.world;
     this.villages = villagesNear(w.G, this.realm, p.x, p.z, 260).sort((a, b) => Math.hypot(a.x - p.x, a.z - p.z) - Math.hypot(b.x - p.x, b.z - p.z)).slice(0, 3);
@@ -1451,7 +1488,7 @@ const Game = {
       const X = bx + dx, Y = by + dy, Z = bz + dz, id = w.blockAt(X, Y, Z);
       if (!id) continue;
       const d = BLOCKS[id];
-      if (d.unbreakable || LIQ[id] || id === B.obsidian || id === B.guardian_stone || id === B.worldstone || id === B.realm_gate) continue;
+      if (d.unbreakable || LIQ[id] || id === B.obsidian || id === B.guardian_stone || id === B.worldstone || id === B.realm_gate || id === B.chest) continue;
       if (id === B.boom_barrel) { w.setBlock(X, Y, Z, 0); this.barrels.push({ x: X + .5, y: Y, z: Z + .5, vx: 0, vy: 3, vz: 0, w: .98, h: .98, fuse: 0.3 + Math.random() * 0.5, fuseSnd: 1 }); continue; }
       w.setBlock(X, Y, Z, WLOG[id] ? B.water : 0);
       if (!this.creative && Math.random() < 0.3) for (const [did, n] of this.getDrops(id)) this.addItem(did, n);

@@ -181,6 +181,7 @@ plant('star_flower', 'Star Flower', { emissive: true, light: [0.8, 0.7, 1, 5], g
 // NOTE: saves store block numbers, so new blocks must always be added at the END of this list.
 block('bed_head', 'Bed', { tex: ['bed_head_top', 'planks', 'bed_head_side'], hard: .4, interact: 'bed', cat: null, opaque: false, sky: 0, height: 0.5625, soft: true, drop: 'bed', pair: 'bed' });
 block('dream_bed_head', 'Dream Bed', { tex: ['dreambed_head_top', 'planks', 'dreambed_head_side'], hard: .4, interact: 'dreambed', cat: null, opaque: false, sky: 0, height: 0.5625, soft: true, drop: 'dream_bed', pair: 'dream_bed', light: [1, 0.6, 0.9, 5] });
+block('chest', 'Chest', { tex: ['chest_top', 'chest_top', 'chest_side', 'chest_front'], hard: 1.5, tool: 'axe', interact: 'chest', cat: 'special' });
 
 // ---------------- Items ----------------
 let _nextItem = 256;
@@ -582,6 +583,9 @@ for (let s = 0; s < 8; s++) TEXDEF['crack' + s] = p => {
   }
 };
 
+TEXDEF.chest_top = p => { p.planks(hx('#a8743e')); for (let i = 0; i < 16; i++) { p.set(i, 0, hx('#5a3a1e')); p.set(i, 15, hx('#5a3a1e')); p.set(0, i, hx('#5a3a1e')); p.set(15, i, hx('#5a3a1e')); } };
+TEXDEF.chest_side = p => { p.planks(hx('#a8743e')); p.rect(0, 5, 16, 2, hx('#5a3a1e')); for (let i = 0; i < 16; i++) { p.set(0, i, hx('#5a3a1e')); p.set(15, i, hx('#5a3a1e')); p.set(i, 15, hx('#5a3a1e')); p.set(i, 0, hx('#5a3a1e')); } };
+TEXDEF.chest_front = p => { TEXDEF.chest_side(p); p.rect(6, 4, 4, 5, hx('#e8c25a')); p.rect(7, 6, 2, 2, hx('#3a2a10')); p.set(6, 4, hx('#fff0a8')); };
 TEXDEF.hand_skin = p => { p.fill(hx('#e8b48a'), 8); p.speck(hx('#d89c74'), 10, 4); };
 TEXDEF.hand_sleeve = p => { p.fill(hx('#3a8ad8'), 10); for (let i = 0; i < 16; i += 4) p.line(0, i, 15, i, hx('#2f72b8'), 4); };
 const TILE = {};

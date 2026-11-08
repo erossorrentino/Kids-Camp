@@ -46,6 +46,8 @@ const UI = {
     $('guide-close').onclick = () => (this.guideFromTitle ? this.showTitle() : Game.closeUI());
     $('travel-close').onclick = () => Game.closeUI();
     $('trade-close').onclick = () => Game.closeUI();
+    $('chest-close').onclick = () => Game.closeUI();
+    $('chest-take').onclick = () => { for (let i = 0; i < 27; i++) { const s = this.chestArr[i]; if (!s) continue; const left = Game.addItem(s.id, s.n); if (left > 0) { s.n = left; break; } this.chestArr[i] = null; } Sound.play('pickup'); this.renderChest(); };
     $('settings-done').onclick = () => { Settings.save(); Sound.applyVolume(); this.show(this.settingsBack); if (this.settingsBack === 'scr-pause') Game.applySettings(); };
     $('d-respawn').onclick = () => Game.respawn();
     $('guide-tabs').addEventListener('click', e => { const b = e.target.closest('button'); if (!b) return; this.guideTab = b.dataset.t; this.renderGuide(); });
@@ -367,7 +369,17 @@ const UI = {
     if (c) { el.querySelector('img').src = iconURL(c.id); el.querySelector('span').textContent = c.n > 1 ? c.n : ''; this.moveCursorItem(); }
   },
   moveCursorItem() { const el = $('cursor-item'); if (!el.hidden) { el.style.left = this.mx + 'px'; el.style.top = this.my + 'px'; } },
-  returnCursor() { if (this.cursor) { Game.addItem(this.cursor.id, this.cursor.n); this.cursor = null; this.updateCursorItem(); } },
+  returnCursor() {
+    if (!this.cursor) return;
+    let left = Game.addItem(this.cursor.id, this.cursor.n);
+    // inventory full while a chest is open: put the rest back in the chest
+    if (left > 0 && this.screen === 'scr-chest' && this.chestArr) {
+      const a = this.chestArr, st = itemDef(this.cursor.id).stack;
+      for (let k = 0; k < a.length && left > 0; k++) if (a[k] && a[k].id === this.cursor.id && a[k].n < st) { const m = Math.min(left, st - a[k].n); a[k].n += m; left -= m; }
+      for (let k = 0; k < a.length && left > 0; k++) if (!a[k]) { a[k] = { id: this.cursor.id, n: left }; left = 0; }
+    }
+    this.cursor = null; this.updateCursorItem();
+  },
   showTip(id) {
     const d = itemDef(id); if (!d) return;
     let extra = '';
@@ -559,6 +571,46 @@ const UI = {
     const list = $('travel-list');
     list.innerHTML = REALMS.map(r => this.realmCardHTML(r, true)).join('');
     list.onclick = e => { const b = e.target.closest('[data-go]'); if (b) { Game.closeUI(); Game.travelTo(b.dataset.go, 'gate'); } };
+  },
+  openChest(items) {
+    this.chestArr = items;
+    this.show('scr-chest');
+    this.renderChest();
+  },
+  renderChest() {
+    const p = Game.player, grid = $('chest-grid'), inv = $('chest-inv'), hot = $('chest-hot');
+    grid.innerHTML = ''; inv.innerHTML = ''; hot.innerHTML = '';
+    for (let i = 0; i < 27; i++) grid.appendChild(this.slotEl(this.chestArr[i], e => this.chestClick(this.chestArr, i, p.inv, e)));
+    for (let i = 9; i < 36; i++) inv.appendChild(this.slotEl(p.inv[i], e => this.chestClick(p.inv, i, this.chestArr, e)));
+    for (let i = 0; i < 9; i++) hot.appendChild(this.slotEl(p.inv[i], e => this.chestClick(p.inv, i, this.chestArr, e), i === p.sel ? ' sel' : ''));
+    $('chest-take').disabled = !this.chestArr.some(Boolean);
+    this.updateCursorItem(); this.updateHotbar();
+  },
+  // tap to pick up / put down / swap; right-click takes half or drops one; shift-click sends to the other side
+  chestClick(arr, i, other, e) {
+    Sound.init();
+    let s = arr[i], c = this.cursor;
+    if (e.shiftKey && s && !c) {
+      const d = itemDef(s.id);
+      if (other === Game.player.inv) { const left = Game.addItem(s.id, s.n); if (left) s.n = left; else arr[i] = null; }
+      else {
+        for (let k = 0; k < other.length && s.n > 0; k++) { const t = other[k]; if (t && t.id === s.id && t.n < d.stack) { const m = Math.min(s.n, d.stack - t.n); t.n += m; s.n -= m; } }
+        for (let k = 0; k < other.length && s.n > 0; k++) if (!other[k]) { other[k] = { id: s.id, n: s.n }; s.n = 0; }
+        if (s.n <= 0) arr[i] = null;
+      }
+    } else if (e.button === 2) {
+      if (!c && s) { const h = Math.ceil(s.n / 2); this.cursor = { id: s.id, n: h }; s.n -= h; if (s.n <= 0) arr[i] = null; }
+      else if (c && (!s || (s.id === c.id && s.n < itemDef(s.id).stack))) { if (!s) arr[i] = { id: c.id, n: 1 }; else s.n++; c.n--; if (c.n <= 0) this.cursor = null; }
+    } else {
+      if (!c && s) { this.cursor = s; arr[i] = null; }
+      else if (c && !s) { arr[i] = c; this.cursor = null; }
+      else if (c && s) {
+        const d = itemDef(s.id);
+        if (s.id === c.id && d.stack > 1) { const m = Math.min(c.n, d.stack - s.n); s.n += m; c.n -= m; if (c.n <= 0) this.cursor = null; }
+        else { arr[i] = c; this.cursor = s; }
+      }
+    }
+    this.renderChest();
   },
   openTrade(m) {
     this.show('scr-trade');

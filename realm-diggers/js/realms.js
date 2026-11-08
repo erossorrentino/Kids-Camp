@@ -246,7 +246,7 @@ function buildVillage(c, G, realm, v) {
     }
     at(0, 3, fy + 1, 0); at(0, 3, fy + 2, 0);
     at(-3, 0, fy + 2, B.glass); at(3, 0, fy + 2, B.glass); at(0, -3, fy + 2, B.glass);
-    at(-2, -1, fy + 1, B.bed); at(-2, -2, fy + 1, B.bed_head); at(2, -2, fy + 1, B.workbench); at(1, -2, fy + 1, B.furnace); at(0, 0, fy + 3, B.lantern);
+    at(-2, -1, fy + 1, B.bed); at(-2, -2, fy + 1, B.bed_head); at(2, -2, fy + 1, B.workbench); at(2, 1, fy + 1, B.chest); at(1, -2, fy + 1, B.furnace); at(0, 0, fy + 3, B.lantern);
     for (const [k, block] of local) { const [lx, y, lz] = k.split(',').map(Number); wset(c, it.x + lx, y, it.z + lz, block, 0); }
   }
 }

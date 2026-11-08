@@ -84,6 +84,7 @@ const Sound = {
       case 'shoot': this.tone(700, 0.15, 'square', 0.05, 0.4); break;
       case 'zap': this.tone(1700, 0.09, 'square', 0.035, 0.45); break;
       case 'jump': break;
+      case 'chest': this.noise(0.3, 260, 2, 0.14, 'bandpass', 0, 1.8); this.tone(140, 0.2, 'triangle', 0.06, 1.5); break;
       case 'bounce': this.tone(300, 0.2, 'sine', 0.12, 2.5); break;
       case 'death': [440, 370, 311, 262].forEach((f, i) => this.tone(f, 0.3, 'triangle', 0.12, 0, i * 0.18)); break;
       case 'levelup': [523, 784, 1047, 1568].forEach((f, i) => this.tone(f, 0.2, 'square', 0.06, 0, i * 0.07)); break;

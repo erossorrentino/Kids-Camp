@@ -24,7 +24,7 @@ art (every texture is painted by code), sounds, and music.
 | Mouse (click the game first) | Drag the screen (aim with the + in the middle) | Look around |
 | Hold left click | Hold the ⛏ **Mine** button | Mine blocks, hit creatures |
 | Right click | Tap the 🧱 **Build** button (hold to keep placing) | Place blocks |
-| Right click | Tap the ✋ **Use** button | Use workbenches, furnaces, beds, gates and villagers; eat; use items |
+| Right click | Tap the ✋ **Use** button | Use workbenches, furnaces, beds, chests, gates and villagers; eat; use items |
 | Space (double-tap in Creative) | ⤒ | Jump / swim / fly |
 | Shift | ⤓ | Sneak (won't fall off edges) / fly down |
 | Ctrl or double-tap W | Push the stick all the way | Sprint |
@@ -79,10 +79,15 @@ Finding 15 different mods unlocks a 5th slot, and beating the final boss unlocks
 - **Survival** (health, hunger, air, monsters at night) and **Creative** (fly, every block, no damage).
   Monsters can be set to Peaceful, Easy or Normal.
 - **Villages** in Greenhollow (oak, desert and snowy styles), Frostveil (ice), Sugarland (candy) and Dino
-  Valley (mud huts): houses with beds, Workbenches and Furnaces, a well, lamp posts, berry farms, and
+  Valley (mud huts): houses with beds, Workbenches, Furnaces and a loot **Chest**, a well, lamp posts, berry farms, and
   villagers who **trade**. The Farmer, Smith, Gem Trader, Explorer (Conch Shells and Fossils for reaching
   realms) and Mystic (Mod Geodes) each have their own offers. There is always a village near your
   starting point, and villages show as a yellow house on the minimap.
+- **Chests**: every village house has one full of loot (food, torches, ingots, gems, tools, sometimes a
+  Mod Geode, plus things that fit the village's style). Make your own from 8 Planks at a Workbench and
+  store up to 27 stacks in it. Tap an item, then tap where it should go (shift-click moves it straight
+  across, right-click takes half). Breaking a chest gives you everything inside; if your bag is too
+  full it stays put so nothing gets lost. Explosions can't destroy chests.
 - Crafting list that shows exactly what you're missing, with Workbench and Furnace stations.
 - A **Materials** browser (in the crafting panel and the Realm Guide): pick any material to see where
   to find it and everything you can make with it. Tap an ingredient in any recipe to jump to it, and

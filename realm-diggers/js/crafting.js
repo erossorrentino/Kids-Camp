@@ -44,6 +44,37 @@ rec('lantern', 1, [['copper_ingot', 1], ['torch', 1]], 'bench', 'blocks');
 rec('bed', 1, [['wool', 3], ['planks', 3]], 'bench', 'blocks');
 rec('boom_barrel', 1, [['sand', 4], ['coal', 5]], 'bench', 'blocks');
 rec('bounce_pad', 1, [['slime_ball', 4]], null, 'blocks');
+rec('chest', 1, [['planks', 8]], 'bench', 'basics');
+
+// ============================================================
+// Loot in village chests (made the first time a chest is opened, same for everyone on that seed)
+// ============================================================
+const CHEST_LOOT = [
+  ['apple', 2, 5, 10], ['berries', 3, 8, 8], ['cooked_meat', 1, 4, 8], ['cooked_fish', 1, 3, 6], ['torch', 4, 12, 9], ['coal', 3, 10, 9],
+  ['iron_ingot', 1, 5, 8], ['copper_ingot', 1, 4, 6], ['gold_ingot', 1, 3, 5], ['planks', 4, 12, 6], ['glass', 2, 6, 4], ['wool', 1, 3, 4],
+  ['ruby', 1, 2, 2], ['sapphire', 1, 2, 2], ['bucket', 1, 1, 2], ['homeward_charm', 1, 2, 3], ['stone_pickaxe', 1, 1, 3], ['iron_pickaxe', 1, 1, 1],
+  ['iron_sword', 1, 1, 1], ['conch', 1, 1, 1.5], ['fossil', 1, 1, 1.2], ['iron_armor', 1, 1, 0.6], ['mod_geode', 1, 1, 0.8], ['boom_barrel', 1, 2, 1.5],
+];
+const CHEST_LOOT_THEME = {
+  candy: [['candy', 3, 8, 12], ['cotton_candy', 1, 4, 6], ['sugar_crystal', 1, 1, 1.2]],
+  jungle: [['dino_meat', 1, 3, 8], ['cooked_dino', 1, 2, 6], ['amber', 1, 1, 1.2]],
+  ice: [['snow', 4, 12, 6], ['ice', 2, 6, 5], ['glacite', 1, 1, 1.2]],
+  desert: [['sand', 4, 16, 6], ['sandstone', 4, 12, 5], ['gold_ingot', 1, 4, 4]],
+  snow: [['snow', 2, 8, 5], ['pine_log', 2, 6, 4]],
+  oak: [['oak_log', 2, 6, 5], ['flower_red', 1, 3, 3]],
+};
+function rollChestLoot(rnd, theme) {
+  const table = CHEST_LOOT.concat(CHEST_LOOT_THEME[theme] || []), total = table.reduce((a, t) => a + t[3], 0);
+  const slots = new Array(27).fill(null), n = 4 + Math.floor(rnd() * 4);
+  for (let k = 0; k < n; k++) {
+    let r = rnd() * total, pick = table[0];
+    for (const t of table) { r -= t[3]; if (r <= 0) { pick = t; break; } }
+    const id = idOf(pick[0]), cnt = Math.min(itemDef(id).stack, pick[1] + Math.floor(rnd() * (pick[2] - pick[1] + 1)));
+    let at = Math.floor(rnd() * 27); while (slots[at]) at = (at + 1) % 27;
+    slots[at] = { id, n: cnt };
+  }
+  return slots;
+}
 rec('iron_block', 1, [['iron_ingot', 9]], 'bench', 'blocks');
 rec('gold_block', 1, [['gold_ingot', 9]], 'bench', 'blocks');
 rec('ruby_block', 1, [['ruby', 9]], 'bench', 'blocks');
