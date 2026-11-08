@@ -7,7 +7,7 @@ const DAY_LEN = 600; // seconds for a full day/night in cycle realms
 
 const Input = {
   keys: {}, pressed: new Set(), mouseL: false, mouseR: false, clickL: false, clickR: false, locked: false, everLocked: false,
-  dragLook: false, dragging: false, joy: { x: 0, y: 0 }, btnMine: false, btnBuild: false, tapAttack: false, tapUse: false,
+  dragLook: false, dragging: false, joy: { x: 0, y: 0 }, btnMine: false, btnBuild: false, tapAttack: false, tapUse: false, tapAct: false,
   keyDown(code) { if (!this.keys[code]) this.pressed.add(code); this.keys[code] = true; },
   keyUp(code) { this.keys[code] = false; },
   consume(code) { if (this.pressed.has(code)) { this.pressed.delete(code); return true; } return false; },
@@ -594,6 +594,9 @@ const Game = {
     for (const k in this.abilityCD) if (this.abilityCD[k] > 0) this.abilityCD[k] -= dt;
     if (this.xrayT > 0) { this.xrayT -= dt; this.xrayScanT -= dt; if (this.xrayScanT <= 0) this.scanXray(); }
     this.attackCD -= dt; this.useCD -= dt;
+    const heldNow = p.inv[p.sel] ? p.inv[p.sel].id : 0;
+    if (heldNow !== this.handId) { this.handId = heldNow; this.equipT = 0.25; }
+    this.equipT = Math.max(0, (this.equipT || 0) - dt); this.swingT = Math.max(0, (this.swingT || 0) - dt);
     this.shake = Math.max(0, this.shake - dt * 1.5);
     this.hurtFlash = Math.max(0, this.hurtFlash - dt * 2);
     $('fx-hurt').style.opacity = this.hurtFlash;
@@ -605,7 +608,7 @@ const Game = {
     if (this.hudT <= 0) { this.hudT = 0.1; UI.updateBars(); UI.updateInfo(); UI.updateModbar(); }
     this.mmT -= dt;
     if (this.mmT <= 0) { this.mmT = 0.5; UI.minimap(); }
-    Input.clickL = Input.clickR = false; Input.tapAttack = Input.tapUse = false;
+    Input.clickL = Input.clickR = false; Input.tapAttack = Input.tapUse = Input.tapAct = false;
     Input.pressed.clear();
   },
 
@@ -806,9 +809,11 @@ const Game = {
       if (!this.mining || this.mining.x !== t.x || this.mining.y !== t.y || this.mining.z !== t.z || this.mining.id !== t.id) {
         this.mining = { x: t.x, y: t.y, z: t.z, id: t.id, prog: 0, snd: 0 };
         const bd = BLOCKS[t.id];
-        if (!this.creative && bd.tier && !this.canHarvest(t.id) && (this.hintId !== t.id || this.t - this.hintT > 8)) {
+        const tool = this.heldTool();
+        if (!this.creative && bd.tool === 'pick' && this.breakTime(t.id) > 2 && (this.hintId !== t.id || this.t - this.hintT > 20)) {
           this.hintId = t.id; this.hintT = this.t;
-          UI.toast(`${bd.name} is tough! ${TIER_NEED[bd.tier][0].toUpperCase() + TIER_NEED[bd.tier].slice(1)} breaks it fast and lets you collect it.`, '#ff9a5a');
+          if (!tool || tool.tool !== 'pick') UI.toast(`Tip: a Pickaxe mines ${bd.name} much faster.`, '#ffc24b');
+          else if (bd.tier && tool.tier < bd.tier) UI.toast(`Tip: ${TIER_NEED[bd.tier]} or better mines ${bd.name} faster.`, '#ffc24b');
         }
       }
       this.lastNormal = [t.nx, t.ny, t.nz];
@@ -825,8 +830,9 @@ const Game = {
     if (Input.tapAttack && !t && !this.targetMob) UI.swing();
     if (Input.tapUse) this.useCD = 0;
     // use / place
-    const useNow = Input.clickR || Input.tapUse || ((Input.mouseR || touchBuild) && this.useCD <= 0);
-    if (useNow) { this.useCD = 0.27; this.use(); }
+    if (Input.clickR || (Input.mouseR && this.useCD <= 0)) { this.useCD = 0.27; this.use('all'); }
+    else if (Input.tapUse || (touchBuild && this.useCD <= 0)) { this.useCD = 0.27; this.use('place'); }
+    if (Input.tapAct) this.use('use');
   },
   attack(m, dir) {
     const S = this.stats, d = this.heldTool(), p = this.player;
@@ -844,23 +850,19 @@ const Game = {
     if (!d || d.unbreakable) return Infinity;
     if (this.creative) return 0;
     const tool = this.heldTool(), S = this.stats;
-    let speed = 1;
-    const right = tool && tool.tool && tool.tool === d.tool;
-    if (right) speed = tool.speed;
+    // harder blocks take longer; the right tool is faster, and stronger tools are faster still
+    let speed;
+    if (tool && tool.tool === d.tool) { speed = tool.speed; if (d.tier && tool.tier < d.tier) speed *= 0.6; }
     else if (tool && tool.tool === 'sword' && (d.leaves || d.render === R_CROSS)) speed = 3;
+    else speed = d.tool === 'pick' ? 0.5 : 1;
     let t = d.hard * 1.5 / speed / S.mine;
-    if (d.tier && (!right || tool.tier < d.tier)) t *= 3.3;
     if (S.widedig >= 2) t *= 1 - 0.2 * (S.widedig - 1);
     if (this.player.headInWater && !S.gills) t *= 2;
     if (!Number.isFinite(t)) t = d.hard * 1.5;
     return Math.max(0.05, t);
   },
-  canHarvest(id) {
-    const d = BLOCKS[id];
-    if (!d.tier) return true;
-    const tool = this.heldTool();
-    return !!(tool && tool.tool === d.tool && tool.tier >= d.tier);
-  },
+  // every block drops its item, even when mined by hand (tools just make it faster)
+  canHarvest() { return true; },
   getDrops(id) {
     const d = BLOCKS[id], S = this.stats;
     let drop = d.drop;
@@ -882,6 +884,7 @@ const Game = {
     const d = BLOCKS[id];
     if (d.unbreakable) return;
     w.setBlock(x, y, z, WLOG[id] ? B.water : 0);
+    if (d.pair) for (const [ox, oz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) if (w.blockAt(x + ox, y, z + oz) === B[d.pair]) { w.setBlock(x + ox, y, z + oz, 0); break; }
     Particles.blockBreak(x, y, z, id);
     if (!extra) Sound.play('break', id);
     if ((id === B.cracked_worldstone || id === B.worldstone) && y === 0) UI.popup('A rift opens!', 'Jump in!', this.realm.key === 'greenhollow' ? 'Something glows far below...' : 'Below is the void. Falling brings you back to the start.', '🕳️', '#c47aff');
@@ -889,9 +892,6 @@ const Game = {
       if (this.canHarvest(id)) {
         for (const [did, n] of this.getDrops(id)) this.addItem(did, n);
         if (d.ore) this.tryModDrop(id, y);
-      } else if (d.tier && !extra) {
-        const need = ['', 'any Pickaxe', 'a Stone Pickaxe', 'an Iron Pickaxe', 'a Ruby Pickaxe', 'a Prismatic Pickaxe'][d.tier];
-        UI.toast(`You need ${need} to collect ${d.name}.`, '#ff9a5a');
       }
       if (d.group === 'log') this.achieve('wood');
       if (id === B.ruby_ore) this.achieve('ruby');
@@ -960,12 +960,18 @@ const Game = {
       this.grantMod(key);
     }
   },
-  use() {
+  // mode: 'all' (right-click), 'place' (Build button: only places blocks), 'use' (Use button: never places)
+  use(mode = 'all') {
     const p = this.player, held = p.inv[p.sel], hd = held ? itemDef(held.id) : null, t = this.target;
+    if (mode === 'place') {
+      if (held && isPlaceable(held.id) && t && !this.targetMob) this.placeBlock(t, held);
+      else if (held && !isPlaceable(held.id) && this.t - (this.tipT || -9) > 4) { this.tipT = this.t; UI.toast('That is not a block. Press ✋ Use to use it.'); }
+      return;
+    }
     if (this.targetMob && this.targetMob.def.trader && !this.targetMob.dead) { this.openTrade(this.targetMob); return; }
     if (t && !this.targetMob) {
       const bd = BLOCKS[t.id];
-      if (bd.interact && !(p.sneaking && held && isPlaceable(held.id))) { if (this.interactBlock(t, bd, held)) return; }
+      if (bd.interact && (mode === 'use' || !(p.sneaking && held && isPlaceable(held.id)))) { if (this.interactBlock(t, bd, held)) return; }
       if (held && held.id === I.frost_crystal && (t.id === B.ice || t.id === B.packed_ice || t.id === B.blue_ice)) {
         if (this.tryFrostPortal(t)) { if (!this.creative) { held.n--; if (held.n <= 0) p.inv[p.sel] = null; UI.updateHotbar(); } }
         else UI.toast('Build a hollow Ice frame first: the hole inside must be 2 wide and 3 tall.', '#8fe0ff');
@@ -976,7 +982,20 @@ const Game = {
     if (hd && hd.food) { this.eat(held, hd); return; }
     if (hd && hd.use) { this.useItem(held, hd); return; }
     if (held && held.id === I.ember_key) { UI.toast('Hold the Ember Key and jump into lava!', '#ff6a2a'); return; }
+    if (mode === 'use') { if (this.t - (this.tipT || -9) > 4) { this.tipT = this.t; UI.toast('Point at a workbench, furnace, bed, gate or villager, or hold food to eat.'); } return; }
     if (held && isPlaceable(held.id) && t && !this.targetMob) this.placeBlock(t, held);
+  },
+  // what the Use button would do right now (shown under the crosshair)
+  useHint() {
+    const p = this.player, held = p.inv[p.sel];
+    if (this.targetMob && this.targetMob.def.trader) return 'Trade with the ' + VILLAGER_ROLES[this.targetMob.variant];
+    const t = this.target;
+    if (!t) return '';
+    if (held && held.id === I.frost_crystal && (t.id === B.ice || t.id === B.packed_ice || t.id === B.blue_ice)) return 'Open a Frost Portal';
+    const d = BLOCKS[t.id];
+    const what = { craft: 'open crafting', bed: this.realm.sky.mode === 'cycle' ? 'sleep and set your spawn' : 'set your spawn', dreambed: 'take a dreamy nap', gate: 'travel to a realm', rocket: 'blast off!', eat: 'eat some cake',
+      barrel: held && held.id === I.igniter ? 'light it, then run!' : '' }[d.interact];
+    return what ? `${d.name}: ${what}` : '';
   },
   useBucket(stack, d) {
     const p = this.player, w = this.world, eye = this.eye(), dir = this.viewDir(), reach = this.creative ? 8 : 5.2;
@@ -1073,7 +1092,17 @@ const Game = {
       if (x + 1 > p.x - hw && x < p.x + hw && y + 1 > p.y && y < p.y + p.h && z + 1 > p.z - hw && z < p.z + hw) return;
       for (const m of Mobs.list) { const mw = m.w * (m.def.scale || 1) / 2; if (x + 1 > m.x - mw && x < m.x + mw && y + 1 > m.y && y < m.y + m.h && z + 1 > m.z - mw && z < m.z + mw) return; }
     }
+    const pairKey = BLOCKS[id].pair;
+    let px2, pz2;
+    if (pairKey) {
+      const f = this.viewDir(), ax = Math.abs(f[0]) > Math.abs(f[2]);
+      px2 = x + (ax ? Math.sign(f[0]) : 0); pz2 = z + (ax ? 0 : Math.sign(f[2]));
+      const c2 = w.blockAt(px2, y, pz2), hw = p.w / 2;
+      const inPlayer = px2 + 1 > p.x - hw && px2 < p.x + hw && y + 1 > p.y && y < p.y + p.h && pz2 + 1 > p.z - hw && pz2 < p.z + hw;
+      if ((c2 && !REPL[c2]) || inPlayer) { UI.toast('A bed is 2 blocks long: it needs an empty space in front of it.'); return; }
+    }
     w.setBlock(x, y, z, id);
+    if (pairKey) w.setBlock(px2, y, pz2, B[pairKey]);
     Sound.play('place', id); UI.swing();
     if (!this.creative) { held.n--; if (held.n <= 0) p.inv[p.sel] = null; UI.updateHotbar(); }
     this.save.counters.placed++;
@@ -1570,7 +1599,7 @@ const Game = {
     let crack = null;
     if (!this.titleMode && this.state === 'playing' && this.target && !p.dead) {
       const tg = this.target, e = 0.004;
-      Bt.lines.wireBox(tg.x - e, tg.y - e, tg.z - e, tg.x + 1 + e, tg.y + 1 + e, tg.z + 1 + e, 0, 0, 0, 0.55);
+      Bt.lines.wireBox(tg.x - e, tg.y - e, tg.z - e, tg.x + 1 + e, tg.y + BLOCK_H[tg.id] + e, tg.z + 1 + e, 0, 0, 0, 0.55);
       if (this.mining && this.mining.prog > 0.02) crack = crackVerts(tg.x, tg.y, tg.z, Math.floor(this.mining.prog * 8));
     }
     if (this.xrayT > 0) {
@@ -1589,17 +1618,75 @@ const Game = {
         Bt.echo.box(m.x - hw, m.y, m.z - hw, m.x + hw, m.y + m.h * sc, m.z + hw, c[0], c[1], c[2], 0.28, 1, true);
       }
     }
-    // hand bob
-    if (!this.titleMode) {
-      const hs = Math.hypot(p.vx, p.vz), bx = Math.sin(p.bob) * 6 * Math.min(1, hs / 4), by = Math.abs(Math.cos(p.bob)) * 6 * Math.min(1, hs / 4);
-      $('hand').style.translate = `${bx}px ${by}px`;
-    }
     Renderer.render({
       vp, invVP: M4.invert(vp), cam: eye, fog, fogNear: near, fogFar: far, sun, sunTint: tint, amb: R.ambient + S.nightEyes + (this.titleMode ? 0.08 : 0),
       time: t, sky: (p.headInWater || p.headInLava) ? null : sp.sky, world: this.world,
       ents: Bt.ents.d, entN: Bt.ents.n, parts: Bt.parts.d, partN: Bt.parts.n, lines: Bt.lines.d, lineN: Bt.lines.n,
       crack, xray: Bt.xray.d, xrayN: Bt.xray.n, echo: Bt.echo.d, echoN: Bt.echo.n,
     });
+    if (!this.titleMode && !p.dead && this.state !== 'title' && this.state !== 'entering' && this.state !== 'loading') {
+      // how bright your hand is: sunlight where you stand, cave light, nearby torches
+      let light = Math.max(this.world.skyAt(p.x, eye[1], p.z) * sun, R.ambient + S.nightEyes);
+      for (const l of this.lights) { const a = clamp(1 - Math.hypot(l[0] - eye[0], l[1] - eye[1], l[2] - eye[2]) / l[3], 0, 1); light += a * a * 0.95; }
+      const hand = this.handMesh(clamp(light, 0.08, 1.15), aspect);
+      hand.proj = M4.perspective(70 * Math.PI / 180, aspect, 0.01, 10);
+      Renderer.drawHand(hand);
+    }
+  },
+  // your arm and whatever you're holding, in view space (camera at 0,0,0 looking down -Z)
+  handMesh(light, aspect) {
+    const p = this.player, held = p.inv[p.sel], atlas = [], items = [];
+    const swing = this.swingT > 0 ? Math.sin((1 - this.swingT / 0.28) * Math.PI) : 0;
+    const eq = this.equipT / 0.25;
+    const moving = p.onGround ? Math.min(1, Math.hypot(p.vx, p.vz) / 4) : 0;
+    const bx = Math.sin(p.bob) * 0.022 * moving, by = -Math.abs(Math.cos(p.bob)) * 0.022 * moving;
+    // place the hand relative to the screen shape so it fits phones and wide screens
+    const halfH = Math.tan(35 * Math.PI / 180) * 0.8, halfW = halfH * aspect, touch = Settings.touchOn();
+    // on touch screens keep the hand clear of the buttons: above them in portrait, left of them in landscape
+    const [ax, ay, sc] = !touch ? [0.56, -0.5, clamp(aspect / 1.4, 0.62, 1)] : aspect < 1 ? [0.48, 0.05, 0.55] : [0.36, -0.45, clamp(aspect / 1.6, 0.6, 0.9)];
+    const empty = !held;
+    const group = M4.chain(
+      M4.translate(halfW * ax + bx, halfH * ay + by - eq * 0.4 - swing * 0.06 + (empty ? 0.03 : 0), -0.8 - swing * 0.1),
+      M4.rotX(-swing * 0.85), M4.rotY(swing * 0.25), M4.scale(sc, sc, sc));
+    const xf = (M, x, y, z) => [M[0] * x + M[4] * y + M[8] * z + M[12], M[1] * x + M[5] * y + M[9] * z + M[13], M[2] * x + M[6] * y + M[10] * z + M[14]];
+    const cube = (out, M, tiles, hs = 1, em = 0) => {
+      for (let f = 0; f < 6; f++) {
+        const tile = f === 2 ? tiles[0] : f === 3 ? tiles[1] : f === 4 ? tiles[3] : tiles[2];
+        const u0 = (tile & 15) / 16, v0 = (tile >> 4) / 16;
+        for (const k of [0, 1, 2, 0, 2, 3]) {
+          const v = FACE_V[f][k], yy = (v[1] - 0.5) * hs, vv = hs < 1 && v[1] === 1 && f !== 2 ? 1 - hs : v[4];
+          const q = xf(M, v[0] - 0.5, yy, v[2] - 0.5);
+          out.push(q[0], q[1], q[2], u0 + v[3] / 16, v0 + vv / 16, FACE_SHADE[f], 1, em);
+        }
+      }
+    };
+    const quad = (out, M, u0, v0, u1, v1, em = 0) => {
+      const C = [[-.5, -.5, u0, v1], [.5, -.5, u1, v1], [.5, .5, u1, v0], [-.5, .5, u0, v0]];
+      for (const k of [0, 1, 2, 0, 2, 3]) { const c = C[k], q = xf(M, c[0], c[1], 0); out.push(q[0], q[1], q[2], c[2], c[3], 0.95, 1, em); }
+    };
+    // a box stretched from point a to point b (used for the arm)
+    const between = (a, b, t) => {
+      const d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], len = Math.hypot(...d), z = d.map(v => v / len);
+      let x = [z[2], 0, -z[0]]; const xl = Math.hypot(...x) || 1; x = x.map(v => v / xl);
+      const y = [z[1] * x[2] - z[2] * x[1], z[2] * x[0] - z[0] * x[2], z[0] * x[1] - z[1] * x[0]];
+      const R = new Float32Array([x[0], x[1], x[2], 0, y[0], y[1], y[2], 0, z[0], z[1], z[2], 0, (a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2, 1]);
+      return M4.mul(R, M4.scale(t, t, len));
+    };
+    // arm: hand just under the held item, sleeve running off the bottom-right of the screen
+    const handA = empty ? [-0.02, 0.02, 0] : [0.05, -0.12, 0.06], wrist = [handA[0] + 0.08, handA[1] - 0.16, handA[2] + 0.16], shoulder = [handA[0] + 0.42, handA[1] - 0.95, handA[2] + 0.75];
+    cube(atlas, M4.mul(group, between(handA, wrist, 0.15)), [TILE.hand_skin, TILE.hand_skin, TILE.hand_skin, TILE.hand_skin]);
+    cube(atlas, M4.mul(group, between(wrist, shoulder, 0.18)), [TILE.hand_sleeve, TILE.hand_sleeve, TILE.hand_sleeve, TILE.hand_sleeve]);
+    if (held) {
+      const id = held.id;
+      if (id < 256 && RENDER[id] !== R_CROSS) {
+        cube(atlas, M4.chain(group, M4.translate(0, 0.04, -0.05), M4.rotX(0.12), M4.rotY(0.78), M4.scale(0.26, 0.26, 0.26)), [TEX_T[id], TEX_B[id], TEX_S[id], TEX_F[id]], BLOCK_H[id], EMIT[id]);
+      } else {
+        const M = M4.chain(group, M4.translate(0.0, 0.09, -0.07), M4.rotY(-0.45), M4.rotZ(0.25), M4.scale(0.42, 0.42, 0.42));
+        if (id < 256) { const tl = TEX_S[id], u0 = (tl & 15) / 16, v0 = (tl >> 4) / 16; quad(atlas, M, u0, v0, u0 + 1 / 16, v0 + 1 / 16, EMIT[id]); }
+        else { const sl = ITEM_SLOT[id], u0 = (sl % 16) / 16, v0 = Math.floor(sl / 16) / 16; quad(items, M, u0, v0, u0 + 1 / 16, v0 + 1 / 16); }
+      }
+    }
+    return { atlas: new Float32Array(atlas), items: new Float32Array(items), light };
   },
 };
 

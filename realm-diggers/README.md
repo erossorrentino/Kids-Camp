@@ -23,11 +23,12 @@ art (every texture is painted by code), sounds, and music.
 | W A S D | Left stick | Walk |
 | Mouse (click the game first) | Drag the screen (aim with the + in the middle) | Look around |
 | Hold left click | Hold the ⛏ **Mine** button | Mine blocks, hit creatures |
-| Right click | Tap the 🧱 **Build** button (hold to keep placing) | Place blocks, eat, use items and blocks |
+| Right click | Tap the 🧱 **Build** button (hold to keep placing) | Place blocks |
+| Right click | Tap the ✋ **Use** button | Use workbenches, furnaces, beds, gates and villagers; eat; use items |
 | Space (double-tap in Creative) | ⤒ | Jump / swim / fly |
 | Shift | ⤓ | Sneak (won't fall off edges) / fly down |
 | Ctrl or double-tap W | Push the stick all the way | Sprint |
-| 1-9, mouse wheel | Tap the hotbar | Pick an item |
+| 1-9, mouse wheel | Tap the hotbar | Pick what you're holding (it shows in your hand) |
 | E / M / G | 🎒 / ✦ / 📖 | Inventory & crafting / Mods / Realm Guide |
 | X / R / F / Q | Extra buttons | Mod powers: X-Ray, Blink, Roar, Frost Bolt |
 | Esc | ⏸ | Pause |
@@ -86,9 +87,16 @@ Finding 15 different mods unlocks a 5th slot, and beating the final boss unlocks
 - A **Materials** browser (in the crafting panel and the Realm Guide): pick any material to see where
   to find it and everything you can make with it. Tap an ingredient in any recipe to jump to it, and
   hover an item to see what it makes.
-- Every block can be broken. Tough ones (Worldstone, Obsidian, Guardian Stone) need a Ruby Pickaxe to
-  break quickly, and the game tells you which pickaxe you need. Buckets scoop up and pour water, lava
-  and chocolate milk. You can even craft your own Realm Gate.
+- Every block can be broken, and every block drops its item, even mined by hand (you can collect any
+  ore without a pickaxe). Harder blocks take longer, and stronger pickaxes are faster: Iron Ore takes
+  7.5s by hand, 3.1s with wood, 0.9s with stone, 0.6s with iron, 0.4s with ruby and 0.3s with
+  prismatic. Buckets scoop up and pour water, lava and chocolate milk. You can even craft a Realm Gate.
+- Beds are 2 blocks long (foot and pillow end) and low enough to jump onto. Sleep at night to skip it
+  and set your spawn point.
+- Monsters that come out at night (Gloomlings, Gloop Spitters, Shade Bats) catch fire when the sun
+  comes up, unless they hide in shade, caves or water.
+- You see your arm holding whatever you've picked: blocks as little 3D cubes, tools and items as
+  sprites, with swing and switch animations. A hint under the crosshair says what Use will do.
 - Wood → Stone → Iron → Ruby → Prismatic tools, plus armor.
 - The same blocks and items stack up to 100 per slot; different items never share a slot. Tools,
   armor, keys and filled buckets don't stack.

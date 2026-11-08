@@ -178,6 +178,14 @@ const Renderer = {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    // item icons texture (for items held in your hand)
+    this.itemTex = gl.createTexture();
+    gl.bindTexture(gl.TEXTURE_2D, this.itemTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, ITEM_ATLAS);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     // sky quad
     this.skyVao = gl.createVertexArray(); gl.bindVertexArray(this.skyVao);
     const sb = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, sb);
@@ -229,6 +237,26 @@ const Renderer = {
     }
     gl.bindBuffer(gl.ARRAY_BUFFER, c.gl.bufO); gl.bufferData(gl.ARRAY_BUFFER, opaque, gl.STATIC_DRAW); c.gl.nO = opaque.length / 8;
     gl.bindBuffer(gl.ARRAY_BUFFER, c.gl.bufT); gl.bufferData(gl.ARRAY_BUFFER, trans, gl.STATIC_DRAW); c.gl.nT = trans.length / 8;
+  },
+  // first-person arm + held item, drawn on top of the world (vertices already in view space)
+  drawHand(h) {
+    const gl = this.gl, P = this.pChunk, u = P.u;
+    gl.clear(gl.DEPTH_BUFFER_BIT);
+    gl.enable(gl.DEPTH_TEST); gl.depthMask(true); gl.disable(gl.CULL_FACE); gl.disable(gl.BLEND);
+    gl.useProgram(P.p);
+    gl.uniformMatrix4fv(u.uVP, false, h.proj);
+    gl.uniform3fv(u.uCam, [0, 0, 0]); gl.uniform3fv(u.uFog, [0, 0, 0]); gl.uniform1f(u.uFogNear, 1e4); gl.uniform1f(u.uFogFar, 2e4);
+    gl.uniform1f(u.uSun, h.light); gl.uniform3fv(u.uSunTint, [1, 1, 1]); gl.uniform1f(u.uAmb, 0); gl.uniform1i(u.uLN, 0);
+    gl.uniform1f(u.uAlphaCut, 0.5); gl.uniform1f(u.uTime, 0);
+    gl.activeTexture(gl.TEXTURE0); gl.uniform1i(u.uTex, 0);
+    gl.bindVertexArray(this.dynVao); gl.bindBuffer(gl.ARRAY_BUFFER, this.dynBuf);
+    for (const [data, tex] of [[h.atlas, this.tex], [h.items, this.itemTex]]) {
+      if (!data.length) continue;
+      gl.bindTexture(gl.TEXTURE_2D, tex);
+      gl.bufferData(gl.ARRAY_BUFFER, data, gl.DYNAMIC_DRAW);
+      gl.drawArrays(gl.TRIANGLES, 0, data.length / 8);
+    }
+    gl.bindVertexArray(null);
   },
   freeChunk(c) {
     if (!c.gl) return;

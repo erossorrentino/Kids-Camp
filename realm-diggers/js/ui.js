@@ -122,6 +122,8 @@ const UI = {
     if (r.sky.mode === 'cycle') { const t = Game.time; const hrs = Math.floor((t * 24 + 6) % 24), mins = Math.floor(((t * 24 * 60) % 60)); clock = `${t < 0.5 ? '☀' : '☾'} ${String(hrs).padStart(2, '0')}:${String(mins).padStart(2, '0')}`; }
     else clock = r.sky.mode === 'none' ? 'Underground' : 'Endless ' + (r.key === 'lunara' || r.key === 'prismara' ? 'night' : 'day');
     if (Game.rain > 0.5) clock += ' ☂';
+    const uh = this.screen ? '' : Game.useHint();
+    if (this.last.use !== uh) { this.last.use = uh; $('use-hint').hidden = !uh; $('use-hint').textContent = uh ? (Settings.touchOn() ? '✋ ' : 'Right-click: ') + uh : ''; }
     const gh = Game.geode ? `🧭 Mod Geode: ${Math.round(Game.geode.d)} blocks${Game.geode.y + 0.5 < p.y - 2 ? ', below you' : Game.geode.y > p.y + 2 ? ', above you' : ''}` : '';
     if (this.last.geode !== gh) { this.last.geode = gh; $('geode-hint').hidden = !gh; $('geode-hint').textContent = gh; }
     if (this.last.clock !== clock) { this.last.clock = clock; $('clock').textContent = clock; }
@@ -154,7 +156,7 @@ const UI = {
     c.hidden = false; c.style.animation = 'none'; void c.offsetWidth; c.style.animation = '';
     clearTimeout(this.cardT); this.cardT = setTimeout(() => { c.hidden = true; }, 3700);
   },
-  swing() { const h = $('hand'); h.classList.remove('swing'); void h.offsetWidth; h.classList.add('swing'); },
+  swing() { Game.swingT = 0.28; },
   minimap() {
     const cv = $('minimap'), ctx = cv.getContext('2d'), w = Game.world, p = Game.player;
     if (!this.mmData) this.mmData = ctx.createImageData(64, 64);
@@ -371,7 +373,7 @@ const UI = {
     let extra = '';
     if (d.food) extra += `<div class="muted">Food +${d.food / 2} 🍗 (use to eat)</div>`;
     if (d.tool && !d.isBlock) extra += `<div class="muted">${d.tool === 'sword' ? 'Damage ' + d.dmg : 'Mining power ' + d.speed}</div>`;
-    if (d.isBlock && (d.tool || d.tier)) extra += `<div class="muted">Best tool: ${{ pick: 'Pickaxe', axe: 'Axe', shovel: 'Shovel' }[d.tool] || 'Any'}${d.tier ? ` (collect it with ${TIER_NEED[d.tier]})` : ''}</div>`;
+    if (d.isBlock && (d.tool || d.tier)) extra += `<div class="muted">Best tool: ${{ pick: 'Pickaxe', axe: 'Axe', shovel: 'Shovel' }[d.tool] || 'Any'}${d.tier ? ` (${TIER_NEED[d.tier]} or better is fastest)` : ''}</div>`;
     if (d.armor) extra += `<div class="muted">Blocks ${Math.round(d.armor * 100)}% of damage</div>`;
     if (d.gem) extra += `<div class="muted">Realm Gem of ${REALM[d.gem].name}</div>`;
     if (d.desc) extra += `<div class="muted">${d.desc}</div>`;
@@ -542,7 +544,8 @@ const UI = {
         <div><h3>Touch</h3><table>
           <tr><td>Left stick</td><td>Walk</td></tr><tr><td>Drag the screen</td><td>Look around (aim with the + in the middle)</td></tr>
           <tr><td>⛏ Mine (hold)</td><td>Dig the block you aim at, hit creatures</td></tr>
-          <tr><td>🧱 Build (tap)</td><td>Place a block, eat food, use items and blocks. Hold to keep placing</td></tr>
+          <tr><td>🧱 Build (tap)</td><td>Place a block. Hold to keep placing</td></tr>
+          <tr><td>✋ Use</td><td>Use workbenches, furnaces, beds, gates and villagers, eat food, use items</td></tr>
           <tr><td>⤒ / ⤓</td><td>Jump and sneak (fly up/down in Creative)</td></tr><tr><td>Tap hotbar</td><td>Pick an item</td></tr></table></div>
         <div><h3>Getting started</h3><table>
           <tr><td>1</td><td>Hold to chop a tree trunk for logs</td></tr><tr><td>2</td><td>Open your inventory (E) and craft Planks, then a Workbench</td></tr>
@@ -619,6 +622,7 @@ const TouchPad = {
     tap('t-ab-r', () => Game.ability('R'));
     tap('t-ab-f', () => Game.ability('F'));
     tap('t-ab-q', () => Game.ability('Q'));
+    tap('t-use', () => { Input.tapAct = true; $('t-use').classList.add('on'); setTimeout(() => $('t-use').classList.remove('on'), 150); });
   },
   start(e) {
     e.preventDefault(); Sound.init();

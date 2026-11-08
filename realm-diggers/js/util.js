@@ -171,6 +171,12 @@ const M4 = {
     }
     return o;
   },
+  translate(x, y, z) { const o = new Float32Array(16); o[0] = o[5] = o[10] = o[15] = 1; o[12] = x; o[13] = y; o[14] = z; return o; },
+  scale(x, y, z) { const o = new Float32Array(16); o[0] = x; o[5] = y; o[10] = z; o[15] = 1; return o; },
+  rotX(a) { const o = M4.scale(1, 1, 1), c = Math.cos(a), s = Math.sin(a); o[5] = c; o[6] = s; o[9] = -s; o[10] = c; return o; },
+  rotY(a) { const o = M4.scale(1, 1, 1), c = Math.cos(a), s = Math.sin(a); o[0] = c; o[2] = -s; o[8] = s; o[10] = c; return o; },
+  rotZ(a) { const o = M4.scale(1, 1, 1), c = Math.cos(a), s = Math.sin(a); o[0] = c; o[1] = s; o[4] = -s; o[5] = c; return o; },
+  chain(...ms) { return ms.reduce((a, b) => M4.mul(a, b)); },
   invert(a) {
     const o = new Float32Array(16);
     const a00 = a[0], a01 = a[1], a02 = a[2], a03 = a[3], a10 = a[4], a11 = a[5], a12 = a[6], a13 = a[7];

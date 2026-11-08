@@ -87,8 +87,8 @@ block('glass', 'Glass', { render: R_GLASS, hard: .3, drop: 'glass' });
 block('bricks', 'Bricks', { hard: 2, tool: 'pick', tier: 1 });
 block('stone_bricks', 'Stone Bricks', { hard: 2, tool: 'pick', tier: 1 });
 block('boom_barrel', 'Boom Barrel', { tex: ['barrel_top', 'barrel_top', 'barrel_side'], hard: .3, interact: 'barrel', cat: 'special' });
-block('bed', 'Bed', { tex: ['bed_top', 'planks', 'bed_side'], hard: .4, interact: 'bed', cat: 'special' });
-block('dream_bed', 'Dream Bed', { tex: ['dreambed_top', 'planks', 'dreambed_side'], hard: .4, interact: 'dreambed', cat: 'special', emissive: false, light: [1, 0.6, 0.9, 5] });
+block('bed', 'Bed', { tex: ['bed_top', 'planks', 'bed_side'], hard: .4, interact: 'bed', cat: 'special', opaque: false, sky: 0, height: 0.5625, soft: true, pair: 'bed_head' });
+block('dream_bed', 'Dream Bed', { tex: ['dreambed_top', 'planks', 'dreambed_side'], hard: .4, interact: 'dreambed', cat: 'special', opaque: false, sky: 0, height: 0.5625, soft: true, pair: 'dream_bed_head', emissive: false, light: [1, 0.6, 0.9, 5] });
 block('scaffold', 'Scaffold', { render: R_CUTOUT, solid: false, climb: true, hard: .1, sky: 0 });
 block('wool', 'Wool', { hard: .5, soft: true });
 const PAINTS = [['red', '#e0413a'], ['orange', '#f28a2e'], ['yellow', '#f7d23b'], ['green', '#4dbb4a'], ['blue', '#3d7ae8'], ['purple', '#9b55e0'], ['pink', '#f58ac7'], ['white', '#f2f2f6'], ['black', '#2a2a33']];
@@ -178,6 +178,10 @@ block('starstone_ore', 'Starstone Ore', { hard: 4, tool: 'pick', tier: 4, drop: 
 block('guardian_stone', 'Guardian Stone', { hard: 10, tool: 'pick', tier: 4, cat: 'realm' });
 plant('star_flower', 'Star Flower', { emissive: true, light: [0.8, 0.7, 1, 5], group: 'flower', cat: 'realm' });
 
+// NOTE: saves store block numbers, so new blocks must always be added at the END of this list.
+block('bed_head', 'Bed', { tex: ['bed_head_top', 'planks', 'bed_head_side'], hard: .4, interact: 'bed', cat: null, opaque: false, sky: 0, height: 0.5625, soft: true, drop: 'bed', pair: 'bed' });
+block('dream_bed_head', 'Dream Bed', { tex: ['dreambed_head_top', 'planks', 'dreambed_head_side'], hard: .4, interact: 'dreambed', cat: null, opaque: false, sky: 0, height: 0.5625, soft: true, drop: 'dream_bed', pair: 'dream_bed', light: [1, 0.6, 0.9, 5] });
+
 // ---------------- Items ----------------
 let _nextItem = 256;
 function item(key, name, o = {}) {
@@ -258,6 +262,7 @@ const XRAY_COLOR = { coal_ore: '#ffffff', copper_ore: '#ff9a4a', iron_ore: '#ffc
 
 // ---------------- Fast lookup tables ----------------
 const RENDER = new Uint8Array(256), SOLID = new Uint8Array(256), OPAQUE = new Uint8Array(256), EMIT = new Uint8Array(256);
+const BLOCK_H = new Float32Array(256).fill(1);
 const LIQ = new Uint8Array(256), WLOG = new Uint8Array(256), SKYB = new Uint8Array(256), SWAY = new Uint8Array(256), LEAF = new Uint8Array(256);
 const REPL = new Uint8Array(256), CLIMB = new Uint8Array(256), LIGHTR = new Float32Array(256), ORE = new Uint8Array(256);
 const TEX_T = new Uint16Array(256), TEX_B = new Uint16Array(256), TEX_S = new Uint16Array(256), TEX_F = new Uint16Array(256);
@@ -462,10 +467,14 @@ const TEXDEF = {
   stone_bricks: p => p.bricks(hx('#8f949e'), hx('#62666e'), 8, 16),
   barrel_side: p => { for (let x = 0; x < 16; x++) for (let y = 0; y < 16; y++) p.set(x, y, p.v(x % 4 === 3 ? hx('#9a2a20') : hx('#d8402e'), 10)); p.rect(0, 5, 16, 6, hx('#f2ead0'), 6); p.rect(7, 6, 2, 3, hx('#2a2a2a')); p.rect(7, 9, 2, 1, hx('#2a2a2a')); p.rect(0, 1, 16, 1, hx('#5a5a60')); p.rect(0, 14, 16, 1, hx('#5a5a60')); },
   barrel_top: p => { p.fill(hx('#c8b49a'), 10); p.blob(7.5, 7.5, 2.4, hx('#3a3a3a'), 6); p.line(7, 5, 9, 1, hx('#ddd')); },
-  bed_top: p => { p.fill(hx('#d83a4a'), 12); p.rect(1, 1, 14, 5, hx('#f4f0ea'), 8); for (let i = 0; i < 6; i++) p.line(0, 8 + i * 2, 15, 8 + i * 2, hx('#b82a3a'), 4); },
-  bed_side: p => { p.planks(hx('#b98b53')); p.rect(0, 0, 16, 7, hx('#d83a4a'), 10); p.rect(0, 0, 4, 7, hx('#f4f0ea'), 6); },
-  dreambed_top: p => { p.fill(hx('#7a4ae0'), 14); p.rect(1, 1, 14, 5, hx('#ffe6f6'), 8); for (let i = 0; i < 8; i++) { const x = 1 + p.r() * 14, y = 7 + p.r() * 8; p.set(x, y, hx('#fff3a0')); } },
-  dreambed_side: p => { p.planks(hx('#d8b0e8')); p.rect(0, 0, 16, 7, hx('#7a4ae0'), 10); p.set(4, 3, hx('#fff3a0')); p.set(11, 2, hx('#fff3a0')); },
+  bed_head_top: p => { p.fill(hx('#d83a4a'), 10); p.rect(1, 1, 14, 14, hx('#e8e4dc'), 4); p.rect(3, 3, 10, 10, hx('#ffffff'), 6); for (let i = 3; i < 13; i++) { p.set(i, 12, hx('#d8d4cc')); p.set(12, i, hx('#d8d4cc')); } },
+  bed_head_side: p => { p.planks(hx('#9a6e40')); p.rect(0, 7, 16, 4, hx('#f4f0ea'), 6); p.rect(0, 11, 16, 1, hx('#d83a4a')); p.rect(0, 14, 2, 2, hx('#5a3e22')); p.rect(14, 14, 2, 2, hx('#5a3e22')); },
+  dreambed_head_top: p => { p.fill(hx('#7a4ae0'), 10); p.rect(1, 1, 14, 14, hx('#f0e0ff'), 4); p.rect(3, 3, 10, 10, hx('#ffffff'), 6); p.set(7, 7, hx('#ffe45a')); p.set(8, 7, hx('#ffe45a')); p.set(7, 8, hx('#ffe45a')); p.set(8, 8, hx('#ffe45a')); },
+  dreambed_head_side: p => { p.planks(hx('#c8a0d8')); p.rect(0, 7, 16, 4, hx('#ffe6f6'), 6); p.rect(0, 11, 16, 1, hx('#7a4ae0')); p.rect(0, 14, 2, 2, hx('#6a4a7a')); p.rect(14, 14, 2, 2, hx('#6a4a7a')); },
+  bed_top: p => { p.fill(hx('#d83a4a'), 12); p.rect(0, 0, 16, 2, hx('#f4f0ea'), 6); for (let i = 0; i < 6; i++) p.line(0, 4 + i * 2, 15, 4 + i * 2, hx('#b82a3a'), 4); },
+  bed_side: p => { p.planks(hx('#9a6e40')); p.rect(0, 7, 16, 5, hx('#d83a4a'), 10); p.rect(0, 7, 16, 1, hx('#f08a96')); p.rect(0, 14, 2, 2, hx('#5a3e22')); p.rect(14, 14, 2, 2, hx('#5a3e22')); },
+  dreambed_top: p => { p.fill(hx('#7a4ae0'), 14); p.rect(0, 0, 16, 2, hx('#ffe6f6'), 6); for (let i = 0; i < 9; i++) { const x = 1 + p.r() * 14, y = 3 + p.r() * 12; p.set(x, y, hx('#fff3a0')); } },
+  dreambed_side: p => { p.planks(hx('#c8a0d8')); p.rect(0, 7, 16, 5, hx('#7a4ae0'), 10); p.set(4, 9, hx('#fff3a0')); p.set(11, 8, hx('#fff3a0')); p.rect(0, 14, 2, 2, hx('#6a4a7a')); p.rect(14, 14, 2, 2, hx('#6a4a7a')); },
   scaffold: p => { const c = hx('#c49a5a'); for (let i = 0; i < 16; i++) { p.set(i, 0, c); p.set(i, 15, c); p.set(0, i, c); p.set(15, i, c); p.set(i, i, mulC(c, .85)); p.set(i, 1, mulC(c, .7)); } },
   wool: p => { p.fill(hx('#f2f0ea'), 10); for (let i = 0; i < 20; i++) { const x = p.r() * 15, y = p.r() * 15; p.set(x, y, hx('#dcd8ce')); p.set(x + 1, y, hx('#fffef8')); } },
   iron_block: p => { p.fill(hx('#d8dde6'), 6); p.rect(1, 1, 14, 14, hx('#e8ecf2'), 4); p.line(1, 14, 14, 14, hx('#a8aeb8')); p.line(14, 1, 14, 14, hx('#a8aeb8')); },
@@ -573,6 +582,8 @@ for (let s = 0; s < 8; s++) TEXDEF['crack' + s] = p => {
   }
 };
 
+TEXDEF.hand_skin = p => { p.fill(hx('#e8b48a'), 8); p.speck(hx('#d89c74'), 10, 4); };
+TEXDEF.hand_sleeve = p => { p.fill(hx('#3a8ad8'), 10); for (let i = 0; i < 16; i += 4) p.line(0, i, 15, i, hx('#2f72b8'), 4); };
 const TILE = {};
 let ATLAS_CANVAS = null;
 const TILE_CANVAS = {};
@@ -581,6 +592,7 @@ function buildAtlas() {
   const names = new Set();
   for (const b of BLOCKS) for (const t of b.tex) if (b.render !== R_NONE) names.add(t);
   for (let s = 0; s < 8; s++) names.add('crack' + s);
+  names.add('hand_skin'); names.add('hand_sleeve');
   const list = [...names];
   const canvas = document.createElement('canvas');
   canvas.width = 256; canvas.height = 256;
@@ -607,6 +619,7 @@ function buildAtlas() {
   for (const b of BLOCKS) {
     const id = b.id;
     RENDER[id] = b.render; SOLID[id] = b.solid ? 1 : 0; OPAQUE[id] = b.opaque ? 1 : 0; EMIT[id] = b.emissive ? 1 : 0;
+    BLOCK_H[id] = b.height || 1;
     LIQ[id] = b.liquid; WLOG[id] = b.wlog ? 1 : 0; SKYB[id] = b.sky; SWAY[id] = b.sway ? 1 : 0; LEAF[id] = b.leaves ? 1 : 0;
     REPL[id] = (b.replace || b.liquid || id === 0) ? 1 : 0; CLIMB[id] = b.climb ? 1 : 0; LIGHTR[id] = b.light ? b.light[3] : 0;
     ORE[id] = b.ore ? 1 : 0;
@@ -728,9 +741,19 @@ function makeBlockIcon(b) {
   draw(top, [15 / 16, -7.5 / 16, 15 / 16, 7.5 / 16, 1, 8.5], 0);
   return c;
 }
+// item icons also go into one texture so items can be drawn in your hand in 3D
+let ITEM_ATLAS = null;
+const ITEM_SLOT = {};
 function buildIcons() {
   for (const b of BLOCKS) if (b.render !== R_NONE) ICON_URL[b.id] = makeBlockIcon(b).toDataURL();
-  for (const id in ITEMS) ICON_URL[id] = makeItemIcon(ITEMS[id]).toDataURL();
+  ITEM_ATLAS = document.createElement('canvas'); ITEM_ATLAS.width = ITEM_ATLAS.height = 512;
+  const actx = ITEM_ATLAS.getContext('2d'); actx.imageSmoothingEnabled = false;
+  let slot = 0;
+  for (const id in ITEMS) {
+    const c = makeItemIcon(ITEMS[id]);
+    ICON_URL[id] = c.toDataURL();
+    ITEM_SLOT[id] = slot; actx.drawImage(c, (slot % 16) * 32, Math.floor(slot / 16) * 32); slot++;
+  }
 }
 function iconURL(id) { return ICON_URL[id] || ''; }
 

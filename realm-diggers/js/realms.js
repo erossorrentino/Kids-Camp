@@ -246,7 +246,7 @@ function buildVillage(c, G, realm, v) {
     }
     at(0, 3, fy + 1, 0); at(0, 3, fy + 2, 0);
     at(-3, 0, fy + 2, B.glass); at(3, 0, fy + 2, B.glass); at(0, -3, fy + 2, B.glass);
-    at(-2, -2, fy + 1, B.bed); at(2, -2, fy + 1, B.workbench); at(1, -2, fy + 1, B.furnace); at(0, 0, fy + 3, B.lantern);
+    at(-2, -1, fy + 1, B.bed); at(-2, -2, fy + 1, B.bed_head); at(2, -2, fy + 1, B.workbench); at(1, -2, fy + 1, B.furnace); at(0, 0, fy + 3, B.lantern);
     for (const [k, block] of local) { const [lx, y, lz] = k.split(',').map(Number); wset(c, it.x + lx, y, it.z + lz, block, 0); }
   }
 }
@@ -595,7 +595,7 @@ realm({
   key: 'hollowdeep', name: 'Hollow Deep', color: '#5ad8ff', gem: 'glowquartz',
   tagline: 'The endless cavern',
   desc: 'A world with no sky: giant glowing mushrooms, crystal caves and underground lakes. Bring torches!',
-  how: 'Dig down to the very bottom of Greenhollow and break a glowing Cracked Worldstone (Iron Pickaxe or better).',
+  how: 'Dig down to the very bottom of Greenhollow and break a glowing Cracked Worldstone (an Iron Pickaxe makes it quick).',
   hint: 'Dig... all... the... way... down.',
   sky: { mode: 'none', day: ['#06030c', '#0e0a1c'], stars: 0, sun: 0, clouds: 0 },
   ambient: 0.07, sunMin: 0, gravity: 1, weather: 'spores', platform: 'gloomstone', spawnXZ: [0, 0], spawnMode: 'bottom',

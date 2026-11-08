@@ -176,7 +176,7 @@ function materialSources(key) {
     const tier = Math.max(...srcs.map(s => (s.b.tool === 'pick' ? s.b.tier : 0)));
     const realms = [...new Set(srcs.flatMap(s => br[s.b.id] || []))];
     const verb = srcs.every(s => s.b.tool === 'axe') ? 'Chop' : srcs.every(s => s.b.render === R_CROSS || s.b.leaves) ? 'Break' : 'Mine';
-    out.push(`${verb} ${names.join(', ')}${srcs.length > 4 ? ' and more' : ''}${realmsText(realms)}${tier ? ` (needs ${TIER_NEED[tier]})` : ''}.`);
+    out.push(`${verb} ${names.join(', ')}${srcs.length > 4 ? ' and more' : ''}${realmsText(realms)}${tier ? ` (fastest with ${TIER_NEED[tier]} or better)` : ''}.`);
   }
   const mobs = Object.values(MOBS).filter(m => m.drops.some(d => d[0] === key));
   if (mobs.length) out.push('Dropped by ' + mobs.map(m => m.name).join(', ') + '.');

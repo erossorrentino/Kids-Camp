@@ -31,7 +31,7 @@ button { font: inherit; color: inherit; }
 #fx-fade { background: #000; transition: opacity .45s; z-index: 50; }
 
 /* ---------- HUD ---------- */
-#hud { position: fixed; inset: 0; pointer-events: none; }
+#hud { position: fixed; inset: 0; pointer-events: none; z-index: 2; }
 #crosshair { position: absolute; left: 50%; top: 50%; width: 22px; height: 22px; transform: translate(-50%, -50%); mix-blend-mode: difference; }
 #crosshair::before, #crosshair::after { content: ''; position: absolute; background: #fff; }
 #crosshair::before { left: 10px; top: 2px; width: 2px; height: 18px; }
@@ -92,7 +92,7 @@ button { font: inherit; color: inherit; }
 @keyframes swing { 0% { transform: rotate(0); } 40% { transform: rotate(-38deg) translate(-12%, -8%); } 100% { transform: rotate(0); } }
 
 /* ---------- touch ---------- */
-#touch { position: fixed; inset: 0; }
+#touch { position: fixed; inset: 0; z-index: 1; }
 #touch-area { position: absolute; inset: 0; }
 #joy { position: absolute; left: calc(26px + env(safe-area-inset-left, 0px)); bottom: calc(110px + env(safe-area-inset-bottom, 0px)); width: 130px; height: 130px; border-radius: 50%; background: rgba(255, 255, 255, .1); border: 3px solid rgba(255, 255, 255, .25); pointer-events: none; }
 #joy-knob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%; background: rgba(255, 255, 255, .35); }
@@ -105,6 +105,10 @@ button { font: inherit; color: inherit; }
 .tb.act small { font-family: var(--display); font-size: 12px; letter-spacing: .04em; }
 .tb.mine { border-color: #ffb36a; background: rgba(120, 60, 10, .5); }
 .tb.build { border-color: #7ae08a; background: rgba(20, 90, 40, .5); }
+.tb.use { border-color: #7ac8ff; background: rgba(20, 60, 120, .5); width: 62px; height: 62px; }
+#t-use { grid-column: 2; }
+#use-hint { position: absolute; left: 50%; top: calc(50% + 22px); transform: translateX(-50%); font-family: var(--display); font-size: 14px; background: rgba(8, 10, 24, .7); border: 1px solid #7ac8ff; padding: 3px 10px; border-radius: 4px; white-space: nowrap; }
+#t-abil { bottom: auto; top: 0; right: calc(100% + 10px); }
 .tb.act.on { background: rgba(255, 194, 75, .55); border-color: var(--gold); transform: scale(.94); }
 #t-abil { position: absolute; bottom: calc(100% + 10px); right: 0; display: flex; gap: 8px; }
 #t-top { position: absolute; top: calc(150px + env(safe-area-inset-top, 0px)); right: calc(14px + env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 8px; }
@@ -290,7 +294,7 @@ input { font: inherit; background: var(--ink); color: var(--text); border: 2px s
 .spinner { width: 48px; height: 48px; background: var(--gold); animation: spin 1s steps(8) infinite; box-shadow: 0 0 0 6px rgba(255, 194, 75, .25); }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-body.touch #hand { display: none; }
+#hand { display: none !important; }
 @media (orientation: portrait) {
   #joy { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
   #t-right { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
@@ -312,6 +316,9 @@ body.touch #hand { display: none; }
   #joy { bottom: calc(70px + env(safe-area-inset-bottom, 0px)); }
   #t-right { bottom: calc(70px + env(safe-area-inset-bottom, 0px)); }
   #t-abil { bottom: auto; top: 13px; right: calc(100% + 10px); flex-direction: row; }
+  #t-right { grid-template-columns: repeat(3, auto); }
+  #t-use { grid-column: 1; grid-row: 1; } #t-build { grid-column: 2; grid-row: 1; } #t-mine { grid-column: 3; grid-row: 1; }
+  #t-sneak { grid-column: 2; grid-row: 2; } #t-jump { grid-column: 3; grid-row: 2; }
 }
 @media (prefers-reduced-motion: reduce) {
   #realm-card, #popup, .toast, #hand.swing { animation-duration: .01s; }

@@ -242,9 +242,10 @@ class World {
       if (rt === R_CROSS) { this.emitCross(id, bx + x, y, bz + z, x + 1, y + 1, z + 1); continue; }
       const liq = LIQ[id], trans = rt === R_GLASS || rt === R_LIQUID;
       const lowerTop = liq && LIQ[padB[p + PADY]] !== liq;
+      const bh = BLOCK_H[id];
       for (let f = 0; f < 6; f++) {
         const nid = padB[p + FACE_D[f]];
-        if (OPAQUE[nid]) continue;
+        if (OPAQUE[nid] && !(bh < 1 && f === 2)) continue;
         if (rt === R_GLASS && nid === id) continue;
         if (liq) { if (LIQ[nid] === liq) continue; if (liq === 1 && WLOG[nid]) continue; if (rt === R_LIQUID && f !== 2 && SOLID[nid] && nid !== 0 && RENDER[nid] === R_GLASS) continue; }
         let tile;
@@ -276,9 +277,10 @@ class World {
         const order = flip ? [1, 2, 3, 1, 3, 0] : [0, 1, 2, 0, 2, 3];
         for (const v of order) {
           const vt = verts[v];
-          let vy = y + vt[1];
+          let vy = y + vt[1], vv = vt[4];
           if (lowerTop && vt[1] === 1) vy -= 0.12;
-          pushV(trans, bx + x + vt[0], vy, bz + z + vt[2], u0 + vt[3] / 16, v0 + vt[4] / 16, shade * L[v], S[v], flag);
+          if (bh < 1 && vt[1] === 1) { vy = y + bh; if (f !== 2) vv = 1 - bh; }
+          pushV(trans, bx + x + vt[0], vy, bz + z + vt[2], u0 + vt[3] / 16, v0 + vv / 16, shade * L[v], S[v], flag);
         }
       }
     }

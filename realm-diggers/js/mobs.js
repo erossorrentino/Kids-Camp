@@ -9,8 +9,26 @@ function boxCollides(world, x, y, z, w, h) {
   const x0 = Math.floor(x - hw + 1e-4), x1 = Math.floor(x + hw - 1e-4);
   const y0 = Math.floor(y + 1e-4), y1 = Math.floor(y + h - 1e-4);
   const z0 = Math.floor(z - hw + 1e-4), z1 = Math.floor(z + hw - 1e-4);
-  for (let by = y0; by <= y1; by++) for (let bz = z0; bz <= z1; bz++) for (let bx = x0; bx <= x1; bx++) if (world.solidAt(bx, by, bz)) return true;
+  for (let by = y0; by <= y1; by++) for (let bz = z0; bz <= z1; bz++) for (let bx = x0; bx <= x1; bx++) {
+    const id = world.getBlock(bx, by, bz);
+    if (id < 0) return true;
+    if (!SOLID[id]) continue;
+    if (BLOCK_H[id] < 1 && y >= by + BLOCK_H[id] - 1e-4) continue;
+    return true;
+  }
   return false;
+}
+// top of the floor under an entity's feet (handles low blocks like beds)
+function floorTop(world, e) {
+  const hw = e.w / 2, r = Math.floor(e.y + 1e-4);
+  let best = -Infinity;
+  for (let bz = Math.floor(e.z - hw + 1e-4); bz <= Math.floor(e.z + hw - 1e-4); bz++) for (let bx = Math.floor(e.x - hw + 1e-4); bx <= Math.floor(e.x + hw - 1e-4); bx++) {
+    const id = world.getBlock(bx, r, bz);
+    if (id >= 0 && !SOLID[id]) continue;
+    const top = r + (id < 0 ? 1 : BLOCK_H[id]);
+    if (top > e.y - 1e-4 && top > best) best = top;
+  }
+  return best > -Infinity ? best : Math.floor(e.y) + 1;
 }
 function physMove(world, e, dx, dy, dz) {
   const steps = Math.max(1, Math.ceil(Math.max(Math.abs(dx), Math.abs(dy), Math.abs(dz)) / 0.35));
@@ -23,7 +41,7 @@ function physMove(world, e, dx, dy, dz) {
     if (dy) {
       e.y += dy;
       if (boxCollides(world, e.x, e.y, e.z, e.w, e.h)) {
-        if (dy < 0) { e.y = Math.floor(e.y) + 1; landed = true; e.impact = -e.vy; } else { e.y = Math.floor(e.y + e.h) - e.h - 0.001; e.hitCeil = true; }
+        if (dy < 0) { e.y = floorTop(world, e); landed = true; e.impact = -e.vy; } else { e.y = Math.floor(e.y + e.h) - e.h - 0.001; e.hitCeil = true; }
         e.vy = 0; dy = 0;
       }
     }
@@ -147,7 +165,7 @@ function flyer(o) {
 // ---------------- creature definitions ----------------
 const MOBS = {};
 function mobDef(key, o) {
-  MOBS[key] = Object.assign({ key, hostile: 0, hp: 10, speed: 1.6, w: 0.7, h: 0.9, dmg: 2, drops: [], pitch: 1, scale: 1, weight: 10, when: 'day', group: [1, 2], on: null }, o);
+  MOBS[key] = Object.assign({ key, hostile: 0, hp: 10, speed: 1.6, w: 0.7, h: 0.9, dmg: 2, drops: [], pitch: 1, scale: 1, weight: 10, when: 'day', group: [1, 2], on: null, burnsInSun: o.when === 'night' && o.hostile === 1 }, o);
   return MOBS[key];
 }
 const V = (fn, n = 1) => { const cache = []; for (let i = 0; i < n; i++) cache.push(fn(i)); return cache; };
@@ -345,7 +363,19 @@ class Mob {
     if (this.frozenT > 0) { this.frozenT -= dt; return; }
     if (this.attackCD > 0) this.attackCD -= dt;
     this.shootCD -= dt;
-    if (this.burnT > 0) { this.burnT -= dt; this.burnTick -= dt; if (this.burnTick <= 0) { this.burnTick = 0.8; this.damage(1 + Game.stats.flamefist * 0.5, true); Particles.burst(this.x, this.y + this.h / 2, this.z, [1, .5, .1], 4, 1.5, 0.1, true); } }
+    if (d.burnsInSun && realm.sky.mode === 'cycle' && !this.inWater && Game.dayFactor() > 0.6 && w.skyAt(this.x, this.y + this.h * d.scale + 0.2, this.z) >= 0.99) {
+      if (this.burnT <= 0.5) { this.burnT = 1.5; this.sunBurn = true; }
+    }
+    if (this.burnT > 0) {
+      this.burnT -= dt; this.burnTick -= dt;
+      if (Math.random() < (this.sunBurn ? 0.6 : 0.3)) Particles.add(this.x + (Math.random() - .5) * this.w, this.y + Math.random() * this.h * d.scale, this.z + (Math.random() - .5) * this.w, 0, 1.5, 0, 0.5, 0.07, 1, 0.45 + Math.random() * 0.4, 0.1, 1, 0, true);
+      if (this.burnTick <= 0) {
+        this.burnTick = 0.8;
+        if (this.sunBurn) this.damage(2, false); else this.damage(1 + Game.stats.flamefist * 0.5, true);
+        Particles.burst(this.x, this.y + this.h / 2, this.z, [1, .5, .1], 4, 1.5, 0.1, true);
+      }
+      if (this.burnT <= 0) this.sunBurn = false;
+    }
     const dx = p.x - this.x, dz = p.z - this.z, dy = (p.y + 0.9) - (this.y + this.h / 2);
     const dist = Math.hypot(dx, dz) || 0.001, dist3 = Math.hypot(dx, dy, dz);
     const friendly = Game.creative || p.dead || (Game.stats.dinofriend && (d.dino || Game.stats.dinofriend >= 2 && d.hostile !== 1 || Game.stats.dinofriend >= 3)) || Settings.data.difficulty === 'peaceful';
