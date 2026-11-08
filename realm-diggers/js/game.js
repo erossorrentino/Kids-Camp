@@ -1633,6 +1633,26 @@ const Game = {
       Renderer.drawHand(hand);
     }
   },
+  // where the held item sits on screen, in pixels (re-measured now and then, since the buttons can move)
+  handSpot() {
+    const cv = Renderer.canvas, W = cv.clientWidth || 1, H = cv.clientHeight || 1, touch = Settings.touchOn();
+    if (this._spot && this._spotN-- > 0 && this._spot.W === W && this._spot.H === H && this._spot.touch === touch) return this._spot;
+    this._spotN = 30;
+    let x, y, size;
+    const jump = $('t-jump').getBoundingClientRect();
+    if (!touch || !jump.width) { size = Math.max(64, 0.16 * H); x = W - size * 0.85 - 18; y = H - size * 0.75 - 18; }
+    else {
+      const bars = $('bars').getBoundingClientRect(), hot = $('hotbar').getBoundingClientRect();
+      if (W < H) { // portrait: the gap under the jump button, above the hearts and food
+        const top = jump.bottom + 4, bottom = Math.min(bars.top, hot.top) - 4;
+        size = clamp(bottom - top, 34, 64); x = jump.left + jump.width / 2; y = Math.max(top + size / 2, (top + bottom) / 2);
+      } else { // landscape: the corner right of the hotbar, under the jump button
+        const left = hot.right + 6, top = jump.bottom + 4;
+        size = clamp(Math.min(W - left - 8, H - top - 4), 34, 64); x = Math.max(left + size / 2, W - size * 0.75 - 10); y = (top + H) / 2;
+      }
+    }
+    return (this._spot = { x, y, size, W, H, touch });
+  },
   // your arm and whatever you're holding, in view space (camera at 0,0,0 looking down -Z)
   handMesh(light, aspect) {
     const p = this.player, held = p.inv[p.sel], atlas = [], items = [];
@@ -1641,12 +1661,13 @@ const Game = {
     const moving = p.onGround ? Math.min(1, Math.hypot(p.vx, p.vz) / 4) : 0;
     const bx = Math.sin(p.bob) * 0.022 * moving, by = -Math.abs(Math.cos(p.bob)) * 0.022 * moving;
     // place the hand relative to the screen shape so it fits phones and wide screens
-    const halfH = Math.tan(35 * Math.PI / 180) * 0.8, halfW = halfH * aspect, touch = Settings.touchOn();
-    // on touch screens keep the hand clear of the buttons: above them in portrait, left of them in landscape
-    const [ax, ay, sc] = !touch ? [0.56, -0.5, clamp(aspect / 1.4, 0.62, 1)] : aspect < 1 ? [0.48, 0.05, 0.55] : [0.36, -0.45, clamp(aspect / 1.6, 0.6, 0.9)];
+    const halfH = Math.tan(35 * Math.PI / 180) * 0.8, halfW = halfH * aspect;
+    // small, tucked into the bottom-right corner (on phones: in the free gap next to the buttons)
+    const spot = this.handSpot(), sc = (spot.size / spot.H) * 2 * halfH / 0.3;
+    const cx = (spot.x / spot.W * 2 - 1) * halfW, cy = (1 - spot.y / spot.H * 2) * halfH;
     const empty = !held;
     const group = M4.chain(
-      M4.translate(halfW * ax + bx, halfH * ay + by - eq * 0.4 - swing * 0.06 + (empty ? 0.03 : 0), -0.8 - swing * 0.1),
+      M4.translate(cx + bx * sc, cy + (by - eq * 0.5 - swing * 0.06) * sc, -0.8 - swing * 0.1 * sc),
       M4.rotX(-swing * 0.85), M4.rotY(swing * 0.25), M4.scale(sc, sc, sc));
     const xf = (M, x, y, z) => [M[0] * x + M[4] * y + M[8] * z + M[12], M[1] * x + M[5] * y + M[9] * z + M[13], M[2] * x + M[6] * y + M[10] * z + M[14]];
     const cube = (out, M, tiles, hs = 1, em = 0) => {
@@ -1673,15 +1694,17 @@ const Game = {
       return M4.mul(R, M4.scale(t, t, len));
     };
     // arm: hand just under the held item, sleeve running off the bottom-right of the screen
-    const handA = empty ? [-0.02, 0.02, 0] : [0.05, -0.12, 0.06], wrist = [handA[0] + 0.08, handA[1] - 0.16, handA[2] + 0.16], shoulder = [handA[0] + 0.42, handA[1] - 0.95, handA[2] + 0.75];
-    cube(atlas, M4.mul(group, between(handA, wrist, 0.15)), [TILE.hand_skin, TILE.hand_skin, TILE.hand_skin, TILE.hand_skin]);
-    cube(atlas, M4.mul(group, between(wrist, shoulder, 0.18)), [TILE.hand_sleeve, TILE.hand_sleeve, TILE.hand_sleeve, TILE.hand_sleeve]);
+    const hl = empty ? [0, 0, 0] : [0.06, -0.13, 0.06];
+    const handV = xf(group, hl[0], hl[1], hl[2]), wristV = xf(group, hl[0] + 0.08, hl[1] - 0.16, hl[2] + 0.16);
+    const shoulderV = [halfW * 1.15, -halfH * 1.15, -0.8];
+    cube(atlas, between(handV, wristV, 0.15 * sc), [TILE.hand_skin, TILE.hand_skin, TILE.hand_skin, TILE.hand_skin]);
+    cube(atlas, between(wristV, shoulderV, 0.18 * sc), [TILE.hand_sleeve, TILE.hand_sleeve, TILE.hand_sleeve, TILE.hand_sleeve]);
     if (held) {
       const id = held.id;
       if (id < 256 && RENDER[id] !== R_CROSS) {
         cube(atlas, M4.chain(group, M4.translate(0, 0.04, -0.05), M4.rotX(0.12), M4.rotY(0.78), M4.scale(0.26, 0.26, 0.26)), [TEX_T[id], TEX_B[id], TEX_S[id], TEX_F[id]], BLOCK_H[id], EMIT[id]);
       } else {
-        const M = M4.chain(group, M4.translate(0.0, 0.09, -0.07), M4.rotY(-0.45), M4.rotZ(0.25), M4.scale(0.42, 0.42, 0.42));
+        const M = M4.chain(group, M4.translate(0.0, 0.06, -0.07), M4.rotY(-0.45), M4.rotZ(0.25), M4.scale(0.34, 0.34, 0.34));
         if (id < 256) { const tl = TEX_S[id], u0 = (tl & 15) / 16, v0 = (tl >> 4) / 16; quad(atlas, M, u0, v0, u0 + 1 / 16, v0 + 1 / 16, EMIT[id]); }
         else { const sl = ITEM_SLOT[id], u0 = (sl % 16) / 16, v0 = Math.floor(sl / 16) / 16; quad(items, M, u0, v0, u0 + 1 / 16, v0 + 1 / 16); }
       }
