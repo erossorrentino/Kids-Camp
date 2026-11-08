@@ -33,6 +33,18 @@ export function trackSvg(id, cls = '') {
 }
 export function trackLength(id) { trackSvg(id); return mapCache.get(id).len; }
 
+export function toggleFullscreen(force) {
+  const d = document, el = d.documentElement;
+  const isFs = d.fullscreenElement || d.webkitFullscreenElement;
+  try {
+    if (force === false || (isFs && force !== true)) { (d.exitFullscreen || d.webkitExitFullscreen)?.call(d); return; }
+    if (!isFs) {
+      const p = (el.requestFullscreen || el.webkitRequestFullscreen)?.call(el, { navigationUI: 'hide' });
+      if (p && p.then) p.then(() => screen.orientation?.lock?.('landscape').catch(() => {})).catch(() => {});
+    }
+  } catch (e) { /* not supported (e.g. iPhone Safari) */ }
+}
+
 export class UI {
   constructor(app) {
     this.app = app;
@@ -45,6 +57,7 @@ export class UI {
           <button data-go="home">Home</button><button data-go="career">Career</button><button data-go="quick">Quick Race</button>
           <button data-go="dealer">Dealership</button><button data-go="garage">Garage</button><button data-go="tuning">Tuning</button><button data-go="settings">Settings</button>
         </nav>
+        <button class="fs-btn" aria-label="Full screen" title="Full screen">⛶</button>
         <div class="wallet"><span class="w-label">CREDITS</span><span class="w-val">$0</span></div>
       </header>
       <main class="screen"></main>
@@ -58,6 +71,7 @@ export class UI {
       const go = e.target.closest('[data-go]');
       if (go) { audio.init(); audio.click(); this.show(go.dataset.go); }
     });
+    $('.fs-btn', root).onclick = () => toggleFullscreen();
     root.addEventListener('mouseover', (e) => { if (e.target.closest('button, .card, .tile')) audio.ctx && audio.hover(); }, { passive: true });
     this.dealer = { search: '', classes: new Set(), brand: '', sort: 'price', afford: false, scroll: 0 };
   }
@@ -567,6 +581,7 @@ export class UI {
       <div class="f-h">Driving assists</div>
       <div class="toggles">
         ${tog('line', 'Racing line', 'Coloured line on the track: green = go, red = brake')}
+        ${tog('autoGas', 'Auto accelerate', 'The car drives forward by itself: you just steer (and brake). Great on phones!')}
         ${tog('autoBrake', 'Auto brake', 'The car brakes for corners by itself (great for beginners)')}
         ${tog('steering', 'Steering assist', 'Helps catch slides')}
         ${tog('abs', 'ABS', 'Stops the wheels locking when braking hard')}

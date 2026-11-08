@@ -19,7 +19,14 @@ async function build() {
   let js = res.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
   const html = fs.readFileSync('src/index.html', 'utf8');
   const css = fs.readFileSync('src/styles.css', 'utf8');
-  const page = html.replace('/*__STYLE__*/', () => css).replace('/*__SCRIPT__*/', () => js);
+  let page = html.replace('/*__STYLE__*/', () => css).replace('/*__SCRIPT__*/', () => js);
+  if (args.includes('--artifact')) {
+    // claude.ai Artifact pages are wrapped in their own document skeleton:
+    // keep the title, fonts, style, body markup and script only.
+    const head = page.match(/<head>([\s\S]*?)<\/head>/)[1].replace(/<meta charset[^>]*>\s*/, '').replace(/<meta name="viewport"[^>]*>\s*/, '');
+    const body = page.match(/<body>([\s\S]*?)<\/body>/)[1];
+    page = head.trim() + '\n' + body.trim() + '\n';
+  }
   fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, page);
   console.log(`built ${out} (${(page.length / 1024).toFixed(0)} KB) in ${Date.now() - t0} ms`);

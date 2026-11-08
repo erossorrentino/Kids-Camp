@@ -21,9 +21,9 @@ export class Showroom {
     pmrem.dispose();
     room.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); } });
     scene.environment = this.envRT.texture;
-    scene.environmentIntensity = 0.9;
+    scene.environmentIntensity = 0.7;
     // floor
-    const floorMat = new THREE.MeshPhysicalMaterial({ color: 0x0b0d12, roughness: 0.18, metalness: 0.4, clearcoat: 1, clearcoatRoughness: 0.08 });
+    const floorMat = new THREE.MeshPhysicalMaterial({ color: 0x0b0d12, roughness: 0.35, metalness: 0.2, clearcoat: 0.6, clearcoatRoughness: 0.15, envMapIntensity: 0.35 });
     const floor = new THREE.Mesh(new THREE.CircleGeometry(30, 64), floorMat);
     floor.rotation.x = -Math.PI / 2;
     floor.receiveShadow = true;
@@ -54,16 +54,16 @@ export class Showroom {
     wall.position.y = 6;
     scene.add(wall);
     // lights
-    const key = new THREE.SpotLight(0xffffff, 300, 30, 0.55, 0.6, 1.5);
+    const key = new THREE.SpotLight(0xffffff, 110, 30, 0.55, 0.6, 1.5);
     key.position.set(4, 9, 6);
     key.castShadow = true;
     key.shadow.mapSize.set(2048, 2048);
     key.shadow.bias = -0.0002;
     key.shadow.radius = 4;
     scene.add(key, key.target);
-    const rimL = new THREE.SpotLight(0x5ad1ff, 160, 30, 0.6, 0.7, 1.5);
+    const rimL = new THREE.SpotLight(0x5ad1ff, 35, 30, 0.5, 0.7, 1.5);
     rimL.position.set(-7, 4, -5);
-    const rimR = new THREE.SpotLight(0xff3d7a, 120, 30, 0.6, 0.7, 1.5);
+    const rimR = new THREE.SpotLight(0xff3d7a, 28, 30, 0.5, 0.7, 1.5);
     rimR.position.set(7, 4, -5);
     scene.add(rimL, rimR);
     scene.add(new THREE.HemisphereLight(0x8899bb, 0x111111, 0.3));
@@ -86,6 +86,7 @@ export class Showroom {
   makeThumbScene() {
     const s = new THREE.Scene();
     s.background = new THREE.Color(0x10141c);
+    s.fog = new THREE.Fog(0x10141c, 7, 15);
     s.environment = this.envRT.texture;
     s.environmentIntensity = 1.0;
     const d = new THREE.DirectionalLight(0xffffff, 2.5);
@@ -108,7 +109,7 @@ export class Showroom {
     this.car.root.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });
     this.pivot.add(this.car.root);
     const L = this.car.dims.front - this.car.dims.rear;
-    this.camTarget.dist = 5.5 + L * 0.95;
+    this.camTarget.dist = 6.5 + L * 1.05;
     this.camTarget.height = 1.2 + this.car.dims.H * 0.5;
     this.camTarget.look = this.car.dims.H * 0.42;
     this.camTarget.x = offsetX;
@@ -160,7 +161,7 @@ export class Showroom {
     this.thumbScene.add(model.root);
     const L = model.dims.front - model.dims.rear;
     const cam = this.thumbCam;
-    cam.position.set(0.9, 1.1 + model.dims.H * 0.4, 4.2 + L * 1.25);
+    cam.position.set(0.7, 0.9 + model.dims.H * 0.45, 2.4 + L * 1.05);
     cam.lookAt(0, model.dims.H * 0.38, 0);
     const w = canvas.width, h = canvas.height;
     cam.aspect = w / h; cam.updateProjectionMatrix();

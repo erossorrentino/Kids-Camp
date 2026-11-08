@@ -155,6 +155,8 @@ export class RaceScene {
     if (this.done) return;
     dt = Math.min(dt, 1 / 20);
     const input = this.input.update(dt);
+    // auto-accelerate assist (great on phones): full throttle unless braking
+    if (this.opts.settings.assists.autoGas && input.brake < 0.1 && !input.handbrake) input.throttle = 1;
     const actions = this.input.consumeActions();
     if (actions.has('pause')) { this.app.togglePause(); }
     if (actions.has('mute')) audio.toggleMute();
@@ -183,7 +185,7 @@ export class RaceScene {
     for (let k = 0; k < sub; k++) {
       if (racing) {
         let inp = input;
-        if (autopilot) inp = this.autopilotInput();
+        if (autopilot || this.autoDrive) inp = this.autopilotInput(this.autoDrive && !autopilot ? 0.93 : 0.7);
         const safe = this.safeSpeed();
         veh.update(sdt, inp, { safeSpeed: safe });
       } else {
@@ -236,7 +238,14 @@ export class RaceScene {
       this.finishedTimer += dt;
       if (this.finishedTimer > 6) this.finish();
     }
-    this.render(dt);
+    if (!this.skipRender) this.render(dt);
+  }
+
+  // Test/debug helper: advance the simulation without drawing frames
+  simulate(seconds, step = 1 / 30) {
+    this.skipRender = true;
+    for (let t = 0; t < seconds && !this.done; t += step) this.frame(step);
+    this.skipRender = false;
   }
 
   hudCam(name) { this.hud.toast(`<small>CAMERA</small> ${name}`, 1.2, 'cam'); }
@@ -268,15 +277,17 @@ export class RaceScene {
     return m;
   }
 
-  autopilotInput() {
+  autopilotInput(k = 0.7) {
     const v = this.player.veh, tr = this.track;
     const look = Math.max(8, v.speed * 0.5);
     const f = tr.frameAt(v.proj.s + look);
     const tx = f.x + f.lx * tr.raceLine[f.i], tz = f.z + f.lz * tr.raceLine[f.i];
     const a = Math.atan2(tx - v.x, tz - v.z) - v.heading;
     const ang = Math.atan2(Math.sin(a), Math.cos(a));
-    const target = this.playerProfile[v.proj.i] * 0.7;
-    return { throttle: v.speed < target ? 0.6 : 0, brake: v.speed > target + 3 ? 0.4 : 0, steer: clamp(ang * 2.5 / Math.max(0.1, v.maxSteer(v.speed) * 2), -1, 1), analog: true };
+    let target = 1e9;
+    for (let q = 0; q < 14; q++) target = Math.min(target, this.playerProfile[(v.proj.i + q) % tr.N]);
+    target *= k;
+    return { throttle: v.speed < target ? (k > 0.8 ? 1 : 0.6) : 0, brake: v.speed > target + 1 ? Math.min(1, (v.speed - target) / 3) : 0, steer: clamp(ang * 2.5 / Math.max(0.1, v.maxSteer(v.speed) * 2), -1, 1), analog: true };
   }
 
   resetPlayer() {
@@ -339,7 +350,7 @@ export class RaceScene {
         const pitch = clamp(-v.ax * 0.0055, -0.05, 0.05);
         m.update(dt, { steer: v.steer, speed: v.vLong, roll, pitch, braking: (this.input.state.brake > 0.1 && v.gear >= 0) || v.lockup > 0 });
         // effects
-        const slipSmoke = clamp((v.slipRear - 0.12) * 4, 0, 1) * clamp(v.speed / 8, 0, 1) + clamp(v.spin, 0, 1) + (this.input.state.handbrake && v.speed > 5 ? 0.6 : 0);
+        const slipSmoke = clamp((v.slipRear - 0.14) * 3.5, 0, 1) * clamp((v.speed - 4) / 10, 0, 1) + clamp(v.spin, 0, 1) * 0.45 + (this.input.state.handbrake && v.speed > 5 ? 0.6 : 0);
         const surf = SURFACES[v.surface];
         const flame = (v.shiftEvent !== e.lastShift && v.lastShift > 0 && v.rpm > v.p.redline * 0.8 && !v.p.ev) || v.nitroOn;
         if (v.shiftEvent !== e.lastShift && v.lastShift > 0 && !v.p.ev && v.rpm > v.p.redline * 0.75) audio.backfire(0.5);

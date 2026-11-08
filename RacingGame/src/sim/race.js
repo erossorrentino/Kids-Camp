@@ -50,7 +50,8 @@ export class Race {
     for (const e of this.entrants) {
       const total = e.ai ? e.ai.total : e.total;
       if (e.finished) continue;
-      const lapNow = Math.floor(total / L); // 0 while on the opening lap's grid side
+      // current lap number: 0 on the grid (behind the line), 1 after crossing it, ...
+      const lapNow = Math.floor(total / L) + 1;
       if (lapNow > e.lap && this.state !== 'grid' && this.state !== 'lights') {
         // completed a lap
         if (e.lap >= 1) {

@@ -6,35 +6,37 @@ import { clamp, lerp } from '../core/rng.js';
 
 export const PARTS = [
   { key: 'engine', name: 'Engine Tune', desc: 'Remapped engine, forged internals. More power everywhere.', icon: '⚙', levels: [
-    { name: 'Stage 1', cost: 2500, power: 1.08 }, { name: 'Stage 2', cost: 6500, power: 1.17 }, { name: 'Stage 3', cost: 15000, power: 1.27 }] },
+    { name: 'Stage 1', cost: 900, power: 1.08 }, { name: 'Stage 2', cost: 2800, power: 1.17 }, { name: 'Stage 3', cost: 12000, power: 1.27 }] },
   { key: 'turbo', name: 'Turbo / Supercharger', desc: 'Forced induction for a big jump in power.', icon: '🌀', noEV: true, levels: [
-    { name: 'Low Boost', cost: 4000, power: 1.1 }, { name: 'High Boost', cost: 9500, power: 1.22 }, { name: 'Twin Turbo', cost: 21000, power: 1.36 }] },
+    { name: 'Low Boost', cost: 4500, power: 1.1 }, { name: 'High Boost', cost: 9000, power: 1.22 }, { name: 'Twin Turbo', cost: 18000, power: 1.36 }] },
   { key: 'exhaust', name: 'Exhaust', desc: 'Free-flowing exhaust: a little power, less weight, a lot more noise.', icon: '🔊', noEV: true, levels: [
-    { name: 'Sport', cost: 1200, power: 1.03, mass: -6 }, { name: 'Race', cost: 3000, power: 1.06, mass: -12 }, { name: 'Titanium', cost: 6500, power: 1.09, mass: -18 }] },
+    { name: 'Sport', cost: 1200, power: 1.03, mass: -6 }, { name: 'Race', cost: 2800, power: 1.06, mass: -12 }, { name: 'Titanium', cost: 6000, power: 1.09, mass: -18 }] },
   { key: 'intake', name: 'Intake & ECU', desc: 'Cold air intake and a smarter engine computer.', icon: '💨', levels: [
-    { name: 'Sport', cost: 1000, power: 1.03 }, { name: 'Race', cost: 2600, power: 1.06 }, { name: 'Custom Map', cost: 5500, power: 1.1 }] },
+    { name: 'Sport', cost: 600, power: 1.03 }, { name: 'Race', cost: 1500, power: 1.06 }, { name: 'Custom Map', cost: 3000, power: 1.1 }] },
   { key: 'transmission', name: 'Gearbox', desc: 'Quicker shifts and better gear ratios.', icon: '🔧', levels: [
-    { name: 'Sport', cost: 2000, shift: 0.15, accel: 1.02 }, { name: 'Race', cost: 5200, shift: 0.1, accel: 1.04 }, { name: 'Sequential', cost: 11500, shift: 0.05, accel: 1.06 }] },
+    { name: 'Sport', cost: 1500, shift: 0.15, accel: 1.02 }, { name: 'Race', cost: 6000, shift: 0.1, accel: 1.04 }, { name: 'Sequential', cost: 18000, shift: 0.05, accel: 1.06 }] },
   { key: 'weight', name: 'Weight Reduction', desc: 'Strip weight: carbon panels, lighter seats, no carpet.', icon: '🪶', levels: [
-    { name: 'Stage 1', cost: 2200, massMul: 0.95 }, { name: 'Stage 2', cost: 5200, massMul: 0.9 }, { name: 'Stage 3', cost: 11500, massMul: 0.84 }, { name: 'Carbon Body', cost: 25000, massMul: 0.78 }] },
+    { name: 'Stage 1', cost: 1500, massMul: 0.95 }, { name: 'Stage 2', cost: 5000, massMul: 0.9 }, { name: 'Stage 3', cost: 12000, massMul: 0.84 }, { name: 'Carbon Body', cost: 30000, massMul: 0.78 }] },
   { key: 'tires', name: 'Tyres', desc: 'Stickier rubber means faster corners and shorter braking.', icon: '⭕', levels: [
-    { name: 'Sport', cost: 1100, grip: 1.08 }, { name: 'Semi-Slick', cost: 2800, grip: 1.16 }, { name: 'Racing Slick', cost: 6500, grip: 1.26 }] },
+    { name: 'Sport', cost: 900, grip: 1.08 }, { name: 'Semi-Slick', cost: 1600, grip: 1.16 }, { name: 'Racing Slick', cost: 2600, grip: 1.26 }] },
   { key: 'brakes', name: 'Brakes', desc: 'Bigger discs and calipers. Brake later, pass more cars.', icon: '🛑', levels: [
-    { name: 'Sport', cost: 1600, brake: 1.12 }, { name: 'Race', cost: 4200, brake: 1.25 }, { name: 'Carbon Ceramic', cost: 9500, brake: 1.4 }] },
+    { name: 'Sport', cost: 1200, brake: 1.12 }, { name: 'Race', cost: 5000, brake: 1.25 }, { name: 'Carbon Ceramic', cost: 14000, brake: 1.4 }] },
   { key: 'suspension', name: 'Suspension', desc: 'Lower, stiffer, sharper. Less body roll and more grip.', icon: '🔩', levels: [
-    { name: 'Sport', cost: 2000, grip: 1.04 }, { name: 'Race', cost: 5000, grip: 1.08 }, { name: 'Adjustable', cost: 10500, grip: 1.12 }] },
+    { name: 'Sport', cost: 1800, grip: 1.04 }, { name: 'Race', cost: 4500, grip: 1.08 }, { name: 'Adjustable', cost: 10000, grip: 1.12 }] },
   { key: 'aero', name: 'Aero Kit', desc: 'Splitter and rear wing push the car into the track at speed.', icon: '🪽', levels: [
-    { name: 'Street Kit', cost: 3000, aero: 0.35, drag: 1.03 }, { name: 'Track Kit', cost: 7200, aero: 0.8, drag: 1.06 }, { name: 'Race Wing', cost: 15500, aero: 1.4, drag: 1.1 }] },
+    { name: 'Street Kit', cost: 2000, aero: 0.35, drag: 1.03 }, { name: 'Track Kit', cost: 6000, aero: 0.8, drag: 1.06 }, { name: 'Race Wing', cost: 13000, aero: 1.4, drag: 1.1 }] },
   { key: 'nitro', name: 'Nitrous', desc: 'Press N (or Shift) for a huge burst of power. Refills a little every lap.', icon: '🔥', levels: [
-    { name: '1 Bottle', cost: 3000, nitro: 4 }, { name: '2 Bottles', cost: 6500, nitro: 7 }, { name: '3 Bottles', cost: 13000, nitro: 10 }] },
+    { name: '1 Bottle', cost: 800, nitro: 4 }, { name: '2 Bottles', cost: 2000, nitro: 7 }, { name: '3 Bottles', cost: 4500, nitro: 10 }] },
 ];
 export const PART_KEYS = PARTS.map((p) => p.key);
 
-// Price of a part scales with how valuable the car is
+// Base costs are real-world aftermarket prices for a typical ~$40k car;
+// parts for exotic machinery cost more (carbon brakes for a hypercar, a
+// gearbox for a Formula car...), so prices scale with the car's value.
 export function partCost(car, key, level) {
   const p = PARTS.find((q) => q.key === key);
   if (!p || level < 1 || level > p.levels.length) return 0;
-  const f = clamp(Math.pow(car.price / 30000, 0.6), 0.55, 40);
+  const f = clamp(Math.pow(car.price / 40000, 0.5), 0.6, 25);
   const c = p.levels[level - 1].cost * f;
   return c < 10000 ? Math.round(c / 50) * 50 : Math.round(c / 500) * 500;
 }

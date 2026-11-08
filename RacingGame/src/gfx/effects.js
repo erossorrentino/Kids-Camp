@@ -292,7 +292,7 @@ export class Effects {
         const sp = c.speed;
         this.smoke.emit(wx + (Math.random() - 0.5) * 0.3, wy + 0.2, wz + (Math.random() - 0.5) * 0.3,
           -fx * sp * 0.15 + (Math.random() - 0.5) * 1.5, 0.6 + Math.random() * 0.8, -fz * sp * 0.15 + (Math.random() - 0.5) * 1.5,
-          { size: 1.2 + smokeAmt, grow: 3.2, life: 1.6 + smokeAmt * 1.8, alpha: 0.32 + smokeAmt * 0.3, color: [0.86, 0.86, 0.88], drag: 1.6, spin: 1.4 });
+          { size: 0.9 + smokeAmt * 0.8, grow: 2.6, life: 1.2 + smokeAmt * 1.4, alpha: 0.18 + smokeAmt * 0.22, color: [0.86, 0.86, 0.88], drag: 1.6, spin: 1.4 });
       }
       // dust off track
       if (c.dust && Math.random() < Math.min(1, c.speed / 25) * dt * 40) {

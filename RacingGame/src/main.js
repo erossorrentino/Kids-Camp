@@ -3,7 +3,7 @@ import { Graphics } from './gfx/renderer.js';
 import { Showroom } from './game/showroom.js';
 import { RaceScene } from './game/raceScene.js';
 import { Input } from './game/input.js';
-import { UI } from './ui/menus.js';
+import { UI, toggleFullscreen } from './ui/menus.js';
 import { audio } from './audio/audio.js';
 import { loadProfile, saveProfile, resetProfile } from './core/save.js';
 import { catalog, CAR_COUNT, formatPrice } from './data/cars.js';
@@ -22,6 +22,12 @@ class App {
     this.overlay.className = 'overlay';
     root.appendChild(this.overlay);
     this.profile = loadProfile();
+    this.root = root;
+    this.isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    if (this.isTouch) root.classList.add('is-touch');
+    // stop pinch-zoom / double-tap zoom on phones
+    document.addEventListener('gesturestart', (e) => e.preventDefault());
+    document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
     try {
       this.gfx = new Graphics(this.view);
     } catch (e) {
@@ -59,7 +65,7 @@ class App {
 
   setQuality(q, rebuild = true) {
     this.gfx.setQuality(q);
-    if (rebuild && this.mode === 'menu') this.gfx.buildComposer(this.showroom.scene, this.showroom.camera, 0.45);
+    if (rebuild && this.mode === 'menu') this.gfx.buildComposer(this.showroom.scene, this.showroom.camera, 0.22);
   }
 
   save() { saveProfile(this.profile); }
@@ -116,15 +122,18 @@ class App {
   // ---------------------------------------------------------------------------
   enterMenu(screen = 'home', params) {
     this.mode = 'menu';
-    this.gfx.buildComposer(this.showroom.scene, this.showroom.camera, 0.45);
+    this.root.classList.remove('racing');
+    this.gfx.buildComposer(this.showroom.scene, this.showroom.camera, 0.22);
     this.gfx.setGrade({ saturation: 1.05, contrast: 1.05, vignette: 0.45 });
-    this.gfx.renderer.toneMappingExposure = 1.0;
+    this.gfx.renderer.toneMappingExposure = 0.85;
     this.ui.setVisible(true);
     this.ui.show(screen, params);
     this.input.capture = false;
   }
 
   async startRace(opts, after) {
+    if (this.isTouch) toggleFullscreen(true);
+    this.root.classList.add('racing');
     this.ui.setVisible(false);
     this.ui.modalEl.classList.remove('show');
     const tr = trackById(opts.trackId);
@@ -226,10 +235,11 @@ class App {
     if (race) race.dispose();
     this.race = null;
     this.mode = 'menu';
-    this.gfx.buildComposer(this.showroom.scene, this.showroom.camera, 0.45);
-    this.gfx.renderer.toneMappingExposure = 1.0;
+    this.gfx.buildComposer(this.showroom.scene, this.showroom.camera, 0.22);
+    this.gfx.renderer.toneMappingExposure = 0.85;
     this.gfx.setGrade({ saturation: 1.05, contrast: 1.05, vignette: 0.45 });
     this.showroom.setFrame(-0.3);
+    this.root.classList.remove('racing');
     if (this.input.touchEl) this.input.touchEl.style.display = 'none';
     this.input.capture = false;
     const wrapOn = (fn) => () => { this.ui.setVisible(true); fn(); };
