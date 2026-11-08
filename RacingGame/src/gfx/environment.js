@@ -214,13 +214,13 @@ void main() {
     float silver = pow(max(cosTheta, 0.0), 40.0) * (1.0 - shade);
     vec3 cc = mix(cloudLit, cloudDark, shade * 0.85);
     cc += cloudLit * (sunAmt * 0.6 + silver * 2.5);
-    float fade = smoothstep(0.0, 0.22, direction.y);
+    float fade = smoothstep(0.0, 0.09, direction.y);
     col = mix(col, cc * skyBoost * cloudBright, dens * fade * 0.97);
   }
 
   // ---- horizon haze -> fog colour; below horizon -> ground colour
-  float hz = 1.0 - smoothstep(-0.02, 0.16, direction.y);
-  col = mix(col, horizonColor, hz * 0.85);
+  float hz = 1.0 - smoothstep(-0.02, 0.11, direction.y);
+  col = mix(col, horizonColor, hz * 0.8);
   float below = smoothstep(0.0, -0.06, direction.y);
   col = mix(col, groundColor, below);
   gl_FragColor = vec4(col, 1.0);

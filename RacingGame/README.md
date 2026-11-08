@@ -142,6 +142,8 @@ src/
   game/            race scene, cameras, input (keyboard/gamepad/touch), showroom
   ui/              menus and HUD
   audio/           procedural engine and effects audio
+  test/            dev pages that render cars, tracks and skies on their own
+                   (build one with: node build.mjs --entry src/test/carshow.js --out carshow.html)
 ```
 
 Built with [three.js](https://threejs.org) r180 and bundled with esbuild.
