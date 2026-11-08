@@ -31,9 +31,12 @@ class App {
     try {
       this.gfx = new Graphics(this.view);
     } catch (e) {
-      root.innerHTML = '<div class="nogl"><h1>Apex Velocity</h1><p>Your browser could not start 3D graphics (WebGL). Try Chrome, Edge, Firefox or Safari on a computer or tablet.</p></div>';
+      window.__bootError?.('This browser could not start 3D graphics (WebGL 2). Try the latest Chrome, Edge, Firefox or Safari, or turn on hardware acceleration.\n\n(' + (e && e.message ? e.message : e) + ')');
       throw e;
     }
+    // if the GPU drops the 3D context (common on phones when memory is low), recover
+    this.gfx.renderer.domElement.addEventListener('webglcontextlost', (ev) => { ev.preventDefault(); this.contextLost = true; this.ui?.toast('Graphics paused… restoring'); });
+    this.gfx.renderer.domElement.addEventListener('webglcontextrestored', () => { this.contextLost = false; this.setQuality('low'); this.profile.settings.quality = 'low'; this.save(); this.enterMenu('home'); });
     this.setQuality(this.profile.settings.quality || this.autoQuality(), false);
     audio.setVolume(this.profile.settings.volume);
     this.input = new Input(root);
@@ -53,6 +56,10 @@ class App {
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
     window.__app = this;
+    window.__appStarted = true;
+    const boot = document.getElementById('boot');
+    if (boot) { boot.style.transition = 'opacity .4s'; boot.style.opacity = '0'; setTimeout(() => boot.remove(), 450); }
+    this.watch = { frames: 0, white: 0 };
   }
 
   autoQuality() {
@@ -160,6 +167,7 @@ class App {
     this.race = race;
     this.raceOpts = { opts, after };
     this.mode = 'race';
+    this.watch = { frames: 0, white: 0 };
     this.input.capture = true;
     if (this.input.isTouchDevice() && !this.input.touchEl) this.input.buildTouchControls(this.overlay);
     if (this.input.touchEl) this.input.touchEl.style.display = '';
@@ -285,23 +293,76 @@ class App {
     };
   }
 
+  // White-screen watchdog: if the 3D view comes out (almost) pure white for a
+  // while, fall back to the simplest graphics settings.
+  checkWhite() {
+    const w = this.watch;
+    if (!w || w.done || this.contextLost) return;
+    w.frames++;
+    if (w.frames < 20 || w.frames % 15 !== 0) return;
+    if (w.frames > 600) { w.done = true; return; }
+    const gl = this.gfx.renderer.getContext();
+    const cw = gl.drawingBufferWidth, ch = gl.drawingBufferHeight;
+    const px = new Uint8Array(4);
+    let white = 0, n = 0;
+    for (let i = 1; i <= 5; i++) for (let j = 1; j <= 5; j++) {
+      gl.readPixels(Math.floor((cw * i) / 6), Math.floor((ch * j) / 6), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      n++;
+      if (px[0] > 245 && px[1] > 245 && px[2] > 245) white++;
+    }
+    if (white >= n - 2) w.white++; else w.white = 0;
+    if (w.white >= 3) {
+      w.done = true;
+      if (this.gfx.qualityName !== 'low') {
+        this.profile.settings.quality = 'low';
+        this.save();
+        this.setQuality('low');
+        if (this.race) { this.gfx.buildComposer(this.race.scene, this.race.camera, 0); }
+        this.ui.toast('The picture was too bright on this device, so graphics were switched to Low. You can change this in Settings.');
+      }
+    }
+  }
+
   loop(now) {
     requestAnimationFrame(this.loop);
     const dt = Math.min(0.1, (now - this.last) / 1000);
     this.last = now;
-    if (this.mode === 'race' && this.race) {
-      this.race.frame(dt);
-    } else if (this.mode === 'menu') {
-      this.stepPR(4);
-      this.showroom.update(dt);
-      this.showroom.processThumbs(12);
-      this.gfx.render(dt, {});
+    if (this.contextLost) return;
+    try {
+      if (this.mode === 'race' && this.race) {
+        this.race.frame(dt);
+      } else if (this.mode === 'menu') {
+        this.stepPR(4);
+        this.showroom.update(dt);
+        this.showroom.processThumbs(12);
+        this.gfx.render(dt, {});
+      }
+      if (this.mode === 'race' || this.mode === 'menu') this.checkWhite();
+    } catch (e) {
+      console.error(e);
+      if (!this._loopErr) { this._loopErr = true; this.ui?.toast('Something went wrong: ' + (e && e.message ? e.message : e)); }
     }
   }
 }
 
+// The display font loads after start-up so a slow or blocked font server can
+// never hold the game on a blank screen (the system font is used meanwhile).
+function loadFont() {
+  try {
+    const l = document.createElement('link');
+    l.rel = 'stylesheet';
+    l.href = 'https://fonts.googleapis.com/css2?family=Titillium+Web:ital,wght@0,300;0,400;0,600;0,700;0,900;1,700;1,900&display=swap';
+    (document.head || document.body).appendChild(l);
+  } catch (e) { /* fonts are optional */ }
+}
+
 function boot() {
-  try { new App(); } catch (e) { console.error(e); }
+  loadFont();
+  try { new App(); } catch (e) {
+    console.error(e);
+    const shown = document.getElementById('boot-err')?.textContent;
+    if (!shown) window.__bootError?.(e && e.message ? e.message : e);
+  }
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
 else boot();

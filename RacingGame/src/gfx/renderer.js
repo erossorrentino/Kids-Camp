@@ -17,6 +17,25 @@ export const QUALITY = {
   ultra: { name: 'Ultra', pixelRatio: 1, shadows: 2, shadowMapSize: 4096, shadowExtent: 85, msaa: 4, bloom: true, post: true, scenery: 1.4, carDetail: 2, maxDpr: 2 },
 };
 
+// Clamps HDR colour and removes NaN/Inf pixels. Real GPUs store very bright
+// specular highlights in half-float buffers that can overflow to infinity,
+// which bloom would otherwise smear across the whole screen as white.
+const SanitizeShader = {
+  uniforms: { tDiffuse: { value: null }, maxValue: { value: 24.0 } },
+  vertexShader: /* glsl */`
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: /* glsl */`
+    uniform sampler2D tDiffuse;
+    uniform float maxValue;
+    varying vec2 vUv;
+    void main() {
+      vec4 c = texture2D(tDiffuse, vUv);
+      if (isnan(c.r) || isnan(c.g) || isnan(c.b) || isinf(c.r) || isinf(c.g) || isinf(c.b)) c.rgb = vec3(0.0);
+      gl_FragColor = vec4(clamp(c.rgb, 0.0, maxValue), 1.0);
+    }`,
+};
+
 const CinematicShader = {
   uniforms: {
     tDiffuse: { value: null },
@@ -121,6 +140,7 @@ export class Graphics {
     composer.setSize(size.x, size.y);
     this.renderPass = new RenderPass(scene, camera);
     composer.addPass(this.renderPass);
+    composer.addPass(new ShaderPass(SanitizeShader));
     this.bloomPass = null;
     if (q.bloom) {
       this.bloomPass = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), bloomStrength, 0.5, 1.0);
