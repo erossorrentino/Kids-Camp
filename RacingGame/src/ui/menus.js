@@ -632,7 +632,7 @@ export class UI {
     let el = $('.pause', this.app.overlay);
     if (!show) { if (el) el.remove(); return; }
     if (!el) { el = document.createElement('div'); el.className = 'pause'; this.app.overlay.appendChild(el); }
-    el.innerHTML = `<div class="p-box"><h2>PAUSED</h2><button class="btn primary wide" data-a="resume">Resume</button><button class="btn wide" data-a="restart">Restart race</button><button class="btn wide" data-a="camera">Change camera</button><button class="btn wide" data-a="line">Racing line: ${this.profile.settings.assists.line ? 'ON' : 'OFF'}</button><button class="btn wide danger" data-a="quit">Quit race</button>${this.controlsHtml()}</div>`;
+    el.innerHTML = `<div class="p-box"><h2>PAUSED</h2><button class="btn primary wide" data-a="resume">Resume</button><button class="btn wide" data-a="restart">Restart race</button><button class="btn wide" data-a="camera">Change camera</button><button class="btn wide" data-a="line">Racing line: ${this.profile.settings.assists.line ? 'ON' : 'OFF'}</button><button class="btn wide" data-a="quality">Graphics: ${QUALITY[this.app.gfx.qualityName]?.name || ''} (tap to change)</button><button class="btn wide danger" data-a="quit">Quit race</button>${this.controlsHtml()}</div>`;
     el.querySelectorAll('[data-a]').forEach((b) => b.onclick = () => { audio.click(); handlers[b.dataset.a](); });
   }
 

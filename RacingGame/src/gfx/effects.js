@@ -15,9 +15,12 @@ const particleVS = /* glsl */`
   uniform float uScale;
   #include <fog_pars_vertex>
   void main() {
-    vAlpha = aAlpha; vColor = aColor; vRot = aRot;
+    vColor = aColor; vRot = aRot;
     vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
-    gl_PointSize = aSize * uScale / max(0.5, -mvPosition.z);
+    float dist = -mvPosition.z;
+    // fade out particles right in front of the camera so smoke/dust can't fill the screen
+    vAlpha = aAlpha * smoothstep(1.5, 6.0, dist);
+    gl_PointSize = min(aSize * uScale / max(0.5, dist), 220.0);
     gl_Position = projectionMatrix * mvPosition;
     #include <fog_vertex>
   }`;
@@ -295,9 +298,9 @@ export class Effects {
           { size: 0.9 + smokeAmt * 0.8, grow: 2.6, life: 1.2 + smokeAmt * 1.4, alpha: 0.18 + smokeAmt * 0.22, color: [0.86, 0.86, 0.88], drag: 1.6, spin: 1.4 });
       }
       // dust off track
-      if (c.dust && Math.random() < Math.min(1, c.speed / 25) * dt * 40) {
+      if (c.dust && Math.random() < Math.min(1, c.speed / 25) * dt * 16) {
         this.smoke.emit(wx, wy + 0.25, wz, -fx * c.speed * 0.1 + (Math.random() - 0.5) * 2, 0.8 + Math.random(), -fz * c.speed * 0.1 + (Math.random() - 0.5) * 2,
-          { size: 1.4, grow: 3.8, life: 1.8, alpha: 0.4, color: c.dust, drag: 1.2, spin: 1 });
+          { size: 1.1, grow: 2.6, life: 1.3, alpha: 0.26, color: c.dust, drag: 1.2, spin: 1 });
       }
       // rain spray
       if (c.wet && c.speed > 8 && Math.random() < dt * 30) {

@@ -11,7 +11,8 @@ import { FXAAPass } from 'three/examples/jsm/postprocessing/FXAAPass.js';
 import { setMaxAnisotropy } from './textures.js';
 
 export const QUALITY = {
-  low: { name: 'Low', pixelRatio: 0.75, shadows: 1, shadowMapSize: 1024, shadowExtent: 45, msaa: 0, bloom: false, post: false, scenery: 0.35, carDetail: 0, maxDpr: 1 },
+  // Low draws straight to the screen (no HDR buffers / post effects): the most compatible path
+  low: { name: 'Low', pixelRatio: 0.9, shadows: 1, shadowMapSize: 1024, shadowExtent: 45, msaa: 0, bloom: false, post: false, direct: true, scenery: 0.35, carDetail: 0, maxDpr: 1 },
   medium: { name: 'Medium', pixelRatio: 1, shadows: 1, shadowMapSize: 2048, shadowExtent: 60, msaa: 2, bloom: true, post: true, scenery: 0.65, carDetail: 1, maxDpr: 1.25 },
   high: { name: 'High', pixelRatio: 1, shadows: 2, shadowMapSize: 4096, shadowExtent: 70, msaa: 4, bloom: true, post: true, scenery: 1, carDetail: 2, maxDpr: 1.5 },
   ultra: { name: 'Ultra', pixelRatio: 1, shadows: 2, shadowMapSize: 4096, shadowExtent: 85, msaa: 4, bloom: true, post: true, scenery: 1.4, carDetail: 2, maxDpr: 2 },
@@ -107,6 +108,11 @@ export class Graphics {
     this.renderer = renderer;
     setMaxAnisotropy(Math.min(8, renderer.capabilities.getMaxAnisotropy()));
     this.renderScale = 1;
+    try {
+      const gl = renderer.getContext();
+      const ext = gl.getExtension('WEBGL_debug_renderer_info');
+      this.gpu = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : String(gl.getParameter(gl.RENDERER));
+    } catch (e) { this.gpu = 'unknown'; }
     this.setQuality('high');
     window.addEventListener('resize', () => this.resize());
     this._frameTimes = [];
@@ -118,7 +124,7 @@ export class Graphics {
     this.renderer.shadowMap.enabled = this.quality.shadows > 0;
     this.renderer.shadowMap.type = this.quality.shadows > 1 ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
     this.renderScale = 1;
-    this.composer = null; // rebuilt lazily for current scene/camera
+    this.dispose(); // composer is rebuilt for the current scene by buildComposer
     this.resize();
   }
 
@@ -129,6 +135,14 @@ export class Graphics {
 
   buildComposer(scene, camera, bloomStrength = 0.35) {
     const q = this.quality;
+    if (this.composer) this.dispose();
+    this.scene = scene;
+    this.camera = camera;
+    if (q.direct) {
+      this.composer = null; this.renderPass = null; this.bloomPass = null; this.cinePass = null; this.fxaaPass = null;
+      this.resize();
+      return null;
+    }
     const size = this.renderer.getSize(new THREE.Vector2());
     const pr = this.pixelRatio();
     const rt = new THREE.WebGLRenderTarget(Math.floor(size.x * pr), Math.floor(size.y * pr), {
@@ -213,7 +227,7 @@ export class Graphics {
       u.flash.value = effects.flash || 0;
     }
     if (this.composer) this.composer.render(dt);
-    else this.renderer.render(this.scene, this.camera);
+    else if (this.scene && this.camera) { this.renderer.setRenderTarget(null); this.renderer.render(this.scene, this.camera); }
   }
 
   dispose() {

@@ -365,14 +365,17 @@ function sharedMats() {
 // ---------------------------------------------------------------------------
 const hex = (c) => '#' + new THREE.Color(c).getHexString();
 
-function paintLivery(spec, dims) {
+function paintLivery(spec, dims, res = 1) {
+  // drawing happens in a 1024x512 logical space; res < 1 makes a smaller texture
   const W = 1024, H = 512;
   const cv = document.createElement('canvas');
-  cv.width = W; cv.height = H;
+  cv.width = Math.round(W * res); cv.height = Math.round(H * res);
   const ctx = cv.getContext('2d');
+  ctx.scale(res, res);
   const bump = document.createElement('canvas');
-  bump.width = W; bump.height = H;
+  bump.width = Math.round(W * res); bump.height = Math.round(H * res);
   const bctx = bump.getContext('2d');
+  bctx.scale(res, res);
   bctx.fillStyle = '#fff'; bctx.fillRect(0, 0, W, H);
   // stretch correction: px per metre along vs around
   const pxU = W / dims.L, pxT = H / dims.perim;
@@ -690,8 +693,9 @@ export function buildCar(spec, { detail = 2, night = false } = {}) {
     hoodLine: Math.min(0.97, cu1 + 0.03), hoodU: (cu1 + 1) / 2, trunkLine: spec.body === 'sedan' || spec.body === 'classic' || spec.body === 'muscle' ? Math.max(0.05, cu0 - 0.02) : 0,
   };
   const useLivery = true;
-  const { map: liveryMap, bumpMap } = useLivery ? paintLivery(spec, dims) : {};
-  const paint = paintMaterial(spec, liveryMap, detail >= 1 ? bumpMap : null);
+  const { map: liveryMap, bumpMap } = useLivery ? paintLivery(spec, dims, detail >= 2 ? 1 : 0.5) : {};
+  const paint = paintMaterial(spec, liveryMap, detail >= 2 ? bumpMap : null);
+  if (detail < 2 && bumpMap) bumpMap.dispose();
   const accentMat = new THREE.MeshPhysicalMaterial({ color: spec.accent, metalness: 0.3, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.05 });
   const headMat = new THREE.MeshStandardMaterial({
     map: TX.headlightTexture(spec.lightStyle % 2), emissiveMap: TX.headlightTexture(spec.lightStyle % 2),

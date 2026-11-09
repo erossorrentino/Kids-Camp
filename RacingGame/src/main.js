@@ -35,8 +35,21 @@ class App {
       throw e;
     }
     // if the GPU drops the 3D context (common on phones when memory is low), recover
-    this.gfx.renderer.domElement.addEventListener('webglcontextlost', (ev) => { ev.preventDefault(); this.contextLost = true; this.ui?.toast('Graphics paused… restoring'); });
-    this.gfx.renderer.domElement.addEventListener('webglcontextrestored', () => { this.contextLost = false; this.setQuality('low'); this.profile.settings.quality = 'low'; this.save(); this.enterMenu('home'); });
+    this.gfx.renderer.domElement.addEventListener('webglcontextlost', (ev) => {
+      ev.preventDefault();
+      this.contextLost = true;
+      this.profile.settings.quality = 'low';
+      this.save();
+      this.notice('Graphics restarting…', 'This device ran out of graphics memory. The game is switching to Low graphics. If nothing happens in a few seconds, reload the page.', [['Reload now', () => location.reload()]]);
+    });
+    this.gfx.renderer.domElement.addEventListener('webglcontextrestored', () => {
+      this.contextLost = false;
+      document.querySelector('.notice')?.remove();
+      if (this.race) { try { this.race.dispose(); } catch (e) { /* ignore */ } this.race = null; }
+      this.gfx.setQuality('low');
+      this.enterMenu('home');
+      this.ui.toast('Graphics were switched to Low so the game runs smoothly on this device.');
+    });
     this.setQuality(this.profile.settings.quality || this.autoQuality(), false);
     audio.setVolume(this.profile.settings.volume);
     this.input = new Input(root);
@@ -65,9 +78,39 @@ class App {
   autoQuality() {
     const touch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
     const small = Math.min(window.innerWidth, window.innerHeight) < 600;
+    const gpu = this.gfx.gpu || '';
+    if (/CrOS/.test(navigator.userAgent)) return 'low'; // Chromebooks
+    if (/SwiftShader|llvmpipe|Software|Mali|PowerVR|Adreno \(TM\) [1-5]\d\d\b/i.test(gpu)) return 'low';
     if (touch && small) return 'low';
-    if (touch) return 'medium';
+    if (touch || /Intel|Adreno|Apple GPU/i.test(gpu)) return 'medium';
     return 'high';
+  }
+
+  // Full-screen notice that works even while the menus are hidden (during races)
+  notice(title, text, buttons = []) {
+    let el = document.querySelector('.notice');
+    if (!el) { el = document.createElement('div'); el.className = 'notice'; this.overlay.appendChild(el); }
+    el.innerHTML = `<div class="n-box"><h2></h2><p></p><div class="n-actions"></div><small class="n-gpu"></small></div>`;
+    el.querySelector('h2').textContent = title;
+    el.querySelector('p').textContent = text;
+    el.querySelector('.n-gpu').textContent = 'Graphics chip: ' + (this.gfx.gpu || 'unknown') + ' · quality: ' + this.gfx.qualityName;
+    for (const [label, fn] of buttons) {
+      const b = document.createElement('button');
+      b.className = 'btn primary';
+      b.textContent = label;
+      b.onclick = () => { el.remove(); fn(); };
+      el.querySelector('.n-actions').appendChild(b);
+    }
+    return el;
+  }
+
+  // Switch quality while a race (or the menu) is on screen
+  applyQualityLive(q) {
+    this.profile.settings.quality = q;
+    this.save();
+    this.gfx.setQuality(q);
+    if (this.mode === 'race' && this.race) this.gfx.buildComposer(this.race.scene, this.race.camera, this.race.env?.preset?.bloom ?? 0.2);
+    else this.gfx.buildComposer(this.showroom.scene, this.showroom.camera, 0.22);
   }
 
   setQuality(q, rebuild = true) {
@@ -277,6 +320,12 @@ class App {
         this.startRace(opts, after);
       },
       camera: () => { this.race.hudCam(this.race.rcam.next()); },
+      quality: () => {
+        const order = ['low', 'medium', 'high', 'ultra'];
+        const q = order[(order.indexOf(this.gfx.qualityName) + 1) % order.length];
+        this.applyQualityLive(q);
+        this.ui.pauseMenu(true, this._pauseHandlers);
+      },
       line: () => {
         const s = this.profile.settings;
         s.assists.line = !s.assists.line;
@@ -308,17 +357,22 @@ class App {
     for (let i = 1; i <= 5; i++) for (let j = 1; j <= 5; j++) {
       gl.readPixels(Math.floor((cw * i) / 6), Math.floor((ch * j) / 6), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
       n++;
-      if (px[0] > 245 && px[1] > 245 && px[2] > 245) white++;
+      if (px[0] > 238 && px[1] > 238 && px[2] > 238) white++;
     }
     if (white >= n - 2) w.white++; else w.white = 0;
     if (w.white >= 3) {
-      w.done = true;
-      if (this.gfx.qualityName !== 'low') {
-        this.profile.settings.quality = 'low';
-        this.save();
-        this.setQuality('low');
-        if (this.race) { this.gfx.buildComposer(this.race.scene, this.race.camera, 0); }
-        this.ui.toast('The picture was too bright on this device, so graphics were switched to Low. You can change this in Settings.');
+      // step down: High/Ultra -> Medium -> Low (direct drawing, no effects)
+      const q = this.gfx.qualityName;
+      const next = q === 'ultra' || q === 'high' ? 'medium' : q === 'medium' ? 'low' : null;
+      if (next) {
+        this.applyQualityLive(next);
+        this.watch = { frames: 0, white: 0 };
+        const msg = `The picture came out white on this device, so graphics were switched to ${next === 'low' ? 'Low' : 'Medium'}.`;
+        if (this.mode === 'race' && this.race) this.race.hud?.toast(msg, 4);
+        else this.ui.toast(msg);
+      } else {
+        w.done = true;
+        this.notice('The 3D picture isn\'t showing', 'Your device is having trouble drawing the 3D graphics. Try opening the game in the Chrome or Safari browser instead of an app, or on another device. Let us know the graphics chip shown below.', [['OK', () => {}]]);
       }
     }
   }
