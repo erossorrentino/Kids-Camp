@@ -16,11 +16,33 @@ async function build() {
     entryPoints: [entry], bundle: true, minify: !dev, format: 'iife', write: false,
     target: ['es2020'], legalComments: 'none', sourcemap: dev ? 'inline' : false,
   });
-  let js = res.outputFiles[0].text.replace(/<\/script/gi, '<\\/script');
+  const artifact = args.includes('--artifact');
+  let js = res.outputFiles[0].text;
   const html = fs.readFileSync('src/index.html', 'utf8');
   const css = fs.readFileSync('src/styles.css', 'utf8');
-  let page = html.replace('/*__STYLE__*/', () => css).replace('/*__SCRIPT__*/', () => js);
-  if (args.includes('--artifact')) {
+  let scriptTag;
+  if (artifact) {
+    // Artifact pages stay tiny: the game code is a separate file loaded after
+    // the loading screen has painted (some viewers struggle with huge pages).
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    fs.writeFileSync(path.join(path.dirname(out), 'game.js'), js);
+    scriptTag = `<script>
+(function () {
+  var bar = document.getElementById('boot-bar'), msg = document.getElementById('boot-msg');
+  if (msg) msg.textContent = 'Downloading the game…';
+  var p = 8, t = setInterval(function () { p = Math.min(85, p + 4); if (bar) bar.style.width = p + '%'; }, 250);
+  var s = document.createElement('script');
+  s.src = 'game.js';
+  s.onload = function () { clearInterval(t); if (bar) bar.style.width = '95%'; };
+  s.onerror = function () { clearInterval(t); window.__bootError && window.__bootError('Could not download the game file. Check the internet connection, then reload the page.'); };
+  setTimeout(function () { document.body.appendChild(s); }, 30);
+})();
+</script>`;
+  } else {
+    scriptTag = '<script>' + js.replace(/<\/script/gi, '<\\/script') + '</script>';
+  }
+  let page = html.replace('/*__STYLE__*/', () => css).replace('<!--__SCRIPT__-->', () => scriptTag);
+  if (artifact) {
     // claude.ai Artifact pages are wrapped in their own document skeleton:
     // keep the title, fonts, style, body markup and script only.
     const head = page.match(/<head>([\s\S]*?)<\/head>/)[1].replace(/<meta charset[^>]*>\s*/, '').replace(/<meta name="viewport"[^>]*>\s*/, '');

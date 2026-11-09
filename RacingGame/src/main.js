@@ -358,11 +358,17 @@ function loadFont() {
 
 function boot() {
   loadFont();
-  try { new App(); } catch (e) {
-    console.error(e);
-    const shown = document.getElementById('boot-err')?.textContent;
-    if (!shown) window.__bootError?.(e && e.message ? e.message : e);
-  }
+  const msg = document.getElementById('boot-msg'), bar = document.getElementById('boot-bar');
+  if (msg) msg.textContent = 'Starting the engines…';
+  if (bar) bar.style.width = '96%';
+  // let the loading screen paint before the heavy start-up work
+  setTimeout(() => {
+    try { new App(); } catch (e) {
+      console.error(e);
+      const shown = document.getElementById('boot-err')?.textContent;
+      if (!shown) window.__bootError?.(e && e.message ? e.message : e);
+    }
+  }, 40);
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
 else boot();
