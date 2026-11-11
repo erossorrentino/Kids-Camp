@@ -5,7 +5,7 @@ import { RaceScene } from './game/raceScene.js';
 import { Input } from './game/input.js';
 import { UI, toggleFullscreen } from './ui/menus.js';
 import { audio } from './audio/audio.js';
-import { loadProfile, saveProfile, resetProfile } from './core/save.js';
+import { loadProfile, saveProfile, resetProfile, isTouchFirst } from './core/save.js';
 import { catalog, CAR_COUNT, formatPrice } from './data/cars.js';
 import { effectiveStats } from './data/parts.js';
 import { SERIES, seriesEvents, buildField, seriesUnlocked, PRIZE_SPLIT } from './data/events.js';
@@ -23,8 +23,10 @@ class App {
     root.appendChild(this.overlay);
     this.profile = loadProfile();
     this.root = root;
-    this.isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    this.isTouch = isTouchFirst();
     if (this.isTouch) root.classList.add('is-touch');
+    // touchscreen laptops/Chromebooks: switch to touch controls once the screen is actually touched
+    window.addEventListener('touchstart', () => this.enableTouch(), { passive: true });
     // stop pinch-zoom / double-tap zoom on phones
     document.addEventListener('gesturestart', (e) => e.preventDefault());
     document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
@@ -75,8 +77,18 @@ class App {
     this.watch = { frames: 0, white: 0 };
   }
 
+  enableTouch() {
+    if (this.isTouch) return;
+    this.isTouch = true;
+    this.root.classList.add('is-touch');
+    if (this.mode === 'race') {
+      if (!this.input.touchEl) this.input.buildTouchControls(this.overlay);
+      this.input.touchEl.style.display = '';
+    }
+  }
+
   autoQuality() {
-    const touch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    const touch = this.isTouch;
     const small = Math.min(window.innerWidth, window.innerHeight) < 600;
     const gpu = this.gfx.gpu || '';
     if (/CrOS/.test(navigator.userAgent)) return 'low'; // Chromebooks
@@ -212,8 +224,8 @@ class App {
     this.mode = 'race';
     this.watch = { frames: 0, white: 0 };
     this.input.capture = true;
-    if (this.input.isTouchDevice() && !this.input.touchEl) this.input.buildTouchControls(this.overlay);
-    if (this.input.touchEl) this.input.touchEl.style.display = '';
+    if (this.isTouch && !this.input.touchEl) this.input.buildTouchControls(this.overlay);
+    if (this.input.touchEl) this.input.touchEl.style.display = this.isTouch ? '' : 'none';
     this.last = performance.now();
   }
 

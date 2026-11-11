@@ -477,3 +477,5 @@ select option { background: #121826; }
 .n-box p { color: #cfd6e4; line-height: 1.5; }
 .n-actions { display: flex; gap: 10px; justify-content: center; margin: 14px 0; }
 .n-gpu { color: var(--muted); font-size: 12px; }
+/* iPhone zooms into inputs smaller than 16px: keep them at 16px on touch devices */
+.is-touch .search, .is-touch select, .is-touch .num, .is-touch input { font-size: 16px !important; }

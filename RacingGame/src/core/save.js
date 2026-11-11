@@ -15,9 +15,16 @@ export const DEFAULT_SETTINGS = {
   camera: 0,
 };
 
-function isTouch() {
-  try { return 'ontouchstart' in window || navigator.maxTouchPoints > 0; } catch (e) { return false; }
+// A phone or tablet: the main pointer is a finger. Touchscreen laptops and
+// Chromebooks report a fine pointer (trackpad/mouse) and are not "touch first".
+export function isTouchFirst() {
+  try {
+    if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches) return true;
+    if (window.matchMedia && window.matchMedia('(pointer: fine)').matches) return false;
+    return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  } catch (e) { return false; }
 }
+const isTouch = isTouchFirst;
 
 // Phones/tablets start with friendlier assists: the car accelerates by itself
 function defaultSettings() {
