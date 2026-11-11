@@ -485,6 +485,22 @@ select option { background: #121826; }
 .n-gpu { color: var(--muted); font-size: 12px; }
 /* iPhone zooms into inputs smaller than 16px: keep them at 16px on touch devices */
 .is-touch .search, .is-touch select, .is-touch .num, .is-touch input { font-size: 16px !important; }
+/* short landscape screens (phones): keep pause + results buttons on screen */
+@media (max-height: 520px) {
+  .p-box { width: min(560px, 94vw); padding: 12px 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; align-content: start; }
+  .p-box h2 { grid-column: 1 / -1; margin: 0 0 2px; font-size: 22px; }
+  .p-box .btn.wide { margin-top: 0; padding: 9px 10px; font-size: 13px; }
+  .p-box [data-a="resume"] { grid-column: 1 / -1; }
+  .r-box { padding: 12px 16px; display: flex; flex-direction: column; }
+  .r-pos { font-size: 34px; }
+  .r-sub { margin-bottom: 4px; font-size: 13px; }
+  .r-table { font-size: 12px; }
+  .r-table td, .r-table th { padding: 3px 6px; }
+  .r-table th:nth-child(3), .r-table td:nth-child(3), .r-table th:nth-child(5), .r-table td:nth-child(5) { display: none; }
+  .r-money { margin: 8px 0; font-size: 14px; gap: 2px; }
+  .r-actions { position: sticky; bottom: -12px; background: linear-gradient(180deg, transparent, rgba(8, 11, 18, 0.98) 30%); padding: 10px 0 4px; }
+  .r-actions .btn { padding: 9px 16px; font-size: 13px; }
+}
 </style>
 </head>
 <body>
