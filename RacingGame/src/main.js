@@ -203,9 +203,20 @@ class App {
   }
 
   // ---------------------------------------------------------------------------
+  // Hide on-screen race buttons and release anything held down
+  hideTouchControls() {
+    const el = this.input.touchEl;
+    if (el) {
+      el.style.display = 'none';
+      el.querySelectorAll('.on').forEach((b) => b.classList.remove('on'));
+    }
+    for (const k in this.input.touch) this.input.touch[k] = k === 'steer' ? 0 : false;
+  }
+
   enterMenu(screen = 'home', params) {
     this.mode = 'menu';
     this.root.classList.remove('racing');
+    this.hideTouchControls();
     this.gfx.buildComposer(this.showroom.scene, this.showroom.camera, 0.22);
     this.gfx.setGrade({ saturation: 1.05, contrast: 1.05, vignette: 0.45 });
     this.gfx.renderer.toneMappingExposure = 0.85;
@@ -216,6 +227,7 @@ class App {
 
   async startRace(opts, after) {
     if (this.isTouch) toggleFullscreen(true);
+    this.hideTouchControls();
     this.root.classList.add('racing');
     this.ui.setVisible(false);
     this.ui.modalEl.classList.remove('show');
@@ -324,7 +336,7 @@ class App {
     this.gfx.setGrade({ saturation: 1.05, contrast: 1.05, vignette: 0.45 });
     this.showroom.setFrame(-0.3);
     this.root.classList.remove('racing');
-    if (this.input.touchEl) this.input.touchEl.style.display = 'none';
+    this.hideTouchControls();
     this.input.capture = false;
     const wrapOn = (fn) => () => { this.ui.setVisible(true); fn(); };
     for (const k in info.on) info.on[k] = wrapOn(info.on[k]);
