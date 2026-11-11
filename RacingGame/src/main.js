@@ -116,8 +116,29 @@ class App {
     return el;
   }
 
+  // Performance watchdog: if frames stay very slow even at the lowest render
+  // resolution, step graphics down a level (e.g. Ultra picked on a Chromebook).
+  perfCheck(dt) {
+    const p = this.perf || (this.perf = { t: 0, n: 0, sum: 0, cool: 6 });
+    p.cool -= dt; p.sum += dt; p.n++; p.t += dt;
+    if (p.t < 2) return;
+    const avg = p.sum / p.n;
+    p.t = 0; p.sum = 0; p.n = 0;
+    if (p.cool > 0 || this.contextLost) return;
+    if (avg > 1 / 18 && this.gfx.renderScale <= 0.56) {
+      const q = this.gfx.qualityName;
+      const next = q === 'ultra' ? 'high' : q === 'high' ? 'medium' : q === 'medium' ? 'low' : null;
+      if (!next) return;
+      this.applyQualityLive(next);
+      p.cool = 6;
+      const msg = `Graphics lowered to ${next[0].toUpperCase() + next.slice(1)} to keep the game smooth on this device.`;
+      if (this.mode === 'race' && this.race) this.race.hud?.toast(msg, 3); else this.ui.toast(msg);
+    }
+  }
+
   // Switch quality while a race (or the menu) is on screen
   applyQualityLive(q) {
+    if (this.perf) this.perf.cool = 8; // give a manual change a moment before judging speed
     this.profile.settings.quality = q;
     this.save();
     this.gfx.setQuality(q);
@@ -403,7 +424,7 @@ class App {
         this.showroom.processThumbs(12);
         this.gfx.render(dt, {});
       }
-      if (this.mode === 'race' || this.mode === 'menu') this.checkWhite();
+      if (this.mode === 'race' || this.mode === 'menu') { this.checkWhite(); this.perfCheck(dt); }
     } catch (e) {
       console.error(e);
       if (!this._loopErr) { this._loopErr = true; this.ui?.toast('Something went wrong: ' + (e && e.message ? e.message : e)); }
