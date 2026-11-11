@@ -107,7 +107,7 @@ export class UI {
   modal(html, { onClose } = {}) {
     this.modalEl.innerHTML = `<div class="modal"><button class="m-x" aria-label="Close">✕</button>${html}</div>`;
     this.modalEl.classList.add('show');
-    const close = () => { this.modalEl.classList.remove('show'); this.modalEl.innerHTML = ''; onClose && onClose(); };
+    const close = () => { this.modalEl.classList.remove('show', 'side-open'); this.modalEl.innerHTML = ''; onClose && onClose(); };
     $('.m-x', this.modalEl).onclick = close;
     this.modalEl.onclick = (e) => { if (e.target === this.modalEl) close(); };
     return { el: $('.modal', this.modalEl), close };
@@ -517,17 +517,18 @@ export class UI {
       <div class="f-h">Race number</div><input type="number" min="1" max="99" class="num" value="${g.number || 7}">
       <button class="btn primary wide" data-done>DONE</button>`, { onClose: () => this.garage() });
     m.el.classList.add('side');
+    this.modalEl.classList.add('side-open');
     m.el.querySelectorAll('[data-k]').forEach((b) => b.onclick = () => {
       audio.click();
       const k = b.dataset.k;
       g[k] = k === 'finish' || k === 'livery' ? b.dataset.v : +b.dataset.v;
       m.el.querySelectorAll(`[data-k="${k}"]`).forEach((x) => x.classList.toggle('on', x === b));
       this.app.save();
-      this.showActiveCar(-0.18);
+      this.showActiveCar(0.3);
     });
-    $('.num', m.el).onchange = (e) => { g.number = Math.max(1, Math.min(99, +e.target.value || 7)); this.app.save(); this.showActiveCar(-0.18); };
+    $('.num', m.el).onchange = (e) => { g.number = Math.max(1, Math.min(99, +e.target.value || 7)); this.app.save(); this.showActiveCar(0.3); };
     $('[data-done]', m.el).onclick = () => m.close();
-    this.showActiveCar(-0.18);
+    this.showActiveCar(0.3);
   }
 
   // ---------------------------------------------------------------------------
