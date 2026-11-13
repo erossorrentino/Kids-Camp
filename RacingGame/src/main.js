@@ -499,28 +499,33 @@ class App {
     const gl = this.gfx.renderer.getContext();
     const cw = gl.drawingBufferWidth, ch = gl.drawingBufferHeight;
     const px = new Uint8Array(4);
-    let white = 0, n = 0;
+    let white = 0, n = 0, lo = 255, hi = 0;
     for (let i = 1; i <= 5; i++) for (let j = 1; j <= 5; j++) {
       gl.readPixels(Math.floor((cw * i) / 6), Math.floor((ch * j) / 6), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
       n++;
-      if (px[0] > 238 && px[1] > 238 && px[2] > 238) white++;
+      if (px[0] > 244 && px[1] > 244 && px[2] > 244) white++;
+      lo = Math.min(lo, px[0], px[1], px[2]); hi = Math.max(hi, px[0], px[1], px[2]);
     }
-    if (white >= n - 2) w.white++; else w.white = 0;
+    // broken picture: three quarters of the screen blown out to pure white (a few things, like
+    // the car's shadow, can still draw), or - in a race - one flat colour everywhere
+    const blank = this.mode === 'race' && hi - lo <= 10;
+    if (white >= 19 || blank) w.white++; else w.white = 0;
     if (w.white >= 3) {
+      w.kind = blank && white < 19 ? `flat colour ${lo}-${hi}` : `white ${white}/${n}`;
       // step down: High/Ultra -> Medium -> Low (direct drawing) -> Lite (plain shading)
       const q = this.gfx.qualityName;
       const next = TIER_DOWN[q];
       if (next) {
-        D.log('white', `at ${q} in ${this.mode} -> ${next}`, true);
+        D.log('white', `${w.kind} at ${q} in ${this.mode} -> ${next}`, true);
         this.profile.settings.liteLocked = true;
         this.applyQualityLive(next);
         this.watch = { frames: 0, white: 0 };
-        const msg = `The picture came out white on this device, so graphics were switched to ${next[0].toUpperCase() + next.slice(1)}.`;
+        const msg = `The picture was not drawing properly on this device, so graphics were switched to ${next[0].toUpperCase() + next.slice(1)}.`;
         if (this.mode === 'race' && this.race) this.race.hud?.toast(msg, 4);
         else this.ui.toast(msg);
       } else {
         w.done = true;
-        this.problem('E-WHITE', 'The 3D picture isn\'t showing', 'This device is having trouble drawing the 3D graphics, even on the simplest setting. Try opening the game in the Chrome or Safari browser, or on another device.', `white at lite in ${this.mode}`);
+        this.problem('E-WHITE', 'The 3D picture isn\'t showing', 'This device is having trouble drawing the 3D graphics, even on the simplest setting. Try opening the game in the Chrome or Safari browser, or on another device.', `${w.kind} at lite in ${this.mode}`);
       }
     }
   }

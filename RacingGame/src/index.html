@@ -56,17 +56,18 @@
     var p;
     try { p = db.doc('diag/' + D.id).set({ build: D.build, at: new Date().toISOString(), info: D.info, ev: D.ev.slice() }); }
     catch (e) { busy = false; D.state = 'write-threw'; return; }
-    p.then(function () { busy = false; D.state = 'saved'; note(true); if (dirty) schedule(2000); },
+    p.then(function () { busy = false; D.state = 'saved'; note(true); if (dirty) schedule(2000, true); },
       function (e) { busy = false; D.state = 'failed:' + (e && e.code); note(false); });
   }
-  function schedule(ms) { dirty = true; if (!db || !auto || timer) return; timer = setTimeout(flush, ms); }
+  // routine events stop saving after 18 writes so there is always room left for error reports (30 max)
+  function schedule(ms, urgent) { dirty = true; if (!db || !auto || timer || (!urgent && D.sent >= 18)) return; timer = setTimeout(flush, ms); }
   D.log = function (code, msg, urgent) {
     var t = Math.round((Date.now() - D.t0) / 100) / 10;
     D.ev.push(t + 's ' + code + (msg ? ' | ' + String(msg).slice(0, 260) : ''));
     if (D.ev.length > 40) D.ev.splice(1, D.ev.length - 40);
-    schedule(urgent ? 300 : 2500);
+    schedule(urgent ? 300 : 2500, urgent);
   };
-  D.set = function (k, v) { D.info[k] = v; schedule(2500); };
+  D.set = function (k, v) { D.info[k] = v; schedule(2500, false); };
   // From a button on an error screen: send the report now (the viewer may be asked to allow it)
   D.send = function () { if (!db) return false; auto = true; if (timer) { clearTimeout(timer); timer = 0; } dirty = true; flush(); return true; };
   D.log('boot');
