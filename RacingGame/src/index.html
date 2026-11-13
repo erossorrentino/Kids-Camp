@@ -7,7 +7,7 @@
 <style>/*__STYLE__*/</style>
 </head>
 <body>
-<div id="boot" style="position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#05070c;color:#eef2f8;font-family:system-ui,-apple-system,Arial,sans-serif;text-align:center;padding:20px;overflow:auto">
+<div id="boot" style="position:fixed;top:0;right:0;bottom:0;left:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#05070c;color:#eef2f8;font-family:system-ui,-apple-system,Arial,sans-serif;text-align:center;padding:20px;overflow:auto">
   <div style="font-size:30px;font-weight:900;font-style:italic;letter-spacing:.02em">APEX <span style="color:#ff2d55">VELOCITY</span></div>
   <div id="boot-msg" style="color:#8d97ab;font-size:15px">Loading the game…</div>
   <div id="boot-barwrap" style="width:220px;height:5px;background:#1a2030;border-radius:3px;overflow:hidden"><div id="boot-bar" style="width:8%;height:100%;background:#ff2d55;transition:width .3s"></div></div>
@@ -114,16 +114,29 @@
     }
   }
   window.__bootError = show;
-  window.addEventListener('error', function (ev) {
+  // An error before the game is running is only shown if the game then fails to start:
+  // other scripts on the page can raise harmless errors.
+  var pending = null;
+  function early(m) {
     if (window.__appStarted) return;
+    if (window.__diag) window.__diag.log('early-error', m);
+    if (pending) return;
+    pending = setTimeout(function () { if (!window.__appStarted) show(m, 'E-BOOT'); }, 5000);
+  }
+  window.addEventListener('error', function (ev) {
     var m = ev.message || (ev.error && ev.error.message) || 'Unknown error';
     if (ev.filename) m += ' (' + String(ev.filename).split('/').pop() + ':' + ev.lineno + ')';
-    show(m, 'E-BOOT');
+    early(m);
   });
   window.addEventListener('unhandledrejection', function (ev) {
-    if (window.__appStarted) return;
-    show((ev.reason && (ev.reason.message || ev.reason)) || 'Unknown error', 'E-BOOT');
+    early(String((ev.reason && (ev.reason.message || ev.reason)) || 'Unknown error'));
   });
+  // Nothing at all after 40 seconds: say so instead of spinning forever
+  setTimeout(function () {
+    if (!window.__appStarted && document.getElementById('boot-err') && !document.getElementById('boot-err').textContent) {
+      show('The game is taking too long to start on this device.', 'E-SLOW');
+    }
+  }, 40000);
 })();
 </script>
 <div id="app"></div>

@@ -99,8 +99,12 @@ class App {
     window.addEventListener('blur', () => { if (this.mode === 'race' && this.race && !this.race.paused) this.togglePause(); });
     document.addEventListener('visibilitychange', () => { if (document.hidden && this.mode === 'race' && this.race && !this.race.paused) this.togglePause(); });
     const unlock = () => { audio.init(); };
-    window.addEventListener('pointerdown', unlock);
-    window.addEventListener('keydown', unlock);
+    for (const ev of ['pointerdown', 'touchend', 'click', 'keydown']) window.addEventListener(ev, unlock);
+    // errors outside the frame loop (button handlers etc.) go into the error report
+    let jsErrors = 0;
+    const jsError = (m) => { if (jsErrors++ < 8 && !/ResizeObserver/.test(m)) D.log('js-error', m, true); };
+    window.addEventListener('error', (ev) => jsError((ev.message || 'error') + (ev.filename ? ` (${String(ev.filename).split('/').pop()}:${ev.lineno})` : '')));
+    window.addEventListener('unhandledrejection', (ev) => jsError('promise: ' + String((ev.reason && (ev.reason.message || ev.reason)) || 'unknown')));
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
     window.__app = this;
@@ -580,8 +584,10 @@ function boot() {
   setTimeout(() => {
     try { new App(); } catch (e) {
       console.error(e);
+      setMark(null);
       const shown = document.getElementById('boot-err')?.textContent;
-      if (!shown) window.__bootError?.(e && e.message ? e.message : e);
+      const where = e && e.stack ? ' @ ' + String(e.stack).split('\n').slice(1, 3).join(' ').trim() : '';
+      if (!shown) window.__bootError?.((e && e.message ? e.message : String(e)) + where, 'E-BOOT');
     }
   }, 40);
 }
