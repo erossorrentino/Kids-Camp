@@ -123,6 +123,7 @@ export function buildTrackScene(track, env, quality, opts = {}) {
     uTrackLen: { value: L },
   };
   const scenery = quality.scenery ?? 1;
+  const lite = !!quality.lite; // plain Lambert materials, no shader patches
   const reg = (m) => { disposables.push(m); return m; };
   const addMesh = (geo, mat, { cast = false, receive = true, name = '' } = {}) => {
     const m = new THREE.Mesh(geo, mat);
@@ -158,6 +159,11 @@ export function buildTrackScene(track, env, quality, opts = {}) {
     let maps;
     if (kind === 'asphalt') maps = TX.asphaltTextures();
     else maps = TX.groundTextures(kind);
+    if (lite) {
+      const lm = new THREE.MeshLambertMaterial({ color, map: cloneTex(maps.map, 1 / tile) });
+      disposables.push(lm, lm.map);
+      return lm;
+    }
     const m = new THREE.MeshStandardMaterial({
       color, map: cloneTex(maps.map, 1 / tile), normalMap: cloneTex(maps.normalMap, 1 / tile),
       roughness: rough ?? maps.roughness ?? 0.9, metalness: 0,
@@ -309,7 +315,25 @@ export function buildTrackScene(track, env, quality, opts = {}) {
     return Math.exp(-x * x) * 0.9;
   };
   const asphaltMat = ribbonMaterial('asphalt', { lines: true, tile: 5, color: 0xffffff });
-  addMesh(stripGeometry([[0, N + 1]], (i) => [-track.hw[i], track.hw[i]], 16, { rubberFn }), asphaltMat, { name: 'asphalt' });
+  addMesh(stripGeometry([[0, N + 1]], (i) => [-track.hw[i], track.hw[i]], lite ? 4 : 16, { rubberFn }), asphaltMat, { name: 'asphalt' });
+
+  // Painted edge lines + start line as plain geometry. The normal road shader
+  // draws these itself; Lite mode (no custom shaders) shows these instead.
+  const liteLines = new THREE.Group();
+  liteLines.name = 'liteLines';
+  liteLines.visible = lite;
+  {
+    const lineMat = reg(new THREE.MeshBasicMaterial({ color: 0xd4d4d4, polygonOffset: true, polygonOffsetFactor: -3, polygonOffsetUnits: -3 }));
+    const startMat = reg(new THREE.MeshBasicMaterial({ map: cloneTex(TX.checkerTexture(), 1 / 6.4), polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4 }));
+    disposables.push(startMat.map);
+    const geos = [
+      [stripGeometry([[0, N + 1]], (i) => [track.hw[i] - 0.62, track.hw[i] - 0.3], 1, { yOff: () => 0.014 }), lineMat],
+      [stripGeometry([[0, N + 1]], (i) => [-track.hw[i] + 0.3, -track.hw[i] + 0.62], 1, { yOff: () => 0.014 }), lineMat],
+      [stripGeometry([[0, 2]], (i) => [-track.hw[i] + 0.3, track.hw[i] - 0.3], 1, { yOff: () => 0.018 }), startMat],
+    ];
+    for (const [g, m] of geos) { const mesh = new THREE.Mesh(g, m); liteLines.add(mesh); disposables.push(g); }
+    group.add(liteLines);
+  }
 
   // ---- run-off surfaces by type (left and right)
   const runoffKinds = new Set([...track.runL, ...track.runR]);
@@ -333,8 +357,8 @@ export function buildTrackScene(track, env, quality, opts = {}) {
   // ---- curbs
   const curbMat = reg(new THREE.MeshStandardMaterial({ map: cloneTex(TX.curbTexture(def.curbColors?.[0] || '#d01818', def.curbColors?.[1] || '#f0f0f0'), 1), roughness: 0.55, metalness: 0, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
   curbMat.map.repeat.set(1, 1 / 6);
-  if (night) curbMat.defines = { USE_LAMPS: '' };
-  patchMaterial(curbMat, 'curb' + night, (shader) => {
+  if (night && !lite) curbMat.defines = { USE_LAMPS: '' };
+  if (!lite) patchMaterial(curbMat, 'curb' + night, (shader) => {
     Object.assign(shader.uniforms, uniforms);
     shader.vertexShader = 'attribute vec3 road;\nvarying vec3 vRoad;\n' + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\nvRoad = road;');
     shader.fragmentShader = 'uniform float uLamp; uniform vec3 uLampColor;\nvarying vec3 vRoad;\n' + shader.fragmentShader.replace('#include <lights_fragment_end>', '#include <lights_fragment_end>\n' + lampChunk);
@@ -357,7 +381,7 @@ export function buildTrackScene(track, env, quality, opts = {}) {
   // ---------------------------------------------------------------------------
   const B = track.bounds;
   const margin = 650;
-  const cell = quality.carDetail >= 2 ? 6 : quality.carDetail === 1 ? 8 : 11;
+  const cell = lite ? 14 : quality.carDetail >= 2 ? 6 : quality.carDetail === 1 ? 8 : 11;
   const tx0 = B.minx - margin, tz0 = B.minz - margin;
   const nx = Math.ceil((B.maxx - B.minx + margin * 2) / cell) + 1;
   const nz = Math.ceil((B.maxz - B.minz + margin * 2) / cell) + 1;
@@ -442,7 +466,13 @@ export function buildTrackScene(track, env, quality, opts = {}) {
   // terrain material: world-space UVs, two scales + macro tint + slope rock + snow caps
   function terrainMaterial(groundKind, slopeKind) {
     const g = TX.groundTextures(groundKind), r = TX.groundTextures(slopeKind);
-    const m = new THREE.MeshStandardMaterial({ map: cloneTex(g.map, 1), normalMap: cloneTex(g.normalMap, 1), roughness: g.roughness, metalness: 0 });
+    if (lite) {
+      const lm = new THREE.MeshLambertMaterial({ map: cloneTex(g.map, 1 / 9) });
+      disposables.push(lm, lm.map);
+      return lm;
+    }
+    // (map repeat only matters if this material is later converted to Lite; the shader below samples by world position)
+    const m = new THREE.MeshStandardMaterial({ map: cloneTex(g.map, 1 / 9), normalMap: cloneTex(g.normalMap, 1), roughness: g.roughness, metalness: 0 });
     m.normalScale.set(0.7, 0.7);
     const rockMap = cloneTex(r.map, 1);
     disposables.push(m, m.map, m.normalMap, rockMap);
@@ -527,6 +557,7 @@ export function buildTrackScene(track, env, quality, opts = {}) {
     g.computeVertexNormals();
     const farMat = terrainMat; // same look; fog does the rest
     const uvs = new Float32Array((fn + 1) * (fn + 1) * 2);
+    for (let k = 0; k < (fn + 1) * (fn + 1); k++) { uvs[k * 2] = pos[k * 3]; uvs[k * 2 + 1] = pos[k * 3 + 2]; }
     g.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
     const far = addMesh(g, farMat, { receive: false, name: 'farTerrain' });
     far.renderOrder = -1;
@@ -1211,9 +1242,14 @@ export function buildTrackScene(track, env, quality, opts = {}) {
     },
     update(dt, time) {
       uniforms.uTime.value = time;
-      if (water) {
+      if (water && water.material.normalMap) {
         water.material.normalMap.offset.set(time * 0.004, time * 0.0025);
       }
+    },
+    // After the scene's materials were swapped to Lite: follow the swapped start-light materials and show the painted lines
+    useLite(cache) {
+      for (let k = 0; k < startLights.length; k++) startLights[k] = cache.get(startLights[k]) || startLights[k];
+      liteLines.visible = true;
     },
     dispose() {
       group.removeFromParent();

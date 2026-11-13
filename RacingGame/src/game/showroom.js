@@ -6,6 +6,7 @@ import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment
 import { buildCar, makeVisualSpec } from '../gfx/carModel.js';
 import { visualOptionsFor } from '../data/cars.js';
 import { clamp, damp } from '../core/rng.js';
+import { liteSwap, liteRestore, disposeLite } from '../gfx/lite.js';
 
 export class Showroom {
   constructor(gfx) {
@@ -15,12 +16,9 @@ export class Showroom {
     scene.background = new THREE.Color(0x07090f);
     scene.fog = new THREE.Fog(0x07090f, 14, 34);
     this.camera = new THREE.PerspectiveCamera(32, 1, 0.1, 200);
-    const pmrem = new THREE.PMREMGenerator(gfx.renderer);
-    const room = new RoomEnvironment();
-    this.envRT = pmrem.fromScene(room, 0.03);
-    pmrem.dispose();
-    room.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); } });
-    scene.environment = this.envRT.texture;
+    this.lite = !!gfx.quality.lite;
+    this.liteCache = new Map();
+    this.envRT = null;
     scene.environmentIntensity = 0.7;
     // floor
     const floorMat = new THREE.MeshPhysicalMaterial({ color: 0x0b0d12, roughness: 0.35, metalness: 0.2, clearcoat: 0.6, clearcoatRoughness: 0.15, envMapIntensity: 0.35 });
@@ -67,6 +65,11 @@ export class Showroom {
     rimR.position.set(7, 4, -5);
     scene.add(rimL, rimR);
     scene.add(new THREE.HemisphereLight(0x8899bb, 0x111111, 0.3));
+    this.key = key;
+    // extra fill light used only in Lite (there are no reflections to light the car)
+    this.liteFill = new THREE.HemisphereLight(0xffffff, 0x3a4050, 1.5);
+    this.liteFill.visible = false;
+    scene.add(this.liteFill);
     this.pivot = new THREE.Group();
     scene.add(this.pivot);
     this.car = null;
@@ -81,17 +84,73 @@ export class Showroom {
     this.thumbCam = new THREE.PerspectiveCamera(26, 240 / 140, 0.1, 100);
     this.thumbQueue = [];
     this.thumbCache = new Map();
+    if (this.lite) { this.lite = false; this.setLite(true); } else this.ensureEnv();
+  }
+
+  // Studio reflections (not used in Lite)
+  ensureEnv() {
+    if (!this.envRT) {
+      const pmrem = new THREE.PMREMGenerator(this.gfx.renderer);
+      const room = new RoomEnvironment();
+      this.envRT = pmrem.fromScene(room, 0.03);
+      pmrem.dispose();
+      room.traverse((o) => { if (o.isMesh) { o.geometry.dispose(); } });
+    }
+    this.scene.environment = this.envRT.texture;
+    this.thumbScene.environment = this.envRT.texture;
+  }
+
+  // Lite graphics on/off for the menu backdrop and car thumbnails
+  setLite(on) {
+    on = !!on;
+    if (on === this.lite) return;
+    this.lite = on;
+    for (const c of this.thumbCache.values()) { c.width = 0; c.height = 0; }
+    this.thumbCache.clear();
+    this.liteFill.visible = on;
+    this.thumbFill.visible = on;
+    this.key.castShadow = !on;
+    if (on) {
+      this.scene.environment = null;
+      this.thumbScene.environment = null;
+      liteSwap(this.scene, this.liteCache);
+      liteSwap(this.thumbScene, this.liteCache);
+      if (this.car) this.car.useLite(this.liteCache);
+    } else {
+      this.ensureEnv();
+      liteRestore(this.scene);
+      liteRestore(this.thumbScene);
+      disposeLite(this.liteCache);
+      // rebuild the car so its light materials are the real ones again
+      if (this.lastCar) { this.carKey = null; this.setCar(...this.lastCar); }
+    }
+  }
+
+  // The graphics context was lost and restored: reflections must be rebuilt
+  contextRestored() {
+    if (this.envRT) { this.envRT.dispose(); this.envRT = null; }
+    if (!this.lite) this.ensureEnv();
+  }
+
+  // Lite copies of one car's own materials are not needed once the car is gone
+  dropLite(car) {
+    for (const d of car.disposables || []) {
+      const l = this.liteCache.get(d);
+      if (l) { l.dispose(); this.liteCache.delete(d); }
+    }
   }
 
   makeThumbScene() {
     const s = new THREE.Scene();
     s.background = new THREE.Color(0x10141c);
     s.fog = new THREE.Fog(0x10141c, 7, 15);
-    s.environment = this.envRT.texture;
     s.environmentIntensity = 1.0;
     const d = new THREE.DirectionalLight(0xffffff, 2.5);
     d.position.set(3, 6, 4);
     s.add(d);
+    this.thumbFill = new THREE.HemisphereLight(0xffffff, 0x3a4050, 1.6);
+    this.thumbFill.visible = false;
+    s.add(this.thumbFill);
     const fl = new THREE.Mesh(new THREE.PlaneGeometry(40, 40), new THREE.MeshStandardMaterial({ color: 0x151a24, roughness: 0.4, metalness: 0.3 }));
     fl.rotation.x = -Math.PI / 2;
     s.add(fl);
@@ -102,12 +161,14 @@ export class Showroom {
     const key = carRecord ? `${carRecord.id}_${JSON.stringify(custom)}` : '';
     if (key === this.carKey) { this.camTarget.x = offsetX; return; }
     this.carKey = key;
-    if (this.car) { this.car.dispose(); this.car = null; }
+    this.lastCar = [carRecord, custom, { offsetX }];
+    if (this.car) { this.dropLite(this.car); this.car.dispose(); this.car = null; }
     if (!carRecord) return;
     const vis = makeVisualSpec(carRecord.body, carRecord.seed, visualOptionsFor(carRecord, custom));
-    this.car = buildCar(vis, { detail: 2 });
+    this.car = buildCar(vis, { detail: this.lite ? 1 : 2 });
     this.car.root.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });
     this.pivot.add(this.car.root);
+    if (this.lite) { liteSwap(this.car.root, this.liteCache); this.car.useLite(this.liteCache); }
     const L = this.car.dims.front - this.car.dims.rear;
     this.camTarget.dist = 6.5 + L * 1.05;
     this.camTarget.height = 1.2 + this.car.dims.H * 0.5;
@@ -159,6 +220,7 @@ export class Showroom {
     model.root.rotation.y = 0.75;
     model.root.position.z = -(model.dims.front + model.dims.rear) / 2 * Math.cos(0.75);
     this.thumbScene.add(model.root);
+    if (this.lite) liteSwap(model.root, this.liteCache);
     const L = model.dims.front - model.dims.rear;
     const cam = this.thumbCam;
     cam.position.set(0.7, 0.9 + model.dims.H * 0.45, 2.4 + L * 1.05);
@@ -176,6 +238,7 @@ export class Showroom {
     ctx.drawImage(r.domElement, 0, bufH - h, w, h, 0, 0, w, h);
     r.setScissorTest(false);
     r.setViewport(0, 0, size.x, size.y);
+    this.dropLite(model);
     model.dispose();
   }
 
@@ -196,7 +259,12 @@ export class Showroom {
       copy.width = canvas.width; copy.height = canvas.height;
       copy.getContext('2d').drawImage(canvas, 0, 0);
       this.thumbCache.set(car.id, copy);
-      if (this.thumbCache.size > 400) this.thumbCache.delete(this.thumbCache.keys().next().value);
+      if (this.thumbCache.size > 150) {
+        const k = this.thumbCache.keys().next().value;
+        const old = this.thumbCache.get(k);
+        old.width = 0; old.height = 0; // free canvas memory right away (matters on iPhone)
+        this.thumbCache.delete(k);
+      }
     }
   }
 }

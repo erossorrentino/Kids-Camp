@@ -173,8 +173,17 @@ class SkidMarks {
 
 // Coloured racing-line guide (green = go, yellow = lift, red = brake)
 export class RacingLineGuide {
-  constructor(scene, track, profile) {
+  constructor(scene, track, profile, { lite = false } = {}) {
     const N = track.N;
+    this.scene = scene;
+    // Lite: brake zones painted once as vertex colours (green = go, yellow = lift, red = brake)
+    const cols = [];
+    const braking = (i) => {
+      const now = profile[i];
+      let ahead = now;
+      for (let k = 4; k <= 30; k += 2) ahead = Math.min(ahead, profile[(i + k) % N]);
+      return now - ahead;
+    };
     const pos = [], prof = [], sArr = [], idx = [];
     const w = 0.55;
     for (let k = 0; k <= N; k++) {
@@ -185,6 +194,8 @@ export class RacingLineGuide {
         pos.push(track.x[i] + track.lx[i] * dd, track.heightAt(i, 0, dd) + 0.03, track.z[i] + track.lz[i] * dd);
         prof.push(profile[i]);
         sArr.push(k * DS);
+        const b = braking(i);
+        if (b > 4) cols.push(1.0, 0.1, 0.06); else if (b > 1.2) cols.push(1.0, 0.8, 0.1); else cols.push(0.1, 0.85, 0.3);
       }
       if (k < N) { const v = k * 2; idx.push(v, v + 2, v + 1, v + 1, v + 2, v + 3); }
     }
@@ -210,14 +221,18 @@ export class RacingLineGuide {
         }`,
       transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
     });
-    this.mesh = new THREE.Mesh(g, this.mat);
+    g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
+    this.liteMat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.4, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 });
+    this.lite = lite;
+    this.mesh = new THREE.Mesh(g, lite ? this.liteMat : this.mat);
     this.mesh.renderOrder = 4;
     this.mesh.frustumCulled = false;
     scene.add(this.mesh);
   }
-  update(s, speed) { this.mat.uniforms.uS.value = s; this.mat.uniforms.uSpeed.value = speed; }
+  goLite() { this.lite = true; this.mesh.material = this.liteMat; }
+  update(s, speed) { if (this.lite) return; this.mat.uniforms.uS.value = s; this.mat.uniforms.uSpeed.value = speed; }
   set visible(v) { this.mesh.visible = v; }
-  dispose() { this.mesh.removeFromParent(); this.mesh.geometry.dispose(); this.mat.dispose(); }
+  dispose() { this.mesh.removeFromParent(); this.mesh.geometry.dispose(); this.mat.dispose(); this.liteMat.dispose(); }
 }
 
 class Rain {
@@ -255,11 +270,12 @@ class Rain {
 }
 
 export class Effects {
-  constructor(scene, { rain = false, night = false, lightColor } = {}) {
+  constructor(scene, { rain = false, night = false, lightColor, lite = false } = {}) {
     const light = lightColor || (night ? new THREE.Color(0.55, 0.55, 0.6) : new THREE.Color(1, 1, 1));
-    this.smoke = new ParticleSystem(scene, 1400, { map: TX.smokeSprite(), light });
-    this.glow = new ParticleSystem(scene, 700, { map: TX.glowSprite(), additive: true });
-    this.skids = new SkidMarks(scene);
+    this.lite = lite; // Lite: no particles or skid marks (they use custom shaders)
+    this.smoke = lite ? null : new ParticleSystem(scene, 1400, { map: TX.smokeSprite(), light });
+    this.glow = lite ? null : new ParticleSystem(scene, 700, { map: TX.glowSprite(), additive: true });
+    this.skids = lite ? null : new SkidMarks(scene);
     this.rain = rain ? new Rain(scene) : null;
     this.wheelState = new Map();
     this._v = new THREE.Vector3();
@@ -267,7 +283,15 @@ export class Effects {
   }
 
   // Per-car emission. car = {x,y,z,heading,speed, slip (0..1), spin, offSurface dust color, rearWheels local positions}
+  goLite() {
+    this.lite = true;
+    if (this.smoke) { this.smoke.dispose(); this.smoke = null; }
+    if (this.glow) { this.glow.dispose(); this.glow = null; }
+    if (this.skids) { this.skids.dispose(); this.skids = null; }
+  }
+
   carFx(dt, id, c) {
+    if (this.lite) return;
     const fx = Math.sin(c.heading), fz = Math.cos(c.heading), lx = Math.cos(c.heading), lz = -Math.sin(c.heading);
     const wheels = c.wheels; // [{lx, lz, rear:boolean}]
     let st = this.wheelState.get(id);
@@ -322,6 +346,7 @@ export class Effects {
   }
 
   sparks(x, y, z, dirX, dirZ, strength) {
+    if (this.lite) return;
     const n = Math.min(40, Math.floor(strength * 4) + 6);
     for (let i = 0; i < n; i++) {
       const sp = 4 + Math.random() * 10;
@@ -334,14 +359,16 @@ export class Effects {
   }
 
   update(dt, camera, camVel) {
-    this.smoke.update(dt);
-    this.glow.update(dt);
-    this.skids.update();
+    if (this.smoke) this.smoke.update(dt);
+    if (this.glow) this.glow.update(dt);
+    if (this.skids) this.skids.update();
     if (this.rain) this.rain.update(dt, camera.position, camVel || { x: 0, z: 0 });
   }
 
   dispose() {
-    this.smoke.dispose(); this.glow.dispose(); this.skids.dispose();
+    if (this.smoke) this.smoke.dispose();
+    if (this.glow) this.glow.dispose();
+    if (this.skids) this.skids.dispose();
     if (this.rain) this.rain.dispose();
   }
 }

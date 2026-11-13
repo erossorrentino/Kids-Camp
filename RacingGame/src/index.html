@@ -7,26 +7,123 @@
 <style>/*__STYLE__*/</style>
 </head>
 <body>
-<div id="boot" style="position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:#05070c;color:#eef2f8;font-family:system-ui,-apple-system,Arial,sans-serif;text-align:center;padding:24px">
+<div id="boot" style="position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;background:#05070c;color:#eef2f8;font-family:system-ui,-apple-system,Arial,sans-serif;text-align:center;padding:20px;overflow:auto">
   <div style="font-size:30px;font-weight:900;font-style:italic;letter-spacing:.02em">APEX <span style="color:#ff2d55">VELOCITY</span></div>
   <div id="boot-msg" style="color:#8d97ab;font-size:15px">Loading the game…</div>
-  <div style="width:220px;height:5px;background:#1a2030;border-radius:3px;overflow:hidden"><div id="boot-bar" style="width:8%;height:100%;background:#ff2d55;transition:width .3s"></div></div>
-  <div id="boot-err" style="display:none;max-width:560px;color:#ffb3c0;font-size:14px;line-height:1.5;white-space:pre-wrap"></div>
+  <div id="boot-barwrap" style="width:220px;height:5px;background:#1a2030;border-radius:3px;overflow:hidden"><div id="boot-bar" style="width:8%;height:100%;background:#ff2d55;transition:width .3s"></div></div>
+  <div id="boot-code" style="display:none;font-size:26px;font-weight:900;color:#ffd400;letter-spacing:.04em"></div>
+  <div id="boot-err" style="display:none;max-width:560px;color:#ffb3c0;font-size:13px;line-height:1.5;white-space:pre-wrap"></div>
+  <div id="boot-help" style="display:none;max-width:520px;color:#cfd6e4;font-size:14px;line-height:1.5"></div>
+  <div id="boot-actions" style="display:none;gap:10px;flex-wrap:wrap;justify-content:center">
+    <button id="boot-reload" style="font:700 15px system-ui,Arial,sans-serif;padding:11px 22px;border-radius:8px;border:0;background:#ff2d55;color:#fff">Reload the game</button>
+    <button id="boot-send" style="display:none;font:700 15px system-ui,Arial,sans-serif;padding:11px 22px;border-radius:8px;border:1px solid #44506a;background:#141a28;color:#fff">Send error report</button>
+  </div>
+  <div id="boot-sent" style="color:#3ddc84;font-size:13px"></div>
 </div>
 <script>
+// ---- Diagnostics: a small report (device, graphics chip, error text) that is
+// saved with the game so problems on a phone or Chromebook can be fixed.
 (function () {
-  // Show any startup problem on screen instead of a blank page.
-  function show(msg) {
-    var b = document.getElementById('boot'), e = document.getElementById('boot-err'), m = document.getElementById('boot-msg');
-    if (!b || !e) return;
-    b.style.display = 'flex';
-    m.textContent = 'Oops, the game hit a problem while starting:';
-    e.style.display = 'block';
-    e.textContent = String(msg).slice(0, 600) + '\n\nTry reloading the page. If it keeps happening, tell us what this message says.';
+  var D = window.__diag = { build: '8', t0: Date.now(), ev: [], info: {}, sent: 0, state: 'init', hasDb: false };
+  try {
+    D.info = {
+      ua: navigator.userAgent,
+      scr: screen.width + 'x' + screen.height + '@' + (window.devicePixelRatio || 1),
+      win: window.innerWidth + 'x' + window.innerHeight,
+      touch: navigator.maxTouchPoints || 0,
+      mem: navigator.deviceMemory || 0,
+      cores: navigator.hardwareConcurrency || 0,
+      framed: window.top !== window.self
+    };
+  } catch (e) { /* ignore */ }
+  function rid() { return Math.random().toString(36).slice(2, 10); }
+  var dev, slot = 0;
+  try {
+    dev = localStorage.getItem('apexVelocity.device');
+    if (!dev) { dev = 'd' + rid(); localStorage.setItem('apexVelocity.device', dev); }
+    slot = (parseInt(localStorage.getItem('apexVelocity.session') || '0', 10) + 1) % 10;
+    localStorage.setItem('apexVelocity.session', String(slot));
+  } catch (e) { dev = 'x' + rid(); }
+  D.id = dev + '-s' + slot;
+  var db = null, auto = false, busy = false, dirty = false, timer = 0;
+  function note(ok) { try { if (D.onSaved) D.onSaved(ok); } catch (e) { /* ignore */ } }
+  function flush() {
+    timer = 0;
+    if (!db || !auto) return;
+    if (busy) { dirty = true; return; }
+    if (D.sent >= 30) return;
+    busy = true; dirty = false; D.sent++;
+    var p;
+    try { p = db.doc('diag/' + D.id).set({ build: D.build, at: new Date().toISOString(), info: D.info, ev: D.ev.slice() }); }
+    catch (e) { busy = false; D.state = 'write-threw'; return; }
+    p.then(function () { busy = false; D.state = 'saved'; note(true); if (dirty) schedule(2000); },
+      function (e) { busy = false; D.state = 'failed:' + (e && e.code); note(false); });
+  }
+  function schedule(ms) { dirty = true; if (!db || !auto || timer) return; timer = setTimeout(flush, ms); }
+  D.log = function (code, msg, urgent) {
+    var t = Math.round((Date.now() - D.t0) / 100) / 10;
+    D.ev.push(t + 's ' + code + (msg ? ' | ' + String(msg).slice(0, 260) : ''));
+    if (D.ev.length > 40) D.ev.splice(1, D.ev.length - 40);
+    schedule(urgent ? 300 : 2500);
+  };
+  D.set = function (k, v) { D.info[k] = v; schedule(2500); };
+  // From a button on an error screen: send the report now (the viewer may be asked to allow it)
+  D.send = function () { if (!db) return false; auto = true; if (timer) { clearTimeout(timer); timer = 0; } dirty = true; flush(); return true; };
+  D.log('boot');
+  var c = window.claude;
+  if (c && typeof c.use === 'function') {
+    try {
+      c.use('db').then(function (d) {
+        if (!d) { D.state = 'no-db'; return; }
+        db = d; D.hasDb = true;
+        return c.use('permissions').then(function (pm) { return pm ? pm.state('db') : 'prompt'; }).then(function (st) {
+          D.state = 'db:' + st;
+          if (st === 'granted') { auto = true; if (!timer) timer = setTimeout(flush, 1500); }
+          note(null);
+        });
+      }, function () { D.state = 'db-error'; });
+    } catch (e) { D.state = 'use-threw'; }
+  } else D.state = 'no-claude';
+})();
+
+// ---- Start-up screen: shows any problem (with an error code) instead of a blank page.
+(function () {
+  function el(id) { return document.getElementById(id); }
+  function show(msg, code) {
+    var b = el('boot'); if (!b) return;
+    code = code || 'E-BOOT';
+    b.style.display = 'flex'; b.style.opacity = '1';
+    el('boot-msg').textContent = 'Oops, the game hit a problem while starting.';
+    el('boot-barwrap').style.display = 'none';
+    el('boot-code').style.display = 'block'; el('boot-code').textContent = 'Error code: ' + code;
+    el('boot-err').style.display = 'block'; el('boot-err').textContent = String(msg).slice(0, 500);
+    el('boot-help').style.display = 'block';
+    el('boot-help').textContent = 'Tap "Reload the game" to try again. If it keeps happening, tell Claude the error code above.';
+    el('boot-actions').style.display = 'flex';
+    el('boot-reload').onclick = function () { location.reload(); };
+    var D = window.__diag;
+    if (D) {
+      D.log(code, msg, true);
+      var sendBtn = el('boot-send'), sent = el('boot-sent');
+      var refresh = function (ok) {
+        if (ok === true) { sent.textContent = 'Error report saved. Claude can read it now.'; sendBtn.style.display = 'none'; }
+        else if (D.hasDb && D.state !== 'saved') sendBtn.style.display = 'inline-block';
+      };
+      D.onSaved = refresh; refresh(D.state === 'saved' ? true : null);
+      sendBtn.onclick = function () { sent.textContent = 'Sending…'; if (!D.send()) sent.textContent = ''; };
+    }
   }
   window.__bootError = show;
-  window.addEventListener('error', function (ev) { if (!window.__appStarted) show(ev.message || ev.error || 'Unknown error'); });
-  window.addEventListener('unhandledrejection', function (ev) { if (!window.__appStarted) show((ev.reason && (ev.reason.message || ev.reason)) || 'Unknown error'); });
+  window.addEventListener('error', function (ev) {
+    if (window.__appStarted) return;
+    var m = ev.message || (ev.error && ev.error.message) || 'Unknown error';
+    if (ev.filename) m += ' (' + String(ev.filename).split('/').pop() + ':' + ev.lineno + ')';
+    show(m, 'E-BOOT');
+  });
+  window.addEventListener('unhandledrejection', function (ev) {
+    if (window.__appStarted) return;
+    show((ev.reason && (ev.reason.message || ev.reason)) || 'Unknown error', 'E-BOOT');
+  });
 })();
 </script>
 <div id="app"></div>

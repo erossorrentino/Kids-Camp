@@ -14,7 +14,7 @@ async function build() {
   const t0 = Date.now();
   const res = await esbuild.build({
     entryPoints: [entry], bundle: true, minify: !dev, format: 'iife', write: false,
-    target: ['es2020'], legalComments: 'none', sourcemap: dev ? 'inline' : false,
+    target: ['es2018'], legalComments: 'none', sourcemap: dev ? 'inline' : false,
   });
   const artifact = args.includes('--artifact');
   let js = res.outputFiles[0].text;
@@ -31,11 +31,19 @@ async function build() {
   var bar = document.getElementById('boot-bar'), msg = document.getElementById('boot-msg');
   if (msg) msg.textContent = 'Downloading the game…';
   var p = 8, t = setInterval(function () { p = Math.min(85, p + 4); if (bar) bar.style.width = p + '%'; }, 250);
-  var s = document.createElement('script');
-  s.src = 'game.js';
-  s.onload = function () { clearInterval(t); if (bar) bar.style.width = '95%'; };
-  s.onerror = function () { clearInterval(t); window.__bootError && window.__bootError('Could not download the game file. Check the internet connection, then reload the page.'); };
-  setTimeout(function () { document.body.appendChild(s); }, 30);
+  var tries = 0;
+  function load() {
+    var s = document.createElement('script');
+    s.src = 'game.js';
+    s.onload = function () { clearInterval(t); if (bar) bar.style.width = '95%'; };
+    s.onerror = function () {
+      if (tries++ < 1) { if (window.__diag) window.__diag.log('dl-retry'); setTimeout(load, 1500); return; }
+      clearInterval(t);
+      window.__bootError && window.__bootError('The game file could not be downloaded. Check the internet connection, then reload.', 'E-DL');
+    };
+    document.body.appendChild(s);
+  }
+  setTimeout(load, 30);
 })();
 </script>`;
   } else {

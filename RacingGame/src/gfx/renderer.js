@@ -11,6 +11,8 @@ import { FXAAPass } from 'three/examples/jsm/postprocessing/FXAAPass.js';
 import { setMaxAnisotropy } from './textures.js';
 
 export const QUALITY = {
+  // Lite: plain Lambert shading, no shadows / reflections / custom shaders. Runs on anything with WebGL.
+  lite: { name: 'Lite', pixelRatio: 0.85, shadows: 0, shadowMapSize: 512, shadowExtent: 40, msaa: 0, bloom: false, post: false, direct: true, lite: true, scenery: 0.2, carDetail: 0, maxDpr: 1 },
   // Low draws straight to the screen (no HDR buffers / post effects): the most compatible path
   low: { name: 'Low', pixelRatio: 0.9, shadows: 1, shadowMapSize: 1024, shadowExtent: 45, msaa: 0, bloom: false, post: false, direct: true, scenery: 0.35, carDetail: 0, maxDpr: 1 },
   medium: { name: 'Medium', pixelRatio: 1, shadows: 1, shadowMapSize: 2048, shadowExtent: 60, msaa: 2, bloom: true, post: true, scenery: 0.65, carDetail: 1, maxDpr: 1.25 },
@@ -84,7 +86,7 @@ const CinematicShader = {
       col = pow(max(col, 0.0) / 0.18, vec3(contrast)) * 0.18;
       col *= tint;
       // vignette
-      float v = smoothstep(0.95, 0.25, d * (1.0 + vignette * 0.4));
+      float v = 1.0 - smoothstep(0.25, 0.95, d * (1.0 + vignette * 0.4));
       col *= mix(1.0, v, vignette * 1.6);
       // film grain
       col += (hash(vUv * resolution + fract(time) * 100.0) - 0.5) * grain * (0.25 + l);
@@ -113,6 +115,16 @@ export class Graphics {
       const ext = gl.getExtension('WEBGL_debug_renderer_info');
       this.gpu = ext ? String(gl.getParameter(ext.UNMASKED_RENDERER_WEBGL)) : String(gl.getParameter(gl.RENDERER));
     } catch (e) { this.gpu = 'unknown'; }
+    // what this graphics chip can do (goes into error reports)
+    try {
+      const gl = renderer.getContext();
+      this.caps = {
+        tex: gl.getParameter(gl.MAX_TEXTURE_SIZE), units: gl.getParameter(gl.MAX_TEXTURE_IMAGE_UNITS),
+        cbf: !!gl.getExtension('EXT_color_buffer_float'), cbhf: !!gl.getExtension('EXT_color_buffer_half_float'),
+        msrtt: !!gl.getExtension('WEBGL_multisampled_render_to_texture'), prec: renderer.capabilities.precision,
+        depth: gl.getParameter(gl.DEPTH_BITS),
+      };
+    } catch (e) { this.caps = {}; }
     this.setQuality('high');
     window.addEventListener('resize', () => this.resize());
     this._frameTimes = [];

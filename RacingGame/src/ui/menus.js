@@ -584,7 +584,7 @@ export class UI {
     this.app.showroom.setFrame(0.3);
     const tog = (k, label, desc) => `<label class="toggle"><input type="checkbox" data-assist="${k}"${s.assists[k] ? ' checked' : ''}><span class="sw-ui"></span><div><b>${label}</b><small>${desc}</small></div></label>`;
     this.screenEl.innerHTML = `<div class="panel settings"><h1>Settings</h1>
-      <div class="f-h">Graphics quality</div><div class="chips">${Object.entries(QUALITY).map(([k, q]) => `<button class="chip${this.app.gfx.qualityName === k ? ' on' : ''}" data-q="${k}">${q.name}</button>`).join('')}</div>
+      <div class="f-h">Graphics quality</div><p class="sub" style="margin-bottom:8px">Lite is the simplest and runs on any phone or Chromebook. Higher settings look better but need a stronger device.</p><div class="chips">${Object.entries(QUALITY).map(([k, q]) => `<button class="chip${this.app.gfx.qualityName === k ? ' on' : ''}" data-q="${k}">${q.name}</button>`).join('')}</div>
       <div class="f-h">Difficulty</div><div class="chips">${['easy', 'normal', 'hard'].map((d) => `<button class="chip${s.difficulty === d ? ' on' : ''}" data-diff="${d}">${d[0].toUpperCase() + d.slice(1)}</button>`).join('')}</div>
       <div class="f-h">Driving assists</div>
       <div class="toggles">
@@ -603,7 +603,7 @@ export class UI {
       <div class="f-h">Save game</div><button class="btn danger" data-reset>Start over (erase progress)</button>
     </div>`;
     const E = this.screenEl;
-    E.querySelectorAll('[data-q]').forEach((b) => b.onclick = () => { s.quality = b.dataset.q; this.app.setQuality(b.dataset.q); this.app.save(); E.querySelectorAll('[data-q]').forEach((x) => x.classList.toggle('on', x === b)); });
+    E.querySelectorAll('[data-q]').forEach((b) => b.onclick = () => { s.quality = b.dataset.q; window.__diag?.log('quality', b.dataset.q + ' (settings)'); this.app.setQuality(b.dataset.q); this.app.save(); E.querySelectorAll('[data-q]').forEach((x) => x.classList.toggle('on', x === b)); });
     E.querySelectorAll('[data-diff]').forEach((b) => b.onclick = () => { s.difficulty = b.dataset.diff; this.app.save(); E.querySelectorAll('[data-diff]').forEach((x) => x.classList.toggle('on', x === b)); });
     E.querySelectorAll('[data-assist]').forEach((c) => c.onchange = () => { s.assists[c.dataset.assist] = c.checked; this.app.save(); });
     E.querySelectorAll('[data-man]').forEach((b) => b.onclick = () => { s.manual = b.dataset.man === '1'; this.app.save(); E.querySelectorAll('[data-man]').forEach((x) => x.classList.toggle('on', x === b)); });
@@ -653,12 +653,15 @@ export class UI {
       <div class="r-money">${info.prize ? `<div>Prize money <b class="money">+${formatPrice(info.prize)}</b></div>` : '<div>No prize this time. Upgrade your car and try again!</div>'}
         ${info.bonus ? `<div class="bonus-line">🏆 Series complete bonus <b class="money">+${formatPrice(info.bonus)}</b></div>` : ''}
         ${info.unlocked ? `<div class="unlock-line">🔓 ${esc(info.unlocked)}</div>` : ''}
-        <div class="r-total">Credits: <b>${formatPrice(p.credits)}</b></div></div>
+        <div class="r-total">Credits: <b>${formatPrice(p.credits)}</b></div>
+        ${info.offerUpgrade ? '<div class="r-upgrade">That ran smoothly! Want nicer graphics? <button class="btn small" data-upgrade>Try better graphics</button></div>' : ''}</div>
       <div class="r-actions">${info.next ? '<button class="btn primary" data-a="next">NEXT RACE ›</button>' : ''}<button class="btn" data-a="again">Race again</button><button class="btn" data-a="menu">Continue</button></div></div>`;
     this.app.overlay.appendChild(el);
     requestAnimationFrame(() => el.classList.add('show'));
     if (info.prize) setTimeout(() => audio.cash(), 500);
     el.querySelectorAll('[data-a]').forEach((b) => b.onclick = () => { audio.click(); el.remove(); info.on[b.dataset.a](); });
+    const up = el.querySelector('[data-upgrade]');
+    if (up) up.onclick = () => { audio.click(); up.parentElement.remove(); info.offerUpgrade(); };
   }
 }
 

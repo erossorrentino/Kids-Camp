@@ -5,6 +5,10 @@
 // a prefiltered environment map that every PBR material (car paint, glass,
 // chrome) reflects.
 import * as THREE from 'three';
+import { gradientSky } from './lite.js';
+
+// Zenith colours for the simple Lite sky
+const LITE_ZENITH = { noon: 0x3f86d6, morning: 0x5c9be0, golden: 0x5a88c4, sunset: 0x4d5f9c, desert: 0x4590dc, snow: 0x74a8e4, night: 0x02040c, overcast: 0x808a96 };
 
 export const ENV_PRESETS = {
   noon: {
@@ -186,7 +190,7 @@ void main() {
     if (hs > 0.9965) {
       vec3 fp = fract(sd) - 0.5;
       float tw = 0.65 + 0.35 * sin(time * (2.0 + hs * 6.0) + hs * 100.0);
-      star = smoothstep(0.32, 0.0, length(fp)) * (hs - 0.9965) * 900.0 * tw;
+      star = (1.0 - smoothstep(0.0, 0.32, length(fp))) * (hs - 0.9965) * 900.0 * tw;
     }
     night += vec3(0.9, 0.95, 1.0) * star * smoothstep(0.0, 0.25, direction.y);
     // milky band
@@ -221,7 +225,7 @@ void main() {
   // ---- horizon haze -> fog colour; below horizon -> ground colour
   float hz = 1.0 - smoothstep(-0.02, 0.11, direction.y);
   col = mix(col, horizonColor, hz * 0.8);
-  float below = smoothstep(0.0, -0.06, direction.y);
+  float below = 1.0 - smoothstep(-0.06, 0.0, direction.y);
   col = mix(col, groundColor, below);
   gl_FragColor = vec4(col, 1.0);
   #include <tonemapping_fragment>
@@ -264,6 +268,8 @@ export class Environment {
     this.sunDir = dirFromAngles(P.sunElev, P.sunAzim);
     this.moonDir = P.night ? dirFromAngles(P.moonElev || 30, P.moonAzim || 120) : new THREE.Vector3(0, 1, 0);
 
+    this.presetName = ENV_PRESETS[presetName] ? presetName : 'noon';
+    this.lite = !!quality.lite;
     // ---- sky
     this.sky = new SkyDome();
     this.sky.scale.setScalar(9000);
@@ -283,7 +289,7 @@ export class Environment {
     u.skySat.value = P.skySat ?? 1.35;
     u.skyBoost.value = P.skyBoost ?? 0.85;
     u.moonDir.value.copy(this.moonDir);
-    scene.add(this.sky);
+    if (!this.lite) scene.add(this.sky);
 
     // ---- fog: exponential haze tinted to the horizon
     scene.fog = new THREE.FogExp2(P.fogColor, P.fogDensity);
@@ -293,7 +299,7 @@ export class Environment {
     this.lightDir = lightDir.clone();
     this.sun = new THREE.DirectionalLight(P.sunColor, P.sunIntensity);
     this.sun.position.copy(lightDir).multiplyScalar(300);
-    this.sun.castShadow = quality.shadows > 0;
+    this.sun.castShadow = quality.shadows > 0 && !this.lite;
     const sm = quality.shadowMapSize;
     this.sun.shadow.mapSize.set(sm, sm);
     const ext = quality.shadowExtent;
@@ -336,8 +342,28 @@ export class Environment {
       this.sun.intensity = 1.25;
       this.hemi.intensity = 0.35;
     }
-    this.buildEnvMap(extras);
+    if (this.lite) this.goLite();
+    else this.buildEnvMap(extras);
     for (const e of extras) { e.geometry.dispose(); }
+  }
+
+  // Switch to the simple Lite look: gradient sky, no reflections, no shadows.
+  goLite() {
+    const P = this.preset;
+    this.lite = true;
+    if (this.sky && this.sky.parent) this.scene.remove(this.sky);
+    if (!this.liteSky) {
+      this.liteSky = gradientSky(LITE_ZENITH[this.presetName] ?? 0x3f86d6, P.fogColor, P.groundColor);
+      this.liteSky.scale.setScalar(9000);
+    }
+    if (!this.liteSky.parent) this.scene.add(this.liteSky);
+    if (this.envRT) { this.envRT.dispose(); this.envRT = null; }
+    this.scene.environment = null;
+    this.sun.castShadow = false;
+    // without image-based lighting the sky fill comes from the hemisphere light
+    this.hemi.intensity = P.night ? 1.5 : 2.1;
+    this.hemi.color.set(P.night ? 0x8fa0c8 : 0xffffff);
+    this.sun.intensity = P.night ? 1.6 : P.sunIntensity * 0.85;
   }
 
   // Render sky (+ a ground plane colour) into a PMREM cube for reflections/IBL.
@@ -363,6 +389,7 @@ export class Environment {
   // Keep shadow frustum centred on the focus point, snapped to texels to avoid shimmer.
   update(dt, focus, time) {
     this.sky.material.uniforms.time.value = time;
+    if (this.lite) { if (focus && this.liteSky) this.liteSky.position.set(focus.x, 0, focus.z); return; }
     if (focus) {
       const ext = this.quality.shadowExtent;
       const texel = (ext * 2) / this.quality.shadowMapSize;
@@ -384,6 +411,7 @@ export class Environment {
   }
 
   dispose() {
+    if (this.liteSky) { this.scene.remove(this.liteSky); this.liteSky.geometry.dispose(); this.liteSky.material.dispose(); }
     this.scene.remove(this.sky, this.sun, this.sun.target, this.hemi);
     this.sky.geometry.dispose();
     this.sky.material.dispose();

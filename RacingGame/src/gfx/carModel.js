@@ -510,8 +510,10 @@ function paintLivery(spec, dims, res = 1) {
   const map = new THREE.CanvasTexture(cv);
   map.colorSpace = THREE.SRGBColorSpace;
   map.anisotropy = 8;
+  map.userData.ownCanvas = true;
   const bumpMap = new THREE.CanvasTexture(bump);
   bumpMap.colorSpace = THREE.NoColorSpace;
+  bumpMap.userData.ownCanvas = true;
   return { map, bumpMap };
 }
 
@@ -695,7 +697,7 @@ export function buildCar(spec, { detail = 2, night = false } = {}) {
   const useLivery = true;
   const { map: liveryMap, bumpMap } = useLivery ? paintLivery(spec, dims, detail >= 2 ? 1 : 0.5) : {};
   const paint = paintMaterial(spec, liveryMap, detail >= 2 ? bumpMap : null);
-  if (detail < 2 && bumpMap) bumpMap.dispose();
+  if (detail < 2 && bumpMap) { bumpMap.dispose(); bumpMap.image.width = 0; bumpMap.image.height = 0; }
   const accentMat = new THREE.MeshPhysicalMaterial({ color: spec.accent, metalness: 0.3, roughness: 0.3, clearcoat: 1, clearcoatRoughness: 0.05 });
   const headMat = new THREE.MeshStandardMaterial({
     map: TX.headlightTexture(spec.lightStyle % 2), emissiveMap: TX.headlightTexture(spec.lightStyle % 2),
@@ -1127,7 +1129,8 @@ function buildFormula(spec, { detail = 2, night = false }) {
   const wr = 0.36;
   const zF = 1.8, zR = -1.8; // wheelbase 3.6
   const dims = { L, perim: 1.8, doorU: 0.5, doorLines: [], hoodLine: 0, hoodU: 0.72, trunkLine: 0 };
-  const { map: liveryMap } = paintLivery({ ...spec, race: true, livery: 'formula' }, dims);
+  const { map: liveryMap, bumpMap: unusedBump } = paintLivery({ ...spec, race: true, livery: 'formula' }, dims, detail >= 2 ? 1 : 0.5);
+  unusedBump.dispose(); unusedBump.image.width = 0; unusedBump.image.height = 0;
   const paint = paintMaterial({ ...spec, finish: spec.finish === 'matte' ? 'matte' : 'gloss' }, liveryMap, null);
   const accent = new THREE.MeshPhysicalMaterial({ color: spec.accent, roughness: 0.3, metalness: 0.2, clearcoat: 1 });
   const root = new THREE.Group();
@@ -1339,9 +1342,21 @@ export class Car3D {
     }
   }
   setHeadlights(on) { this.headMat.emissiveIntensity = on ? 4 : 0.6; }
+  // After liteSwap(): follow the swapped materials so brake lights / headlights still change
+  useLite(cache) {
+    this.tailMat = cache.get(this.tailMat) || this.tailMat;
+    this.headMat = cache.get(this.headMat) || this.headMat;
+    this.paint = cache.get(this.paint) || this.paint;
+    this.blob.visible = true;
+  }
   dispose() {
     this.root.traverse((o) => { if (o.isMesh && o.geometry) o.geometry.dispose(); });
     this.root.removeFromParent();
-    for (const d of this.disposables) d && d.dispose && d.dispose();
+    for (const d of this.disposables) {
+      if (!d || !d.dispose) continue;
+      d.dispose();
+      // free the livery canvas right away (iPhone Safari limits total canvas memory)
+      if (d.isTexture && d.userData.ownCanvas && d.image && 'width' in d.image) { d.image.width = 0; d.image.height = 0; }
+    }
   }
 }

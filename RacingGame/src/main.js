@@ -12,6 +12,13 @@ import { SERIES, seriesEvents, buildField, seriesUnlocked, PRIZE_SPLIT } from '.
 import { TRACKS, trackById } from './data/tracks.js';
 import { hashString } from './core/rng.js';
 
+// Error reports (see index.html). A no-op outside the published page.
+const D = window.__diag || { log() {}, set() {}, send() { return false; }, hasDb: false, state: 'none' };
+const MARK = 'apexVelocity.loading'; // set while something heavy loads; if it is still there at next start-up, the page crashed
+const GFX_VERSION = 8;
+const setMark = (v) => { try { if (v) localStorage.setItem(MARK, v); else localStorage.removeItem(MARK); } catch (e) { /* ignore */ } };
+const TIER_DOWN = { ultra: 'medium', high: 'medium', medium: 'low', low: 'lite' };
+
 class App {
   constructor() {
     const root = document.getElementById('app');
@@ -24,6 +31,20 @@ class App {
     this.profile = loadProfile();
     this.root = root;
     this.isTouch = isTouchFirst();
+    const st = this.profile.settings;
+    // Phones and Chromebooks get the new safe defaults once (a higher setting can be picked again in Settings)
+    if (st.gfxVersion !== GFX_VERSION) {
+      if (this.isTouch || /CrOS/.test(navigator.userAgent)) st.quality = null;
+      st.gfxVersion = GFX_VERSION;
+    }
+    // Did the page die while loading last time (out of memory, graphics crash)? Then use Lite.
+    try {
+      const m = localStorage.getItem(MARK);
+      if (m) { D.log('crash-recovered', m, true); st.quality = 'lite'; st.liteLocked = true; this.crashRecovered = m; }
+    } catch (e) { /* ignore */ }
+    setMark('boot');
+    window.addEventListener('pagehide', () => setMark(null));
+    saveProfile(this.profile);
     if (this.isTouch) root.classList.add('is-touch');
     // touchscreen laptops/Chromebooks: switch to touch controls once the screen is actually touched
     window.addEventListener('touchstart', () => this.enableTouch(), { passive: true });
@@ -33,26 +54,38 @@ class App {
     try {
       this.gfx = new Graphics(this.view);
     } catch (e) {
-      window.__bootError?.('This browser could not start 3D graphics (WebGL 2). Try the latest Chrome, Edge, Firefox or Safari, or turn on hardware acceleration.\n\n(' + (e && e.message ? e.message : e) + ')');
+      setMark(null);
+      window.__bootError?.('This device or browser could not start 3D graphics (WebGL 2). Try opening the game in the latest Chrome or Safari.\n(' + (e && e.message ? e.message : e) + ')', 'E-GL');
       throw e;
     }
+    D.set('gpu', this.gfx.gpu);
+    D.set('gl', this.gfx.caps);
     // if the GPU drops the 3D context (common on phones when memory is low), recover
     this.gfx.renderer.domElement.addEventListener('webglcontextlost', (ev) => {
       ev.preventDefault();
       this.contextLost = true;
-      this.profile.settings.quality = 'low';
+      const was = this.gfx.qualityName;
+      this.profile.settings.quality = 'lite';
+      this.profile.settings.liteLocked = true;
       this.save();
-      this.notice('Graphics restarting…', 'This device ran out of graphics memory. The game is switching to Low graphics. If nothing happens in a few seconds, reload the page.', [['Reload now', () => location.reload()]]);
+      setMark(null);
+      this.problem('E-LOST', 'Graphics restarting…', 'This device ran out of graphics memory, so the game is switching to Lite graphics. If nothing happens in a few seconds, tap Reload.',
+        `context lost at ${was} in ${this.mode}`, [['Reload the game', () => location.reload()]]);
     });
     this.gfx.renderer.domElement.addEventListener('webglcontextrestored', () => {
       this.contextLost = false;
+      D.log('context-restored');
       document.querySelector('.notice')?.remove();
+      this.ui.pauseMenu(false);
       if (this.race) { try { this.race.dispose(); } catch (e) { /* ignore */ } this.race = null; }
-      this.gfx.setQuality('low');
+      this.gfx.setQuality('lite');
+      this.showroom.contextRestored();
+      this.showroom.setLite(true);
       this.enterMenu('home');
-      this.ui.toast('Graphics were switched to Low so the game runs smoothly on this device.');
+      this.ui.toast('Graphics were switched to Lite so the game runs on this device.');
     });
     this.setQuality(this.profile.settings.quality || this.autoQuality(), false);
+    D.log('app-start', `${this.gfx.qualityName}${this.profile.settings.quality ? ' (saved)' : ' (auto)'} touch=${this.isTouch}`);
     audio.setVolume(this.profile.settings.volume);
     this.input = new Input(root);
     this.showroom = new Showroom(this.gfx);
@@ -75,6 +108,8 @@ class App {
     const boot = document.getElementById('boot');
     if (boot) { boot.style.transition = 'opacity .4s'; boot.style.opacity = '0'; setTimeout(() => boot.remove(), 450); }
     this.watch = { frames: 0, white: 0 };
+    this.goodFrames = 0;
+    if (this.crashRecovered) setTimeout(() => this.ui.toast('The game closed unexpectedly last time, so graphics were set to Lite.'), 1200);
   }
 
   enableTouch() {
@@ -88,24 +123,27 @@ class App {
   }
 
   autoQuality() {
-    const touch = this.isTouch;
     const small = Math.min(window.innerWidth, window.innerHeight) < 600;
     const gpu = this.gfx.gpu || '';
+    if ((navigator.deviceMemory || 4) <= 2) return 'lite'; // very little memory
+    if (/SwiftShader|llvmpipe|Software|Mali-4|Mali-T|PowerVR|Adreno \(TM\) [2-5]\d\d\b/i.test(gpu)) return 'lite'; // old or software graphics
+    if (this.isTouch && small) return 'lite'; // phones: start safe (Settings can raise it)
     if (/CrOS/.test(navigator.userAgent)) return 'low'; // Chromebooks
-    if (/SwiftShader|llvmpipe|Software|Mali|PowerVR|Adreno \(TM\) [1-5]\d\d\b/i.test(gpu)) return 'low';
-    if (touch && small) return 'low';
-    if (touch || /Intel|Adreno|Apple GPU/i.test(gpu)) return 'medium';
+    if (this.isTouch) return 'low'; // tablets
+    if (/Intel|Adreno|Mali|Apple GPU/i.test(gpu)) return 'medium';
     return 'high';
   }
 
   // Full-screen notice that works even while the menus are hidden (during races)
-  notice(title, text, buttons = []) {
+  notice(title, text, buttons = [], code = '', detail = '') {
     let el = document.querySelector('.notice');
     if (!el) { el = document.createElement('div'); el.className = 'notice'; this.overlay.appendChild(el); }
-    el.innerHTML = `<div class="n-box"><h2></h2><p></p><div class="n-actions"></div><small class="n-gpu"></small></div>`;
+    el.innerHTML = `<div class="n-box"><h2></h2><div class="n-code"></div><p></p><div class="n-detail"></div><div class="n-actions"></div><div class="n-report"></div><small class="n-gpu"></small></div>`;
     el.querySelector('h2').textContent = title;
     el.querySelector('p').textContent = text;
-    el.querySelector('.n-gpu').textContent = 'Graphics chip: ' + (this.gfx.gpu || 'unknown') + ' · quality: ' + this.gfx.qualityName;
+    el.querySelector('.n-code').textContent = code ? 'Error code: ' + code : '';
+    el.querySelector('.n-detail').textContent = detail ? String(detail).slice(0, 300) : '';
+    el.querySelector('.n-gpu').textContent = 'Graphics chip: ' + (this.gfx.gpu || 'unknown') + ' · graphics: ' + this.gfx.qualityName;
     for (const [label, fn] of buttons) {
       const b = document.createElement('button');
       b.className = 'btn primary';
@@ -113,7 +151,30 @@ class App {
       b.onclick = () => { el.remove(); fn(); };
       el.querySelector('.n-actions').appendChild(b);
     }
+    if (code) {
+      // error report: saved automatically when allowed, otherwise offered as a button
+      const rp = el.querySelector('.n-report');
+      const refresh = (ok) => {
+        if (ok === true || D.state === 'saved') rp.textContent = 'Error report saved. Claude can read it now.';
+        else if (D.hasDb && !rp.querySelector('button')) {
+          const b = document.createElement('button');
+          b.className = 'btn small';
+          b.textContent = 'Send error report';
+          b.onclick = () => { b.remove(); rp.textContent = 'Sending…'; if (!D.send()) rp.textContent = ''; };
+          rp.textContent = '';
+          rp.appendChild(b);
+        }
+      };
+      D.onSaved = refresh;
+      refresh(null);
+    }
     return el;
+  }
+
+  // A problem the player should know about: shows a notice with an error code and files an error report
+  problem(code, title, text, detail = '', buttons = [['OK', () => {}]]) {
+    D.log(code, detail || text, true);
+    return this.notice(title, text, buttons, code, detail);
   }
 
   // Performance watchdog: if frames stay very slow even at the lowest render
@@ -127,8 +188,9 @@ class App {
     if (p.cool > 0 || this.contextLost) return;
     if (avg > 1 / 18 && this.gfx.renderScale <= 0.56) {
       const q = this.gfx.qualityName;
-      const next = q === 'ultra' ? 'high' : q === 'high' ? 'medium' : q === 'medium' ? 'low' : null;
+      const next = q === 'ultra' ? 'high' : q === 'high' ? 'medium' : q === 'medium' ? 'low' : q === 'low' ? 'lite' : null;
       if (!next) return;
+      D.log('slow', `${Math.round(1 / avg)} fps at ${q} -> ${next}`);
       this.applyQualityLive(next);
       p.cool = 6;
       const msg = `Graphics lowered to ${next[0].toUpperCase() + next.slice(1)} to keep the game smooth on this device.`;
@@ -142,12 +204,27 @@ class App {
     this.profile.settings.quality = q;
     this.save();
     this.gfx.setQuality(q);
-    if (this.mode === 'race' && this.race) this.gfx.buildComposer(this.race.scene, this.race.camera, this.race.env?.preset?.bloom ?? 0.2);
-    else this.gfx.buildComposer(this.showroom.scene, this.showroom.camera, 0.22);
+    const lite = !!this.gfx.quality.lite;
+    this.showroom.setLite(lite);
+    if (this.mode === 'race' && this.race) {
+      if (lite) this.race.goLite();
+      else if (this.race.isLite) { this.restartRace(); return; } // leaving Lite needs the scene rebuilt
+      this.gfx.buildComposer(this.race.scene, this.race.camera, this.race.env?.preset?.bloom ?? 0.2);
+    } else if (this.mode === 'menu') this.gfx.buildComposer(this.showroom.scene, this.showroom.camera, 0.22);
+  }
+
+  restartRace() {
+    const race = this.race;
+    if (!race || !this.raceOpts) return;
+    this.ui.pauseMenu(false);
+    const { opts, after } = this.raceOpts;
+    race.dispose(); this.race = null;
+    this.startRace(opts, after);
   }
 
   setQuality(q, rebuild = true) {
     this.gfx.setQuality(q);
+    if (this.showroom) this.showroom.setLite(!!this.gfx.quality.lite);
     if (rebuild && this.mode === 'menu') this.gfx.buildComposer(this.showroom.scene, this.showroom.camera, 0.22);
   }
 
@@ -242,19 +319,37 @@ class App {
       player: { car: a.car, stats: a.stats, custom: a.entry },
       onFinish: (r) => this.finishRace(r, after),
     });
+    const q0 = this.gfx.qualityName;
+    const t0 = performance.now();
+    setMark(`race ${opts.trackId} ${q0}`);
+    D.log('race-load', `${opts.trackId} ${q0} cars=${opts.field.length + 1}`);
     try {
       await race.load((p, msg) => ld.set(p, msg));
     } catch (e) {
       console.error(e);
+      setMark(null);
       ld.close();
-      this.ui.toast('Something went wrong loading the race 😢');
+      try { race.dispose(); } catch (e2) { /* ignore */ }
+      const msg = (e && e.message ? e.message : String(e)) + (e && e.stack ? ' @ ' + String(e.stack).split('\n').slice(1, 3).join(' ').trim() : '');
+      if (this.contextLost) return; // the context-lost handler takes over
+      if (!this.gfx.quality.lite && !opts._retried) {
+        // try once more with the simplest graphics before giving up
+        D.log('race-load-failed', `${q0}: ${msg} -> retry in lite`, true);
+        this.profile.settings.liteLocked = true;
+        this.applyQualityLive('lite');
+        return this.startRace({ ...opts, _retried: true }, after);
+      }
       this.enterMenu('home');
+      this.problem('E-RACE', 'The race could not start', 'Something went wrong while getting the race ready. Try again, or pick another track.', msg);
       return;
     }
+    if (this.contextLost) return;
     ld.close();
+    D.log('race-ready', `${Math.round(performance.now() - t0)} ms`);
     this.race = race;
     this.raceOpts = { opts, after };
     this.mode = 'race';
+    this.goodFrames = 0;
     this.watch = { frames: 0, white: 0 };
     this.input.capture = true;
     if (this.isTouch && !this.input.touchEl) this.input.buildTouchControls(this.overlay);
@@ -291,6 +386,12 @@ class App {
     const race = this.race;
     const info = { title: '', prize: 0, bonus: 0, on: {} };
     const pos = r.position;
+    const fps = race ? race.avgFps() : 0;
+    D.log('race-end', `P${pos} ${fps} fps ${this.gfx.qualityName} scale=${this.gfx.renderScale}`);
+    // ran smoothly on Lite and nothing has gone wrong on this device: offer nicer graphics
+    if (this.gfx.quality.lite && fps >= 45 && !p.settings.liteLocked) {
+      info.offerUpgrade = () => { D.log('upgrade-try', 'low'); this.applyQualityLive('low'); this.ui.toast('Graphics set to Low. If anything looks wrong the game will switch back by itself.'); };
+    }
     if (after.kind === 'career') {
       const { series, event } = after;
       const before = SERIES.filter((s) => seriesUnlocked(s, p)).map((s) => s.id);
@@ -357,19 +458,14 @@ class App {
   pauseHandlers() {
     return {
       resume: () => this.togglePause(),
-      restart: () => {
-        const race = this.race;
-        this.ui.pauseMenu(false);
-        const { opts, after } = this.raceOpts;
-        race.dispose(); this.race = null;
-        this.startRace(opts, after);
-      },
+      restart: () => this.restartRace(),
       camera: () => { this.race.hudCam(this.race.rcam.next()); },
       quality: () => {
-        const order = ['low', 'medium', 'high', 'ultra'];
+        const order = ['lite', 'low', 'medium', 'high', 'ultra'];
         const q = order[(order.indexOf(this.gfx.qualityName) + 1) % order.length];
-        this.applyQualityLive(q);
-        this.ui.pauseMenu(true, this._pauseHandlers);
+        D.log('quality', q + ' (pause menu)');
+        this.applyQualityLive(q); // leaving Lite restarts the race with the new graphics
+        if (this.race && this.race.paused) this.ui.pauseMenu(true, this._pauseHandlers);
       },
       line: () => {
         const s = this.profile.settings;
@@ -381,6 +477,7 @@ class App {
       quit: () => {
         const race = this.race;
         this.ui.pauseMenu(false);
+        setMark(null);
         race.dispose(); this.race = null;
         this.enterMenu('home');
       },
@@ -406,18 +503,20 @@ class App {
     }
     if (white >= n - 2) w.white++; else w.white = 0;
     if (w.white >= 3) {
-      // step down: High/Ultra -> Medium -> Low (direct drawing, no effects)
+      // step down: High/Ultra -> Medium -> Low (direct drawing) -> Lite (plain shading)
       const q = this.gfx.qualityName;
-      const next = q === 'ultra' || q === 'high' ? 'medium' : q === 'medium' ? 'low' : null;
+      const next = TIER_DOWN[q];
       if (next) {
+        D.log('white', `at ${q} in ${this.mode} -> ${next}`, true);
+        this.profile.settings.liteLocked = true;
         this.applyQualityLive(next);
         this.watch = { frames: 0, white: 0 };
-        const msg = `The picture came out white on this device, so graphics were switched to ${next === 'low' ? 'Low' : 'Medium'}.`;
+        const msg = `The picture came out white on this device, so graphics were switched to ${next[0].toUpperCase() + next.slice(1)}.`;
         if (this.mode === 'race' && this.race) this.race.hud?.toast(msg, 4);
         else this.ui.toast(msg);
       } else {
         w.done = true;
-        this.notice('The 3D picture isn\'t showing', 'Your device is having trouble drawing the 3D graphics. Try opening the game in the Chrome or Safari browser instead of an app, or on another device. Let us know the graphics chip shown below.', [['OK', () => {}]]);
+        this.problem('E-WHITE', 'The 3D picture isn\'t showing', 'This device is having trouble drawing the 3D graphics, even on the simplest setting. Try opening the game in the Chrome or Safari browser, or on another device.', `white at lite in ${this.mode}`);
       }
     }
   }
@@ -436,10 +535,27 @@ class App {
         this.showroom.processThumbs(12);
         this.gfx.render(dt, {});
       }
-      if (this.mode === 'race' || this.mode === 'menu') { this.checkWhite(); this.perfCheck(dt); }
+      if (this.mode === 'race' || this.mode === 'menu') {
+        this.checkWhite(); this.perfCheck(dt);
+        // a couple of seconds of normal frames: whatever was loading did not crash the page
+        if (++this.goodFrames === 120) setMark(null);
+      }
+      this.badFrames = 0;
     } catch (e) {
       console.error(e);
-      if (!this._loopErr) { this._loopErr = true; this.ui?.toast('Something went wrong: ' + (e && e.message ? e.message : e)); }
+      this.badFrames = (this.badFrames || 0) + 1;
+      const msg = (e && e.message ? e.message : String(e)) + (e && e.stack ? ' @ ' + String(e.stack).split('\n').slice(1, 3).join(' ').trim() : '');
+      if (this.badFrames === 1) D.log('frame-error', `${this.mode} ${this.gfx.qualityName}: ${msg}`, true);
+      // the same failure on every frame means the game is stuck: stop the race and say so
+      if (this.badFrames === 20 && !this._loopErr) {
+        this._loopErr = true;
+        if (this.mode === 'race' && this.race) {
+          try { this.ui.pauseMenu(false); this.race.dispose(); } catch (e2) { /* ignore */ }
+          this.race = null;
+          try { this.enterMenu('home'); } catch (e2) { /* ignore */ }
+          this.problem('E-LOOP', 'The game hit a problem', 'The race had to stop. You can try again from the menu.', msg);
+        } else this.problem('E-LOOP', 'The game hit a problem', 'Something is not working properly. Reloading the game usually fixes it.', msg, [['Reload the game', () => location.reload()], ['OK', () => {}]]);
+      }
     }
   }
 }

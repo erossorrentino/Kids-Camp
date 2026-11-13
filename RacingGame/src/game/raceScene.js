@@ -15,6 +15,7 @@ import { HUD } from '../ui/hud.js';
 import { audio } from '../audio/audio.js';
 import { visualOptionsFor } from '../data/cars.js';
 import { clamp, lerp } from '../core/rng.js';
+import { liteSwap, disposeLite } from '../gfx/lite.js';
 
 const hexCss = (c) => '#' + new THREE.Color(c).getHexString();
 
@@ -66,7 +67,7 @@ export class RaceScene {
         // player
         const P = o.player;
         const vis = makeVisualSpec(P.car.body, P.car.seed, visualOptionsFor(P.car, P.custom));
-        const model = buildCar(vis, { detail: 2, night: this.night });
+        const model = buildCar(vis, { detail: quality.lite ? 1 : 2, night: this.night });
         model.root.rotation.order = 'YXZ';
         scene.add(model.root);
         const veh = new Vehicle(P.stats.physics, this.track, {
@@ -96,9 +97,9 @@ export class RaceScene {
     this.race.updatePositions();
 
     // ---- helpers
-    this.effects = new Effects(scene, { rain: this.wet, night: this.night });
+    this.effects = new Effects(scene, { rain: this.wet, night: this.night, lite: !!quality.lite });
     this.playerProfile = speedProfile(this.track, this.player.stats.physics, 0.97);
-    this.guide = new RacingLineGuide(scene, this.track, this.playerProfile);
+    this.guide = new RacingLineGuide(scene, this.track, this.playerProfile, { lite: !!quality.lite });
     this.guide.visible = !!settings.assists.line;
     this.rcam = new RaceCamera(this.camera, this.track);
     this.rcam.setMode(settings.camera || 0);
@@ -115,6 +116,7 @@ export class RaceScene {
       spot.target = tgt;
       for (const e of entrants) e.model.setHeadlights(true);
     }
+    if (quality.lite) this.goLite();
     gfx.buildComposer(scene, this.camera, this.env.preset.bloom);
     const grade = { night: { saturation: 1.12, contrast: 1.06, tint: [0.95, 0.98, 1.06], vignette: 0.42 }, sunset: { saturation: 1.12, contrast: 1.05, tint: [1.05, 0.98, 0.92], vignette: 0.38 },
       desert: { saturation: 1.06, contrast: 1.05, tint: [1.04, 1.0, 0.95] }, snow: { saturation: 1.0, contrast: 1.04, tint: [0.97, 1.0, 1.05] }, golden: { saturation: 1.1, contrast: 1.05, tint: [1.04, 1.0, 0.94] } }[envName];
@@ -144,6 +146,19 @@ export class RaceScene {
     this.crowd = audio.noiseLayer('bandpass', 1100, 0.4);
   }
 
+  // Switch this race to Lite graphics (also works in the middle of a race)
+  goLite() {
+    this.isLite = true;
+    this.env.goLite();
+    this.effects.goLite();
+    this.guide.goLite();
+    this.liteCache = liteSwap(this.scene, this.liteCache || new Map());
+    for (const e of this.entrants) e.model.useLite(this.liteCache);
+    this.venue.useLite(this.liteCache);
+  }
+
+  avgFps() { return this.fpsT > 1 ? Math.round(this.fpsN / this.fpsT) : 0; }
+
   camTarget() {
     const p = this.player, v = p.veh, d = p.model.dims;
     return { x: v.x, y: v.y, z: v.z, heading: v.heading, vx: v.vx, vz: v.vz, speed: v.speed, roll: v.groundRoll || 0, L: d.front - d.rear, H: d.H, nitro: v.nitroOn, s: v.proj.s };
@@ -162,6 +177,7 @@ export class RaceScene {
     if (actions.has('mute')) audio.toggleMute();
     if (this.paused) { this.render(0); return; }
     this.time += dt;
+    if (!this.skipRender && dt > 0) { this.fpsN = (this.fpsN || 0) + 1; this.fpsT = (this.fpsT || 0) + dt; }
     const race = this.race, P = this.player, veh = P.veh;
     if (actions.has('camera')) this.hudCam(this.rcam.next());
     if (actions.has('shiftUp') && this.opts.settings.manual) veh.shift(1);
@@ -451,6 +467,7 @@ export class RaceScene {
     this.effects?.dispose();
     this.guide?.dispose();
     for (const e of this.entrants || []) e.model.dispose();
+    disposeLite(this.liteCache);
     this.venue?.dispose();
     this.env?.dispose();
     this.gfx.dispose();

@@ -498,3 +498,12 @@ select option { background: #121826; }
 
 /* paint shop: side panel with a clear backdrop so the car stays visible */
 .modal-wrap.side-open { background: transparent; backdrop-filter: none; -webkit-backdrop-filter: none; justify-content: flex-start; }
+
+/* error code + report lines in notices */
+.n-code { font-size: 24px; font-weight: 900; color: var(--gold); letter-spacing: 0.04em; margin: 2px 0 6px; }
+.n-code:empty, .n-detail:empty, .n-report:empty { display: none; }
+.n-detail { color: #ffb3c0; font-size: 12px; line-height: 1.4; word-break: break-word; margin: 6px 0; }
+.n-report { color: var(--green); font-size: 13px; margin: 8px 0; }
+.n-box { max-height: 92vh; overflow-y: auto; }
+.r-upgrade { font-size: 14px; color: #cfd6e4; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+@media (max-height: 520px) { .n-box { padding: 14px 18px; } .n-box h2 { font-size: 20px; margin-bottom: 4px; } .n-code { font-size: 19px; } .n-box p { margin: 6px 0; font-size: 13px; } }
