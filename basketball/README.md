@@ -18,6 +18,14 @@ fonts from their CDNs. There is nothing to install.
   on each rack worth two.
 - **Watch CPU vs CPU**: sit back and watch a full game.
 
+## Camera
+
+The default camera is **third person**: it rides behind the player you control,
+looking at the basket on offense and at the ball handler on defense, with chevrons
+over your teammates (the bright one is your pass target). In this mode you stay
+locked to your own player on defense. Settings also offer Broadcast (full court),
+Close and Skycam.
+
 ## Controls
 
 | Action | Keyboard | Gamepad |

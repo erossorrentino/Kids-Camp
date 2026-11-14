@@ -149,6 +149,9 @@ table.box tr.tot td { font-weight: 700; color: var(--chalk); }
 #bug .shc.low { color: var(--bad); }
 #bug .sc.flash { animation: flash .6s ease-out; }
 @keyframes flash { 0% { color: var(--warn); transform: scale(1.35); } 100% { color: inherit; transform: scale(1); } }
+#hud.tp #bug { bottom: auto; top: max(10px, env(safe-area-inset-top, 0px)); }
+#hud.tp #ticker { top: 70px; }
+#hud.tp #hint { top: 70px; }
 #ticker { position: absolute; left: max(14px, env(safe-area-inset-left, 0px)); top: max(12px, env(safe-area-inset-top, 0px)); display: flex; flex-direction: column; gap: 4px; max-width: min(420px, 70vw); }
 #ticker div { font: 600 14px var(--f-body); background: rgba(10,14,22,0.72); padding: 5px 10px; border-left: 3px solid var(--wood); animation: tick 5s forwards; }
 @keyframes tick { 0% { opacity: 0; transform: translateX(-8px); } 6% { opacity: 1; transform: none; } 85% { opacity: 1; } 100% { opacity: 0; } }
@@ -287,6 +290,7 @@ table.box tr.tot td { font-weight: 700; color: var(--chalk); }
           <p><span>Stay in front</span><span>Move, don't sprint</span></p></div>
       </div>
       <ul class="tips">
+        <li>The camera rides behind your player: it looks at the basket on offense and at the ball handler on defense. Chevrons mark your teammates, and the bright one is who your pass will go to. Switch to Broadcast in Settings for the full-court view.</li>
         <li>Hold shoot and let go when the meter reaches the green band at the top. A green release nearly always goes in, even when it's contested.</li>
         <li>Shoot while sprinting at the rim to attack it: high-flyers dunk, everyone else lays it in. Contested layups miss more often.</li>
         <li>Point the stick at a teammate before you pass. The white diamond on the floor shows who will get the ball.</li>

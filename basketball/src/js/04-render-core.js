@@ -380,6 +380,11 @@ function camTargets(dt) {
   const sway = Math.sin(R.t * 0.37) * 0.35 + Math.sin(R.t * 0.71) * 0.2;
   let pos = V3(lx * 0.92 + sway, C.H + Math.sin(R.t * 0.29) * 0.25, C.D + lz * 0.5), look = V3(lx, 3.2, lz);
   let fov = C.fov;
+  R.camRate = null;
+  if (R.camMode === 'third' && G.ctrl && G.userTeam >= 0 && !G.auto && !G.attract && G.mode !== 'threept') {
+    const t = thirdPerson(dt);
+    if (t) { pos = t.pos; look = t.look; fov = t.fov; R.camRate = [7, 9]; }
+  }
   if ((G.state === 'ft' || G.state === 'ftcut') && G.ft && G.ft.placed) {
     const sh = G.ft.shooter, s = sh.team.dir;
     pos = V3(sh.x - s * 16, 10.5, sh.z + 8); look = V3(s * CT.RIM_X, 8, 0); fov = 40;
@@ -418,6 +423,31 @@ function camTargets(dt) {
   }
   return { pos, look, fov };
 }
+/* Third person: over the controlled player's shoulder. Offense looks at the basket being attacked,
+   defense looks at the ball handler, loose balls and shots pull the view toward the ball. */
+function thirdPerson(dt) {
+  const p = G.ctrl, b = G.ball;
+  if (!p || p.z < -100) return null;
+  const off = p.team.idx === G.offense;
+  const hx = hoopX(p.team);
+  let tx, tz;
+  if (b.state === 'shot' && b.shooter) { tx = b.shooter.team.dir * CT.RIM_X; tz = 0; }
+  else if (b.state === 'loose') { tx = b.x; tz = b.z; }
+  else if (off) { const own = p.hasBall; tx = own ? hx : lerp(hx, b.x, 0.4); tz = own ? 0 : lerp(0, b.z, 0.4); }
+  else { const h = b.holder || (b.state === 'pass' ? b.passTo : null); tx = h ? h.x : b.x; tz = h ? h.z : b.z; }
+  if (G.state === 'dead' && G.dead) { tx = G.dead.inb.x; tz = G.dead.inb.z; if (G.dead.inb === p) { tx = 0; tz = 0; } }
+  const dx = tx - p.x, dz = tz - p.z;
+  let want = R.tpYaw == null ? Math.atan2(dz, dx) : R.tpYaw;
+  if (hyp(dx, dz) > 6) want = Math.atan2(dz, dx);
+  if (R.tpYaw == null || R.snapCam) R.tpYaw = want;
+  else R.tpYaw += angDiff(R.tpYaw, want) * (1 - Math.exp(-2.4 * dt));
+  const fx = Math.cos(R.tpYaw), fz = Math.sin(R.tpYaw);
+  const dist = 13.5, height = 8.4, side = 2.0;
+  let cx = p.x - fx * dist - fz * side, cz = p.z - fz * dist + fx * side;
+  cx = clamp(cx, -54, 54); cz = clamp(cz, -32, 32);
+  const lift = b.state === 'shot' ? clamp(b.y - 8, 0, 8) * 0.45 : 0;
+  return { pos: V3(cx, height + p.y * 0.35, cz), look: V3(p.x + fx * 7, 3.4 + lift, p.z + fz * 7), fov: 54 };
+}
 function updateCamera(dt) {
   const t = camTargets(dt);
   const aspect = R.cam.aspect;
@@ -425,7 +455,8 @@ function updateCamera(dt) {
   if (aspect < 1.4) fov = 2 * Math.atan(Math.tan(fov * PI / 360) * 1.42 / aspect) * 180 / PI;
   fov = Math.min(fov, 80);
   if (Math.abs(R.cam.fov - fov) > 0.02) { R.cam.fov = R.snapCam ? fov : lerp(R.cam.fov, fov, 1 - Math.exp(-3 * dt)); R.cam.updateProjectionMatrix(); }
-  const kp = R.snapCam ? 1 : 1 - Math.exp(-2.6 * dt), kl = R.snapCam ? 1 : 1 - Math.exp(-3.6 * dt);
+  const rr = R.camRate || [2.6, 3.6];
+  const kp = R.snapCam ? 1 : 1 - Math.exp(-rr[0] * dt), kl = R.snapCam ? 1 : 1 - Math.exp(-rr[1] * dt);
   R.snapCam = false;
   R.camPos.lerp(t.pos, kp); R.camLook.lerp(t.look, kl);
   R.cam.position.copy(R.camPos);

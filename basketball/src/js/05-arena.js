@@ -807,6 +807,17 @@ function buildIndicators() {
   const dt = radialTex([[0, 'rgba(255,255,255,0.0)'], [0.55, 'rgba(255,255,255,0.0)'], [0.7, 'rgba(255,255,255,0.9)'], [0.85, 'rgba(255,255,255,0)'], [1, 'rgba(255,255,255,0)']]);
   const tgt = new THREE.Mesh(new THREE.PlaneGeometry(3, 3), new THREE.MeshBasicMaterial({ map: dt, color: new THREE.Color(1.6, 1.6, 1.6), transparent: true, depthWrite: false, toneMapped: false, blending: THREE.AdditiveBlending }));
   tgt.rotation.x = -PI / 2; tgt.position.y = 0.05; R.scene.add(tgt); R.tgt = tgt; R.reflHide.push(tgt);
+  // teammate markers for the third-person camera: a chevron over each teammate's head
+  { const c = mkCanvas(64, 64), g = c.getContext('2d');
+    g.fillStyle = '#ffffff'; g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 4;
+    g.beginPath(); g.moveTo(10, 14); g.lineTo(32, 46); g.lineTo(54, 14); g.lineTo(32, 26); g.closePath(); g.stroke(); g.fill();
+    const t = new THREE.CanvasTexture(c);
+    R.mates = [];
+    for (let i = 0; i < 5; i++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, color: new THREE.Color(1, 1, 1), depthTest: false, depthWrite: false, toneMapped: false, transparent: true }));
+      sp.renderOrder = 10; sp.visible = false; sp.scale.set(1.1, 1.1, 1);
+      R.scene.add(sp); R.mates.push(sp); R.reflHide.push(sp);
+    } }
   R.blobTex = radialTex([[0, 'rgba(0,0,0,0.6)'], [0.5, 'rgba(0,0,0,0.32)'], [1, 'rgba(0,0,0,0)']]);
   R.blobMat = new THREE.MeshBasicMaterial({ map: R.blobTex, transparent: true, depthWrite: false });
   const bb = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.4), R.blobMat); bb.rotation.x = -PI / 2; R.scene.add(bb); R.ballBlob = bb; R.reflHide.push(bb);
@@ -1031,6 +1042,19 @@ function updateWorld(dt, rdt) {
     R.ring.material.color.setRGB(col[0], col[1], col[2]);
   }
   const pt = G.passTarget;
+  const showMates = showRing && R.camMode === 'third' && c.team.idx === G.offense && (G.state === 'live' || G.state === 'dead');
+  const mates = showMates ? c.team.players.filter((q) => q !== c) : [];
+  R.mates.forEach((sp, i) => {
+    const q = mates[i];
+    sp.visible = !!q;
+    if (!q) return;
+    const tgt = q === pt && c.hasBall, k = tgt ? 2.4 : 1.2;
+    const col = new THREE.Color(q.team.def.c3);
+    sp.material.color.setRGB(col.r * k, col.g * k, col.b * k);
+    sp.material.opacity = tgt ? 1 : 0.75;
+    const bob = Math.sin(R.t * 5 + i) * 0.12, s2 = tgt ? 1.5 : 1.0;
+    sp.position.set(q.x, q.y + q.hgt + 1.3 + bob, q.z); sp.scale.set(s2, s2, 1);
+  });
   R.tgt.visible = !!(pt && showRing && c.hasBall && G.state === 'live');
   if (R.tgt.visible) { R.tgt.position.set(pt.x, 0.05, pt.z); R.tgt.rotation.z += dt * 2; }
   // crowd, wave, boards, scoreboard

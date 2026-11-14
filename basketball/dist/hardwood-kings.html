@@ -154,6 +154,9 @@ table.box tr.tot td { font-weight: 700; color: var(--chalk); }
 #bug .shc.low { color: var(--bad); }
 #bug .sc.flash { animation: flash .6s ease-out; }
 @keyframes flash { 0% { color: var(--warn); transform: scale(1.35); } 100% { color: inherit; transform: scale(1); } }
+#hud.tp #bug { bottom: auto; top: max(10px, env(safe-area-inset-top, 0px)); }
+#hud.tp #ticker { top: 70px; }
+#hud.tp #hint { top: 70px; }
 #ticker { position: absolute; left: max(14px, env(safe-area-inset-left, 0px)); top: max(12px, env(safe-area-inset-top, 0px)); display: flex; flex-direction: column; gap: 4px; max-width: min(420px, 70vw); }
 #ticker div { font: 600 14px var(--f-body); background: rgba(10,14,22,0.72); padding: 5px 10px; border-left: 3px solid var(--wood); animation: tick 5s forwards; }
 @keyframes tick { 0% { opacity: 0; transform: translateX(-8px); } 6% { opacity: 1; transform: none; } 85% { opacity: 1; } 100% { opacity: 0; } }
@@ -295,6 +298,7 @@ table.box tr.tot td { font-weight: 700; color: var(--chalk); }
           <p><span>Stay in front</span><span>Move, don't sprint</span></p></div>
       </div>
       <ul class="tips">
+        <li>The camera rides behind your player: it looks at the basket on offense and at the ball handler on defense. Chevrons mark your teammates, and the bright one is who your pass will go to. Switch to Broadcast in Settings for the full-court view.</li>
         <li>Hold shoot and let go when the meter reaches the green band at the top. A green release nearly always goes in, even when it's contested.</li>
         <li>Shoot while sprinting at the rim to attack it: high-flyers dunk, everyone else lays it in. Contested layups miss more often.</li>
         <li>Point the stick at a teammate before you pass. The white diamond on the floor shows who will get the ball.</li>
@@ -2847,6 +2851,11 @@ function camTargets(dt) {
   const sway = Math.sin(R.t * 0.37) * 0.35 + Math.sin(R.t * 0.71) * 0.2;
   let pos = V3(lx * 0.92 + sway, C.H + Math.sin(R.t * 0.29) * 0.25, C.D + lz * 0.5), look = V3(lx, 3.2, lz);
   let fov = C.fov;
+  R.camRate = null;
+  if (R.camMode === 'third' && G.ctrl && G.userTeam >= 0 && !G.auto && !G.attract && G.mode !== 'threept') {
+    const t = thirdPerson(dt);
+    if (t) { pos = t.pos; look = t.look; fov = t.fov; R.camRate = [7, 9]; }
+  }
   if ((G.state === 'ft' || G.state === 'ftcut') && G.ft && G.ft.placed) {
     const sh = G.ft.shooter, s = sh.team.dir;
     pos = V3(sh.x - s * 16, 10.5, sh.z + 8); look = V3(s * CT.RIM_X, 8, 0); fov = 40;
@@ -2885,6 +2894,31 @@ function camTargets(dt) {
   }
   return { pos, look, fov };
 }
+/* Third person: over the controlled player's shoulder. Offense looks at the basket being attacked,
+   defense looks at the ball handler, loose balls and shots pull the view toward the ball. */
+function thirdPerson(dt) {
+  const p = G.ctrl, b = G.ball;
+  if (!p || p.z < -100) return null;
+  const off = p.team.idx === G.offense;
+  const hx = hoopX(p.team);
+  let tx, tz;
+  if (b.state === 'shot' && b.shooter) { tx = b.shooter.team.dir * CT.RIM_X; tz = 0; }
+  else if (b.state === 'loose') { tx = b.x; tz = b.z; }
+  else if (off) { const own = p.hasBall; tx = own ? hx : lerp(hx, b.x, 0.4); tz = own ? 0 : lerp(0, b.z, 0.4); }
+  else { const h = b.holder || (b.state === 'pass' ? b.passTo : null); tx = h ? h.x : b.x; tz = h ? h.z : b.z; }
+  if (G.state === 'dead' && G.dead) { tx = G.dead.inb.x; tz = G.dead.inb.z; if (G.dead.inb === p) { tx = 0; tz = 0; } }
+  const dx = tx - p.x, dz = tz - p.z;
+  let want = R.tpYaw == null ? Math.atan2(dz, dx) : R.tpYaw;
+  if (hyp(dx, dz) > 6) want = Math.atan2(dz, dx);
+  if (R.tpYaw == null || R.snapCam) R.tpYaw = want;
+  else R.tpYaw += angDiff(R.tpYaw, want) * (1 - Math.exp(-2.4 * dt));
+  const fx = Math.cos(R.tpYaw), fz = Math.sin(R.tpYaw);
+  const dist = 13.5, height = 8.4, side = 2.0;
+  let cx = p.x - fx * dist - fz * side, cz = p.z - fz * dist + fx * side;
+  cx = clamp(cx, -54, 54); cz = clamp(cz, -32, 32);
+  const lift = b.state === 'shot' ? clamp(b.y - 8, 0, 8) * 0.45 : 0;
+  return { pos: V3(cx, height + p.y * 0.35, cz), look: V3(p.x + fx * 7, 3.4 + lift, p.z + fz * 7), fov: 54 };
+}
 function updateCamera(dt) {
   const t = camTargets(dt);
   const aspect = R.cam.aspect;
@@ -2892,7 +2926,8 @@ function updateCamera(dt) {
   if (aspect < 1.4) fov = 2 * Math.atan(Math.tan(fov * PI / 360) * 1.42 / aspect) * 180 / PI;
   fov = Math.min(fov, 80);
   if (Math.abs(R.cam.fov - fov) > 0.02) { R.cam.fov = R.snapCam ? fov : lerp(R.cam.fov, fov, 1 - Math.exp(-3 * dt)); R.cam.updateProjectionMatrix(); }
-  const kp = R.snapCam ? 1 : 1 - Math.exp(-2.6 * dt), kl = R.snapCam ? 1 : 1 - Math.exp(-3.6 * dt);
+  const rr = R.camRate || [2.6, 3.6];
+  const kp = R.snapCam ? 1 : 1 - Math.exp(-rr[0] * dt), kl = R.snapCam ? 1 : 1 - Math.exp(-rr[1] * dt);
   R.snapCam = false;
   R.camPos.lerp(t.pos, kp); R.camLook.lerp(t.look, kl);
   R.cam.position.copy(R.camPos);
@@ -3725,6 +3760,17 @@ function buildIndicators() {
   const dt = radialTex([[0, 'rgba(255,255,255,0.0)'], [0.55, 'rgba(255,255,255,0.0)'], [0.7, 'rgba(255,255,255,0.9)'], [0.85, 'rgba(255,255,255,0)'], [1, 'rgba(255,255,255,0)']]);
   const tgt = new THREE.Mesh(new THREE.PlaneGeometry(3, 3), new THREE.MeshBasicMaterial({ map: dt, color: new THREE.Color(1.6, 1.6, 1.6), transparent: true, depthWrite: false, toneMapped: false, blending: THREE.AdditiveBlending }));
   tgt.rotation.x = -PI / 2; tgt.position.y = 0.05; R.scene.add(tgt); R.tgt = tgt; R.reflHide.push(tgt);
+  // teammate markers for the third-person camera: a chevron over each teammate's head
+  { const c = mkCanvas(64, 64), g = c.getContext('2d');
+    g.fillStyle = '#ffffff'; g.strokeStyle = 'rgba(0,0,0,0.6)'; g.lineWidth = 4;
+    g.beginPath(); g.moveTo(10, 14); g.lineTo(32, 46); g.lineTo(54, 14); g.lineTo(32, 26); g.closePath(); g.stroke(); g.fill();
+    const t = new THREE.CanvasTexture(c);
+    R.mates = [];
+    for (let i = 0; i < 5; i++) {
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, color: new THREE.Color(1, 1, 1), depthTest: false, depthWrite: false, toneMapped: false, transparent: true }));
+      sp.renderOrder = 10; sp.visible = false; sp.scale.set(1.1, 1.1, 1);
+      R.scene.add(sp); R.mates.push(sp); R.reflHide.push(sp);
+    } }
   R.blobTex = radialTex([[0, 'rgba(0,0,0,0.6)'], [0.5, 'rgba(0,0,0,0.32)'], [1, 'rgba(0,0,0,0)']]);
   R.blobMat = new THREE.MeshBasicMaterial({ map: R.blobTex, transparent: true, depthWrite: false });
   const bb = new THREE.Mesh(new THREE.PlaneGeometry(1.4, 1.4), R.blobMat); bb.rotation.x = -PI / 2; R.scene.add(bb); R.ballBlob = bb; R.reflHide.push(bb);
@@ -3949,6 +3995,19 @@ function updateWorld(dt, rdt) {
     R.ring.material.color.setRGB(col[0], col[1], col[2]);
   }
   const pt = G.passTarget;
+  const showMates = showRing && R.camMode === 'third' && c.team.idx === G.offense && (G.state === 'live' || G.state === 'dead');
+  const mates = showMates ? c.team.players.filter((q) => q !== c) : [];
+  R.mates.forEach((sp, i) => {
+    const q = mates[i];
+    sp.visible = !!q;
+    if (!q) return;
+    const tgt = q === pt && c.hasBall, k = tgt ? 2.4 : 1.2;
+    const col = new THREE.Color(q.team.def.c3);
+    sp.material.color.setRGB(col.r * k, col.g * k, col.b * k);
+    sp.material.opacity = tgt ? 1 : 0.75;
+    const bob = Math.sin(R.t * 5 + i) * 0.12, s2 = tgt ? 1.5 : 1.0;
+    sp.position.set(q.x, q.y + q.hgt + 1.3 + bob, q.z); sp.scale.set(s2, s2, 1);
+  });
   R.tgt.visible = !!(pt && showRing && c.hasBall && G.state === 'live');
   if (R.tgt.visible) { R.tgt.position.set(pt.x, 0.05, pt.z); R.tgt.rotation.z += dt * 2; }
   // crowd, wave, boards, scoreboard
@@ -4953,9 +5012,9 @@ const $ = (s, r) => (r || document).querySelector(s);
 const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
 const APP = { screen: null, back: null, running: false, paused: false, mode: 'attract', focus: 0, finalT: 0, shownFinal: false,
   mu: { a: 0, b: 1, kind: 'play', shooter: 0 }, hudCache: {}, meterHold: 0, introT: 0, isTouch: false };
-const SET = { quality: 'auto', camera: 'broadcast', difficulty: 'pro', qLen: 180, autoSwitch: true, meter: true, voice: false, master: 80, crowd: 80, music: 50, touch: 'auto', side: 'home' };
+const SET = { v: 2, quality: 'auto', camera: 'third', difficulty: 'pro', qLen: 180, autoSwitch: true, meter: true, voice: false, master: 80, crowd: 80, music: 50, touch: 'auto', side: 'home' };
 const OPTS = {
-  camera: [['broadcast', 'Broadcast'], ['close', 'Close'], ['sky', 'Skycam']],
+  camera: [['third', 'Third person'], ['broadcast', 'Broadcast'], ['close', 'Close'], ['sky', 'Skycam']],
   difficulty: [['rookie', 'Rookie'], ['pro', 'Pro'], ['allstar', 'All-Star'], ['legend', 'Legend']],
   qLen: [[120, '2 min'], [180, '3 min'], [300, '5 min'], [480, '8 min'], [720, '12 min']],
   autoSwitch: [[true, 'On'], [false, 'Off']], meter: [[true, 'On'], [false, 'Off']], voice: [[false, 'Off'], [true, 'On']],
@@ -4969,7 +5028,11 @@ const OPTS = {
 const SET_LABELS = { quality: 'Graphics', camera: 'Camera', difficulty: 'Difficulty', qLen: 'Quarter length', autoSwitch: 'Auto-switch on defense', meter: 'Shot meter', voice: 'Announcer voice', master: 'Master volume', crowd: 'Crowd volume', music: 'Menu music', touch: 'Touch controls', side: 'Your court' };
 
 function loadSettings() {
-  try { const s = JSON.parse(localStorage.getItem('hk-settings') || '{}'); for (const k in SET) if (k in s) SET[k] = s[k]; } catch (e) { /* storage unavailable */ }
+  try {
+    const s = JSON.parse(localStorage.getItem('hk-settings') || '{}');
+    for (const k in SET) if (k in s) SET[k] = s[k];
+    if (!s.v || s.v < 2) { SET.v = 2; SET.camera = 'third'; }   // third person became the default
+  } catch (e) { /* storage unavailable */ }
   try { const m = JSON.parse(localStorage.getItem('hk-matchup') || 'null'); if (m) { APP.mu.a = m.a | 0; APP.mu.b = m.b | 0; } } catch (e) { /* ignore */ }
   APP.mu.a = ((APP.mu.a % 8) + 8) % 8; APP.mu.b = ((APP.mu.b % 8) + 8) % 8;
   if (APP.mu.a === APP.mu.b) APP.mu.b = (APP.mu.a + 1) % 8;
@@ -4983,7 +5046,7 @@ function applySettings() {
   if (R.r && SET.quality !== 'auto' && R.quality !== SET.quality) setQuality(SET.quality);
   AU.vol.master = SET.master / 100; AU.vol.crowd = SET.crowd / 100; AU.vol.music = SET.music / 100;
   VOICE.on = !!SET.voice;
-  if (G.state !== 'none') G.autoSwitch = SET.autoSwitch;
+  if (G.state !== 'none') G.autoSwitch = SET.autoSwitch && SET.camera !== 'third';
   setVolumes();
 }
 function cycle(key, dir) {
@@ -5146,7 +5209,8 @@ function startFromMatchup() {
 function startGame(cfg) {
   APP.last = cfg;
   newGame({ mode: cfg.mode === 'threept' ? 'threept' : 'game', home: cfg.home, away: cfg.away, userTeam: cfg.userTeam == null ? 0 : cfg.userTeam,
-    auto: cfg.mode === 'watch', difficulty: SET.difficulty, qLen: SET.qLen, autoSwitch: SET.autoSwitch, shooter: cfg.shooter });
+    auto: cfg.mode === 'watch', difficulty: SET.difficulty, qLen: SET.qLen, autoSwitch: SET.autoSwitch && SET.camera !== 'third', shooter: cfg.shooter });
+  R.tpYaw = null;
   G.attract = false;
   buildPlayers(); R.snapCam = true; R.slowmo = 0;
   APP.running = true; APP.paused = false; APP.mode = cfg.mode; APP.shownFinal = false; APP.finalT = 0;
@@ -5198,6 +5262,7 @@ function shortName(p) { const parts = p.d.n.split(' '); return parts.slice(1).jo
 function setTxt(el, v) { if (el.textContent !== v) el.textContent = v; }
 function updateHUD(rdt) {
   if (!APP.running || G.state === 'none') return;
+  $('#hud').classList.toggle('tp', SET.camera === 'third' && G.userTeam >= 0 && !G.auto && APP.mode !== 'threept');
   const H = APP.hudCache;
   if (APP.mode === 'threept') { updateTPHud(); }
   else {

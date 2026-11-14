@@ -9,9 +9,9 @@ const $ = (s, r) => (r || document).querySelector(s);
 const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
 const APP = { screen: null, back: null, running: false, paused: false, mode: 'attract', focus: 0, finalT: 0, shownFinal: false,
   mu: { a: 0, b: 1, kind: 'play', shooter: 0 }, hudCache: {}, meterHold: 0, introT: 0, isTouch: false };
-const SET = { quality: 'auto', camera: 'broadcast', difficulty: 'pro', qLen: 180, autoSwitch: true, meter: true, voice: false, master: 80, crowd: 80, music: 50, touch: 'auto', side: 'home' };
+const SET = { v: 2, quality: 'auto', camera: 'third', difficulty: 'pro', qLen: 180, autoSwitch: true, meter: true, voice: false, master: 80, crowd: 80, music: 50, touch: 'auto', side: 'home' };
 const OPTS = {
-  camera: [['broadcast', 'Broadcast'], ['close', 'Close'], ['sky', 'Skycam']],
+  camera: [['third', 'Third person'], ['broadcast', 'Broadcast'], ['close', 'Close'], ['sky', 'Skycam']],
   difficulty: [['rookie', 'Rookie'], ['pro', 'Pro'], ['allstar', 'All-Star'], ['legend', 'Legend']],
   qLen: [[120, '2 min'], [180, '3 min'], [300, '5 min'], [480, '8 min'], [720, '12 min']],
   autoSwitch: [[true, 'On'], [false, 'Off']], meter: [[true, 'On'], [false, 'Off']], voice: [[false, 'Off'], [true, 'On']],
@@ -25,7 +25,11 @@ const OPTS = {
 const SET_LABELS = { quality: 'Graphics', camera: 'Camera', difficulty: 'Difficulty', qLen: 'Quarter length', autoSwitch: 'Auto-switch on defense', meter: 'Shot meter', voice: 'Announcer voice', master: 'Master volume', crowd: 'Crowd volume', music: 'Menu music', touch: 'Touch controls', side: 'Your court' };
 
 function loadSettings() {
-  try { const s = JSON.parse(localStorage.getItem('hk-settings') || '{}'); for (const k in SET) if (k in s) SET[k] = s[k]; } catch (e) { /* storage unavailable */ }
+  try {
+    const s = JSON.parse(localStorage.getItem('hk-settings') || '{}');
+    for (const k in SET) if (k in s) SET[k] = s[k];
+    if (!s.v || s.v < 2) { SET.v = 2; SET.camera = 'third'; }   // third person became the default
+  } catch (e) { /* storage unavailable */ }
   try { const m = JSON.parse(localStorage.getItem('hk-matchup') || 'null'); if (m) { APP.mu.a = m.a | 0; APP.mu.b = m.b | 0; } } catch (e) { /* ignore */ }
   APP.mu.a = ((APP.mu.a % 8) + 8) % 8; APP.mu.b = ((APP.mu.b % 8) + 8) % 8;
   if (APP.mu.a === APP.mu.b) APP.mu.b = (APP.mu.a + 1) % 8;
@@ -39,7 +43,7 @@ function applySettings() {
   if (R.r && SET.quality !== 'auto' && R.quality !== SET.quality) setQuality(SET.quality);
   AU.vol.master = SET.master / 100; AU.vol.crowd = SET.crowd / 100; AU.vol.music = SET.music / 100;
   VOICE.on = !!SET.voice;
-  if (G.state !== 'none') G.autoSwitch = SET.autoSwitch;
+  if (G.state !== 'none') G.autoSwitch = SET.autoSwitch && SET.camera !== 'third';
   setVolumes();
 }
 function cycle(key, dir) {
@@ -202,7 +206,8 @@ function startFromMatchup() {
 function startGame(cfg) {
   APP.last = cfg;
   newGame({ mode: cfg.mode === 'threept' ? 'threept' : 'game', home: cfg.home, away: cfg.away, userTeam: cfg.userTeam == null ? 0 : cfg.userTeam,
-    auto: cfg.mode === 'watch', difficulty: SET.difficulty, qLen: SET.qLen, autoSwitch: SET.autoSwitch, shooter: cfg.shooter });
+    auto: cfg.mode === 'watch', difficulty: SET.difficulty, qLen: SET.qLen, autoSwitch: SET.autoSwitch && SET.camera !== 'third', shooter: cfg.shooter });
+  R.tpYaw = null;
   G.attract = false;
   buildPlayers(); R.snapCam = true; R.slowmo = 0;
   APP.running = true; APP.paused = false; APP.mode = cfg.mode; APP.shownFinal = false; APP.finalT = 0;
@@ -254,6 +259,7 @@ function shortName(p) { const parts = p.d.n.split(' '); return parts.slice(1).jo
 function setTxt(el, v) { if (el.textContent !== v) el.textContent = v; }
 function updateHUD(rdt) {
   if (!APP.running || G.state === 'none') return;
+  $('#hud').classList.toggle('tp', SET.camera === 'third' && G.userTeam >= 0 && !G.auto && APP.mode !== 'threept');
   const H = APP.hudCache;
   if (APP.mode === 'threept') { updateTPHud(); }
   else {
