@@ -212,13 +212,13 @@ function startGame(cfg) {
   $('#bug').style.display = cfg.mode === 'threept' ? 'none' : '';
   $('#ticker').innerHTML = '';
   musicStop(); crowdBase(0.13); if (AU.on) AU.sfx.gain.setTargetAtTime(AU.vol.sfx, now(), 0.1);
-  if (cfg.mode !== 'threept') showIntro(cfg.home, cfg.away);
-  else showIntroTP();
   drawRibbon(cfg.mode === 'threept' ? 'THREE-POINT CONTEST  •  HARDWOOD KINGS  •  ' : null);
+  if (cfg.mode !== 'threept') { showIntro(cfg.home, cfg.away); startShow(cfg.home, cfg.away); APP.introT = R.showDur + 0.4; }
+  else showIntroTP();
 }
 function restartGame() { if (APP.last) startGame(APP.last); }
 function quitToMenu() {
-  APP.running = false; APP.paused = false;
+  APP.running = false; APP.paused = false; if (R.show > 0) R.show = 0.01;
   $('#hud').classList.remove('on');
   startAttract();
   showScreen('home');

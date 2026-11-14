@@ -113,7 +113,9 @@ function setQuality(q) {
     if (R.key.shadow.map) { R.key.shadow.map.dispose(); R.key.shadow.map = null; }
   }
   const dpr = devicePixelRatio || 1;
-  R.dpr = q === 'low' ? Math.min(dpr, 1) : q === 'medium' ? Math.min(dpr, 1.25) : Math.min(dpr, R.mobile ? 1.5 : 2);
+  const w = Math.max(320, innerWidth);
+  R.dpr = q === 'low' ? Math.min(dpr, 1) : q === 'medium' ? Math.min(dpr, 1.25, 1920 / w) : Math.min(dpr, R.mobile ? 1.5 : 2, 2560 / w);
+  R.dpr = Math.max(0.5, R.dpr);
   r.setPixelRatio(R.dpr);
   R.scene.traverse((o) => { if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => (m.needsUpdate = true)); });
   if (R.floorMat) R.floorMat.needsUpdate = true;
@@ -171,6 +173,7 @@ function buildLights() {
   const fill = new THREE.DirectionalLight('#ffe9d2', 0.26); fill.position.set(0, 40, 80); R.scene.add(fill);
   const rim = new THREE.DirectionalLight('#9fc2ff', 0.42); rim.position.set(-20, 30, -80); R.scene.add(rim);
   const bowl = new THREE.PointLight('#ffb070', 0.32, 220, 1.6); bowl.position.set(0, 60, 0); R.scene.add(bowl);
+  R.fill = fill; R.rimL = rim; R.bowlL = bowl;
 }
 
 /* ---------------- planar reflection ---------------- */
@@ -403,6 +406,10 @@ function camTargets(dt) {
       pos = V3(Math.sin(a) * 52, 15, Math.cos(a) * 44); look = V3(b.x * 0.4, 4, b.z * 0.3); fov = 42;
     } else { pos.y += 4; }
     if (R.lastShot !== shot) { R.lastShot = shot; R.snapCam = true; }
+  }
+  if (R.show > 0) {
+    const u = 1 - R.show / R.showDur, a = -1.6 + u * 2.4;
+    pos = V3(Math.sin(a) * lerp(46, 36, u), lerp(5, 15, smooth(u)), Math.cos(a) * lerp(46, 36, u)); look = V3(0, lerp(10, 5, u), 0); fov = 46;
   }
   if (R.slowmo > 0 && R.slowSide) {
     const s = R.slowSide;

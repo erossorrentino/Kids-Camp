@@ -16,7 +16,7 @@ function tick(rdt) {
   const inp = pollInput();
   if (APP.screen) menuInput(inp);
   else if (APP.running && inp.pPause) pauseGame();
-  const simOn = APP.mode === 'attract' ? true : APP.running && !APP.paused && !APP.screen;
+  const simOn = APP.mode === 'attract' ? true : APP.running && !APP.paused && !APP.screen && !(R.show > 0);
   if (simOn && APP.running) {
     const w = stickToWorld(inp.sx, inp.sy), I = G.input;
     I.mx = w.x; I.mz = w.z; I.sprint = inp.sprint; I.shoot = inp.shoot;

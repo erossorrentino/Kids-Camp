@@ -802,6 +802,7 @@ function buildFX() {
   R.scene.add(im);
   R.conf = { mesh: im, n: N, p: [], on: false, t: 0, d: new THREE.Object3D() };
   buildTrail();
+  buildShow();
   // camera flashes in the bowl
   const M = 600, fp = new Float32Array(M * 3), seed = new Float32Array(M);
   R.flashGeo = new THREE.BufferGeometry();
@@ -876,6 +877,62 @@ function stepTrail(rdt) {
   T.mesh.geometry.attributes.position.needsUpdate = true; T.mesh.geometry.attributes.color.needsUpdate = true;
   T.mesh.visible = true;
 }
+/* pre-game light show: arena dims, coloured pools and beams sweep the court, then the lights slam on */
+function buildShow() {
+  const pt = radialTex([[0, 'rgba(255,255,255,1)'], [0.45, 'rgba(255,255,255,0.55)'], [1, 'rgba(255,255,255,0)']]);
+  R.showPools = []; R.showBeams = [];
+  const beamMat = () => new THREE.ShaderMaterial({
+    uniforms: { uC: { value: new THREE.Color(1, 1, 1) }, uA: { value: 0 } }, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
+    vertexShader: 'varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main(){ vUv = uv; vec4 mv = modelViewMatrix * vec4(position,1.0); vV = normalize(-mv.xyz); vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * mv; }',
+    fragmentShader: 'uniform vec3 uC; uniform float uA; varying vec2 vUv; varying vec3 vN; varying vec3 vV; void main(){ float f = pow(abs(dot(vN, vV)), 1.6); gl_FragColor = vec4(uC * uA * f * (0.25 + 0.75 * vUv.y), 1.0); }',
+  });
+  for (let i = 0; i < 5; i++) {
+    const pool = new THREE.Mesh(new THREE.PlaneGeometry(16, 16), new THREE.MeshBasicMaterial({ map: pt, color: new THREE.Color(0, 0, 0), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, toneMapped: false }));
+    pool.rotation.x = -PI / 2; pool.position.y = 0.06; pool.visible = false; pool.renderOrder = 5;
+    R.scene.add(pool); R.showPools.push(pool); R.reflHide.push(pool);
+    const g = new THREE.CylinderGeometry(0.6, 6.5, 1, 20, 1, true); g.translate(0, -0.5, 0);
+    const beam = new THREE.Mesh(g, beamMat()); beam.visible = false; R.scene.add(beam); R.showBeams.push(beam); R.reflHide.push(beam);
+  }
+  R.show = 0; R.showDur = 3.6;
+  R.baseLights = { key: R.key.intensity, hemi: R.hemi.intensity, fill: R.fill.intensity, rim: R.rimL.intensity, bowl: R.bowlL.intensity };
+}
+function startShow(home, away) {
+  R.show = R.showDur; R.showCols = [home.c1, home.c3, '#ffffff', away.c1, home.c1].map((h) => new THREE.Color(h));
+  drawRibbon(`${away.city.toUpperCase()} ${away.name.toUpperCase()}  AT  ${home.city.toUpperCase()} ${home.name.toUpperCase()}   ◆   `);
+}
+function stepShow(rdt) {
+  if (!R.showPools) return;
+  const on = R.show > 0;
+  if (on) {
+    R.show -= rdt;
+    const u = 1 - R.show / R.showDur;
+    const dim = R.show > 0.25 ? 0.1 : 1;
+    const lo = dim < 1;
+    R.key.intensity = R.baseLights.key * dim; R.hemi.intensity = R.baseLights.hemi * (lo ? 0.3 : 1);
+    R.fill.intensity = R.baseLights.fill * (lo ? 0.15 : 1); R.rimL.intensity = R.baseLights.rim * (lo ? 0.6 : 1); R.bowlL.intensity = R.baseLights.bowl * (lo ? 0.25 : 1);
+    R.showPools.forEach((p, i) => {
+      const t = R.t * (0.7 + i * 0.13) + i * 1.7;
+      const x = Math.sin(t * 1.1) * 34 * (i % 2 ? 1 : -0.8), z = Math.cos(t * 0.8 + i) * 19;
+      p.visible = true; p.position.x = x; p.position.z = z;
+      const c = R.showCols[i], k = (R.show > 0.25 ? 2.4 : 0) * clamp(u * 5, 0, 1);
+      p.material.color.setRGB(c.r * k, c.g * k, c.b * k);
+      const b = R.showBeams[i], top = V3((i - 2) * 22, 80, i % 2 ? -26 : 26);
+      b.visible = k > 0; b.position.copy(top);
+      const d = V3(x, 0, z).sub(top), len = d.length();
+      b.scale.set(1, len, 1); b.quaternion.setFromUnitVectors(V3(0, -1, 0), d.normalize());
+      b.material.uniforms.uC.value.copy(c); b.material.uniforms.uA.value = k * 0.1;
+    });
+    R.excite = Math.max(R.excite, 0.55); R.flashRate = Math.max(R.flashRate, 0.08);
+    if (R.show <= 0) {
+      R.show = 0; R.flash = 0.4; R.excite = 1; R.flashRate = 0.25;
+      R.key.intensity = R.baseLights.key; R.hemi.intensity = R.baseLights.hemi;
+      R.fill.intensity = R.baseLights.fill; R.rimL.intensity = R.baseLights.rim; R.bowlL.intensity = R.baseLights.bowl;
+      R.showPools.forEach((p) => (p.visible = false)); R.showBeams.forEach((b) => (b.visible = false));
+      drawRibbon(G.mode === 'threept' ? 'THREE-POINT CONTEST  •  HARDWOOD KINGS  •  ' : null);
+      if (typeof crowdRoar === 'function') crowdRoar(1, 3);
+    }
+  }
+}
 function startConfetti(T) {
   const C = R.conf, cols = [T.c1, T.c3, '#ffffff', '#ffd23f', T.c1].map((h) => new THREE.Color(h));
   C.p = [];
@@ -903,6 +960,7 @@ function stepFX(dt, rdt) {
     if (C.t > 30) stopConfetti();
   }
   stepTrail(rdt);
+  stepShow(rdt);
   R.flashU.uTime.value = R.t;
   R.flashRate = Math.max(0.004, R.flashRate - rdt * 0.08);
   R.flashU.uRate.value = R.flashRate;
