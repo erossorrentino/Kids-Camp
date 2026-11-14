@@ -1,5 +1,9 @@
 # Crime City (working title)
 
+> Also in this repo: **Hardwood Kings**, a 3D browser basketball game.
+> See [`basketball/README.md`](basketball/README.md) or open
+> `basketball/dist/hardwood-kings.html` to play.
+
 An open-world crime game in the GTA tradition: steal cars, plan and run
 heists, build wanted stars, buy guns and vehicles. Built as a real Unity
 project with working, data-driven systems rather than hand-placed content,

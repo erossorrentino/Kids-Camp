@@ -381,7 +381,10 @@ function camTargets(dt) {
     pos = V3(sh.x - s * 16, 10.5, sh.z + 8); look = V3(s * CT.RIM_X, 8, 0); fov = 40;
   } else if (G.mode === 'threept' && G.tp) {
     const sh = G.tp.sh;
-    pos = V3(sh.x - 21, 13.5, sh.z * 1.1 + (sh.z >= 0 ? 11 : -11)); look = V3(lerp(sh.x, CT.RIM_X, 0.55), 6.5, sh.z * 0.45); fov = 42;
+    let dx = sh.x - CT.RIM_X, dz = sh.z; const dl = hyp(dx, dz) || 1; dx /= dl; dz /= dl;
+    const side = sh.z >= 0 ? 1 : -1;
+    pos = V3(sh.x + dx * 15 - dz * 6 * side, 9.5, sh.z + dz * 15 + dx * 6 * side);
+    look = V3(lerp(sh.x, CT.RIM_X, 0.42), 6.2, sh.z * 0.58); fov = 44;
   } else if (G.state === 'tip') {
     const u = clamp(G.stT / 1.3, 0, 1), a = lerp(-0.9, -0.15, smooth(u));
     pos = V3(Math.sin(a) * 40, lerp(9, 22, smooth(u)), Math.cos(a) * 40); look = V3(0, lerp(9, 5, u), 0); fov = 40;

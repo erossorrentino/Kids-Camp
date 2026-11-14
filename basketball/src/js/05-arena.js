@@ -271,6 +271,8 @@ function crowdGeo() {
   };
   const torso = new THREE.CylinderGeometry(0.4, 0.38, 1.45, 6, 1, false); torso.scale(0.75, 1, 1.15); torso.translate(0, 1.42, 0); add(torso, 0);
   const head = new THREE.SphereGeometry(0.34, 6, 4); head.scale(0.95, 1.12, 0.9); head.translate(0, 2.5, 0); add(head, 1);
+  { const hg = parts[parts.length - 1], hp = hg.attributes.position, ap = hg.attributes.aPart;
+    for (let i = 0; i < hp.count; i++) if (hp.getY(i) > 2.6) ap.setX(i, 4); }
   for (const s of [-1, 1]) {
     const arm = new THREE.CylinderGeometry(0.12, 0.1, 1.05, 4, 1, true); arm.translate(0.08, 1.55, s * 0.56); add(arm, s < 0 ? 2 : 3);
   }
@@ -316,7 +318,9 @@ function crowdMat() {
         }
         if (aPart < 0.5 && position.y < 1.0) transformed.x -= stand * 0.35;
         transformed.y += stand * 0.85 + jump + sin(uTime * 1.3 + ph) * 0.03;
-        vCrowd = (aPart > 0.5 && aPart < 1.5) ? aSkin : aShirt;`);
+        float ht = fract(ph * 7.31);
+        vec3 hair = ht > 0.9 ? vec3(0.55, 0.45, 0.3) : ht > 0.8 ? vec3(0.42, 0.42, 0.44) : aSkin * 0.22 + 0.015;
+        vCrowd = aPart > 3.5 ? hair : (aPart > 0.5 && aPart < 1.5) ? aSkin : aShirt;`);
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vCrowd;')
       .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= vCrowd;');
@@ -797,6 +801,7 @@ function buildFX() {
   im.frustumCulled = false; im.visible = false;
   R.scene.add(im);
   R.conf = { mesh: im, n: N, p: [], on: false, t: 0, d: new THREE.Object3D() };
+  buildTrail();
   // camera flashes in the bowl
   const M = 600, fp = new Float32Array(M * 3), seed = new Float32Array(M);
   R.flashGeo = new THREE.BufferGeometry();
@@ -819,6 +824,57 @@ function buildFX() {
     const s = seats[Math.floor(vr() * seats.length)];
     fp[i * 3] = s.x; fp[i * 3 + 1] = s.y + 2.5; fp[i * 3 + 2] = s.z; seed[i] = vr();
   }
+}
+function buildTrail() {
+  const N = 28, pos = new Float32Array(N * 2 * 3), col = new Float32Array(N * 2 * 3), idx = [];
+  for (let i = 0; i < N - 1; i++) { const a = i * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3).setUsage(THREE.DynamicDrawUsage));
+  g.setIndex(idx);
+  const m = new THREE.Mesh(g, new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, toneMapped: false }));
+  m.frustumCulled = false; m.visible = false;
+  R.scene.add(m); R.reflHide.push(m);
+  R.trail = { mesh: m, N, pts: [], on: false, t: 0, col: new THREE.Color(0.25, 2.4, 0.9) };
+  const burst = new THREE.Sprite(new THREE.SpriteMaterial({ map: R.glowTex, color: new THREE.Color(0.6, 3.5, 1.4), blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, transparent: true }));
+  burst.visible = false; R.scene.add(burst); R.burst = { s: burst, t: 0 };
+}
+function startTrail(kind) {
+  const T = R.trail;
+  T.on = true; T.t = 0; T.pts = [];
+  T.col.setRGB(kind === 'perfect' ? 0.25 : 2.2, kind === 'perfect' ? 2.4 : 1.6, kind === 'perfect' ? 0.9 : 0.3);
+  const b = G.ball; R.burst.t = 0.45; R.burst.s.position.set(b.x, b.y, b.z); R.burst.s.visible = true;
+  R.burst.s.material.color.copy(T.col).multiplyScalar(1.4);
+}
+const _tv = new THREE.Vector3(), _ts = new THREE.Vector3(), _tc = new THREE.Vector3();
+function stepTrail(rdt) {
+  const T = R.trail, B = R.burst;
+  if (B.t > 0) { B.t -= rdt; const u = 1 - B.t / 0.45; const sc = 1.5 + u * 5; B.s.scale.set(sc, sc, 1); B.s.material.opacity = Math.max(0, 1 - u); if (B.t <= 0) B.s.visible = false; }
+  if (!T.on) { T.mesh.visible = false; return; }
+  T.t += rdt;
+  let b = G.ball, src = R.ball.position;
+  if (G.mode === 'threept' && G.xballs && G.xballs.length) { b = G.xballs[G.xballs.length - 1]; src = R.xballs[G.xballs.length - 1].position; }
+  if (b.state === 'shot' || b.shotLive || (b.state === 'loose' && T.t < 1.6)) T.pts.unshift({ x: src.x, y: src.y, z: src.z });
+  else if (T.pts.length) T.pts.pop();
+  if (T.pts.length > T.N) T.pts.length = T.N;
+  if ((T.pts.length < 2 && T.t > 0.3) || T.t > 3.2) { T.on = false; T.mesh.visible = false; return; }
+  const pos = T.mesh.geometry.attributes.position.array, col = T.mesh.geometry.attributes.color.array;
+  const n = T.pts.length;
+  for (let i = 0; i < T.N; i++) {
+    const p = T.pts[Math.min(i, n - 1)] || { x: 0, y: -10, z: 0 }, q = T.pts[Math.min(i + 1, n - 1)] || p;
+    _tv.set(p.x - q.x, p.y - q.y, p.z - q.z);
+    _tc.set(p.x - R.cam.position.x, p.y - R.cam.position.y, p.z - R.cam.position.z);
+    _ts.crossVectors(_tv, _tc).normalize();
+    const u = i / (T.N - 1), w = CT.BALL_R * 0.9 * (1 - u * 0.85) * (i < n ? 1 : 0);
+    for (let k = 0; k < 2; k++) {
+      const o = (i * 2 + k) * 3, sg = k ? 1 : -1;
+      pos[o] = p.x + _ts.x * w * sg; pos[o + 1] = p.y + _ts.y * w * sg; pos[o + 2] = p.z + _ts.z * w * sg;
+      const f = Math.pow(1 - u, 1.6) * (i < n ? 1 : 0);
+      col[o] = T.col.r * f; col[o + 1] = T.col.g * f; col[o + 2] = T.col.b * f;
+    }
+  }
+  T.mesh.geometry.attributes.position.needsUpdate = true; T.mesh.geometry.attributes.color.needsUpdate = true;
+  T.mesh.visible = true;
 }
 function startConfetti(T) {
   const C = R.conf, cols = [T.c1, T.c3, '#ffffff', '#ffd23f', T.c1].map((h) => new THREE.Color(h));
@@ -846,6 +902,7 @@ function stepFX(dt, rdt) {
     C.mesh.instanceMatrix.needsUpdate = true;
     if (C.t > 30) stopConfetti();
   }
+  stepTrail(rdt);
   R.flashU.uTime.value = R.t;
   R.flashRate = Math.max(0.004, R.flashRate - rdt * 0.08);
   R.flashU.uRate.value = R.flashRate;

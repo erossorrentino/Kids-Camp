@@ -53,6 +53,15 @@ function jerseyCanvas(T, home, p, skin) {
   g.fillStyle = base; g.fillRect(0, 0, 512, 512);
   // fabric texture
   for (let y = 0; y < 512; y += 3) { g.fillStyle = 'rgba(0,0,0,0.035)'; g.fillRect(0, y, 512, 1); }
+  // cloth folds: soft vertical light and shadow bands, darker toward the hem
+  for (let i = 0; i < 22; i++) {
+    const x = Math.random() * 512, w = 10 + Math.random() * 30, dk = Math.random() < 0.6;
+    const gr = g.createLinearGradient(x - w, 0, x + w, 0);
+    gr.addColorStop(0, 'rgba(0,0,0,0)'); gr.addColorStop(0.5, dk ? 'rgba(0,0,0,0.09)' : 'rgba(255,255,255,0.07)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr; g.fillRect(x - w, 150 + Math.random() * 120, w * 2, 362);
+  }
+  const hem = g.createLinearGradient(0, 330, 0, 512); hem.addColorStop(0, 'rgba(0,0,0,0)'); hem.addColorStop(1, 'rgba(0,0,0,0.16)');
+  g.fillStyle = hem; g.fillRect(0, 330, 512, 182);
   // side panels
   g.fillStyle = trim; g.fillRect(0, 180, 16, 332); g.fillRect(496, 180, 16, 332); g.fillRect(240, 180, 32, 332);
   // armholes (sides at u=0/1 and u=0.5) and neck scoop, with trim
@@ -69,7 +78,8 @@ function jerseyCanvas(T, home, p, skin) {
   g.fillStyle = ink; g.lineWidth = 6; g.strokeStyle = trim;
   g.strokeText(word, 128, 168); g.fillText(word, 128, 168);
   g.font = `900 150px ${FONT_D}`; g.lineWidth = 9;
-  g.strokeText(String(p.num), 128, 285); g.fillText(String(p.num), 128, 285);
+  g.shadowColor = 'rgba(0,0,0,0.25)'; g.shadowBlur = 6; g.shadowOffsetY = 3;
+  g.strokeText(String(p.num), 128, 285); g.shadowColor = 'rgba(0,0,0,0)'; g.fillText(String(p.num), 128, 285);
   const last = p.n.split(' ').slice(1).join(' ').toUpperCase();
   let ls = 46; g.font = `800 ${ls}px ${FONT_D}`;
   while (g.measureText(last).width > 170 && ls > 24) { ls -= 2; g.font = `800 ${ls}px ${FONT_D}`; }
@@ -79,6 +89,14 @@ function jerseyCanvas(T, home, p, skin) {
   // hem
   g.fillStyle = trim; g.fillRect(0, 496, 512, 16);
   return c;
+}
+function shadeByY(g, y0, y1, k) {
+  const p = g.attributes.position, c = g.attributes.color;
+  for (let i = 0; i < p.count; i++) {
+    const y = p.getY(i), f = 1 - k * clamp((y0 - y) / (y0 - y1), 0, 1);
+    c.setXYZ(i, c.getX(i) * f, c.getY(i) * f, c.getZ(i) * f);
+  }
+  return g;
 }
 function nameHash(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return Math.abs(h); }
 
@@ -150,7 +168,7 @@ function buildHumanoid(pl, home) {
   const mkLeg = (side) => {
     const hp2 = new THREE.Group(); hp2.position.set(0, -0.08, side * 0.32 * bulk); hips.add(hp2);
     hp2.add(mk(vmerge([
-      T_(lathe([[0.43, -1.42], [0.45, -1.2], [0.46, -0.6], [0.45, -0.12], [0.4, 0.06]], 16, bulk, bulk), kit),
+      shadeByY(T_(lathe([[0.43, -1.42], [0.45, -1.2], [0.46, -0.6], [0.45, -0.12], [0.4, 0.06]], 16, bulk, bulk), kit), -0.3, -1.42, 0.22),
       T_(lathe([[0.437, -1.42], [0.452, -1.3]], 16, bulk * 1.01, bulk * 1.01), trim),
       T_(boxG(0.06, 1.2, 0.12, 0, -0.72, side * 0.455 * bulk), trim),
       T_(lathe([[0.19, -1.62], [0.24, -1.3], [0.29, -0.8], [0.31, -0.3], [0.3, 0.0]], 12, bulk, bulk), skin),

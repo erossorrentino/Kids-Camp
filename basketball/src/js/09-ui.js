@@ -467,7 +467,7 @@ function handleEvents() {
             const m = $('#meter');
             m.className = e.grade === 'perfect' ? 'res-perfect' : /1$/.test(e.grade) ? 'res-ok' : 'res-bad';
             feedback(e.p, gt[0], gt[1], e.shotType === 'ft' ? '' : contestTxt(e.contest));
-            if (e.grade === 'perfect') SFX.ui('perfect');
+            if (e.grade === 'perfect') { SFX.ui('perfect'); startTrail('perfect'); }
           } else if (e.shotType !== 'jump') feedback(e.p, e.shotType === 'dunk' ? 'Rim attack' : 'Layup', 'var(--chalk)', contestTxt(e.contest));
         }
         break;
