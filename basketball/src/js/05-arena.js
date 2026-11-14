@@ -900,10 +900,18 @@ function startShow(home, away) {
   R.show = R.showDur; R.showCols = [home.c1, home.c3, '#ffffff', away.c1, home.c1].map((h) => new THREE.Color(h));
   drawRibbon(`${away.city.toUpperCase()} ${away.name.toUpperCase()}  AT  ${home.city.toUpperCase()} ${home.name.toUpperCase()}   ◆   `);
 }
+function endShow() {
+  R.show = 0; R.showActive = false;
+  R.key.intensity = R.baseLights.key; R.hemi.intensity = R.baseLights.hemi;
+  R.fill.intensity = R.baseLights.fill; R.rimL.intensity = R.baseLights.rim; R.bowlL.intensity = R.baseLights.bowl;
+  R.showPools.forEach((p) => (p.visible = false)); R.showBeams.forEach((b) => (b.visible = false));
+}
 function stepShow(rdt) {
   if (!R.showPools) return;
+  if (R.show <= 0 && R.showActive) endShow();
   const on = R.show > 0;
   if (on) {
+    R.showActive = true;
     R.show -= rdt;
     const u = 1 - R.show / R.showDur;
     const dim = R.show > 0.25 ? 0.1 : 1;
@@ -924,10 +932,7 @@ function stepShow(rdt) {
     });
     R.excite = Math.max(R.excite, 0.55); R.flashRate = Math.max(R.flashRate, 0.08);
     if (R.show <= 0) {
-      R.show = 0; R.flash = 0.4; R.excite = 1; R.flashRate = 0.25;
-      R.key.intensity = R.baseLights.key; R.hemi.intensity = R.baseLights.hemi;
-      R.fill.intensity = R.baseLights.fill; R.rimL.intensity = R.baseLights.rim; R.bowlL.intensity = R.baseLights.bowl;
-      R.showPools.forEach((p) => (p.visible = false)); R.showBeams.forEach((b) => (b.visible = false));
+      endShow(); R.flash = 0.4; R.excite = 1; R.flashRate = 0.25;
       drawRibbon(G.mode === 'threept' ? 'THREE-POINT CONTEST  •  HARDWOOD KINGS  •  ' : null);
       if (typeof crowdRoar === 'function') crowdRoar(1, 3);
     }
