@@ -1,0 +1,365 @@
+<title>Hardwood Kings</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:ital,wght@0,600;0,700;0,800;0,900;1,800;1,900&family=Barlow:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: full-bleed 3D arena canvas, every screen and HUD layer floats over it.
+   Single deliberate look: a night-game arena, dark ink with hardwood amber and signal orange. */
+:root {
+  --ink: #0a0e16;
+  --ink-2: #121a28;
+  --ink-3: #1b2638;
+  --chalk: #f3efe6;
+  --steel: #8e97a6;
+  --wood: #e2a25a;
+  --signal: #ff7a1a;
+  --good: #4ef59a;
+  --warn: #ffd23f;
+  --bad: #ff4d3d;
+  --line: rgba(243, 239, 230, 0.14);
+  --f-display: "Barlow Condensed", "Arial Narrow", Impact, sans-serif;
+  --f-body: "Barlow", "Segoe UI", system-ui, sans-serif;
+  color-scheme: dark;
+}
+html, body { height: 100%; margin: 0; background: var(--ink); color: var(--chalk); overflow: hidden; }
+body { font-family: var(--f-body); -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; touch-action: none; }
+#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
+#ui { position: fixed; inset: 0; pointer-events: none;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: max(12px, env(safe-area-inset-top, 0px)) max(12px, env(safe-area-inset-bottom, 0px)); box-sizing: border-box; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--warn); outline-offset: 3px; }
+
+/* ---------- boot ---------- */
+#boot { position: fixed; inset: 0; display: grid; place-items: center; background: var(--ink); z-index: 50; pointer-events: auto;
+  font: 800 italic clamp(28px, 6vw, 56px)/1 var(--f-display); letter-spacing: 0.02em; text-transform: uppercase; }
+#boot small { display: block; font: 500 14px var(--f-body); color: var(--steel); letter-spacing: 0.04em; text-transform: none; margin-top: 14px; text-align: center; }
+#boot .err { color: var(--bad); font: 600 15px var(--f-body); max-width: 40ch; text-align: center; text-transform: none; }
+
+/* ---------- screens ---------- */
+.screen { position: absolute; inset: 0; display: none; pointer-events: auto;
+  padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: max(20px, env(safe-area-inset-right, 0px));
+  padding-block: max(20px, env(safe-area-inset-top, 0px)) max(20px, env(safe-area-inset-bottom, 0px)); box-sizing: border-box; overflow-y: auto; }
+.screen.on { display: block; animation: fadein .25s ease-out; }
+@keyframes fadein { from { opacity: 0; } to { opacity: 1; } }
+.scrim-left { background: linear-gradient(90deg, rgba(10,14,22,0.94) 0%, rgba(10,14,22,0.82) 38%, rgba(10,14,22,0.15) 75%, rgba(10,14,22,0) 100%); }
+.scrim-full { background: rgba(8, 11, 18, 0.86); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); }
+
+.eyebrow { font: 700 13px var(--f-body); letter-spacing: 0.18em; text-transform: uppercase; color: var(--wood); }
+.h-display { font: 900 italic clamp(40px, 7vw, 92px)/0.86 var(--f-display); text-transform: uppercase; letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+.h-2 { font: 800 italic clamp(28px, 4vw, 44px)/0.95 var(--f-display); text-transform: uppercase; margin: 0; text-wrap: balance; }
+.muted { color: var(--steel); }
+
+/* home */
+#home .wrap { max-width: 560px; display: flex; flex-direction: column; gap: 28px; min-height: 100%; justify-content: center; }
+.wordmark { display: flex; flex-direction: column; gap: 4px; }
+.wordmark .k2 { color: transparent; -webkit-text-stroke: 2px var(--wood); }
+.wordmark .tag { font: 600 16px/1.4 var(--f-body); color: var(--steel); max-width: 40ch; margin-top: 10px; }
+.menu { display: flex; flex-direction: column; gap: 2px; }
+.item { position: relative; background: none; border: 0; text-align: left; cursor: pointer; padding: 8px 18px 8px 16px;
+  font: 800 italic clamp(26px, 3.4vw, 38px)/1 var(--f-display); text-transform: uppercase; letter-spacing: 0.01em; color: rgba(243,239,230,0.62);
+  transition: color .12s, transform .12s; isolation: isolate; }
+.item::before { content: ""; position: absolute; inset: 2px -4px; background: var(--signal); transform: skewX(-14deg) scaleX(0); transform-origin: left; transition: transform .16s ease-out; z-index: -1; }
+.item.sel { color: var(--ink); transform: translateX(6px); }
+.item.sel::before { transform: skewX(-14deg) scaleX(1); }
+.item small { display: block; font: 600 13px var(--f-body); font-style: normal; letter-spacing: 0.02em; text-transform: none; color: inherit; opacity: 0.8; margin-top: 4px; }
+.foot { font: 500 13px var(--f-body); color: var(--steel); display: flex; gap: 18px; flex-wrap: wrap; }
+kbd { font: 700 12px var(--f-body); background: var(--ink-3); border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 1px 6px; color: var(--chalk); }
+
+/* matchup */
+#matchup .wrap { max-width: 1100px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; min-height: 100%; justify-content: center; }
+.versus { display: grid; grid-template-columns: 1fr auto 1fr; gap: 18px; align-items: stretch; }
+.vs { align-self: center; font: 900 italic 44px var(--f-display); color: var(--wood); }
+.tcard { position: relative; border-radius: 6px; overflow: hidden; background: var(--ink-2); border: 1px solid var(--line); min-width: 0; }
+.tcard .band { position: relative; padding: 16px 18px 14px; color: #fff; overflow: hidden; }
+.tcard .band::after { content: attr(data-id); position: absolute; right: -6px; bottom: -22px; font: 900 italic 120px/1 var(--f-display); opacity: 0.16; pointer-events: none; }
+.tcard .side { font: 700 12px var(--f-body); letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.85; }
+.tcard .city { font: 700 18px var(--f-display); text-transform: uppercase; letter-spacing: 0.04em; margin-top: 6px; opacity: 0.9; }
+.tcard .name { font: 900 italic clamp(32px, 4vw, 48px)/0.9 var(--f-display); text-transform: uppercase; }
+.tcard .style { font: 500 14px/1.35 var(--f-body); margin-top: 8px; opacity: 0.92; max-width: 34ch; }
+.tcard .arrows { position: absolute; top: 12px; right: 12px; display: flex; gap: 6px; z-index: 2; }
+.arrow { width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.45); background: rgba(0,0,0,0.25); color: #fff; cursor: pointer; font: 800 18px var(--f-display); display: grid; place-items: center; }
+.tcard .body { padding: 12px 18px 16px; display: grid; gap: 12px; }
+.rt { display: grid; grid-template-columns: 44px 1fr 30px; gap: 10px; align-items: center; font: 700 13px var(--f-body); letter-spacing: 0.08em; color: var(--steel); }
+.rt .bar { height: 6px; background: var(--ink-3); border-radius: 3px; overflow: hidden; }
+.rt .bar i { display: block; height: 100%; background: var(--wood); }
+.rt b { font: 800 18px var(--f-display); color: var(--chalk); text-align: right; font-variant-numeric: tabular-nums; }
+.roster { display: grid; gap: 2px; font-size: 14px; }
+.roster div { display: grid; grid-template-columns: 30px 1fr 30px; gap: 8px; padding: 4px 0; border-top: 1px solid var(--line); align-items: baseline; }
+.roster .pos { font: 700 12px var(--f-body); color: var(--steel); letter-spacing: 0.06em; }
+.roster .ov { font: 800 16px var(--f-display); text-align: right; font-variant-numeric: tabular-nums; }
+.tcard.sel { outline: 2px solid var(--warn); outline-offset: 2px; }
+.opts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.opt { background: var(--ink-2); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; cursor: pointer; text-align: left; display: grid; gap: 2px; min-width: 0; }
+.opt .l { font: 700 11px var(--f-body); letter-spacing: 0.16em; text-transform: uppercase; color: var(--steel); }
+.opt .v { font: 800 22px var(--f-display); text-transform: uppercase; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+.opt .v::before { content: "‹"; color: var(--steel); }
+.opt .v::after { content: "›"; color: var(--steel); }
+.opt.sel { border-color: var(--warn); background: var(--ink-3); }
+.row-actions { display: flex; gap: 12px; justify-content: flex-end; align-items: center; flex-wrap: wrap; }
+.btn { border: 0; cursor: pointer; padding: 12px 26px; font: 900 italic 24px var(--f-display); text-transform: uppercase; color: var(--ink); background: var(--signal); clip-path: polygon(8% 0, 100% 0, 92% 100%, 0 100%); }
+.btn.ghost { background: var(--ink-3); color: var(--chalk); }
+.btn.sel { background: var(--warn); }
+.btn.ghost.sel { background: var(--chalk); color: var(--ink); }
+
+/* how to / settings / pause / box */
+.panel { max-width: 860px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; min-height: 100%; justify-content: center; }
+.controls { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+.ccol { background: var(--ink-2); border: 1px solid var(--line); border-radius: 6px; padding: 14px 16px; display: grid; gap: 8px; align-content: start; min-width: 0; }
+.ccol h3 { margin: 0 0 4px; font: 800 italic 22px var(--f-display); text-transform: uppercase; color: var(--wood); }
+.ccol p { margin: 0; display: flex; justify-content: space-between; gap: 10px; font-size: 14px; line-height: 1.35; }
+.ccol p span:last-child { text-align: right; color: var(--steel); }
+.tips { font-size: 15px; line-height: 1.5; color: var(--chalk); max-width: 70ch; display: grid; gap: 6px; margin: 0; padding-left: 18px; }
+.list { display: grid; gap: 8px; max-width: 520px; }
+.list .opt { grid-template-columns: 1fr auto; align-items: center; }
+.list .opt .v { font-size: 20px; min-width: 140px; }
+.pause-wrap { max-width: 420px; margin: 0 auto; min-height: 100%; display: flex; flex-direction: column; justify-content: center; gap: 20px; }
+.box-wrap { max-width: 1000px; margin: 0 auto; min-height: 100%; display: flex; flex-direction: column; justify-content: center; gap: 16px; }
+.final-score { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
+.final-score .ts { display: flex; align-items: center; gap: 12px; font: 900 italic clamp(36px, 6vw, 64px)/1 var(--f-display); }
+.final-score .sw { width: 14px; height: 44px; transform: skewX(-14deg); }
+.final-score .ts.lose { opacity: 0.5; }
+.pog { background: var(--ink-2); border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+.pog b { font: 800 italic 26px var(--f-display); text-transform: uppercase; }
+.tbl-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; background: var(--ink-2); }
+table.box { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; min-width: 640px; }
+table.box th, table.box td { padding: 6px 8px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--line); }
+table.box th:first-child, table.box td:first-child { text-align: left; }
+table.box thead th { font: 700 11px var(--f-body); letter-spacing: 0.12em; color: var(--steel); text-transform: uppercase; }
+table.box tr.team td { font: 800 15px var(--f-display); text-transform: uppercase; letter-spacing: 0.04em; color: var(--wood); background: var(--ink-3); }
+table.box tr.tot td { font-weight: 700; color: var(--chalk); }
+
+/* ---------- HUD ---------- */
+#hud { position: absolute; inset: 0; display: none; pointer-events: none; }
+#hud.on { display: block; }
+#bug { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(14px, env(safe-area-inset-bottom, 0px)); display: flex; align-items: stretch; height: 46px; box-shadow: 0 8px 30px rgba(0,0,0,0.45); font-variant-numeric: tabular-nums; }
+#bug .tm { display: flex; align-items: center; gap: 10px; padding: 0 12px 0 0; background: #0d121c; min-width: 128px; position: relative; }
+#bug .tm .sw { width: 10px; align-self: stretch; }
+#bug .tm .ab { font: 800 22px var(--f-display); letter-spacing: 0.03em; }
+#bug .tm .sc { font: 900 30px var(--f-display); margin-left: auto; min-width: 2ch; text-align: right; }
+#bug .tm .bonus { position: absolute; left: 18px; bottom: 3px; font: 700 9px var(--f-body); letter-spacing: 0.14em; color: var(--warn); }
+#bug .tm .pos { position: absolute; top: 4px; right: 4px; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid var(--warn); opacity: 0; }
+#bug .tm.has .pos { opacity: 1; }
+#bug .clk { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 14px; background: #f3efe6; color: #0a0e16; min-width: 86px; }
+#bug .clk .q { font: 700 11px var(--f-body); letter-spacing: 0.14em; }
+#bug .clk .t { font: 900 24px/1 var(--f-display); }
+#bug .shc:empty { display: none; }
+#bug .shc { display: grid; place-items: center; min-width: 46px; background: #000; color: var(--warn); font: 900 26px var(--f-display); }
+#bug .shc.low { color: var(--bad); }
+#bug .sc.flash { animation: flash .6s ease-out; }
+@keyframes flash { 0% { color: var(--warn); transform: scale(1.35); } 100% { color: inherit; transform: scale(1); } }
+#ticker { position: absolute; left: max(14px, env(safe-area-inset-left, 0px)); top: max(12px, env(safe-area-inset-top, 0px)); display: flex; flex-direction: column; gap: 4px; max-width: min(420px, 70vw); }
+#ticker div { font: 600 14px var(--f-body); background: rgba(10,14,22,0.72); padding: 5px 10px; border-left: 3px solid var(--wood); animation: tick 5s forwards; }
+@keyframes tick { 0% { opacity: 0; transform: translateX(-8px); } 6% { opacity: 1; transform: none; } 85% { opacity: 1; } 100% { opacity: 0; } }
+#banner { position: absolute; left: 50%; top: 22%; transform: translateX(-50%); text-align: center; opacity: 0; }
+#banner.go { animation: banner 2.1s ease-out forwards; }
+#banner b { display: block; font: 900 italic clamp(40px, 8vw, 96px)/0.9 var(--f-display); text-transform: uppercase; color: #fff; text-shadow: 0 4px 24px rgba(0,0,0,0.55); -webkit-text-stroke: 1px rgba(0,0,0,0.25); white-space: nowrap; }
+#banner span { display: inline-block; margin-top: 8px; padding: 4px 14px; font: 800 18px var(--f-display); letter-spacing: 0.08em; text-transform: uppercase; background: var(--signal); color: var(--ink); transform: skewX(-12deg); }
+@keyframes banner { 0% { opacity: 0; transform: translateX(-50%) scale(1.4); } 10% { opacity: 1; transform: translateX(-50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) scale(0.96); } }
+#ptag { position: absolute; left: max(14px, env(safe-area-inset-left, 0px)); bottom: max(14px, env(safe-area-inset-bottom, 0px)); display: flex; align-items: stretch; background: rgba(10,14,22,0.82); border-radius: 4px; overflow: hidden; min-width: 210px; }
+#ptag .num { display: grid; place-items: center; min-width: 50px; font: 900 italic 30px var(--f-display); color: #fff; }
+#ptag .inf { padding: 6px 12px; display: grid; gap: 2px; flex: 1; }
+#ptag b { font: 800 18px/1 var(--f-display); text-transform: uppercase; letter-spacing: 0.02em; }
+#ptag span { font: 600 12px var(--f-body); color: var(--steel); letter-spacing: 0.06em; }
+#ptag .stam { height: 4px; background: var(--ink-3); border-radius: 2px; overflow: hidden; margin-top: 3px; }
+#ptag .stam i { display: block; height: 100%; background: var(--good); width: 100%; transition: width .2s; }
+#hint { position: absolute; right: max(14px, env(safe-area-inset-right, 0px)); top: max(12px, env(safe-area-inset-top, 0px)); font: 600 13px var(--f-body); color: var(--chalk); background: rgba(10,14,22,0.7); padding: 7px 10px; border-radius: 4px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; max-width: 46vw; }
+#hint span { white-space: nowrap; }
+#meter { position: absolute; width: 12px; height: 78px; background: rgba(0,0,0,0.6); border: 2px solid rgba(255,255,255,0.85); border-radius: 7px; overflow: hidden; display: none; }
+#meter .fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: linear-gradient(0deg, #f3efe6, #fff); }
+#meter .win { position: absolute; left: 0; right: 0; background: var(--good); opacity: 0.9; }
+#meter.res-perfect .fill { background: var(--good); }
+#meter.res-ok .fill { background: var(--warn); }
+#meter.res-bad .fill { background: var(--bad); }
+#fb { position: absolute; transform: translate(-50%, -100%); font: 900 italic 26px/1 var(--f-display); text-transform: uppercase; text-align: center; white-space: nowrap; text-shadow: 0 2px 12px rgba(0,0,0,0.7); opacity: 0; }
+#fb small { display: block; font: 700 13px var(--f-body); font-style: normal; letter-spacing: 0.08em; color: var(--chalk); margin-top: 4px; }
+#fb.go { animation: fb 1.5s ease-out forwards; }
+@keyframes fb { 0% { opacity: 0; margin-top: 10px; } 12% { opacity: 1; margin-top: 0; } 75% { opacity: 1; } 100% { opacity: 0; margin-top: -14px; } }
+#tphud { position: absolute; top: max(14px, env(safe-area-inset-top, 0px)); left: 50%; transform: translateX(-50%); display: none; align-items: stretch; gap: 0; background: #0d121c; box-shadow: 0 8px 30px rgba(0,0,0,0.45); }
+#tphud.on { display: flex; }
+#tphud > div { padding: 6px 16px; display: grid; place-items: center; }
+#tphud .lb { font: 700 10px var(--f-body); letter-spacing: 0.16em; color: var(--steel); }
+#tphud .vl { font: 900 30px/1 var(--f-display); font-variant-numeric: tabular-nums; }
+#tphud .racks { display: flex; gap: 8px; }
+#tphud .rk { display: flex; gap: 2px; }
+#tphud .rk i { width: 9px; height: 9px; border-radius: 50%; background: var(--ink-3); }
+#tphud .rk i.m { background: var(--wood); } #tphud .rk i.x { background: #3a2222; } #tphud .rk i.mm { background: #ff4fd8; }
+#intro { position: absolute; inset: 0; display: none; place-items: center; text-align: center; }
+#intro.on { display: grid; animation: fadein .3s; }
+#intro .card { display: grid; gap: 10px; justify-items: center; }
+#intro .teams { display: flex; align-items: center; gap: 18px; flex-wrap: wrap; justify-content: center; }
+#intro .teams div { font: 900 italic clamp(34px, 6vw, 70px)/0.9 var(--f-display); text-transform: uppercase; padding: 8px 18px; transform: skewX(-10deg); color: #fff; }
+#intro .vs2 { font: 900 italic 30px var(--f-display); color: var(--wood); }
+
+/* ---------- touch ---------- */
+#touch { position: absolute; inset: 0; display: none; pointer-events: none; }
+#touch.on { display: block; }
+#tZone { position: absolute; left: 0; bottom: 0; width: 50%; height: 70%; pointer-events: auto; }
+#tStick { position: absolute; left: 40px; bottom: 60px; width: 140px; height: 140px; border-radius: 50%; border: 2px solid rgba(255,255,255,0.25); background: rgba(10,14,22,0.25); pointer-events: none; opacity: 0.55; }
+#tStick.live { opacity: 1; bottom: auto; }
+#tKnob { position: absolute; left: 42px; top: 42px; width: 56px; height: 56px; border-radius: 50%; background: rgba(243,239,230,0.75); }
+#tBtns { position: absolute; right: max(18px, env(safe-area-inset-right, 0px)); bottom: max(22px, env(safe-area-inset-bottom, 0px)); width: 220px; height: 200px; pointer-events: none; }
+.tb { position: absolute; border-radius: 50%; border: 2px solid rgba(255,255,255,0.4); background: rgba(10,14,22,0.5); color: #fff; font: 800 15px var(--f-display); letter-spacing: 0.06em; display: grid; place-items: center; pointer-events: auto; text-transform: uppercase; touch-action: none; }
+.tb.on { background: var(--signal); color: var(--ink); border-color: var(--signal); }
+.tb[data-btn="shoot"] { width: 92px; height: 92px; right: 0; bottom: 0; font-size: 18px; }
+.tb[data-btn="pass"] { width: 66px; height: 66px; right: 104px; bottom: 6px; }
+.tb[data-btn="move"] { width: 66px; height: 66px; right: 14px; bottom: 104px; }
+.tb[data-btn="sprint"] { width: 60px; height: 60px; right: 112px; bottom: 90px; font-size: 13px; }
+.tb[data-btn="alt"] { width: 50px; height: 50px; right: 160px; bottom: 156px; font-size: 12px; }
+#tPause { position: absolute; top: max(10px, env(safe-area-inset-top, 0px)); right: max(12px, env(safe-area-inset-right, 0px)); width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(255,255,255,0.35); background: rgba(10,14,22,0.6); color: #fff; font: 900 16px var(--f-display); pointer-events: auto; display: none; }
+#tPause.on { display: block; }
+
+@media (max-width: 1100px) and (min-width: 761px) { #ptag { bottom: 72px; } }
+@media (max-width: 760px) {
+  .versus { grid-template-columns: 1fr; }
+  .vs { justify-self: center; font-size: 30px; }
+  .opts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .controls { grid-template-columns: 1fr; }
+  .tcard .roster { display: none; }
+  #hint { display: none; }
+  #bug { height: 40px; bottom: auto; top: max(10px, env(safe-area-inset-top, 0px)); }
+  #bug .tm { min-width: 96px; }
+  #bug .tm .ab { font-size: 18px; } #bug .tm .sc { font-size: 24px; }
+  #ticker { top: 60px; }
+  #ptag { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
+}
+</style>
+
+<canvas id="gl" aria-label="Basketball arena"></canvas>
+<div id="ui">
+  <div id="boot">Loading the arena<small>Building the court, the crowd and both rosters</small></div>
+
+  <section id="home" class="screen scrim-left" aria-label="Main menu">
+    <div class="wrap">
+      <div class="wordmark">
+        <span class="eyebrow">Season 2027 · Eight-team league</span>
+        <h1 class="h-display">Hardwood<br><span class="k2">Kings</span></h1>
+        <p class="tag">Full 5-on-5 basketball with timed shooting, dribble moves, real fouls and a CPU that runs plays.</p>
+      </div>
+      <nav class="menu" data-nav>
+        <button class="item" data-act="play">Play now<small>Pick two teams and tip it off</small></button>
+        <button class="item" data-act="threept">3-point contest<small>60 seconds, 25 balls, money racks</small></button>
+        <button class="item" data-act="watch">Watch CPU vs CPU<small>Sit courtside for a full game</small></button>
+        <button class="item" data-act="howto">How to play<small>Controls and shooting tips</small></button>
+        <button class="item" data-act="settings">Settings<small>Camera, sound, announcer</small></button>
+      </nav>
+      <div class="foot"><span><kbd>↑</kbd> <kbd>↓</kbd> choose</span><span><kbd>Enter</kbd> select</span><span>Gamepad and touch supported</span></div>
+    </div>
+  </section>
+
+  <section id="matchup" class="screen scrim-full" aria-label="Choose teams">
+    <div class="wrap">
+      <div><span class="eyebrow" id="muEyebrow">Exhibition</span><h2 class="h-2" id="muTitle">Choose your matchup</h2></div>
+      <div class="versus">
+        <div class="tcard" id="cardA"></div>
+        <div class="vs">VS</div>
+        <div class="tcard" id="cardB"></div>
+      </div>
+      <div class="opts" id="muOpts"></div>
+      <div class="row-actions">
+        <button class="btn ghost" data-act="back">Back</button>
+        <button class="btn" data-act="start" id="muStart">Tip off</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="howto" class="screen scrim-full" aria-label="How to play">
+    <div class="panel">
+      <div><span class="eyebrow">How to play</span><h2 class="h-2">Controls</h2></div>
+      <div class="controls">
+        <div class="ccol"><h3>Keyboard</h3>
+          <p><span>Move</span><span>WASD / arrows</span></p><p><span>Sprint</span><span>Shift</span></p>
+          <p><span>Shoot (hold, release)</span><span>Space / J</span></p><p><span>Pass to aimed teammate</span><span>E / K</span></p>
+          <p><span>Dribble move</span><span>Q / L</span></p><p><span>Call a screen</span><span>R</span></p>
+          <p><span>Pause</span><span>Esc / P</span></p></div>
+        <div class="ccol"><h3>Gamepad</h3>
+          <p><span>Move</span><span>Left stick</span></p><p><span>Sprint</span><span>RT / RB</span></p>
+          <p><span>Shoot / block</span><span>X / ▢</span></p><p><span>Pass / switch</span><span>A / ✕</span></p>
+          <p><span>Dribble move / steal</span><span>B / ◯</span></p><p><span>Screen / switch</span><span>Y / △</span></p>
+          <p><span>Pause</span><span>Start</span></p></div>
+        <div class="ccol"><h3>Defense</h3>
+          <p><span>Contest / block</span><span>Shoot button</span></p><p><span>Hands up</span><span>Hold shoot</span></p>
+          <p><span>Steal attempt</span><span>Dribble-move button</span></p><p><span>Switch player</span><span>Pass button</span></p>
+          <p><span>Stay in front</span><span>Move, don't sprint</span></p></div>
+      </div>
+      <ul class="tips">
+        <li>Hold shoot and let go when the meter reaches the green band at the top. A green release nearly always goes in, even when it's contested.</li>
+        <li>Shoot while sprinting at the rim to attack it: high-flyers dunk, everyone else lays it in. Contested layups miss more often.</li>
+        <li>Point the stick at a teammate before you pass. The white diamond on the floor shows who will get the ball.</li>
+        <li>Dribble moves (crossover, spin, step-back) freeze your defender. Good ball handlers can break ankles.</li>
+        <li>Reaching for a steal can draw a foul. Jumping into a shooter can, too.</li>
+      </ul>
+      <div class="row-actions"><button class="btn" data-act="back">Back</button></div>
+    </div>
+  </section>
+
+  <section id="settings" class="screen scrim-full" aria-label="Settings">
+    <div class="panel">
+      <div><span class="eyebrow">Settings</span><h2 class="h-2">Game options</h2></div>
+      <div class="list" id="setList"></div>
+      <div class="row-actions"><button class="btn" data-act="back">Done</button></div>
+    </div>
+  </section>
+
+  <section id="pause" class="screen scrim-full" aria-label="Paused">
+    <div class="pause-wrap">
+      <div><span class="eyebrow" id="pauseInfo">Paused</span><h2 class="h-2">Timeout</h2></div>
+      <nav class="menu" data-nav>
+        <button class="item" data-act="resume">Resume</button>
+        <button class="item" data-act="box">Box score</button>
+        <button class="item" data-act="howto">Controls</button>
+        <button class="item" data-act="settings">Settings</button>
+        <button class="item" data-act="restart">Restart</button>
+        <button class="item" data-act="quit">Quit to menu</button>
+      </nav>
+    </div>
+  </section>
+
+  <section id="boxscreen" class="screen scrim-full" aria-label="Box score">
+    <div class="box-wrap">
+      <div><span class="eyebrow" id="boxEyebrow">Box score</span><h2 class="h-2" id="boxTitle">Final</h2></div>
+      <div class="final-score" id="boxScore"></div>
+      <div class="pog" id="boxPog"></div>
+      <div class="tbl-wrap"><table class="box" id="boxTable"></table></div>
+      <div class="row-actions" id="boxActions"></div>
+    </div>
+  </section>
+
+  <div id="hud">
+    <div id="ticker" aria-live="polite"></div>
+    <div id="banner"><b></b><span></span></div>
+    <div id="meter"><div class="win"></div><div class="fill"></div></div>
+    <div id="fb"></div>
+    <div id="intro"><div class="card"><span class="eyebrow" id="introEy">Tip-off</span><div class="teams" id="introTeams"></div></div></div>
+    <div id="tphud"><div><span class="lb">TIME</span><span class="vl" id="tpTime">60.0</span></div><div><div class="racks" id="tpRacks"></div></div><div><span class="lb">SCORE</span><span class="vl" id="tpScore">0</span></div></div>
+    <div id="bug">
+      <div class="tm" id="bugA"><span class="sw"></span><span class="ab"></span><span class="sc">0</span><span class="bonus"></span><span class="pos"></span></div>
+      <div class="clk"><span class="q" id="bugQ">1ST</span><span class="t" id="bugT">3:00</span></div>
+      <div class="tm" id="bugB"><span class="sw"></span><span class="ab"></span><span class="sc">0</span><span class="bonus"></span><span class="pos"></span></div>
+      <div class="shc" id="bugS">24</div>
+    </div>
+    <div id="ptag"><div class="num" id="ptNum">3</div><div class="inf"><b id="ptName">Player</b><span id="ptInfo">PG</span><div class="stam"><i id="ptStam"></i></div></div></div>
+    <div id="hint"></div>
+  </div>
+
+  <div id="touch">
+    <div id="tZone"></div>
+    <div id="tStick"><div id="tKnob"></div></div>
+    <div id="tBtns">
+      <div class="tb" data-btn="shoot">Shoot</div>
+      <div class="tb" data-btn="pass">Pass</div>
+      <div class="tb" data-btn="move">Move</div>
+      <div class="tb" data-btn="sprint">Turbo</div>
+      <div class="tb" data-btn="alt">Screen</div>
+    </div>
+  </div>
+  <button id="tPause" aria-label="Pause">II</button>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/*__GAME__*/
+</script>

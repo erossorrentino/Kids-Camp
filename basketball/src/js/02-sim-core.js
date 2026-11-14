@@ -1204,6 +1204,7 @@ function setupThreePt() {
   const T = G.teams[0];
   let sh = T.players[0];
   for (const p of T.players) if (p.d.tpt > sh.d.tpt) sh = p;
+  if (G.opts.shooter != null) sh = T.players[G.opts.shooter] || sh;
   for (const p of G.players) placeP(p, 0, -300 - p.id * 4, 0);
   const r = TP_RACKS[0];
   placeP(sh, r[0], r[1], Math.atan2(-r[1], CT.RIM_X - r[0]));
