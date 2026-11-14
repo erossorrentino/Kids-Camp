@@ -31,18 +31,18 @@ function spotW(T, p) { const a = T.tac.spots[p.slot]; return [T.dir * a[0], T.di
 function evalShot(m, closing) {
   const T = m.team, d = distRim(m), c = contestOn(m, closing);
   const three = isThreeAt(m.x, m.z, T.dir);
-  const type = d < 6 ? 'layup' : 'jump';
+  const type = d < 9.5 && !three ? 'layup' : 'jump';
   const prob = baseProb(m.d, d, three, type) * contestMult(type, c);
   let ev = Math.max(0, prob) * (three ? 3 : 2);
-  if (three) ev *= m.d.tpt < 66 ? 0.55 : m.d.tpt < 80 ? 0.88 : 1;
+  if (three) ev *= m.d.tpt < 66 ? 0.55 : m.d.tpt < 74 ? 0.85 : 1.04;
   if (!three && d > 10) ev *= 0.97;
   return { prob, ev, three, d, c };
 }
-function laneOpen(p) {
+function laneOpen(p, skip) {
   const T = p.team, hx = hoopX(T);
   let open = 1;
   for (const o of G.teams[1 - T.idx].players) {
-    if (o.act === 'stumble') continue;
+    if (o.act === 'stumble' || o === skip) continue;
     const r = distSeg(o.x, o.z, p.x, p.z, hx, 0);
     if (r.t < 0.04) continue;
     const blk = clamp((3.3 - r.d) / 2.3, 0, 1) * (0.75 + 0.4 * rt(o.d.def));
@@ -184,7 +184,7 @@ function aiDecide(p, mk, md, dRim) {
   const nz = () => randRange(-0.09, 0.09) * noise;
   const driving = A.plan === 'drive';
   const me = evalShot(p, 2), lane = laneOpen(p);
-  if (dRim < 8.5 && (me.ev >= 0.86 || u > 0.5 || (lane > 0.5 && me.c < 0.7))) { startShot(p); return; }
+  if (dRim < 8.5 && (me.ev >= 0.86 || u > 0.5 || (lane > 0.5 && me.c < 0.7))) { startShot(p, true); return; }
   let bm = null, bev = -9, bsafe = null, bs = 9;
   for (const m of T.players) {
     if (m === p) continue;
@@ -198,16 +198,22 @@ function aiDecide(p, mk, md, dRim) {
     if (s * (m.x - p.x) < -14) ev -= 0.25;
     if (ev > bev) { bev = ev; bm = m; }
   }
-  const early = clamp((sc - 11) / 8, 0, 1);            // patience while the clock is fresh
+  let early = clamp((sc - 11) / 8, 0, 1);              // patience while the clock is fresh
+  if (T.tac.setT > 0 && !A.fast) early = 1;
   const shootEV = me.ev + nz();
-  const thresh = lerp(driving ? 0.92 : 1.0, 0.45, u) + early * 0.2;
+  const thresh = lerp(driving ? 0.92 : 0.96, 0.45, u) + early * 0.3;
   const fin = lerp(0.56, 0.84, rt(p.d.ins));
+  // drive value: help defense in the lane, and how likely I am to beat my own man
+  let beat = 0.55 + 0.3 * (rt(p.d.hnd) + rt(p.d.spd)) / 2 - (mk ? 0.28 * rt(mk.d.def) : -0.3);
+  if (mk && (md > 4.5 || mk.ai.freezeT > 0 || mk.act === 'stumble')) beat += 0.25;
+  if (T.tac.screener && T.tac.screener.ai.task && T.tac.screener.ai.task.set) beat += 0.15;
+  const help = laneOpen(p, mk);
   const driveEV = (!driving && dRim > 9 && dRim < 36 && A.driveCD <= 0)
-    ? lane * fin * 2 * (0.72 + 0.3 * rt(p.d.hnd)) * (0.82 + 0.25 * rt(p.d.spd)) + nz() : -9;
+    ? clamp(beat, 0.2, 1) * (0.3 + 0.7 * help) * fin * 1.6 + nz() : -9;
   const passEV = bev + nz() - (A.holdT < 0.4 ? 0.25 : 0);
-  if (shootEV >= thresh && shootEV >= passEV - 0.04 && shootEV >= driveEV - 0.1) { startShot(p); return; }
+  if (shootEV >= thresh && shootEV >= passEV - 0.04 && shootEV >= driveEV - 0.1) { startShot(p, dRim < 9.5); return; }
   if (bm && passEV > lerp(0.98, 0.5, u) + early * 0.12 && passEV > shootEV + 0.08 && passEV >= driveEV - 0.05) { startPass(p, bm); return; }
-  if (driveEV > lerp(0.85, 0.35, u) + early * 0.25) { beginDrive(p, mk, md); return; }
+  if (driveEV > lerp(0.95, 0.4, u) + early * 0.6 && (A.holdT > 0.8 || beat > 0.85)) { beginDrive(p, mk, md); return; }
   if (driving) return;
   if (u > 0.75) {
     if (bm && passEV > shootEV + 0.15 && sc > 1.6) startPass(p, bm);
@@ -221,7 +227,7 @@ function aiDecide(p, mk, md, dRim) {
   if (dRim < 15) { const w = spotW(T, p); A.sx = w[0]; A.sz = w[1]; }      // stuck inside: back it out
   const r = rand();
   if (r < 0.12 && T.tac.screenCD <= 0) callScreen(T);
-  else if (r < 0.3 && bsafe && bs < 0.25 && A.holdT > 1.6) startPass(p, bsafe);
+  else if (r < (early > 0.5 ? 0.5 : 0.3) && bsafe && bs < 0.25 && A.holdT > 1.2) startPass(p, bsafe);
   else if (r < 0.75 && md < 5.5 && p.moveCD <= 0 && A.holdT > 0.9 && A.driveCD <= 0) beginDrive(p, mk, md);
 }
 function aiHandler(p, dt) {
@@ -239,12 +245,12 @@ function aiHandler(p, dt) {
     goTo(p, tx, tz, A.fast || (md < 5 && pa < 6), 1.5);
     p.in.face = null;
     if (A.fast && pa > -10 && dRim < 44 && laneOpen(p) > 0.62) { beginDrive(p, mk, md); return; }
-    if (pa > 7) { A.plan = 'survey'; A.sx = tx; A.sz = tz; A.thinkT = Math.min(A.thinkT, 0.2); A.fast = false; }
+    if (pa > 7) { if (!A.fast) T.tac.setT = randRange(4, 9); A.plan = 'survey'; A.sx = tx; A.sz = tz; A.thinkT = Math.min(A.thinkT, 0.2); A.fast = false; }
     return;
   }
   if (A.plan === 'drive') {
     A.driveT += dt;
-    let ux = hx - p.x, uz = -p.z;
+    let ux = hx - s * 3 - p.x, uz = -p.z;
     const l = hyp(ux, uz) || 1; ux /= l; uz /= l;
     let bd = 99, blat = 0, blocked = false;
     for (const o of G.teams[1 - T.idx].players) {
@@ -261,7 +267,7 @@ function aiHandler(p, dt) {
       const ml = hyp(mx, mz); mx /= ml; mz /= ml;
     }
     p.in.mx = mx; p.in.mz = mz; p.in.sprint = true; p.in.face = null;
-    if (dRim < A.finishD) { startShot(p); return; }
+    if (dRim < A.finishD) { startShot(p, true); return; }
     if (hyp(p.vx, p.vz) < 5 && A.driveT > 0.5) A.stallT += dt; else A.stallT = 0;
     if (A.stallT > 0.45 || A.driveT > 2.6) {
       A.plan = 'survey'; A.thinkT = 0; A.stallT = 0; A.driveCD = 1.4;
@@ -282,6 +288,7 @@ function offenseAI(T, dt) {
   const b = G.ball, tac = T.tac;
   const h = b.holder && b.holder.team === T ? b.holder : null;
   if (tac.screenCD > 0) tac.screenCD -= dt;
+  if (tac.setT > 0) tac.setT -= dt;
   if (h && T.dir * h.x > 6 && h.act !== 'shoot') {
     tac.actT -= dt;
     if (tac.actT <= 0) { tac.actT = randRange(2.4, 4.4); startOffAction(T, h); }

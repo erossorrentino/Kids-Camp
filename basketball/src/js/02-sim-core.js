@@ -17,7 +17,7 @@ function mkStats() {
   return { pts: 0, fgm: 0, fga: 0, tpm: 0, tpa: 0, ftm: 0, fta: 0, reb: 0, oreb: 0, ast: 0, stl: 0, blk: 0, to: 0, pf: 0 };
 }
 function mkTac() {
-  return { actT: 2.2, helper: null, helpT: 0, mirror: 1, spots: [null, null, null, null, null], screenCD: 0, screener: null };
+  return { actT: 2.2, helper: null, helpT: 0, mirror: 1, spots: [null, null, null, null, null], screenCD: 0, screener: null, setT: 0 };
 }
 function mkPlayer(T, slot, d) {
   const hgt = d.h / 12;
@@ -31,7 +31,7 @@ function mkPlayer(T, slot, d) {
     moveCD: 0, stealCD: 0, jumpCD: 0, noGrabT: 0, stealDone: false,
     hgt, sc: hgt / 6.5, reach: hgt * 1.335,
     ai: { mark: null, px: 0, pz: 0, task: null, plan: 'bring', thinkT: 0, holdT: 0, driveT: 0, side: 1, freezeT: 0,
-      stealT: 1, contestT: 0, jumpDecided: false, fast: false, assistFrom: null, assistT: -99, stallT: 0, finishD: 7.5 },
+      stealT: 1, contestT: 0, jumpDecided: false, fast: false, driveCD: 0, wasOn: false, closeT: 0, jumpAt: null, sx: null, sz: null, assistFrom: null, assistT: -99, stallT: 0, finishD: 7.5 },
     st: mkStats(), celebT: 0,
   };
 }
@@ -303,7 +303,7 @@ function changePossession(p, how) {
   G.shotClock = 24;
   let back = 0;
   for (const o of O.players) if (T.dir * (o.x - p.x) > 3) back++;
-  const brk = how === 'steal' ? back <= 2 : back <= 1 && rand() < 0.55;
+  const brk = how === 'steal' ? back <= 2 : back <= 1 && rand() < 0.4;
   for (const q of T.players) q.ai.fast = brk;
   emit('possession', { team: T.idx, how });
 }
@@ -348,7 +348,7 @@ function giveBall(p, how) {
 }
 
 /* ---------- actions ---------- */
-function startShot(p) {
+function startShot(p, rim) {
   if (!p.hasBall || (p.act !== 'none' && p.act !== 'move')) return false;
   if (G.state !== 'live' && G.state !== 'tp') return false;
   const T = p.team, s = T.dir, hx = s * CT.RIM_X;
@@ -357,7 +357,7 @@ function startShot(p) {
   const behind = s * p.x > CT.RIM_X + 0.3;
   const user = userHas(p);
   let type = 'jump';
-  if (G.state === 'live' && !behind && d < 11.5 && (toward > 3.5 || d < 5.5)) {
+  if (G.state === 'live' && (!behind || d < 7) && d < 11.5 && (toward > 3.5 || d < 5.5 || (rim && d < 9.5))) {
     const c = contestOn(p);
     const canDunk = p.d.dnk >= 62 && d < 10.5 && d > 2.4;
     let want = canDunk && (user ? (p.in.sprint || p.d.dnk >= 88 || toward > 12) : (c < 0.55 && rand() < 0.08 + 0.6 * rt(p.d.dnk)));
@@ -373,10 +373,16 @@ function startShot(p) {
     if (user) { S.timed = true; S.win = G.diff.win * (0.85 + 0.4 * rt(S.three ? p.d.tpt : p.d.mid)); }
     else S.tRel = S.ideal + randRange(-0.03, 0.03);
   } else {
-    const ux = dx / d, uz = dz / d;
     const stop = type === 'dunk' ? 1.2 : 1.9;
-    S.relX = hx - ux * stop; S.relZ = -uz * stop;
-    const travel = Math.max(0, d - stop);
+    // release point sits in front of the rim, on the shooter's side (reverse layup when coming from behind)
+    const ax = Math.min(s * p.x, CT.RIM_X - 1.2);
+    let vx = ax - CT.RIM_X, vz = p.z;
+    const vl = hyp(vx, vz) || 1; vx /= vl; vz /= vl;
+    S.relX = hx + s * vx * stop; S.relZ = vz * stop;
+    let ux = S.relX - p.x, uz = S.relZ - p.z;
+    const travel = hyp(ux, uz);
+    ux /= travel || 1; uz /= travel || 1;
+    p.face = Math.atan2(uz, ux);
     S.air = type === 'dunk' ? 0.68 : 0.62; S.uRel = type === 'dunk' ? 0.56 : 0.5;
     const airD = Math.min(travel, type === 'dunk' ? 6.5 : 5.5);
     S.runSp = Math.max(sp, 13);
