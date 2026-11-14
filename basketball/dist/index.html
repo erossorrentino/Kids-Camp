@@ -485,10 +485,10 @@ for (const T of TEAMS) { for (const p of T.roster) p.ovr = playerOvr(p); T.rt = 
 
 /* win = half width (seconds) of the perfect-release window for the human shooter */
 const DIFFS = {
-  rookie:  { name: 'Rookie',   win: 0.058, boost: 0.95, cpuShot: 0.84, react: 1.75, think: 0.55, cpuSteal: 0.45, jump: 0.30, noise: 1.6, userSteal: 1.45, cpuFoul: 1.2 },
-  pro:     { name: 'Pro',      win: 0.044, boost: 0.90, cpuShot: 0.95, react: 1.30, think: 0.42, cpuSteal: 0.75, jump: 0.46, noise: 1.0, userSteal: 1.15, cpuFoul: 1.0 },
-  allstar: { name: 'All-Star', win: 0.034, boost: 0.86, cpuShot: 1.03, react: 1.00, think: 0.34, cpuSteal: 1.00, jump: 0.60, noise: 0.7, userSteal: 1.0,  cpuFoul: 0.9 },
-  legend:  { name: 'Legend',   win: 0.026, boost: 0.80, cpuShot: 1.10, react: 0.85, think: 0.28, cpuSteal: 1.20, jump: 0.72, noise: 0.5, userSteal: 0.9,  cpuFoul: 0.8 },
+  rookie:  { name: 'Rookie',   win: 0.058, boost: 0.95, cpuShot: 0.84, react: 1.75, think: 0.55, cpuSteal: 0.45, jump: 0.30, noise: 1.6, userSteal: 1.1, cpuFoul: 1.2 },
+  pro:     { name: 'Pro',      win: 0.044, boost: 0.90, cpuShot: 0.95, react: 1.30, think: 0.42, cpuSteal: 0.75, jump: 0.46, noise: 1.0, userSteal: 0.8, cpuFoul: 1.0 },
+  allstar: { name: 'All-Star', win: 0.034, boost: 0.86, cpuShot: 1.03, react: 1.00, think: 0.34, cpuSteal: 1.00, jump: 0.60, noise: 0.7, userSteal: 0.65, cpuFoul: 0.9 },
+  legend:  { name: 'Legend',   win: 0.026, boost: 0.80, cpuShot: 1.10, react: 0.85, think: 0.28, cpuSteal: 1.20, jump: 0.72, noise: 0.5, userSteal: 0.52, cpuFoul: 0.8 },
 };
 
 /* Half-court spots in attack coordinates (the hoop being attacked sits at +41.75, 0) */
@@ -614,7 +614,7 @@ function newGame(o) {
   G.quarter = 1; G.clock = G.qLen; G.shotClock = 24; G.time = 0;
   G.offense = 0; G.ctrl = null; G.stT = 0; G.next = null; G.whDur = 0;
   G.dead = null; G.ft = null; G.pendingFT = null; G.crossedHalf = false; G.clockExpired = false;
-  G.tipWinner = 0; G.tp = null; G.lastRelease = null; G.passTarget = null; G.tip = null;
+  G.tipWinner = 0; G.tp = null; G.lastRelease = null; G.passTarget = null; G.tip = null; G.chargeCD = 0;
   G.input = mkInput();
   if (G.mode === 'threept') setupThreePt(); else setupTip();
 }
@@ -824,11 +824,12 @@ function baseProb(r, d, three, type) {
   if (d > 10) return lerp(0.36, 0.56, rt(r.mid));
   return lerp(0.42, 0.64, rt((r.mid + r.ins) / 2));
 }
-function contestMult(type, c) { return type === 'dunk' ? 1 - 0.3 * c * c : type === 'layup' ? 1 - 0.3 * c : 1 - 0.34 * c; }
+function contestMult(type, c) { return type === 'dunk' ? 1 - 0.42 * c * c : type === 'layup' ? 1 - 0.4 * c : 1 - 0.34 * c; }
 function shotChance(p, S, c) {
   if (S.type === 'ft') return clamp(0.52 + 0.42 * rt(p.d.mid), 0.4, 0.95);
   let base = baseProb(p.d, S.dist, S.three, S.type) * contestMult(S.type, c);
   if (S.type === 'jump' && S.moving) base *= 0.9;
+  if (S.type === 'layup' && S.runSp > 17.5) base *= 0.92;
   if (p.stam < 25) base *= 0.9;
   return clamp(base, 0.01, 0.97);
 }
@@ -913,7 +914,7 @@ function startShot(p, rim) {
     const c = contestOn(p);
     const canDunk = p.d.dnk >= 62 && d < 10.5 && d > 2.4;
     let want = canDunk && (user ? (p.in.sprint || p.d.dnk >= 88 || toward > 12) : (c < 0.55 && rand() < 0.08 + 0.6 * rt(p.d.dnk)));
-    if (want && c > 0.8) want = false;
+    if (want && c > (user ? 0.58 : 0.8)) want = false;
     type = want ? 'dunk' : 'layup';
   }
   const S = { type, dist: d, three: false, released: false, relT: 0, timed: false, ideal: 0, win: 0, moving: sp > 7, made: false };
@@ -1156,7 +1157,7 @@ function stealCheck(p) {
     }
   } else {
     let F = 0.12;
-    if (p === G.ctrl) F = 0.15; else if (G.userTeam >= 0 && p.team.idx !== G.userTeam) F *= G.diff.cpuFoul;
+    if (p === G.ctrl) F = 0.24; else if (G.userTeam >= 0 && p.team.idx !== G.userTeam) F *= G.diff.cpuFoul;
     if (d < 3 && rand() < F) reachFoul(p, h);
   }
 }
@@ -1304,13 +1305,32 @@ function massOf(p) {
   if (hyp(p.vx, p.vz) < 2) m *= 1.4;
   return m;
 }
+/* a ball handler who barrels into a set defender outside the restricted area can be called for a charge */
+function chargeCheck(h, o) {
+  if (G.state !== 'live' || !h.hasBall || o.team === h.team || h.act === 'shoot' || o.act !== 'none' || G.chargeCD > 0) return false;
+  const sp = hyp(h.vx, h.vz), osp = hyp(o.vx, o.vz);
+  if (sp < 13 || osp > 4.5 || distRim(h) < 5) return false;
+  const dx = o.x - h.x, dz = o.z - h.z, d = hyp(dx, dz) || 1;
+  if ((h.vx * dx + h.vz * dz) / (sp * d) < 0.75) return false;
+  G.chargeCD = 1.5;
+  let P = 0.18 + 0.25 * rt(o.d.def);
+  if (h === G.ctrl && G.userTeam === h.team.idx) P *= 1.35;
+  if (rand() > P) return false;
+  h.st.to++; registerFoul(h, o, 'charge');
+  emit('turnover', { p: h, why: 'charge' });
+  const sp2 = oobSpot(h.x, h.z);
+  whistle('Offensive foul · charge', 1.2, () => startDead(o.team.idx, sp2.x, sp2.z, { minT: 0.9 }));
+  return true;
+}
 function collidePlayers() {
   const P = G.players, n = P.length, R = 1.8;
+  if (G.chargeCD > 0) G.chargeCD -= DT;
   for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
     const a = P[i], c = P[j];
     if (a.y > 1.2 || c.y > 1.2) continue;
     const dx = c.x - a.x, dz = c.z - a.z, d2 = dx * dx + dz * dz;
     if (d2 >= R * R || d2 < 1e-6) continue;
+    if ((a.hasBall && chargeCheck(a, c)) || (c.hasBall && chargeCheck(c, a))) return;
     const d = Math.sqrt(d2), ov = R - d, nx = dx / d, nz = dz / d;
     const wa = massOf(a), wc = massOf(c), ta = wc / (wa + wc), tc = wa / (wa + wc);
     a.x -= nx * ov * ta; a.z -= nz * ov * ta; c.x += nx * ov * tc; c.z += nz * ov * tc;
@@ -2321,6 +2341,11 @@ function defendMan(p, m, h, bx, bz, hx, dt, react, cpu) {
     f *= tight; g *= tight;
     const tk = m.ai.task;
     if ((tk && (tk.type === 'cut' || tk.type === 'roll')) || dm < 12) { f = Math.min(f, 0.2); g = Math.min(g, 0.1); }
+    // collapse into the lane when the ball handler is attacking the rim
+    if (h) {
+      const hd = hyp(hx - h.x, h.z), toward = (h.vx * (hx - h.x) + h.vz * -h.z) / (hd || 1);
+      if (hd < 24 && toward > 9 && hyp(hx - p.x, p.z) < 22) { f = Math.max(f, 0.55 - 0.25 * rt(m.d.tpt)); g = 0.1; }
+    }
     tx = mx + (hx - mx) * f + (bx - mx) * g; tz = mz + (0 - mz) * f + (bz - mz) * g;
     sprint = hyp(tx - p.x, tz - p.z) > 6;
     p.in.face = Math.atan2(bz - p.z, bx - p.x);
@@ -5021,6 +5046,7 @@ function handleEvents() {
       case 'turnover':
         if (!quiet && e.why === 'shotclock') banner('Shot clock', 'Violation');
         else if (!quiet && e.why === 'backcourt') banner('Backcourt', 'Violation');
+        else if (!quiet && e.why === 'charge') banner('Charge!', shortName(e.p));
         break;
       case 'periodEnd':
         crowdRoar(0.6, 2); backboardLights();

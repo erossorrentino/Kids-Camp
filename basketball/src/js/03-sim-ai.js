@@ -406,6 +406,11 @@ function defendMan(p, m, h, bx, bz, hx, dt, react, cpu) {
     f *= tight; g *= tight;
     const tk = m.ai.task;
     if ((tk && (tk.type === 'cut' || tk.type === 'roll')) || dm < 12) { f = Math.min(f, 0.2); g = Math.min(g, 0.1); }
+    // collapse into the lane when the ball handler is attacking the rim
+    if (h) {
+      const hd = hyp(hx - h.x, h.z), toward = (h.vx * (hx - h.x) + h.vz * -h.z) / (hd || 1);
+      if (hd < 24 && toward > 9 && hyp(hx - p.x, p.z) < 22) { f = Math.max(f, 0.55 - 0.25 * rt(m.d.tpt)); g = 0.1; }
+    }
     tx = mx + (hx - mx) * f + (bx - mx) * g; tz = mz + (0 - mz) * f + (bz - mz) * g;
     sprint = hyp(tx - p.x, tz - p.z) > 6;
     p.in.face = Math.atan2(bz - p.z, bx - p.x);

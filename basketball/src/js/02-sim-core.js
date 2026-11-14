@@ -62,7 +62,7 @@ function newGame(o) {
   G.quarter = 1; G.clock = G.qLen; G.shotClock = 24; G.time = 0;
   G.offense = 0; G.ctrl = null; G.stT = 0; G.next = null; G.whDur = 0;
   G.dead = null; G.ft = null; G.pendingFT = null; G.crossedHalf = false; G.clockExpired = false;
-  G.tipWinner = 0; G.tp = null; G.lastRelease = null; G.passTarget = null; G.tip = null;
+  G.tipWinner = 0; G.tp = null; G.lastRelease = null; G.passTarget = null; G.tip = null; G.chargeCD = 0;
   G.input = mkInput();
   if (G.mode === 'threept') setupThreePt(); else setupTip();
 }
@@ -272,11 +272,12 @@ function baseProb(r, d, three, type) {
   if (d > 10) return lerp(0.36, 0.56, rt(r.mid));
   return lerp(0.42, 0.64, rt((r.mid + r.ins) / 2));
 }
-function contestMult(type, c) { return type === 'dunk' ? 1 - 0.3 * c * c : type === 'layup' ? 1 - 0.3 * c : 1 - 0.34 * c; }
+function contestMult(type, c) { return type === 'dunk' ? 1 - 0.42 * c * c : type === 'layup' ? 1 - 0.4 * c : 1 - 0.34 * c; }
 function shotChance(p, S, c) {
   if (S.type === 'ft') return clamp(0.52 + 0.42 * rt(p.d.mid), 0.4, 0.95);
   let base = baseProb(p.d, S.dist, S.three, S.type) * contestMult(S.type, c);
   if (S.type === 'jump' && S.moving) base *= 0.9;
+  if (S.type === 'layup' && S.runSp > 17.5) base *= 0.92;
   if (p.stam < 25) base *= 0.9;
   return clamp(base, 0.01, 0.97);
 }
@@ -361,7 +362,7 @@ function startShot(p, rim) {
     const c = contestOn(p);
     const canDunk = p.d.dnk >= 62 && d < 10.5 && d > 2.4;
     let want = canDunk && (user ? (p.in.sprint || p.d.dnk >= 88 || toward > 12) : (c < 0.55 && rand() < 0.08 + 0.6 * rt(p.d.dnk)));
-    if (want && c > 0.8) want = false;
+    if (want && c > (user ? 0.58 : 0.8)) want = false;
     type = want ? 'dunk' : 'layup';
   }
   const S = { type, dist: d, three: false, released: false, relT: 0, timed: false, ideal: 0, win: 0, moving: sp > 7, made: false };
@@ -604,7 +605,7 @@ function stealCheck(p) {
     }
   } else {
     let F = 0.12;
-    if (p === G.ctrl) F = 0.15; else if (G.userTeam >= 0 && p.team.idx !== G.userTeam) F *= G.diff.cpuFoul;
+    if (p === G.ctrl) F = 0.24; else if (G.userTeam >= 0 && p.team.idx !== G.userTeam) F *= G.diff.cpuFoul;
     if (d < 3 && rand() < F) reachFoul(p, h);
   }
 }
@@ -752,13 +753,32 @@ function massOf(p) {
   if (hyp(p.vx, p.vz) < 2) m *= 1.4;
   return m;
 }
+/* a ball handler who barrels into a set defender outside the restricted area can be called for a charge */
+function chargeCheck(h, o) {
+  if (G.state !== 'live' || !h.hasBall || o.team === h.team || h.act === 'shoot' || o.act !== 'none' || G.chargeCD > 0) return false;
+  const sp = hyp(h.vx, h.vz), osp = hyp(o.vx, o.vz);
+  if (sp < 13 || osp > 4.5 || distRim(h) < 5) return false;
+  const dx = o.x - h.x, dz = o.z - h.z, d = hyp(dx, dz) || 1;
+  if ((h.vx * dx + h.vz * dz) / (sp * d) < 0.75) return false;
+  G.chargeCD = 1.5;
+  let P = 0.18 + 0.25 * rt(o.d.def);
+  if (h === G.ctrl && G.userTeam === h.team.idx) P *= 1.35;
+  if (rand() > P) return false;
+  h.st.to++; registerFoul(h, o, 'charge');
+  emit('turnover', { p: h, why: 'charge' });
+  const sp2 = oobSpot(h.x, h.z);
+  whistle('Offensive foul · charge', 1.2, () => startDead(o.team.idx, sp2.x, sp2.z, { minT: 0.9 }));
+  return true;
+}
 function collidePlayers() {
   const P = G.players, n = P.length, R = 1.8;
+  if (G.chargeCD > 0) G.chargeCD -= DT;
   for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++) {
     const a = P[i], c = P[j];
     if (a.y > 1.2 || c.y > 1.2) continue;
     const dx = c.x - a.x, dz = c.z - a.z, d2 = dx * dx + dz * dz;
     if (d2 >= R * R || d2 < 1e-6) continue;
+    if ((a.hasBall && chargeCheck(a, c)) || (c.hasBall && chargeCheck(c, a))) return;
     const d = Math.sqrt(d2), ov = R - d, nx = dx / d, nz = dz / d;
     const wa = massOf(a), wc = massOf(c), ta = wc / (wa + wc), tc = wa / (wa + wc);
     a.x -= nx * ov * ta; a.z -= nz * ov * ta; c.x += nx * ov * tc; c.z += nz * ov * tc;

@@ -491,6 +491,7 @@ function handleEvents() {
       case 'turnover':
         if (!quiet && e.why === 'shotclock') banner('Shot clock', 'Violation');
         else if (!quiet && e.why === 'backcourt') banner('Backcourt', 'Violation');
+        else if (!quiet && e.why === 'charge') banner('Charge!', shortName(e.p));
         break;
       case 'periodEnd':
         crowdRoar(0.6, 2); backboardLights();

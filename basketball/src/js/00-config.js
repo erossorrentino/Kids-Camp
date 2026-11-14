@@ -121,10 +121,10 @@ for (const T of TEAMS) { for (const p of T.roster) p.ovr = playerOvr(p); T.rt = 
 
 /* win = half width (seconds) of the perfect-release window for the human shooter */
 const DIFFS = {
-  rookie:  { name: 'Rookie',   win: 0.058, boost: 0.95, cpuShot: 0.84, react: 1.75, think: 0.55, cpuSteal: 0.45, jump: 0.30, noise: 1.6, userSteal: 1.45, cpuFoul: 1.2 },
-  pro:     { name: 'Pro',      win: 0.044, boost: 0.90, cpuShot: 0.95, react: 1.30, think: 0.42, cpuSteal: 0.75, jump: 0.46, noise: 1.0, userSteal: 1.15, cpuFoul: 1.0 },
-  allstar: { name: 'All-Star', win: 0.034, boost: 0.86, cpuShot: 1.03, react: 1.00, think: 0.34, cpuSteal: 1.00, jump: 0.60, noise: 0.7, userSteal: 1.0,  cpuFoul: 0.9 },
-  legend:  { name: 'Legend',   win: 0.026, boost: 0.80, cpuShot: 1.10, react: 0.85, think: 0.28, cpuSteal: 1.20, jump: 0.72, noise: 0.5, userSteal: 0.9,  cpuFoul: 0.8 },
+  rookie:  { name: 'Rookie',   win: 0.058, boost: 0.95, cpuShot: 0.84, react: 1.75, think: 0.55, cpuSteal: 0.45, jump: 0.30, noise: 1.6, userSteal: 1.1, cpuFoul: 1.2 },
+  pro:     { name: 'Pro',      win: 0.044, boost: 0.90, cpuShot: 0.95, react: 1.30, think: 0.42, cpuSteal: 0.75, jump: 0.46, noise: 1.0, userSteal: 0.8, cpuFoul: 1.0 },
+  allstar: { name: 'All-Star', win: 0.034, boost: 0.86, cpuShot: 1.03, react: 1.00, think: 0.34, cpuSteal: 1.00, jump: 0.60, noise: 0.7, userSteal: 0.65, cpuFoul: 0.9 },
+  legend:  { name: 'Legend',   win: 0.026, boost: 0.80, cpuShot: 1.10, react: 0.85, think: 0.28, cpuSteal: 1.20, jump: 0.72, noise: 0.5, userSteal: 0.52, cpuFoul: 0.8 },
 };
 
 /* Half-court spots in attack coordinates (the hoop being attacked sits at +41.75, 0) */
