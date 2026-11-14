@@ -72,7 +72,7 @@ export class Input {
     let nitro = K.has('KeyN') || K.has('ShiftLeft') || K.has('ShiftRight');
     // keyboard steering ramps so taps make small corrections
     const target = (left ? 1 : 0) - (right ? 1 : 0);
-    const rate = target === 0 ? 7 : Math.sign(target) !== Math.sign(this._kbSteer) ? 9 : 4.2;
+    const rate = target === 0 ? 8 : Math.sign(target) !== Math.sign(this._kbSteer) ? 10 : 5.5;
     this._kbSteer += Math.max(-rate * dt, Math.min(rate * dt, target - this._kbSteer));
     let steer = this._kbSteer;
     let analog = false;
@@ -80,7 +80,7 @@ export class Input {
     if (T.gas) thr = 1;
     if (T.brake) brk = 1;
     if (T.nitro) nitro = true;
-    if (T.left || T.right) { const t2 = (T.left ? 1 : 0) - (T.right ? 1 : 0); steer = t2 * Math.min(1, Math.abs(steer) + dt * 4) || t2; this._kbSteer = steer; }
+    if (T.left || T.right) { const t2 = (T.left ? 1 : 0) - (T.right ? 1 : 0); steer = t2 * Math.min(1, Math.abs(steer) + dt * 7) || t2; this._kbSteer = steer; }
     if (T.steer) { steer = T.steer; analog = true; }
     // gamepad
     const gp = this.gamepad();

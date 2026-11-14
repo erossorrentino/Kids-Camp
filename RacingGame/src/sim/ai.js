@@ -6,6 +6,7 @@
 // and stable while still reacting to contact with the player.
 import { clamp, lerp, RNG } from '../core/rng.js';
 import { DS } from './track.js';
+import { CORNER_GRIP } from './vehicle.js';
 
 const G = 9.81;
 
@@ -29,7 +30,7 @@ export function brakeAt(ph, v) {
 // Max speed at each track sample along the racing line (m/s)
 export function speedProfile(track, ph, gripScale = 1) {
   const N = track.N;
-  const mu = ph.mu * gripScale;
+  const mu = ph.mu * gripScale * CORNER_GRIP; // cornering grip (braking below uses plain mu)
   const vmax = new Float32Array(N);
   for (let i = 0; i < N; i++) {
     const k = Math.abs(track.raceKappa[i]) + 1e-5;

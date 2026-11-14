@@ -34,6 +34,10 @@ tablet, or host it anywhere. Progress saves in the browser.
   Hills (cherry blossoms) and Glacier Point (snow).
 - **Quick Race** on any track with any time of day or rain, and a
   **Test Drive** for any car in the dealership before you buy it.
+- **Game-style handling.** Cars grip harder in corners than real cars
+  (the AI gets the same grip, so races stay fair). Holding a steer button
+  all the way turns the wheels just far enough for the most grip, and the
+  stability assist keeps the car turning hard without spinning.
 - **AI opponents** matched to your car and difficulty. They follow the
   racing line, brake for corners based on their own car's grip and
   downforce, overtake, defend and slipstream.
@@ -86,8 +90,9 @@ crowd cheer when you win.
 | Manual gears | Q / E | LB / RB | |
 
 **Phones:** the game goes full screen and asks you to turn the phone
-sideways for racing. On phones, *Auto accelerate* and *Auto brake* are on
-by default so young drivers only need to steer. Change them in Settings.
+sideways for racing. You drive with the GAS and BRAKE buttons. If you would
+rather only steer, switch on *Auto accelerate* and *Auto brake* in Settings
+(they are off by default on every device).
 
 ### Kid-friendly assists (Settings)
 

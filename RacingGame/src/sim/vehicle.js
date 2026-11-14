@@ -19,6 +19,10 @@ export const SURFACES = {
   dirt: { mu: 0.6, roll: 0.15, bump: 0.5, dust: [0.5, 0.4, 0.3] },
 };
 
+// Game-style cornering: race cars grip this much harder sideways than the
+// real-world numbers, so they turn sharply (AI corner speeds use it too).
+export const CORNER_GRIP = 1.6;
+
 export class Vehicle {
   constructor(phys, track, opts = {}) {
     this.p = phys;
@@ -32,6 +36,7 @@ export class Vehicle {
     this.halfW = opts.halfWidth || 0.95;
     this.halfL = opts.halfLength || 2.25;
     this.wet = opts.wet ? 0.82 : 1;
+    this.latGrip = opts.latGrip ?? CORNER_GRIP;
     this.buildGears();
     this.reset(0, 0);
     this.nitroMax = phys.nitro || 0;
@@ -104,7 +109,11 @@ export class Vehicle {
     return (p.powerW * pw) / w;
   }
 
-  maxSteer(v) { return 0.6 / (1 + Math.abs(v) / 15); }
+  // Most sideways acceleration the tyres can hold at speed v (m/s^2), with downforce
+  latLimit(v) { const p = this.p; return p.mu * this.latGrip * this.wet * (G + (p.cl * v * v) / p.mass); }
+  // Full steering lock at speed v: about the angle that gives the most grip, so
+  // holding a steer button all the way turns the car hard instead of sliding.
+  maxSteer(v) { const v2 = Math.max(v * v, 1); return Math.min(0.6, 0.12 + (this.p.wheelbase * this.latLimit(v)) / v2); }
 
   update(dt, input, opts = {}) {
     const p = this.p, tr = this.track, A = this.assists;
@@ -146,7 +155,7 @@ export class Vehicle {
     const maxS = this.maxSteer(v);
     let target = clamp(input.steer || 0, -1, 1) * maxS;
     if (A.steering) target += clamp(beta * 0.75, -0.35, 0.35);
-    const rate = (input.analog ? 6 : 3.2) * Math.max(maxS, 0.12);
+    const rate = (input.analog ? 6 : 4.5) * Math.max(maxS, 0.12);
     this.steer += clamp(target - this.steer, -rate * dt, rate * dt);
     const delta = this.steer;
 
@@ -240,11 +249,12 @@ export class Vehicle {
     const alphaF = Math.atan2(vLat + this.yawRate * this.a, vxa) - delta * sg;
     const alphaR = Math.atan2(vLat - this.yawRate * this.b, vxa);
     const Bf = 18, Br = 19.5, C = 1.3;
-    let Fyf = -mu * Fzf * Math.sin(C * Math.atan(Bf * alphaF));
-    let Fyr = -mu * Fzr * Math.sin(C * Math.atan(Br * alphaR)) * rearLatScale;
+    const muLat = mu * this.latGrip;
+    let Fyf = -muLat * Fzf * Math.sin(C * Math.atan(Bf * alphaF));
+    let Fyr = -muLat * Fzr * Math.sin(C * Math.atan(Br * alphaR)) * rearLatScale;
     // friction ellipse: longitudinal use eats into lateral capacity
-    const capF = Math.sqrt(Math.max(0, limF * limF - Fxf * Fxf));
-    const capR = Math.sqrt(Math.max(0, limR * limR - Fxr * Fxr)) * rearLatScale;
+    const capF = muLat * Fzf * Math.sqrt(Math.max(0, 1 - (Fxf * Fxf) / (limF * limF)));
+    const capR = muLat * Fzr * Math.sqrt(Math.max(0, 1 - (Fxr * Fxr) / (limR * limR))) * rearLatScale;
     Fyf = clamp(Fyf, -capF, capF);
     Fyr = clamp(Fyr, -capR, capR);
     if (this.lockup) { Fyf *= 0.3; }
@@ -265,11 +275,13 @@ export class Vehicle {
     const Flong = Fxf * cd - Fyf * sd + Fxr + Fslope;
     const Flat = Fyf * cd + Fxf * sd + Fyr - m * G * Math.sin(bankLocal);
     let torque = this.a * (Fyf * cd + Fxf * sd) - this.b * Fyr;
-    // stability assist: damp excessive yaw relative to path curvature
+    // stability assist: steer the yaw rate toward what the driver asks for, but
+    // never faster than the tyres can hold (so the car turns hard without spinning)
     if (A.stability && v > 5) {
-      const yawTarget = (vLong * Math.tan(delta)) / L;
+      const rMax = (muLat * (G + down / m) * 0.97) / v;
+      const yawTarget = clamp((vLong * Math.tan(delta)) / L, -rMax, rMax);
       const err = this.yawRate - yawTarget;
-      if (Math.abs(beta) > 0.07) torque -= err * this.Iz * 3.0;
+      torque -= err * this.Iz * (Math.abs(beta) > 0.07 ? 3.5 : 2.0);
     }
     const Fwx = Flong * fx + Flat * lx + dragX;
     const Fwz = Flong * fz + Flat * lz + dragZ;

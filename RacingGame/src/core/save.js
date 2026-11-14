@@ -24,13 +24,12 @@ export function isTouchFirst() {
     return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   } catch (e) { return false; }
 }
-const isTouch = isTouchFirst;
 
-// Phones/tablets start with friendlier assists: the car accelerates by itself
+// Every device starts with the driver in charge of gas and brake
+// (Auto accelerate / Auto brake can be switched on in Settings).
+const SETTINGS_REV = 2;
 function defaultSettings() {
-  const s = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
-  if (isTouch()) { s.assists.autoGas = true; s.assists.autoBrake = true; }
-  return s;
+  return JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
 }
 
 function starterCar() {
@@ -51,6 +50,7 @@ export function newProfile() {
     seriesDone: {}, // seriesId -> true (bonus paid)
     stats: { races: 0, wins: 0, podiums: 0, earned: 0 },
     settings: defaultSettings(),
+    settingsRev: SETTINGS_REV,
     welcomeSeen: false,
   };
 }
@@ -62,6 +62,8 @@ export function loadProfile() {
       const p = JSON.parse(raw);
       if (p && p.garage && p.garage.length) {
         p.settings = { ...DEFAULT_SETTINGS, ...(p.settings || {}), assists: { ...DEFAULT_SETTINGS.assists, ...(p.settings?.assists || {}) } };
+        // Older saves had Auto accelerate + Auto brake switched on for phones: switch them off once
+        if (!(p.settingsRev >= SETTINGS_REV)) { p.settings.assists.autoGas = false; p.settings.assists.autoBrake = false; p.settingsRev = SETTINGS_REV; }
         p.career ||= {}; p.seriesDone ||= {}; p.stats ||= { races: 0, wins: 0, podiums: 0, earned: 0 };
         return p;
       }
