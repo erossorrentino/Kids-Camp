@@ -56,8 +56,13 @@ tablet, or host it anywhere. Progress saves in the browser.
   with lit windows, sea water and snow-capped mountains.
 - Tyre smoke, skid marks, sparks, dust off-track, exhaust flames on
   upshifts and nitro, rain spray.
-- Quality presets (Low / Medium / High / Ultra) plus automatic resolution
-  scaling to keep the frame rate smooth.
+- Quality presets (Lite / Low / Medium / High / Ultra) plus automatic
+  resolution scaling to keep the frame rate smooth.
+- **Lite** is the simplest look (no shadows, reflections or special
+  effects). Phones and very weak computers start on Lite; Chromebooks and
+  tablets start on Low. If the game sees a white or blank picture, loses
+  the graphics, or runs too slowly, it switches down a step by itself. You
+  can change it any time in Settings or the pause menu.
 
 ### Sound
 
@@ -121,6 +126,26 @@ Upgrade parts are priced at real aftermarket costs for a typical $40k car
 (for example a Stage 1 tune is about $900, racing slicks about $2,600,
 carbon-ceramic brakes about $14,000). They cost more for exotic cars,
 the same way parts for a supercar or race car do in real life.
+
+## If something goes wrong
+
+Every error screen shows a short **error code**. Tap **Send error report**
+to save a small report (device type, screen size, graphics chip, browser
+and what happened) in the game's own private storage so it can be looked
+at. Reports contain no names or personal details.
+
+| Code | What it means | What the game does |
+|---|---|---|
+| E-DL | The game file didn't download | Tries again once, then asks you to reload |
+| E-SLOW | The game took too long to start | Asks you to reload |
+| E-BOOT | The game crashed while starting | Asks you to reload |
+| E-GL | The browser can't draw 3D graphics | Suggests the latest Chrome or Safari |
+| E-LOST | The graphics chip reset | Switches to Lite and goes back to the menu |
+| E-WHITE | The picture stayed white or blank | Switches down a graphics step; shows this only if Lite fails too |
+| E-RACE | A race failed to load | Retries once on Lite before showing this |
+| E-LOOP | The game kept hitting an error | Stops the race (or suggests a reload) |
+
+If the game crashes while loading, it starts on Lite graphics next time.
 
 ## Building from source
 
