@@ -115,7 +115,12 @@ export class UI {
 
   show(name, params) {
     this.current = name;
-    this.root.querySelectorAll('.tabs button').forEach((b) => b.classList.toggle('on', b.dataset.go === name || (name === 'series' && b.dataset.go === 'career')));
+    this.root.querySelectorAll('.tabs button').forEach((b) => {
+      const on = b.dataset.go === name || (name === 'series' && b.dataset.go === 'career');
+      b.classList.toggle('on', on);
+      // keep the current tab visible when the tab bar is too narrow and scrolls
+      if (on) { const bar = b.parentElement; if (bar && bar.scrollWidth > bar.clientWidth) bar.scrollLeft = Math.max(0, b.offsetLeft - bar.offsetLeft - (bar.clientWidth - b.offsetWidth) / 2); }
+    });
     this.root.classList.remove('full');
     this.screenEl.className = 'screen s-' + name;
     this.updateWallet();

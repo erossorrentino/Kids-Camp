@@ -513,3 +513,23 @@ select option { background: #121826; }
   .modal .howto { margin: 8px 0; }
   .modal .lead { margin: 6px 0; }
 }
+/* Short phone screens: the big rev dial sat on top of the player's car, so a
+   small speed/gear readout in the top-right corner replaces it */
+.hud-dig { display: none; }
+@media (max-height: 520px) {
+  .is-touch .hud-br { display: none; }
+  .is-touch .hud-dig { display: flex; position: absolute; top: calc(12px + env(safe-area-inset-top, 0px)); right: calc(18px + env(safe-area-inset-right, 0px)); align-items: center; gap: 8px; height: 44px; padding: 0 12px 0 10px; background: rgba(8, 11, 18, 0.72); border: 1px solid var(--line); border-radius: 10px; }
+  .hud-dig .d-gear { font: italic 900 30px/1 "Titillium Web", Arial, sans-serif; min-width: 20px; text-align: center; }
+  .hud-dig .d-gear.lim { color: #ff2d55; }
+  .hud-dig .d-sp { display: flex; flex-direction: column; align-items: flex-end; line-height: 1; }
+  .hud-dig .d-spd { font-weight: 800; font-size: 22px; font-variant-numeric: tabular-nums; min-width: 3ch; text-align: right; }
+  .hud-dig small { font-size: 9px; color: var(--muted); letter-spacing: 0.1em; }
+  .hud-dig .d-n { position: absolute; left: 8px; right: 8px; bottom: 3px; height: 3px; background: rgba(255, 255, 255, 0.12); border-radius: 2px; overflow: hidden; }
+  .hud-dig .d-n i { display: block; height: 100%; width: 100%; background: #8ad8ff; }
+}
+/* Narrow sideways phones: drop the logo so more menu tabs fit, and fade the
+   right edge of the tab bar to show it scrolls */
+@media (max-height: 520px) and (max-width: 760px) {
+  .logo { display: none; }
+  .tabs { -webkit-mask-image: linear-gradient(90deg, #000 82%, transparent); mask-image: linear-gradient(90deg, #000 82%, transparent); }
+}

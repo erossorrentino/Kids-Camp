@@ -33,6 +33,7 @@ export class HUD {
         <canvas class="hud-tach" width="300" height="300"></canvas>
         <div class="hud-nitro"><div class="n-fill"></div><span>N₂O</span></div>
       </div>
+      <div class="hud-dig"><b class="d-gear">N</b><div class="d-sp"><span class="d-spd">0</span><small>${units === 'mph' ? 'MPH' : 'KM/H'}</small></div><i class="d-n"><i></i></i></div>
       <div class="hud-bl"><span class="as as-abs">ABS</span><span class="as as-tcs">TCS</span><span class="as as-cam"></span></div>
       <div class="hud-lights"><div class="pod"><i></i><i></i></div><div class="pod"><i></i><i></i></div><div class="pod"><i></i><i></i></div><div class="pod"><i></i><i></i></div><div class="pod"><i></i><i></i></div></div>
       <div class="hud-msg"></div>
@@ -51,6 +52,9 @@ export class HUD {
     this.msgEl = this.q('.hud-msg'); this.toastEl = this.q('.hud-toast'); this.wrongEl = this.q('.hud-wrong');
     this.tach = this.q('.hud-tach');
     this.tctx = this.tach.getContext('2d');
+    // small speed/gear readout that replaces the big dial on short phone screens
+    this.dig = this.q('.hud-dig'); this.dGear = this.q('.d-gear'); this.dSpd = this.q('.d-spd'); this.dN = this.q('.d-n'); this.dNf = this.q('.d-n i');
+    this.compact = false; this.compactT = 0; this._dg = ''; this._ds = -1;
     this.buildMap(track);
     this.textTimer = 0;
     this.msgTimer = 0; this.toastTimer = 0;
@@ -94,7 +98,9 @@ export class HUD {
     // timers
     if (this.msgTimer > 0) { this.msgTimer -= dt; if (this.msgTimer <= 0) this.msgEl.classList.remove('show'); }
     if (this.toastTimer > 0) { this.toastTimer -= dt; if (this.toastTimer <= 0) this.toastEl.classList.remove('show'); }
-    this.drawTach(info);
+    this.compactT -= dt;
+    if (this.compactT <= 0) { this.compactT = 0.5; this.compact = this.dig.offsetWidth > 0; }
+    if (this.compact) this.drawDigital(info); else this.drawTach(info);
     this.textTimer -= dt;
     if (this.textTimer > 0) return;
     this.textTimer = 1 / 15;
@@ -112,7 +118,8 @@ export class HUD {
       this.nitroEl.style.display = '';
       this.nitroFill.style.width = `${(info.nitro / info.nitroMax) * 100}%`;
       this.nitroEl.classList.toggle('on', info.nitroOn);
-    } else this.nitroEl.style.display = 'none';
+      this.dN.style.display = ''; this.dNf.style.width = `${(info.nitro / info.nitroMax) * 100}%`;
+    } else { this.nitroEl.style.display = 'none'; this.dN.style.display = 'none'; }
     this.absEl.classList.toggle('active', !!info.absActive);
     this.tcsEl.classList.toggle('active', !!info.tcsActive);
     this.absEl.classList.toggle('off', !info.abs);
@@ -143,6 +150,14 @@ export class HUD {
       c.setAttribute('r', e.isPlayer ? '5.5' : '3.6');
       c.setAttribute('class', e.isPlayer ? 'me' : '');
     });
+  }
+
+  drawDigital(info) {
+    const g = String(info.gear);
+    if (g !== this._dg) { this._dg = g; this.dGear.textContent = g; }
+    this.dGear.classList.toggle('lim', !!info.limiter);
+    const spd = Math.round(this.units === 'mph' ? info.speed * 2.23694 : info.speed * 3.6);
+    if (spd !== this._ds) { this._ds = spd; this.dSpd.textContent = String(spd); }
   }
 
   drawTach(info) {
