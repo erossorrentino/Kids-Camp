@@ -1,0 +1,37 @@
+import * as THREE from 'three';
+import { Graphics } from '../gfx/renderer.js';
+import { Environment, ENV_PRESETS } from '../gfx/environment.js';
+const params = new URLSearchParams(location.search);
+const app = document.getElementById('app');
+const gfx = new Graphics(app);
+gfx.setQuality('medium');
+const names = Object.keys(ENV_PRESETS);
+// render each preset into a tile
+const tiles = [];
+const W = 320, H = 200;
+const out = document.createElement('canvas');
+out.width = W * 4; out.height = H * 2;
+out.style.cssText = 'position:fixed;left:0;top:0;z-index:5';
+document.body.appendChild(out);
+const octx = out.getContext('2d');
+gfx.renderer.setSize(W, H, false);
+gfx.renderer.setPixelRatio(1);
+names.forEach((n, i) => {
+  const scene = new THREE.Scene();
+  const cam = new THREE.PerspectiveCamera(70, W / H, 0.1, 5000);
+  const env = new Environment(scene, gfx.renderer, n, gfx.quality);
+  const g = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000), new THREE.MeshStandardMaterial({ color: 0x556644 }));
+  g.rotation.x = -Math.PI / 2; scene.add(g);
+  const ball = new THREE.Mesh(new THREE.SphereGeometry(2, 32, 16), new THREE.MeshPhysicalMaterial({ color: 0xc00000, metalness: 0.5, roughness: 0.3, clearcoat: 1 }));
+  ball.position.set(0, 2, -10); scene.add(ball);
+  cam.position.set(0, 3, 0);
+  const az = THREE.MathUtils.degToRad(env.preset.sunAzim);
+  cam.lookAt(new THREE.Vector3(Math.sin(az) * 10, 3 + 10 * Math.tan(THREE.MathUtils.degToRad(+(params.get('pitch') || 12))), Math.cos(az) * 10));
+  if (params.get('away')) cam.lookAt(new THREE.Vector3(-Math.sin(az) * 10, 6, -Math.cos(az) * 10));
+  gfx.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  gfx.renderer.render(scene, cam);
+  octx.drawImage(gfx.renderer.domElement, (i % 4) * W, Math.floor(i / 4) * H);
+  octx.fillStyle = '#fff'; octx.font = '14px sans-serif'; octx.fillText(n, (i % 4) * W + 6, Math.floor(i / 4) * H + 16);
+  env.dispose();
+});
+window.__ready = true;
