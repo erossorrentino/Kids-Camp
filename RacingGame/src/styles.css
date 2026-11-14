@@ -507,3 +507,9 @@ select option { background: #121826; }
 .n-box { max-height: 92vh; overflow-y: auto; }
 .r-upgrade { font-size: 14px; color: #cfd6e4; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
 @media (max-height: 520px) { .n-box { padding: 14px 18px; } .n-box h2 { font-size: 20px; margin-bottom: 4px; } .n-code { font-size: 19px; } .n-box p { margin: 6px 0; font-size: 13px; } }
+/* Short (sideways phone) screens: keep a dialog's main button in view while its text scrolls */
+@media (max-height: 520px) {
+  .modal > .btn.wide:last-child { position: -webkit-sticky; position: sticky; bottom: 0; z-index: 1; box-shadow: 0 0 0 10px #0b0f18, 0 22px 0 10px #0b0f18; margin-top: 14px; }
+  .modal .howto { margin: 8px 0; }
+  .modal .lead { margin: 6px 0; }
+}
