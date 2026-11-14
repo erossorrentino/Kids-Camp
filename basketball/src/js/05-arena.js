@@ -269,12 +269,14 @@ function crowdGeo() {
     if (g.attributes.uv) g.deleteAttribute('uv');
     parts.push(g.index ? g.toNonIndexed() : g);
   };
-  const torso = new THREE.CylinderGeometry(0.4, 0.38, 1.45, 6, 1, false); torso.scale(0.75, 1, 1.15); torso.translate(0, 1.42, 0); add(torso, 0);
+  const torso = new THREE.LatheGeometry([[0.3, 0.72], [0.37, 1.15], [0.45, 1.75], [0.43, 2.02], [0.15, 2.2]].map((q) => new THREE.Vector2(q[0], q[1])), 6);
+  torso.scale(0.72, 1, 1.22); torso.computeVertexNormals(); add(torso, 0);
+  const lap = new THREE.BoxGeometry(0.95, 0.32, 0.9); lap.translate(0.38, 0.86, 0); add(lap, 0);
   const head = new THREE.SphereGeometry(0.34, 6, 4); head.scale(0.95, 1.12, 0.9); head.translate(0, 2.5, 0); add(head, 1);
   { const hg = parts[parts.length - 1], hp = hg.attributes.position, ap = hg.attributes.aPart;
     for (let i = 0; i < hp.count; i++) if (hp.getY(i) > 2.6) ap.setX(i, 4); }
   for (const s of [-1, 1]) {
-    const arm = new THREE.CylinderGeometry(0.12, 0.1, 1.05, 4, 1, true); arm.translate(0.08, 1.55, s * 0.56); add(arm, s < 0 ? 2 : 3);
+    const arm = new THREE.CylinderGeometry(0.12, 0.1, 1.05, 5, 1, true); arm.translate(0.06, 1.5, s * 0.53); add(arm, s < 0 ? 2 : 3);
   }
   // merge (all non-indexed now)
   let n = 0; for (const g of parts) n += g.attributes.position.count;
@@ -428,6 +430,17 @@ function buildArena() {
     }
     R.benchMats.push(bm);
   }
+  // courtside people: bench players, coaches and baseline photographers share the crowd shader
+  const cs = [];
+  for (const s of [-1, 1]) {
+    for (let i = 0; i < 8; i++) if (i !== 4) cs.push({ x: s * (20 + i * 2.15), y: 1.0, z: -30.45, face: -PI / 2, ang: 9, row: 0, kind: i === 0 ? 'coach' : 'bench', side: s });
+    for (let i = 0; i < 4; i++) cs.push({ x: s * (49.2 + (i % 2) * 0.9), y: -0.45, z: (i < 2 ? 1 : -1) * (9 + i * 2.6), face: s > 0 ? PI : 0, ang: 9, row: 0, kind: 'photo' });
+  }
+  R.courtside = buildCrowdMesh(cs); R.scene.add(R.courtside);
+  { const a = R.courtside.geometry.attributes.aAnim; cs.forEach((c, i) => { a.array[i * 4 + 3] = c.stand ? 1 : 0; a.array[i * 4 + 1] = c.kind === 'photo' ? 0.2 : 0.9; }); a.needsUpdate = true;
+    const d = new THREE.Object3D(); cs.forEach((c, i) => { const sc = c.kind === 'bench' ? 1.22 : 1.05; d.position.set(c.x, c.y, c.z); d.rotation.set(0, -c.face, 0); d.scale.set(sc, sc, sc); d.updateMatrix(); R.courtside.setMatrixAt(i, d.matrix); });
+    R.courtside.instanceMatrix.needsUpdate = true; }
+  R.courtsideSeats = cs;
   buildCeiling();
   buildJumbotron();
 }
@@ -537,6 +550,13 @@ function paintArena(home, away) {
   R.benchMats[0].color.set(shade(home.c1, -0.55)); R.benchMats[1].color.set(shade(away.c1, -0.55));
   R.bowlMat.color.set(shade(home.c2, -0.1)).lerp(new THREE.Color('#3a3f4a'), 0.6);
   colorCrowd(R.crowdLower, home, away); colorCrowd(R.crowdUpper, home, away);
+  { const a = R.courtside.geometry.attributes.aShirt, col = new THREE.Color();
+    R.courtsideSeats.forEach((c, i) => {
+      col.set(c.kind === 'bench' ? (c.side < 0 ? home.c1 : away.c1) : c.kind === 'coach' ? '#1c1f26' : '#2a2c31');
+      if (c.kind === 'bench') col.multiplyScalar(0.85);
+      a.array[i * 3] = col.r; a.array[i * 3 + 1] = col.g; a.array[i * 3 + 2] = col.b;
+    });
+    a.needsUpdate = true; }
   drawReflCrowd(home, away);
   R.jumboRing.color.set(home.c1).multiplyScalar(2.2);
   for (const h of R.hoops) { drawPad(h, home); }
@@ -981,6 +1001,7 @@ function updateWorld(dt, rdt) {
     const pf = q.f + angDiff(q.f, p.face) * a;
     poseHumanoid(R.players[i], p, Math.max(dt, 1e-4), px, py, pz, pf);
   });
+  stepRefs(dt);
   const b = G.ball, bm = R.ball;
   bm.visible = b.visible;
   const bx = lerp(R.prevBall.x, b.x, a), by = lerp(R.prevBall.y, b.y, a), bz = lerp(R.prevBall.z, b.z, a);

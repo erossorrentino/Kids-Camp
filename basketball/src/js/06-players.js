@@ -13,9 +13,9 @@ const HAIRC = ['#14100c', '#221710', '#35261a', '#6a4a2a', '#c9a35e'];
 /* ---------- atlas layout: 1024 x 1024 canvas, uv v = 1 - y / 1024 ---------- */
 const AT = 1024;
 const REG = { jersey: [0, 0, 1024, 512], shorts: [0, 512, 512, 256], pelvis: [512, 512, 512, 256], face: [0, 768, 256, 256], hair: [256, 768, 256, 256] };
-const PATCH = { skin: 0, sock: 1, shoe: 2, sole: 3, accent: 4, trim: 5, dark: 6, white: 7, band: 8, sleeve: 9, lip: 10, kit: 11, hairSolid: 12, shoe2: 13 };
+const PATCH = { skin: 0, sock: 1, shoe: 2, sole: 3, accent: 4, trim: 5, dark: 6, white: 7, band: 8, sleeve: 9, lip: 10, kit: 11, hairSolid: 12, shoe2: 13, pants: 14, shirt: 15 };
 const ROUGH = { jersey: 0.74, shorts: 0.6, pelvis: 0.6, face: 0.5, hair: 0.85,
-  patch: [0.47, 0.85, 0.32, 0.55, 0.38, 0.6, 0.35, 0.6, 0.8, 0.5, 0.4, 0.6, 0.82, 0.3] };
+  patch: [0.47, 0.85, 0.32, 0.55, 0.38, 0.6, 0.35, 0.6, 0.8, 0.5, 0.4, 0.6, 0.82, 0.3, 0.7, 0.72] };
 function patchXY(i) { return [512 + (i % 8) * 64, 768 + Math.floor(i / 8) * 64]; }
 function patchUV(name) { const [x, y] = patchXY(PATCH[name]); return [(x + 32) / AT, 1 - (y + 32) / AT]; }
 
@@ -130,6 +130,14 @@ function paintAtlas(T, home, d, C) {
   folds(g, 0, 150, 1024, 362, 40, 0.08);
   const hem = g.createLinearGradient(0, 330, 0, 512); hem.addColorStop(0, 'rgba(0,0,0,0)'); hem.addColorStop(1, 'rgba(0,0,0,0.16)');
   g.fillStyle = hem; g.fillRect(0, 330, 1024, 182);
+  if (C.ref) {
+    for (let x = 6; x < 1024; x += 36) { g.fillStyle = '#121212'; g.fillRect(x, 0, 12, 512); }
+    g.fillStyle = '#121212'; g.beginPath(); g.moveTo(196, 0); g.lineTo(256, 92); g.lineTo(316, 0); g.fill();
+    g.fillStyle = C.skin; g.beginPath(); g.moveTo(212, 0); g.lineTo(256, 70); g.lineTo(300, 0); g.fill();
+    g.fillStyle = '#e8e8e8'; g.fillRect(708, 220, 120, 150);
+    g.font = `900 120px ${FONT_D}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#111'; g.fillText(String(d.num), 768, 300);
+  }
+  if (!C.ref) {
   g.fillStyle = trim;
   for (const x of [0, 1008, 496]) g.fillRect(x, 190, x === 496 ? 32 : 16, 322);
   const hole = (cx, cy, rx, ry) => {
@@ -152,8 +160,10 @@ function paintAtlas(T, home, d, C) {
   g.font = `900 196px ${FONT_D}`; g.lineWidth = 11;
   g.strokeText(String(d.num), 768, 300); g.fillText(String(d.num), 768, 300);
   g.fillStyle = trim; g.fillRect(0, 494, 1024, 18);
+  }
   // shorts legs (u 0/1 = +z side, 0.5 = -z side; v 0 = hem at the bottom of the region)
-  g.fillStyle = kit; g.fillRect(0, 512, 512, 256);
+  const kitB = C.ref ? C.pants : kit;
+  g.fillStyle = kitB; g.fillRect(0, 512, 512, 256);
   folds(g, 0, 512, 512, 256, 26, 0.09);
   const sh = g.createLinearGradient(0, 640, 0, 768); sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(0,0,0,0.2)');
   g.fillStyle = sh; g.fillRect(0, 640, 512, 128);
@@ -163,7 +173,7 @@ function paintAtlas(T, home, d, C) {
   g.save(); g.beginPath(); g.arc(128, 580, 30, 0, TAU); g.fillStyle = home ? T.c2 : T.c1; g.fill();
   g.font = `900 italic 30px ${FONT_D}`; g.fillStyle = '#fff'; g.fillText(T.id, 128, 582); g.restore();
   // shorts pelvis with waistband
-  g.fillStyle = kit; g.fillRect(512, 512, 512, 256);
+  g.fillStyle = kitB; g.fillRect(512, 512, 512, 256);
   folds(g, 512, 512, 512, 256, 20, 0.07);
   g.fillStyle = trim; g.fillRect(512, 512, 512, 46);
   g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(512, 558, 512, 6);
@@ -204,7 +214,7 @@ function paintAtlas(T, home, d, C) {
     g.beginPath(); g.moveTo(x, y); g.lineTo(x + (Math.random() - 0.5) * 3, y + l); g.stroke();
   }
   // solid patches
-  const pc = { skin: C.skin, sock: C.sock, shoe: C.shoe, sole: C.sole, accent: C.accent, trim, dark: '#140d09', white: '#f2f2f2', band: C.band, sleeve: C.sleeve, lip: C.lip, kit, hairSolid: C.hair, shoe2: C.shoe2 };
+  const pc = { skin: C.skin, sock: C.sock, shoe: C.shoe, sole: C.sole, accent: C.accent, trim, dark: '#140d09', white: '#f2f2f2', band: C.band, sleeve: C.sleeve, lip: C.lip, kit, hairSolid: C.hair, shoe2: C.shoe2, pants: C.pants || C.skin, shirt: C.shirt || kit };
   for (const k in PATCH) { const [x, y] = patchXY(PATCH[k]); g.fillStyle = pc[k]; g.fillRect(x, y, 64, 64); }
   return c;
 }
@@ -222,7 +232,7 @@ function roughAtlas() {
 /* ---------- the model ---------- */
 const BI = { body: 0, hips: 1, torso: 2, head: 3, shR: 4, elR: 5, shL: 6, elL: 7, hipR: 8, knR: 9, ankR: 10, hipL: 11, knL: 12, ankL: 13 };
 function buildHumanoid(pl, home) {
-  const d = pl.d, T = pl.team.def;
+  const d = pl.d, T = pl.team.def, ref = !!pl.ref;
   const hsh = nameHash(d.n), bulk = { PG: 0.94, SG: 0.97, SF: 1.0, PF: 1.06, C: 1.12 }[d.pos];
   const hairC = HAIRC[d.skin <= 1 && d.hair === 2 ? 4 : d.hair % 3];
   const skinC = new THREE.Color(SKIN[d.skin]);
@@ -233,6 +243,7 @@ function buildHumanoid(pl, home) {
     lip: '#' + skinC.clone().multiplyScalar(0.72).lerp(new THREE.Color('#7a3b30'), 0.25).getHexString(),
     beard: hsh % 3 === 0, bald: d.hair === 0,
   };
+  if (ref) Object.assign(C, { kit: '#dcdddf', trim: '#111111', sock: '#111111', shoe: '#101010', shoe2: '#1c1c1c', sole: '#202020', accent: '#101010', pants: '#141518', shirt: '#cfd0d2', ref: true });
   const b = bulk;
   // bind-pose joint positions in mesh space (feet at the origin, facing +x)
   const J = { hips: [0, 3.35, 0], head: [0, 5.77, 0], shR: [0, 5.25, 0.76 * b], shL: [0, 5.25, -0.76 * b], hipR: [0, 3.27, 0.32 * b], hipL: [0, 3.27, -0.32 * b] };
@@ -286,6 +297,7 @@ function buildHumanoid(pl, home) {
     if (d.acc === 2 && s > 0) P.push(piece(constUV(lathe([[0.108, -2.05], [0.14, -1.85], [0.165, -1.55], [0.148, -1.3], [0.14, -1.18], [0.158, -1.02], [0.2, -0.75], [0.222, -0.48], [0.21, -0.25]], 16, b, b), 'sleeve'), j,
       (x, y) => blend(sh, el, sstep(ys - 0.98, ys - 1.32, y))));
     if (d.acc === 2 && s < 0) P.push(piece(constUV(cylG(0.108, 0.1, 0.16, 14, 0, -2.08, 0), 'band'), j, () => [el, 1]));
+    if (ref) P.push(piece(constUV(lathe([[0.2, -0.62], [0.225, -0.45], [0.23, -0.2], [0.24, 0.02], [0.2, 0.14]], 16, b, b), 'shirt'), j, () => [sh, 1], armAO));
   }
   // legs: continuous skin from hip to ankle, baggy shorts over the thigh, sock and shoe
   for (const s of [1, -1]) {
@@ -293,9 +305,10 @@ function buildHumanoid(pl, home) {
     const yh = j[1], yk = yh - 1.6, ya = yk - 1.52;
     const legW = (x, y) => { if (y > yk + 0.2) return [hp, 1]; if (y > yk - 0.18) return blend(hp, kn, sstep(yk + 0.2, yk - 0.18, y)); if (y > ya + 0.1) return [kn, 1]; return blend(kn, an, sstep(ya + 0.1, ya - 0.02, y)); };
     const legAO = (x, y, z, nx, ny, nz) => 1 - 0.22 * clamp(-nz * s, 0, 1) * sstep(yk + 0.5, yh - 0.6, y) - 0.1 * clamp(-nx, 0, 1) * (1 - Math.min(1, Math.abs(y - yk) / 0.4));
-    P.push(piece(constUV(lathe([[0.115, -3.14], [0.12, -3.05], [0.14, -2.9], [0.176, -2.6], [0.212, -2.22], [0.2, -1.95], [0.182, -1.75], [0.19, -1.6], [0.22, -1.4], [0.27, -1.0], [0.3, -0.55], [0.3, -0.2], [0.28, 0.02]], 16, b, b), 'skin'), j, legW, legAO));
-    P.push(piece(constUV(sphereG(0.19, 12, 9, 1.05, 1, 1, 0.02, -1.6, 0), 'skin'), j, legW, legAO));
-    P.push(piece(regionUV(lathe([[0.43, -1.42], [0.452, -1.2], [0.46, -0.6], [0.45, -0.12], [0.4, 0.06]], 20, b, b), 'shorts'), j,
+    const lp = ref ? 'pants' : 'skin', lw = ref ? 1.18 : 1;
+    P.push(piece(constUV(lathe([[0.115 * lw, -3.14], [0.12 * lw, -3.05], [0.14 * lw, -2.9], [0.176 * lw, -2.6], [0.212 * lw, -2.22], [0.2 * lw, -1.95], [0.19 * lw, -1.75], [0.2 * lw, -1.6], [0.23 * lw, -1.4], [0.28 * lw, -1.0], [0.31 * lw, -0.55], [0.31 * lw, -0.2], [0.29 * lw, 0.02]], 16, b, b), lp), j, legW, legAO));
+    P.push(piece(constUV(sphereG(0.19 * lw, 12, 9, 1.05, 1, 1, 0.02, -1.6, 0), lp), j, legW, legAO));
+    if (!ref) P.push(piece(regionUV(lathe([[0.43, -1.42], [0.452, -1.2], [0.46, -0.6], [0.45, -0.12], [0.4, 0.06]], 20, b, b), 'shorts'), j,
       (x, y) => blend(BI.hips, hp, sstep(yh + 0.05, yh - 0.35, y)),
       (x, y, z, nx, ny, nz) => 1 - 0.2 * clamp(-nz * s, 0, 1) - 0.12 * (1 - sstep(yh - 1.42, yh - 1.1, y))));
     P.push(piece(constUV(lathe([[0.127, -3.14], [0.133, -2.98], [0.158, -2.75], [0.183, -2.54], [0.179, -2.5]], 16, b, b), 'sock'), j, legW, legAO));
@@ -329,6 +342,55 @@ function buildHumanoid(pl, home) {
     armR: { sh: bShR, el: bElR }, armL: { sh: bShL, el: bElL }, legR: { hp: bHipR, kn: bKnR, ank: bAnkR }, legL: { hp: bHipL, kn: bKnL, ank: bAnkL },
     blob, stride: 0, j: { lean: 0, crouch: 0, twist: 0 } };
 }
+/* three officials: purely visual, they follow the play with standard lead / trail / centre mechanics */
+const REF_TEAM = { idx: -1, def: { c1: '#dcdddf', c2: '#111111', c3: '#111111', name: '', id: '', city: '' } };
+function buildRefs() {
+  if (R.refs) for (const r of R.refs) disposeHumanoid(r.h);
+  R.refs = [];
+  if (G.mode === 'threept') return;
+  const skins = [1, 4, 2];
+  for (let i = 0; i < 3; i++) {
+    const p = { ref: true, id: 100 + i, team: REF_TEAM, d: { n: 'Official ' + (i + 1), pos: 'SF', h: 73, num: [34, 21, 58][i], skin: skins[i], hair: i === 1 ? 0 : 1, acc: 0 },
+      x: [44, -10, 4][i], y: 0, z: [-12, 26.8, -26.6][i], vx: 0, vz: 0, face: 0, act: 'none', actT: 0, shot: null, hasBall: false, gather: false, holdT: 0,
+      expectPass: false, handsUp: false, celebT: 0, dribHand: 1, mv: null, signalT: 0, signal: null };
+    p.hgt = p.d.h / 12; p.sc = p.hgt / 6.5;
+    R.refs.push({ p, h: buildHumanoid(p, false) });
+  }
+}
+function refSignal(kind, x, z) {
+  if (!R.refs || !R.refs.length) return;
+  let best = R.refs[0], bd = 1e9;
+  for (const r of R.refs) { const d = hyp(r.p.x - x, r.p.z - z); if (d < bd) { bd = d; best = r; } }
+  best.p.signal = kind; best.p.signalT = kind === 'three' ? 1.4 : 1.2;
+}
+function stepRefs(dt) {
+  if (!R.refs || !R.refs.length) return;
+  const b = G.ball, O = G.teams[G.offense], dir = O ? O.dir : 1;
+  let bx = b.x, bz = b.z;
+  if (b.state === 'held' && b.holder) { bx = b.holder.x; bz = b.holder.z; }
+  if (G.state === 'dead' && G.dead) { bx = clamp(G.dead.sx, -45, 45); bz = clamp(G.dead.sz, -22, 22); }
+  let T = [
+    [dir * (CT.HL + 1.7), clamp(bz * 0.35 + (bz > 0 ? -9 : 9), -19, 19)],
+    [clamp(bx - dir * 11, -42, 42), CT.HW + 1.8],
+    [clamp(bx * 0.7 + dir * 5, -40, 40), -(CT.HW + 1.6)],
+  ];
+  if ((G.state === 'ft' || G.state === 'ftcut') && G.ft) {
+    const s = G.ft.shooter.team.dir;
+    T = [[s * (CT.HL + 1.7), -9], [s * 16, CT.HW + 1.8], [s * 30, -(CT.HW + 1.6)]];
+  } else if (G.state === 'tip') T = [[0, 6.5], [-12, CT.HW + 1.8], [12, -(CT.HW + 1.6)]];
+  R.refs.forEach((r, i) => {
+    const p = r.p, t = T[i];
+    const dx = t[0] - p.x, dz = t[1] - p.z, d = hyp(dx, dz);
+    const sp = Math.min(14, d * 2.0);
+    const tvx = d > 0.4 ? dx / d * sp : 0, tvz = d > 0.4 ? dz / d * sp : 0;
+    p.vx = damp(p.vx, tvx, 5, dt); p.vz = damp(p.vz, tvz, 5, dt);
+    p.x += p.vx * dt; p.z += p.vz * dt;
+    p.face = turnToward(p.face, Math.atan2(bz - p.z, bx - p.x), 7 * dt);
+    if (p.signalT > 0) p.signalT -= dt;
+    p.actT += dt;
+    poseHumanoid(r.h, p, Math.max(dt, 1e-4), p.x, 0, p.z, p.face);
+  });
+}
 function disposeHumanoid(h) {
   R.scene.remove(h.root); R.scene.remove(h.blob);
   h.mesh.geometry.dispose(); h.mat.dispose(); h.atlas.dispose();
@@ -338,6 +400,7 @@ function disposeHumanoid(h) {
 function buildPlayers() {
   for (const h of R.players) disposeHumanoid(h);
   R.players = G.players.map((p) => buildHumanoid(p, p.team.idx === 0));
+  buildRefs();
   R.prev = G.players.map((p) => ({ x: p.x, y: p.y, z: p.z, f: p.face }));
   R.prevBall = { x: G.ball.x, y: G.ball.y, z: G.ball.z };
   paintArena(G.teams[0].def, G.teams[1].def);
@@ -385,7 +448,7 @@ function poseHumanoid(h, p, dt, px, py, pz, pf) {
   const fwdV = p.vx * cf + p.vz * sf, latV = -p.vx * sf + p.vz * cf;
   const air = py > 0.05;
   const S = p.shot, b = G.ball;
-  const def = p.team.idx !== G.offense && (G.state === 'live' || G.state === 'dead');
+  const def = !p.ref && p.team.idx !== G.offense && (G.state === 'live' || G.state === 'dead');
   const J = h.j;
   let lean = 0, crouch = 0, bob = 0, twist = 0;
   const shuffle = !air && Math.abs(latV) > Math.abs(fwdV) * 1.1 && sp > 2;
@@ -477,6 +540,11 @@ function poseHumanoid(h, p, dt, px, py, pz, pf) {
     }
     if (crouch > 0.3 && !shuffle && sp <= 1.2) lean = crouch * 0.48;
     if (def && shuffle) lean = 0.32;
+  }
+  if (!arms && p.ref && p.signalT > 0) {
+    if (p.signal === 'three') { setArm(h.armR, 3.0, -0.3, 0.05, kf); setArm(h.armL, 3.0, 0.3, 0.05, kf); }
+    else { setArm(h.armR, 3.05, -0.1, 0.35, kf); setArm(h.armL, 0.4, 0.2, 0.4, k); }
+    arms = true;
   }
   if (!arms) {
     if (p.hasBall && !p.gather && p.holdT <= 0) {

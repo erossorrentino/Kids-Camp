@@ -200,6 +200,7 @@ function renderReflection() {
   const hidden = [];
   for (const o of R.reflHide) if (o.visible) { o.visible = false; hidden.push(o); }
   for (const h of R.players) if (h.blob.visible) { h.blob.visible = false; hidden.push(h.blob); }
+  if (R.refs) for (const r of R.refs) if (r.h.blob.visible) { r.h.blob.visible = false; hidden.push(r.h.blob); }
   if (R.reflOnly) for (const o of R.reflOnly) o.visible = true;
   const fog = R.scene.fog; R.scene.fog = null;
   r.setRenderTarget(R.reflRT);
@@ -364,7 +365,7 @@ function renderFrame(dt, rdt) {
 
 /* ---------------- camera ---------------- */
 const CAMS = {
-  broadcast: { H: 34, D: 60, fov: 36 },
+  broadcast: { H: 33, D: 58, fov: 34 },
   close: { H: 22, D: 44, fov: 40 },
   sky: { H: 58, D: 56, fov: 40 },
 };

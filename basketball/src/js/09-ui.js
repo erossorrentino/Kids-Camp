@@ -485,6 +485,7 @@ function handleEvents() {
         if (!quiet) { banner('Ankles!', `${shortName(e.by)} drops ${shortName(e.on)}`); say(`Oh! ${shortName(e.by)} broke his ankles!`, true); }
         break;
       case 'whistle':
+        { const bb = G.ball; refSignal('foul', bb.x, bb.z); }
         if (!quiet) { ticker(e.reason); if (/And one/.test(e.reason)) { banner('And one!'); crowdRoar(1, 2); say('And one!', true); } }
         break;
       case 'foul': if (!quiet) ticker(`Foul on ${shortName(e.by)} (${e.by.st.pf})`); break;
@@ -518,6 +519,7 @@ function onScoreEv(e, quiet) {
   const p = e.p, T = p.team;
   if (AU.on && e.swish) SFX.swish();
   netSwish(T.dir);
+  if (e.three && !e.tp) refSignal('three', p.x, p.z);
   const homeTeam = e.team === 0;
   const big = e.three || e.dunk || G.clockExpired;
   R.excite = Math.max(R.excite, homeTeam ? (big ? 1 : 0.6) : 0.25);
