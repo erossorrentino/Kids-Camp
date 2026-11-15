@@ -49,16 +49,17 @@ function drawCourt(home, W) {
   const rnd = mulberry32(7);
   // stained apron in team colour
   const ap = g.createLinearGradient(0, 0, 0, H);
-  ap.addColorStop(0, shade(home.c2, -0.15)); ap.addColorStop(0.5, shade(home.c2, 0.05)); ap.addColorStop(1, shade(home.c2, -0.15));
+  ap.addColorStop(0, shade(home.c1, -0.3)); ap.addColorStop(0.5, shade(home.c1, -0.12)); ap.addColorStop(1, shade(home.c1, -0.3));
   g.fillStyle = ap; g.fillRect(0, 0, W, H);
   // maple planks running baseline to baseline
   const plank = 0.19;
   for (let z = -25; z < 25; z += plank) {
     let x = -47 - rnd() * 9;
-    const rowTone = rnd() * 10 - 5;
+    const rowTone = rnd() * 14 - 7;
     while (x < 47) {
-      const len = 3 + rnd() * 9, t = rnd();
-      const r0 = 222 + t * 16 + rowTone, g0 = 170 + t * 15 + rowTone * 0.8, b0 = 112 + t * 12 + rowTone * 0.5;
+      // pale northern maple: every board a slightly different tone
+      const len = 3 + rnd() * 9, t = rnd(), t2 = t * t;
+      const r0 = 214 + t * 26 + rowTone, g0 = 178 + t * 26 + rowTone * 0.9 - t2 * 4, b0 = 132 + t * 26 + rowTone * 0.8 - t2 * 6;
       g.fillStyle = `rgb(${r0 | 0},${g0 | 0},${b0 | 0})`;
       const x0 = Math.max(x, -47), x1 = Math.min(x + len, 47);
       g.fillRect(X(x0), Y(z), (x1 - x0) * k + 1, plank * k + 1);
@@ -87,20 +88,37 @@ function drawCourt(home, W) {
     g.fillStyle = 'rgba(120,60,20,0.12)'; g.fill();
   }
   g.restore();
-  g.globalAlpha = 0.93;
+  // painted lanes in the secondary colour with a primary-colour circle at the free-throw line
+  const laneC = shade(home.c2, 0.16), circC = shade(home.c1, -0.06);
+  g.globalAlpha = 0.95;
   for (const s of [-1, 1]) {
     const x0 = s > 0 ? X(28) : X(-47);
     const lg = g.createLinearGradient(x0, 0, x0 + 19 * k, 0);
-    lg.addColorStop(0, shade(home.c1, s > 0 ? -0.05 : -0.18)); lg.addColorStop(1, shade(home.c1, s > 0 ? -0.18 : -0.05));
+    lg.addColorStop(0, shade(laneC, s > 0 ? 0.04 : -0.1)); lg.addColorStop(1, shade(laneC, s > 0 ? -0.1 : 0.04));
     g.fillStyle = lg; g.fillRect(x0, Y(-8), 19 * k, 16 * k);
+    g.beginPath(); g.arc(X(s * 28), Y(0), 6 * k, 0, TAU); g.fillStyle = circC; g.fill();
   }
   g.globalAlpha = 1;
+  // wood grain showing through the paint
+  for (let i = 0; i < 5000; i++) {
+    const s = rnd() < 0.5 ? -1 : 1, xx = s * (28 + rnd() * 19 + (rnd() < 0.3 ? -6 * rnd() : 0)), zz = -8 + rnd() * 16;
+    g.fillStyle = `rgba(0,0,0,${0.03 + rnd() * 0.04})`; g.fillRect(X(xx), Y(zz), 3 + rnd() * k * 1.4, Math.max(1, k * 0.02));
+  }
   g.beginPath(); g.arc(X(0), Y(0), 6 * k, 0, TAU); g.fillStyle = shade(home.c1, -0.25); g.fill();
   drawEmblem(g, home, X(0), Y(0), 5.4 * k);
   // apron wordmarks
   g.fillStyle = 'rgba(255,255,255,0.94)'; g.textAlign = 'center'; g.textBaseline = 'middle';
-  g.font = `900 italic ${3.4 * k}px ${FONT_D}`;
-  for (const s of [-1, 1]) { g.save(); g.translate(X(s * 51), Y(0)); g.rotate(s * PI / 2); g.fillText(home.city.toUpperCase(), 0, 0); g.restore(); }
+  // big baseline lettering either side of the stanchion, reading from the court
+  for (const s of [-1, 1]) {
+    g.save(); g.translate(X(s * 51.2), Y(0)); g.rotate(s * PI / 2);
+    for (const [w, x] of [[home.city.toUpperCase(), -12.5], [home.name.toUpperCase(), 12.5]]) {
+      let fs = 4.6 * k; g.font = `900 italic ${fs}px ${FONT_D}`;
+      while (g.measureText(w).width > 19 * k && fs > 2 * k) { fs -= k * 0.1; g.font = `900 italic ${fs}px ${FONT_D}`; }
+      g.lineWidth = 0.22 * k; g.strokeStyle = shade(home.c2, -0.2); g.strokeText(w, x * k, 0);
+      g.fillStyle = 'rgba(255,255,255,0.95)'; g.fillText(w, x * k, 0);
+    }
+    g.restore();
+  }
   g.font = `800 ${2.1 * k}px ${FONT_D}`; g.fillStyle = 'rgba(255,255,255,0.6)';
   g.fillText('HARDWOOD KINGS', X(-26), Y(29.2)); g.fillText(home.name.toUpperCase(), X(26), Y(29.2));
   g.save(); g.translate(X(0), Y(-29.2)); g.rotate(PI); g.fillText(home.name.toUpperCase(), 0, 0); g.restore();
@@ -289,7 +307,7 @@ function bowlSeats(o, list, density) {
     }
   }
 }
-function crowdGeo() {
+function crowdGeo(lite) {
   const parts = [];
   const add = (g, part) => {
     const n = g.attributes.position.count, a = new Float32Array(n).fill(part);
@@ -297,14 +315,19 @@ function crowdGeo() {
     if (g.attributes.uv) g.deleteAttribute('uv');
     parts.push(g.index ? g.toNonIndexed() : g);
   };
-  const torso = new THREE.LatheGeometry([[0.3, 0.72], [0.37, 1.15], [0.45, 1.75], [0.43, 2.02], [0.15, 2.2]].map((q) => new THREE.Vector2(q[0], q[1])), 6);
-  torso.scale(0.72, 1, 1.22); torso.computeVertexNormals(); add(torso, 0);
-  const lap = new THREE.BoxGeometry(0.95, 0.32, 0.9); lap.translate(0.38, 0.86, 0); add(lap, 0);
-  const head = new THREE.SphereGeometry(0.34, 6, 4); head.scale(0.95, 1.12, 0.9); head.translate(0, 2.5, 0); add(head, 1);
+  // parts: 0 shirt, 1 skin, 2/3 arms, 4 hair or cap crown, 5 trousers, 6 cap brim
+  // the upper deck sits far away in the dark, so it gets a lighter figure
+  const torso = new THREE.LatheGeometry([[0.3, 0.72], [0.37, 1.15], [0.45, 1.7], [0.45, 1.98], [0.2, 2.16], [0.13, 2.22]].map((q) => new THREE.Vector2(q[0], q[1])), lite ? 5 : 7);
+  torso.scale(0.7, 1, 1.18); torso.computeVertexNormals(); add(torso, 0);
+  if (!lite) { const neck = new THREE.CylinderGeometry(0.11, 0.13, 0.2, 6, 1, true); neck.translate(0, 2.26, 0); add(neck, 1); }
+  const head = new THREE.SphereGeometry(0.33, lite ? 6 : 7, lite ? 4 : 5); head.scale(0.97, 1.14, 0.88); head.translate(0.02, 2.58, 0); add(head, 1);
   { const hg = parts[parts.length - 1], hp = hg.attributes.position, ap = hg.attributes.aPart;
-    for (let i = 0; i < hp.count; i++) if (hp.getY(i) > 2.6) ap.setX(i, 4); }
+    for (let i = 0; i < hp.count; i++) if (hp.getY(i) > 2.66 || (hp.getX(i) < -0.12 && hp.getY(i) > 2.42)) ap.setX(i, 4); }
+  if (!lite) { const brim = new THREE.BoxGeometry(0.34, 0.035, 0.5); brim.translate(0.34, 2.78, 0); add(brim, 6); }
   for (const s of [-1, 1]) {
-    const arm = new THREE.CylinderGeometry(0.12, 0.1, 1.05, 5, 1, true); arm.translate(0.06, 1.5, s * 0.53); add(arm, s < 0 ? 2 : 3);
+    const thigh = new THREE.BoxGeometry(0.98, 0.34, 0.34); thigh.translate(0.36, 0.86, s * 0.2); add(thigh, 5);
+    const arm = new THREE.CylinderGeometry(0.12, 0.1, 1.05, lite ? 4 : 6, 1, true); arm.translate(0.06, 1.5, s * 0.55); add(arm, s < 0 ? 2 : 3);
+    if (!lite) { const hand = new THREE.BoxGeometry(0.15, 0.18, 0.13); hand.translate(0.06, 0.92, s * 0.55); add(hand, s < 0 ? 2 : 3); }
   }
   // merge (all non-indexed now)
   let n = 0; for (const g of parts) n += g.attributes.position.count;
@@ -328,7 +351,7 @@ function crowdMat() {
     sh.vertexShader = sh.vertexShader
       .replace('#include <common>', `#include <common>
         attribute float aPart; attribute vec3 aShirt; attribute vec3 aSkin; attribute vec4 aAnim;
-        uniform float uTime; uniform float uExcite; uniform float uWave; varying vec3 vCrowd;`)
+        uniform float uTime; uniform float uExcite; uniform float uWave; uniform float uFar; varying vec3 vCrowd;`)
       .replace('#include <begin_vertex>', `
         vec3 transformed = vec3(position);
         float ph = aAnim.x, amp = aAnim.y;
@@ -337,6 +360,8 @@ function crowdMat() {
         float ex = clamp(uExcite * amp, 0.0, 1.6);
         float stand = clamp(ex * 1.3 + wave * 1.2 + aAnim.w, 0.0, 1.0);
         float jump = max(0.0, sin(uTime * (6.5 + amp * 3.0) + ph)) * clamp(ex - 0.25, 0.0, 1.0) * 0.8;
+        float capOn = step(0.86, fract(ph * 5.13));
+        if (aPart > 5.5) transformed *= capOn;
         if (aPart > 1.5 && aPart < 3.5) {
           float side = aPart > 2.5 ? 1.0 : -1.0;
           float clapper = step(0.45, fract(ph * 3.17));
@@ -352,11 +377,19 @@ function crowdMat() {
           p = vec3(p.x * ci + p.z * si, p.y, -p.x * si + p.z * ci);
           transformed = sh + p;
         }
-        if (aPart < 0.5 && position.y < 1.0) transformed.x -= stand * 0.35;
+        if ((aPart < 0.5 || aPart > 4.5 && aPart < 5.5) && position.y < 1.05) transformed.x -= stand * 0.45;
         transformed.y += stand * 0.85 + jump + sin(uTime * 1.3 + ph) * 0.03;
         float ht = fract(ph * 7.31);
         vec3 hair = ht > 0.9 ? vec3(0.55, 0.45, 0.3) : ht > 0.8 ? vec3(0.42, 0.42, 0.44) : aSkin * 0.22 + 0.015;
-        vCrowd = aPart > 3.5 ? hair : (aPart > 0.5 && aPart < 1.5) ? aSkin : aShirt;`);
+        float pt = fract(ph * 3.71);
+        vec3 pants = pt < 0.45 ? vec3(0.1, 0.13, 0.22) : pt < 0.7 ? vec3(0.035) : pt < 0.85 ? vec3(0.3, 0.26, 0.18) : vec3(0.16, 0.16, 0.17);
+        vec3 cap = fract(ph * 9.7) < 0.5 ? aShirt : vec3(0.04);
+        vCrowd = aPart > 5.5 ? cap : aPart > 4.5 ? pants : aPart > 3.5 ? mix(hair, cap, capOn) : (aPart > 0.5 && aPart < 1.5) ? aSkin : aShirt;
+        // the house lights are down: fans fade into the dark the further they sit from the floor
+        vec4 wp0 = modelMatrix * instanceMatrix * vec4(0.0, 1.5, 0.0, 1.0);
+        float ddx = max(abs(wp0.x) - 47.0, 0.0), ddz = max(abs(wp0.z) - 25.0, 0.0);
+        float dd = length(vec2(ddx, ddz)) + max(wp0.y - 2.0, 0.0) * 0.55;
+        vCrowd *= mix(1.0, uFar, pow(smoothstep(3.0, 58.0, dd), 0.7)) * (0.78 + 0.4 * fract(ph * 2.39));`);
     sh.fragmentShader = sh.fragmentShader
       .replace('#include <common>', '#include <common>\nvarying vec3 vCrowd;')
       .replace('#include <color_fragment>', '#include <color_fragment>\ndiffuseColor.rgb *= vCrowd;');
@@ -365,7 +398,7 @@ function crowdMat() {
   return m;
 }
 function buildCrowdMesh(seats, upper) {
-  const geo = crowdGeo();
+  const geo = crowdGeo(upper || R.mobile);
   const n = seats.length;
   const shirt = new Float32Array(n * 3), skin = new Float32Array(n * 3), anim = new Float32Array(n * 4);
   const mats = [];
@@ -392,11 +425,13 @@ function buildCrowdMesh(seats, upper) {
 }
 function colorCrowd(mesh, home, away) {
   const a = mesh.geometry.attributes.aShirt, n = mesh.count;
-  const pal = [home.c1, home.c1, home.c1, home.c2, home.c3, '#e9e6df', '#1d1f24', '#30425f', '#5b2b2b', away.c1, '#7a6a55', '#4b4f57', home.c1, '#e9e6df'];
-  const col = new THREE.Color();
+  // mostly everyday clothes, with pockets of home colours and a few away fans
+  const pal = [home.c1, home.c1, home.c1, home.c1, home.c3, home.c2, away.c1, '#e9e6df', '#e9e6df', '#1b1c20', '#1b1c20', '#2c3a55', '#5b2b2b', '#7a6a55',
+    '#4b4f57', '#8a8f99', '#2f5d3a', '#a83232', '#c9a227', '#3b6ea8', '#d9773a', '#6b4c8a', '#e8b9b9', '#26292f'];
+  const col = new THREE.Color(), rnd = mulberry32(31 + n);
   for (let i = 0; i < n; i++) {
-    col.set(pal[(i * 11 + (i >> 3)) % pal.length]);
-    col.multiplyScalar(0.36 + 0.3 * ((i * 0.618) % 1));
+    col.set(pal[Math.floor(rnd() * pal.length)]);
+    col.multiplyScalar(0.5 + 0.3 * rnd());
     a.array[i * 3] = col.r; a.array[i * 3 + 1] = col.g; a.array[i * 3 + 2] = col.b;
   }
   a.needsUpdate = true;
@@ -413,7 +448,7 @@ function buildArena() {
   ground.rotation.x = -PI / 2; ground.position.y = -0.03; ground.receiveShadow = true;
   R.scene.add(ground); R.reflHide.push(ground);
   // bowl
-  R.crowdU = { uTime: { value: 0 }, uExcite: { value: 0 }, uWave: { value: -9 } };
+  R.crowdU = { uTime: { value: 0 }, uExcite: { value: 0 }, uWave: { value: -9 }, uFar: { value: 0.2 } };
   R.crowdMaterial = crowdMat();
   const lower = { ax: 57.5, az: 35.5, rc: 12, rows: 17, depth: 2.7, rise: 1.3, base: 1.8, off0: 0, wall: 4 };
   const upper = { ax: 57.5, az: 35.5, rc: 12, rows: 13, depth: 2.6, rise: 1.85, base: 37, off0: 52, wall: 14 };
@@ -654,7 +689,7 @@ function paintArena(home, away) {
   R.floorMat.map = R.floorTex; R.floorMat.roughnessMap = R.floorRough; R.floorMat.bumpMap = R.floorBump; R.floorMat.bumpScale = 0.012;
   R.floorMat.needsUpdate = true;
   R.benchMats[0].color.set(shade(home.c1, -0.55)); R.benchMats[1].color.set(shade(away.c1, -0.55));
-  R.bowlMat.color.set(shade(home.c2, -0.1)).lerp(new THREE.Color('#3a3f4a'), 0.6);
+  R.bowlMat.color.set(shade(home.c2, -0.3)).lerp(new THREE.Color('#22252c'), 0.6);
   colorCrowd(R.crowdLower, home, away); colorCrowd(R.crowdUpper, home, away); colorCrowd(R.courtFans, home, away);
   { const a = R.courtside.geometry.attributes.aShirt, col = new THREE.Color();
     R.courtsideSeats.forEach((c, i) => {
@@ -784,7 +819,9 @@ function buildHoops() {
     const ntx = nt.clone(); ntx.needsUpdate = true; ntx.repeat.set(1, 4.5);
     const net = new THREE.Mesh(ng, new THREE.MeshStandardMaterial({ color: '#f6f6f6', alphaMap: ntx, transparent: true, side: THREE.DoubleSide, depthWrite: false, roughness: 0.9 }));
     net.frustumCulled = false; net.renderOrder = 2; grp.add(net);
-    R.hoops.push({ s, nodes, NS, NL, net, sc, sct, scVal: -2, rimG, led, ledT: 0, wob: 0, padC, padT });
+    // everything but the rim and net: hidden whenever the camera swings behind this backboard
+    const occ = grp.children.filter((c) => c !== rimG && c !== net);
+    R.hoops.push({ s, nodes, NS, NL, net, sc, sct, scVal: -2, rimG, led, ledT: 0, wob: 0, padC, padT, occ, occHidden: false });
   }
 }
 function drawPad(h, T) {

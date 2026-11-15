@@ -209,6 +209,7 @@ function startFromMatchup() {
 function startGame(cfg) {
   APP.last = cfg;
   replayReset(); hideLower3();
+  APP.hudCache.grade = null; APP.hudCache.pfP = null;
   newGame({ mode: cfg.mode === 'threept' ? 'threept' : 'game', home: cfg.home, away: cfg.away, userTeam: cfg.userTeam == null ? 0 : cfg.userTeam,
     auto: cfg.mode === 'watch', difficulty: cfg.difficulty || SET.difficulty, qLen: SET.qLen, autoSwitch: SET.autoSwitch && SET.camera !== 'third', shooter: cfg.shooter });
   R.tpYaw = null;
@@ -309,7 +310,7 @@ function updateHUD(rdt) {
         el.dataset.t = T.def.id + T.def.c1;
         el.style.setProperty('--tc', T.def.c1);
         $('.em', el).src = emblemURL(T.def);
-        $('.ab', el).textContent = T.def.id;
+        $('.ab', el).textContent = T.def.city;
       }
       const fl = Math.min(5, T.fouls), dots = $$('.fl i', el);
       dots.forEach((d, i) => d.classList.toggle('on', i < fl));
@@ -331,11 +332,13 @@ function updateHUD(rdt) {
     if (H.pt !== c) {
       H.pt = c;
       $('#ptNum').textContent = c.d.num; $('#ptNum').style.background = c.team.def.c1;
-      $('#ptName').textContent = c.d.n; $('#ptInfo').textContent = `${c.d.pos} · ${c.d.ovr} OVR · 3PT ${c.d.tpt} · DNK ${c.d.dnk}`;
+      $('#ptName').textContent = c.d.n; $('#ptInfo').textContent = `${c.d.pos} · ${c.d.ovr}`;
     }
     $('#ptStam').style.width = c.stam.toFixed(0) + '%';
-    $('#ptStam').style.background = c.stam < 25 ? 'var(--bad)' : c.stam < 55 ? 'var(--warn)' : 'var(--good)';
+    $('#ptStam').style.background = c.stam < 25 ? 'var(--bad)' : '';
   }
+  updatePerf(c, show && APP.mode !== 'threept', rdt);
+  $('#hud').classList.toggle('l3', LOWER.t > 0);
   updateHint(c, show);
   updateMeter(rdt);
   // intro card, starting lineups, lower third
@@ -346,11 +349,43 @@ function updateHUD(rdt) {
   const wantTouch = SET.touch === 'on' || (SET.touch === 'auto' && APP.isTouch && IN.device === 'touch');
   const tOn = wantTouch && APP.running && !APP.paused && !APP.screen && G.userTeam >= 0 && !G.auto;
   $('#touch').classList.toggle('on', tOn); IN.touch.on = tOn;
+  $('#hud').classList.toggle('tch', tOn);
   $('#tPause').classList.toggle('on', APP.running && !APP.paused && !APP.screen && (APP.isTouch || SET.touch === 'on'));
   if (tOn) {
     const off = G.offense === G.userTeam, hb = c && c.hasBall;
     const lbl = { shoot: APP.mode === 'threept' || hb ? 'Shoot' : off ? 'Jump' : 'Block', pass: hb ? 'Pass' : 'Switch', move: hb ? 'Move' : off ? 'Move' : 'Steal', alt: hb ? 'Screen' : 'Switch' };
     for (const k in lbl) { const b = $(`#tBtns [data-btn="${k}"]`); if (b && b.textContent !== lbl[k]) b.textContent = lbl[k]; }
+  }
+}
+/* live stat line for the controlled player and a running grade for the user's team */
+const GRADES = [[93, 'A+'], [87, 'A'], [82, 'A-'], [77, 'B+'], [72, 'B'], [67, 'B-'], [62, 'C+'], [57, 'C'], [52, 'C-'], [45, 'D'], [0, 'F']];
+function gameGrade() {
+  const T = G.teams[G.userTeam], O = G.teams[1 - G.userTeam];
+  let fgm = 0, fga = 0, ast = 0, to = 0, stl = 0, blk = 0;
+  for (const p of T.players) { const q = p.st; fgm += q.fgm; fga += q.fga; ast += q.ast; to += q.to; stl += q.stl; blk += q.blk; }
+  const fg = fga >= 4 ? fgm / fga : 0.47;
+  return clamp(68 + (T.score - O.score) * 1.1 + (fg - 0.47) * 55 + ast * 0.7 + stl * 0.9 + blk * 0.6 - to * 1.3, 0, 100);
+}
+function updatePerf(c, show, rdt) {
+  const el = $('#perf'), H = APP.hudCache;
+  el.style.display = show ? '' : 'none';
+  if (!show) return;
+  H.gT = (H.gT || 0) - rdt;
+  if (H.gT > 0 && H.pfP === c) return;
+  H.gT = 0.4; H.pfP = c;
+  const q = c.st;
+  setTxt($('#pfPts'), String(q.pts)); setTxt($('#pfReb'), String(q.reb)); setTxt($('#pfAst'), String(q.ast));
+  setTxt($('#pfFg'), q.fga ? Math.round(q.fgm / q.fga * 100) + '%' : '-');
+  const g = gameGrade();
+  H.grade = H.grade == null ? g : lerp(H.grade, g, 0.25);
+  const L = GRADES.find((x) => H.grade >= x[0])[1];
+  const ring = $('#pfRing');
+  ring.style.setProperty('--g', H.grade.toFixed(1));
+  ring.style.setProperty('--gc', L[0] === 'A' ? '#4ef59a' : L[0] === 'B' ? '#a6e35a' : L[0] === 'C' ? '#ffd23f' : L[0] === 'D' ? '#ff9f43' : '#ff4d3d');
+  if ($('#pfGrade').textContent !== L) {
+    const up = GRADES.findIndex((x) => x[1] === L) < GRADES.findIndex((x) => x[1] === $('#pfGrade').textContent);
+    $('#pfGrade').textContent = L;
+    if (up) { ring.classList.remove('up'); void ring.offsetWidth; ring.classList.add('up'); }
   }
 }
 function updateHint(c, show) {

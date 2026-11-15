@@ -92,6 +92,7 @@ function initRender(canvas, quality) {
   buildIndicators();
   buildFX();
   initPost();
+  initDof();
   setQuality(quality || 'high');
   R.ready = true;
 }
@@ -129,6 +130,7 @@ function resizeRender() {
   R.cam.updateProjectionMatrix();
   const bw = Math.max(2, Math.floor(w * R.dpr)), bh = Math.max(2, Math.floor(h * R.dpr));
   resizePost(bw, bh);
+  resizeDof(bw, bh);
   const rs = R.quality === 'high' ? 0.5 : 0.33;
   R.reflRT.setSize(Math.max(2, Math.floor(bw * rs)), Math.max(2, Math.floor(bh * rs)));
   if (R.floorU) R.floorU.reflTexel.value.set(1 / R.reflRT.width, 1 / R.reflRT.height);
@@ -156,10 +158,10 @@ function buildEnv() {
   pm.dispose();
 }
 function buildLights() {
-  R.hemi = new THREE.HemisphereLight('#c9d4ff', '#2a1d12', 0.26);
+  R.hemi = new THREE.HemisphereLight('#c9d4ff', '#2a1d12', 0.17);
   R.scene.add(R.hemi);
   // the key: one big overhead spot that pools light on the court and leaves the bowl darker
-  const key = new THREE.SpotLight('#fff3e2', 1.05, 0, 0.62, 0.55, 0);
+  const key = new THREE.SpotLight('#fff3e2', 1.18, 0, 0.55, 0.34, 0);
   key.position.set(6, 110, 22);
   key.target.position.set(0, 0, 0);
   key.castShadow = true;
@@ -172,7 +174,7 @@ function buildLights() {
   // broadcast fill from the camera side, and a cool rim light from behind for player silhouettes
   const fill = new THREE.DirectionalLight('#ffe9d2', 0.26); fill.position.set(0, 40, 80); R.scene.add(fill);
   const rim = new THREE.DirectionalLight('#9fc2ff', 0.42); rim.position.set(-20, 30, -80); R.scene.add(rim);
-  const bowl = new THREE.PointLight('#ffb070', 0.32, 220, 1.6); bowl.position.set(0, 60, 0); R.scene.add(bowl);
+  const bowl = new THREE.PointLight('#ffb070', 0.18, 220, 1.6); bowl.position.set(0, 60, 0); R.scene.add(bowl);
   R.fill = fill; R.rimL = rim; R.bowlL = bowl;
 }
 
@@ -265,6 +267,7 @@ function initPost() {
     uniform sampler2D tScene; uniform sampler2D tBloom; uniform vec2 uRes;
     uniform float uBloom; uniform float uExposure; uniform float uTime; uniform float uVig; uniform float uGrain;
     uniform float uFlash; uniform float uCine; uniform float uCA; uniform float uSat; uniform float uStreak;
+    uniform sampler2D tDof; uniform float uDof;
     varying vec2 vUv;
     vec3 rrt(vec3 v){ vec3 a = v * (v + 0.0245786) - 0.000090537; vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081; return a / b; }
     vec3 aces(vec3 c){
@@ -278,6 +281,7 @@ function initPost() {
       vec2 uv = vUv, d = uv - 0.5;
       float ca = uCA * dot(d, d);
       vec3 col = vec3(texture2D(tScene, uv - d * ca).r, texture2D(tScene, uv).g, texture2D(tScene, uv + d * ca).b);
+      if (uDof > 0.001) { vec4 bk = texture2D(tDof, uv); col = mix(col, bk.rgb, smoothstep(0.07, 0.32, abs(bk.a)) * uDof); }
       col += texture2D(tBloom, uv).rgb * uBloom;
       vec3 st = vec3(0.0);
       for (int i = 1; i <= 6; i++) { float o = float(i) * 0.02; st += (texture2D(tBloom, uv + vec2(o, 0.0)).rgb + texture2D(tBloom, uv - vec2(o, 0.0)).rgb) * (1.0 - float(i) / 7.0); }
@@ -296,7 +300,89 @@ function initPost() {
       gl_FragColor = vec4(col, 1.0);
     }`, { tScene: { value: null }, tBloom: { value: null }, uRes: { value: new THREE.Vector2(1, 1) }, uBloom: { value: 0.45 },
     uExposure: { value: 1.12 }, uTime: { value: 0 }, uVig: { value: 0.32 }, uGrain: { value: 0.028 }, uFlash: { value: 0 },
-    uCine: { value: 0 }, uCA: { value: 0.006 }, uSat: { value: 1.1 }, uStreak: { value: 0.045 } });
+    uCine: { value: 0 }, uCA: { value: 0.006 }, uSat: { value: 1.1 }, uStreak: { value: 0.045 }, tDof: { value: null }, uDof: { value: 0 } });
+}
+/* depth of field for close and cinematic cameras: a half-resolution depth prepass (the crowd is skipped:
+   the seating bowl behind it is close enough), signed circle of confusion, then a golden-angle bokeh
+   gather that keeps sharp foreground edges from smearing over the background */
+function initDof() {
+  let ok = false;
+  try { ok = R.gl2 || !!R.r.extensions.get('WEBGL_depth_texture'); } catch (e) { ok = false; }
+  const D = R.dof = { ok, on: 0, focus: 30, ap: 1, want: null };
+  if (!ok) return;
+  // depth-only stand-ins, one per vertex path so each keeps its own compiled program
+  const dm = (o) => new THREE.MeshBasicMaterial(Object.assign({ colorWrite: false, side: THREE.DoubleSide }, o || {}));
+  D.mats = { plain: dm(), skin: dm({ skinning: true }), inst: dm() };
+  const o = { type: R.hdrType, format: THREE.RGBAFormat, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false, stencilBuffer: false };
+  D.a = new THREE.WebGLRenderTarget(4, 4, o); D.b = new THREE.WebGLRenderTarget(4, 4, o);
+  D.mPrep = ppMat(`
+    uniform sampler2D tScene; uniform sampler2D tDepth; uniform vec2 texel; uniform float uFocus; uniform float uAp; uniform float uNear; uniform float uFar; varying vec2 vUv;
+    void main(){
+      vec3 c = texture2D(tScene, vUv + texel * vec2(-0.25,-0.25)).rgb + texture2D(tScene, vUv + texel * vec2(0.25,-0.25)).rgb
+             + texture2D(tScene, vUv + texel * vec2(-0.25,0.25)).rgb + texture2D(tScene, vUv + texel * vec2(0.25,0.25)).rgb;
+      float dz = texture2D(tDepth, vUv).x;
+      float z = (uNear * uFar) / (uFar - (uFar - uNear) * dz);
+      gl_FragColor = vec4(min(c * 0.25, vec3(30.0)), clamp((z - uFocus) / z * uAp, -1.0, 1.0));
+    }`, { tScene: { value: null }, tDepth: { value: null }, texel: { value: new THREE.Vector2() }, uFocus: { value: 30 }, uAp: { value: 1 }, uNear: { value: 0.8 }, uFar: { value: 900 } });
+  // separable blur masked by the circle of confusion: sharp pixels barely spill into the blurred background,
+  // and the kernel widens with distance from the focal plane
+  D.mBlur = ppMat(`
+    uniform sampler2D tex; uniform vec2 texel; uniform vec2 dir; uniform float uStep; varying vec2 vUv;
+    void main(){
+      vec4 c = texture2D(tex, vUv);
+      float st = uStep * clamp(abs(c.a) * 1.6, 0.12, 1.0);
+      vec3 acc = vec3(0.0); float ws = 0.0;
+      for (int i = -6; i <= 6; i++) {
+        float fi = float(i);
+        vec4 s = texture2D(tex, vUv + dir * texel * fi * st);
+        float w = exp(-fi * fi / 16.0) * (0.03 + smoothstep(0.03, 0.2, abs(s.a)));
+        acc += s.rgb * w; ws += w;
+      }
+      gl_FragColor = vec4(acc / max(ws, 1e-4), c.a);
+    }`, { tex: { value: null }, texel: { value: new THREE.Vector2() }, dir: { value: new THREE.Vector2(1, 0) }, uStep: { value: 1.4 } });
+}
+function resizeDof(w, h) {
+  const D = R.dof;
+  if (!D || !D.ok) return;
+  const hw = Math.max(2, w >> 1), hh = Math.max(2, h >> 1);
+  if (D.rt) { D.rt.depthTexture.dispose(); D.rt.dispose(); }
+  D.rt = new THREE.WebGLRenderTarget(hw, hh, { minFilter: THREE.NearestFilter, magFilter: THREE.NearestFilter, format: THREE.RGBAFormat, depthBuffer: true, stencilBuffer: false });
+  D.rt.depthTexture = new THREE.DepthTexture(hw, hh);
+  D.rt.depthTexture.type = R.gl2 ? THREE.UnsignedIntType : THREE.UnsignedShortType;
+  D.a.setSize(hw, hh); D.b.setSize(hw, hh);
+}
+function renderDof() {
+  const D = R.dof, r = R.r, sc = R.scene, hidden = [];
+  const hide = (o) => { if (o && o.visible) { o.visible = false; hidden.push(o); } };
+  if (!D.skip) {
+    D.skip = [];
+    sc.traverse((o) => { const m = o.material; if (o.isSprite || o.isPoints || o.isLine || (m && !Array.isArray(m) && (m.transparent || m.blending === THREE.AdditiveBlending))) D.skip.push(o); });
+  }
+  hide(R.crowdLower); hide(R.crowdUpper); hide(R.signs);
+  for (const o of D.skip) hide(o);
+  for (const h of R.players) hide(h.blob);
+  if (R.refs) for (const q of R.refs) hide(q.h.blob);
+  const fog = sc.fog, bg = sc.background, swapped = [];
+  sc.traverseVisible((o) => {
+    if (!o.isMesh) return;
+    swapped.push(o, o.material);
+    o.material = o.isSkinnedMesh ? D.mats.skin : o.isInstancedMesh ? D.mats.inst : D.mats.plain;
+  });
+  sc.fog = null; sc.background = null;
+  r.setRenderTarget(D.rt); r.clear(); r.render(sc, R.cam);
+  for (let i = 0; i < swapped.length; i += 2) swapped[i].material = swapped[i + 1];
+  sc.fog = fog; sc.background = bg;
+  for (const o of hidden) o.visible = true;
+  const P = R.pp, U = D.mPrep.uniforms;
+  U.tScene.value = P.main.texture; U.tDepth.value = D.rt.depthTexture;
+  U.texel.value.set(1 / P.main.width, 1 / P.main.height);
+  U.uFocus.value = D.focus; U.uAp.value = D.ap; U.uNear.value = R.cam.near; U.uFar.value = R.cam.far;
+  ppPass(D.mPrep, D.a);
+  const B = D.mBlur.uniforms;
+  B.texel.value.set(1 / D.a.width, 1 / D.a.height);
+  B.uStep.value = clamp(D.a.height / 300, 0.8, 2.2);
+  B.tex.value = D.a.texture; B.dir.value.set(1, 0); ppPass(D.mBlur, D.b);
+  B.tex.value = D.b.texture; B.dir.value.set(0, 1); ppPass(D.mBlur, D.a);
 }
 function resizePost(w, h) {
   const P = R.pp;
@@ -330,6 +416,9 @@ function renderPost() {
   U.tScene.value = P.main.texture; U.tBloom.value = src.texture;
   U.uTime.value = R.t; U.uFlash.value = R.flash; U.uCine.value = R.cine;
   U.uBloom.value = 0.42 + R.excite * 0.1;
+  const D = R.dof;
+  U.uDof.value = D && D.ok && D.on > 0.01 ? D.on : 0;
+  U.tDof.value = D && D.ok ? D.a.texture : null;
   ppPass(P.mComp, null);
 }
 
@@ -363,6 +452,23 @@ function renderFrame(dt, rdt) {
   r.setRenderTarget(R.pp.main);
   r.clear();
   r.render(R.scene, R.cam);
+  const D = R.dof;
+  if (D && D.ok) {
+    const w = D.want;
+    D.on = R.dofSnap ? (w ? 1 : 0) : damp(D.on, w ? 1 : 0, 3.5, rdt);
+    if (w) {
+      const fd = Math.max(3, R.cam.position.distanceTo(w.focus));
+      D.focus = D.on < 0.05 || R.dofSnap ? fd : damp(D.focus, fd, 6, rdt);
+      D.ap = w.ap || 1;
+    }
+    if (D.on > 0.01) renderDof();
+    if (R.debugView === 'coc' && D.on > 0.01) {
+      if (!R.pp.mCoc) R.pp.mCoc = ppMat('uniform sampler2D tex; varying vec2 vUv; void main(){ float c = texture2D(tex, vUv).a; gl_FragColor = vec4(max(c, 0.0), max(-c, 0.0), 0.0, 1.0); }', { tex: { value: null } });
+      if (!R.pp.mRgb) R.pp.mRgb = ppMat('uniform sampler2D tex; varying vec2 vUv; void main(){ vec3 c = texture2D(tex, vUv).rgb; gl_FragColor = vec4(pow(c / (1.0 + c), vec3(0.4545)), 1.0); }', { tex: { value: null } });
+      if (R.cocSrc === 'rgb') { R.pp.mRgb.uniforms.tex.value = D.a.texture; ppPass(R.pp.mRgb, null); return; }
+      R.pp.mCoc.uniforms.tex.value = D.a.texture; ppPass(R.pp.mCoc, null); return;
+    }
+  }
   renderPost();
 }
 
@@ -373,7 +479,7 @@ const CAMS = {
   sky: { H: 58, D: 56, fov: 40 },
 };
 function camTargets(dt) {
-  if (R.debugCam) return { pos: R.debugCam.pos.clone(), look: R.debugCam.look.clone(), fov: R.debugCam.fov || 40 };
+  if (R.debugCam) return { pos: R.debugCam.pos.clone(), look: R.debugCam.look.clone(), fov: R.debugCam.fov || 40, dof: R.debugCam.dof || null };
   if (REP.active) { const rc = replayCam(); if (rc) { R.camRate = [3, 4]; return rc; } }
   const b = G.ball, C = CAMS[R.camMode] || CAMS.broadcast;
   let fx = b.x, fz = b.z;
@@ -383,7 +489,7 @@ function camTargets(dt) {
   const lx = clamp(fx * 0.85, -31, 31), lz = clamp(fz * 0.22, -4, 5) + 1.5;
   const sway = Math.sin(R.t * 0.37) * 0.35 + Math.sin(R.t * 0.71) * 0.2;
   let pos = V3(lx * 0.92 + sway, C.H + Math.sin(R.t * 0.29) * 0.25, C.D + lz * 0.5), look = V3(lx, 3.2, lz);
-  let fov = C.fov;
+  let fov = C.fov, dof = null;
   R.camRate = null;
   if (R.camMode === 'third' && G.ctrl && G.userTeam >= 0 && !G.auto && !G.attract && G.mode !== 'threept') {
     const t = thirdPerson(dt);
@@ -392,6 +498,7 @@ function camTargets(dt) {
   if ((G.state === 'ft' || G.state === 'ftcut') && G.ft && G.ft.placed) {
     const sh = G.ft.shooter, s = sh.team.dir;
     pos = V3(sh.x - s * 16, 10.5, sh.z + 8); look = V3(s * CT.RIM_X, 8, 0); fov = 40;
+    dof = { focus: V3(sh.x, 5, sh.z), ap: 0.9 };
   } else if (G.mode === 'threept' && G.tp) {
     const sh = G.tp.sh;
     let dx = sh.x - CT.RIM_X, dz = sh.z; const dl = hyp(dx, dz) || 1; dx /= dl; dz /= dl;
@@ -404,6 +511,7 @@ function camTargets(dt) {
   } else if (G.state === 'final' && !G.attract) {
     const a = R.t * 0.12;
     pos = V3(Math.sin(a) * 34, 12, Math.cos(a) * 34); look = V3(0, 5, 0); fov = 42;
+    dof = { focus: V3(0, 5, 0), ap: 0.7 };
   }
   if (G.attract) {
     // cinematic cuts in the menu: broadcast, low baseline, slow orbit
@@ -411,6 +519,7 @@ function camTargets(dt) {
     if (shot === 1) {
       const s = b.x >= 0 ? 1 : -1;
       pos = V3(s * 58, 7, -10 + Math.sin(R.t * 0.2) * 6); look = V3(s * 20, 5, 0); fov = 44;
+      dof = { focus: V3(b.x, 5, b.z), ap: 0.8 };
     } else if (shot === 2) {
       const a = R.t * 0.09;
       pos = V3(Math.sin(a) * 52, 15, Math.cos(a) * 44); look = V3(b.x * 0.4, 4, b.z * 0.3); fov = 42;
@@ -420,12 +529,14 @@ function camTargets(dt) {
   if (R.show > 0) {
     const u = 1 - R.show / R.showDur, a = -1.6 + u * 2.4;
     pos = V3(Math.sin(a) * lerp(46, 36, u), lerp(5, 15, smooth(u)), Math.cos(a) * lerp(46, 36, u)); look = V3(0, lerp(10, 5, u), 0); fov = 46;
+    dof = { focus: V3(0, 5, 0), ap: 0.6 };
   }
   if (R.slowmo > 0 && R.slowSide) {
     const s = R.slowSide;
     pos = V3(s * 26, 9, 24); look = V3(s * CT.RIM_X, 8.6, 0); fov = 34;
+    dof = { focus: V3(s * (CT.RIM_X - 2), 8, 0), ap: 1.1 };
   }
-  return { pos, look, fov };
+  return { pos, look, fov, dof };
 }
 /* Third person: over the controlled player's shoulder. Offense looks at the basket being attacked,
    defense looks at the ball handler, loose balls and shots pull the view toward the ball. */
@@ -446,14 +557,25 @@ function thirdPerson(dt) {
   if (R.tpYaw == null || R.snapCam) R.tpYaw = want;
   else R.tpYaw += angDiff(R.tpYaw, want) * (1 - Math.exp(-2.4 * dt));
   const fx = Math.cos(R.tpYaw), fz = Math.sin(R.tpYaw);
-  const dist = 13.5, height = 8.4, side = 2.0;
+  // high behind the player: the controlled player sits low in frame with the half court and rim ahead
+  let dist = 20.5, height = 14.2;
+  const side = 0.6, lim = 41.5;
+  // never drop behind a backboard: pull in (and up) so the glass and stanchion don't block the view
+  const bx = p.x - fx * dist;
+  if (Math.abs(bx) > lim && Math.abs(fx) > 0.12) {
+    const dmax = (p.x - Math.sign(bx) * lim) / fx;
+    if (dmax > 7) { const dd = Math.min(dist, dmax); height += (dist - dd) * 0.18; dist = dd; }
+    else height += 4;
+  }
   let cx = p.x - fx * dist - fz * side, cz = p.z - fz * dist + fx * side;
-  cx = clamp(cx, -54, 54); cz = clamp(cz, -32, 32);
-  const lift = b.state === 'shot' ? clamp(b.y - 8, 0, 8) * 0.45 : 0;
-  return { pos: V3(cx, height + p.y * 0.35, cz), look: V3(p.x + fx * 7, 3.4 + lift, p.z + fz * 7), fov: 54 };
+  cx = clamp(cx, -60, 60); cz = clamp(cz, -36, 36);
+  const lift = b.state === 'shot' ? clamp(b.y - 8, 0, 8) * 0.4 : 0;
+  const ahead = 3 + 7 * clamp(dist / 20.5, 0, 1);
+  return { pos: V3(cx, height + p.y * 0.3, cz), look: V3(p.x + fx * ahead, 3.2 + lift, p.z + fz * ahead), fov: 47 + (20.5 - dist) * 0.5 };
 }
 function updateCamera(dt) {
   const t = camTargets(dt);
+  if (R.dof) R.dof.want = R.quality === 'low' ? null : t.dof || null;
   const aspect = R.cam.aspect;
   let fov = t.fov;
   if (aspect < 1.4) fov = 2 * Math.atan(Math.tan(fov * PI / 360) * 1.42 / aspect) * 180 / PI;
@@ -461,6 +583,7 @@ function updateCamera(dt) {
   if (Math.abs(R.cam.fov - fov) > 0.02) { R.cam.fov = R.snapCam ? fov : lerp(R.cam.fov, fov, 1 - Math.exp(-3 * dt)); R.cam.updateProjectionMatrix(); }
   const rr = R.camRate || [2.6, 3.6];
   const kp = R.snapCam ? 1 : 1 - Math.exp(-rr[0] * dt), kl = R.snapCam ? 1 : 1 - Math.exp(-rr[1] * dt);
+  R.dofSnap = !!R.snapCam;
   R.snapCam = false;
   R.camPos.lerp(t.pos, kp); R.camLook.lerp(t.look, kl);
   R.cam.position.copy(R.camPos);
@@ -471,6 +594,11 @@ function updateCamera(dt) {
   }
   R.cam.lookAt(R.camLook);
   R.cam.updateMatrixWorld();
+  // a camera behind a backboard would look through glass, stanchion and pads: drop them out of the shot
+  if (R.hoops) for (const h of R.hoops) {
+    const behind = h.s * R.cam.position.x > CT.BB_X + 0.4 && Math.abs(R.cam.position.z) < 30;
+    if (h.occHidden !== behind) { h.occHidden = behind; for (const m of h.occ) m.visible = !behind; }
+  }
 }
 /* camera-relative stick mapping: returns world (x, z) for a stick pointing (sx right, sy up) */
 function stickToWorld(sx, sy) {

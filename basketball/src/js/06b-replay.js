@@ -117,12 +117,14 @@ function replayCam() {
   const u = A.pos / A.frames.length;
   if (A.kind === 'dunk') {
     const ang = lerp(-0.5, 0.2, u);
-    return { pos: V3(s * (CT.RIM_X - 22 * Math.cos(ang)), lerp(10, 12.5, u), 22 * Math.sin(ang) + 6), look: V3(s * (CT.RIM_X - 3), lerp(6.5, 8.5, u), 0), fov: 38 };
+    return { pos: V3(s * (CT.RIM_X - 22 * Math.cos(ang)), lerp(10, 12.5, u), 22 * Math.sin(ang) + 6), look: V3(s * (CT.RIM_X - 3), lerp(6.5, 8.5, u), 0), fov: 38,
+      dof: { focus: V3(p.x, p.y + 5.5, p.z), ap: 1.3 } };
   }
   // jump shots: low and in front of the shooter, then follow the ball toward the rim
   const toRim = V3(s * CT.RIM_X - p.x, 0, -p.z).normalize();
   const side = V3(-toRim.z, 0, toRim.x);
   const track = b.state === 'shot' || b.shotLive ? 0.7 : 0.2;
   const look = V3(lerp(p.x, b.x, track), lerp(5, b.y, track), lerp(p.z, b.z, track));
-  return { pos: V3(p.x + toRim.x * 11 + side.x * 11, 6.5, p.z + toRim.z * 11 + side.z * 11), look, fov: 42 };
+  return { pos: V3(p.x + toRim.x * 11 + side.x * 11, 6.5, p.z + toRim.z * 11 + side.z * 11), look, fov: 42,
+    dof: { focus: track > 0.5 ? V3(b.x, b.y, b.z) : V3(p.x, p.y + 5, p.z), ap: 1.3 } };
 }

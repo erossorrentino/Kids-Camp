@@ -33,11 +33,13 @@ fonts from their CDNs. There is nothing to install.
 
 ## Camera
 
-The default camera is **third person**: it rides behind the player you control,
-looking at the basket on offense and at the ball handler on defense, with chevrons
-over your teammates (the bright one is your pass target). In this mode you stay
-locked to your own player on defense. Settings also offer Broadcast (full court),
-Close and Skycam.
+The default camera is **third person**: it rides high behind the player you control,
+so your player sits low in the frame with the half court and the rim ahead, looking
+at the basket on offense and at the ball handler on defense. Chevrons mark your
+teammates (the bright one is your pass target). Near a baseline the camera pulls in
+rather than dropping behind the glass, and if it does swing behind a backboard, the
+glass and stanchion drop out of the shot. In this mode you stay locked to your own
+player on defense. Settings also offer Broadcast (full court), Close and Skycam.
 
 ## Controls
 
@@ -78,20 +80,39 @@ Phones and tablets get an on-screen joystick and buttons.
 **Graphics** (`src/js/04-render-core.js`, `05-arena.js`, `06-players.js`)
 - HDR rendering with MSAA, bloom, ACES tone mapping, color grading,
   vignette, film grain and a letterboxed slow-motion dunk cam.
-- A lacquered maple floor with real-time planar reflections, fresnel
-  blending and a per-plank roughness map.
-- Spotlit arena: rounded two-tier bowl with suites, about 7,000 GPU-animated
-  fans who stand, cheer and do the wave, a 360° ribbon board, a center-hung
+- A pale maple floor, every board a slightly different tone, with real-time
+  planar reflections, fresnel blending and a per-plank roughness map. The home
+  team's colours fill the apron, the lanes and the free-throw circles, with big
+  city and team lettering along both baselines.
+- House lights down: the court sits in a pool of light while the stands fade into
+  the dark the further they are from the floor. Rounded two-tier bowl with
+  suites, about 7,500 GPU-animated fans in everyday clothes (caps, jeans, team
+  shirts) who stand, cheer and do the wave, a 360° ribbon board, a center-hung
   scoreboard, ceiling light rig with haze, camera flashes and confetti.
-- Players are single skinned meshes on a 14-bone skeleton, painted from a
-  per-player texture atlas: jerseys with names and numbers, shorts with stripes
-  and a team badge, faces, hair, fingers, fabric detail and a broadcast rim light.
+- Players are single skinned meshes on a 15-bone skeleton, painted from a
+  per-player texture atlas: jerseys with names, numbers and side panels, long
+  shorts with stripes and a team badge, fabric detail and a broadcast rim light.
   Arms use IK to dribble, shoot and catch; feet stay planted on the floor.
+- Athletic bodies: sculpted biceps, triceps, forearms, quads and calves, curled
+  fingers, and skin with a sweat sheen. Faces have eyes with lids and catchlights,
+  hair-stroke eyebrows, a sculpted nose, lips and chin, and stubble, goatees, chin
+  straps or full beards. Eleven hairstyles (shaved, buzz, fade, waves, flow, high-top,
+  sponge curls, afro, locs, bun, braids) with natural hairlines.
+- Every player has their own gear, chosen from their name: compression tights on one
+  or both legs, padded knee sleeves, high or crew socks, shooting sleeves,
+  wristbands, headbands, arm tattoos and four sneaker colourways.
+- Depth of field on replays, the pregame show, free throws and other cinematic
+  shots: the arena melts into a soft blur behind sharp players.
 - Three referees, bench players, coaches, photographers and courtside fans.
 - Broadcast presentation: a starting-lineups intro with 3D player cards,
   instant replays of big dunks and threes (logo wipe, slow motion, cinematic
-  camera, skippable), pop-up stat graphics for hot players, a scorebug with
-  team logos and foul dots, and a player-of-the-game portrait.
+  camera, skippable), pop-up stat graphics for hot players, and a
+  player-of-the-game portrait.
+- In-game HUD: a stacked scorebug at the bottom right (team logos, city names,
+  scores, foul dots, bonus, possession, quarter, clock, shot clock), your player's
+  name and stamina bar at the bottom centre, and a live panel at the top right with
+  their points, rebounds, assists and FG% plus a running letter grade (A+ to F) for
+  your team's play.
 - Skin with a warm subsurface-style scatter, muscle definition on the limbs,
   sculpted faces, and jerseys whose hem swings with momentum.
 - Fans hold up signs on big moments, courtside rows clap, and bright lights

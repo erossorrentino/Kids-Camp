@@ -300,18 +300,6 @@ table.box tr.tot td { font-weight: 700; color: var(--chalk); }
 }
 
 /* ---------- broadcast package ---------- */
-#bug { height: 52px; border-radius: 8px; overflow: hidden; background: linear-gradient(180deg, #1a2232, #0a0e16); box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.12); }
-#bug .tm { background: transparent; padding: 0 14px 0 8px; gap: 10px; min-width: 150px; border-bottom: 3px solid var(--tc, #888); }
-#bug .tm .em { width: 36px; height: 36px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
-#bug .tm .tn { display: grid; gap: 3px; }
-#bug .tm .fl { display: flex; gap: 3px; }
-#bug .tm .fl i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.18); }
-#bug .tm .fl i.on { background: var(--warn); }
-#bug .tm .sc { font-size: 32px; }
-#bug .tm .bonus { left: auto; right: 54px; bottom: 4px; }
-#bug .tm .pos { top: auto; bottom: -1px; right: auto; left: 50%; transform: translateX(-50%); border-top: 0; border-bottom: 6px solid var(--warn); }
-#bug .clk { background: linear-gradient(180deg, #f6f2ea, #d9d3c7); min-width: 92px; }
-#bug .shc { background: #050608; }
 #lineups { position: absolute; inset: 0; display: none; align-content: center; justify-content: center; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px 40px; padding: 0 max(20px, env(safe-area-inset-left, 0px)); background: linear-gradient(180deg, rgba(4,6,10,0.15), rgba(4,6,10,0.55)); }
 #lineups.on { display: grid; animation: fadein .4s; }
 .lu-title { grid-column: 1 / -1; text-align: center; }
@@ -355,25 +343,40 @@ table.box tr.tot td { font-weight: 700; color: var(--chalk); }
 #hud { position: absolute; inset: 0; display: none; pointer-events: none; }
 .screen.on ~ #hud { display: none !important; }
 #hud.on { display: block; }
-#bug { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(14px, env(safe-area-inset-bottom, 0px)); display: flex; align-items: stretch; height: 46px; box-shadow: 0 8px 30px rgba(0,0,0,0.45); font-variant-numeric: tabular-nums; }
-#bug .tm { display: flex; align-items: center; gap: 10px; padding: 0 12px 0 0; background: #0d121c; min-width: 128px; position: relative; }
-#bug .tm .sw { width: 10px; align-self: stretch; }
-#bug .tm .ab { font: 800 22px var(--f-display); letter-spacing: 0.03em; }
-#bug .tm .sc { font: 900 30px var(--f-display); margin-left: auto; min-width: 2ch; text-align: right; }
-#bug .tm .bonus { position: absolute; left: 18px; bottom: 3px; font: 700 9px var(--f-body); letter-spacing: 0.14em; color: var(--warn); }
-#bug .tm .pos { position: absolute; top: 4px; right: 4px; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-top: 6px solid var(--warn); opacity: 0; }
+/* scorebug: stacked team rows and a clock row, bottom right */
+#bug { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); bottom: max(16px, env(safe-area-inset-bottom, 0px)); width: 272px; display: grid; border-radius: 6px; overflow: hidden;
+  background: linear-gradient(180deg, rgba(16,21,32,0.9), rgba(6,9,15,0.94)); box-shadow: 0 12px 34px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.1); font-variant-numeric: tabular-nums; backdrop-filter: blur(6px); }
+#bug .tm { display: grid; grid-template-columns: 5px 34px minmax(0, 1fr) auto auto auto; align-items: center; gap: 0 8px; height: 44px; padding-right: 12px; position: relative; border-bottom: 1px solid rgba(255,255,255,0.06); }
+#bug .tm::before { content: ""; align-self: stretch; background: var(--tc, #888); box-shadow: 0 0 12px var(--tc, #888); }
+#bug .tm .em { width: 32px; height: 32px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+#bug .tm .tn { display: grid; gap: 3px; min-width: 0; }
+#bug .tm .ab { font: 900 italic 19px/1 var(--f-display); letter-spacing: 0.02em; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#bug .tm .fl { display: flex; gap: 3px; }
+#bug .tm .fl i { width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,0.18); }
+#bug .tm .fl i.on { background: var(--warn); }
+#bug .tm .sc { font: 900 32px/1 var(--f-display); min-width: 2ch; text-align: right; }
+#bug .tm .bonus { font: 800 9px var(--f-body); letter-spacing: 0.12em; color: var(--warn); }
+#bug .tm .pos { width: 0; height: 0; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-right: 7px solid var(--warn); opacity: 0; }
 #bug .tm.has .pos { opacity: 1; }
-#bug .clk { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 0 14px; background: #f3efe6; color: #0a0e16; min-width: 86px; }
-#bug .clk .q { font: 700 11px var(--f-body); letter-spacing: 0.14em; }
-#bug .clk .t { font: 900 24px/1 var(--f-display); }
+#bug .clk { display: flex; align-items: center; gap: 12px; height: 34px; padding: 0 12px 0 15px; background: rgba(0,0,0,0.35); }
+#bug .clk .q { font: 800 13px var(--f-body); letter-spacing: 0.14em; color: var(--steel); }
+#bug .clk .t { font: 900 24px/1 var(--f-display); margin-left: auto; }
+#bug .shc { display: grid; place-items: center; min-width: 38px; height: 24px; border-radius: 4px; background: #000; color: var(--warn); font: 900 20px var(--f-display); box-shadow: inset 0 0 0 1px rgba(255,210,63,0.25); }
 #bug .shc:empty { display: none; }
-#bug .shc { display: grid; place-items: center; min-width: 46px; background: #000; color: var(--warn); font: 900 26px var(--f-display); }
-#bug .shc.low { color: var(--bad); }
+#bug .shc.low { color: var(--bad); box-shadow: inset 0 0 0 1px rgba(255,77,61,0.4); }
 #bug .sc.flash { animation: flash .6s ease-out; }
 @keyframes flash { 0% { color: var(--warn); transform: scale(1.35); } 100% { color: inherit; transform: scale(1); } }
-#hud.tp #bug { bottom: auto; top: max(10px, env(safe-area-inset-top, 0px)); }
-#hud.tp #ticker { top: 70px; }
-#hud.tp #hint { top: 70px; }
+/* live stat panel with a game grade, top right */
+#perf { position: absolute; right: max(16px, env(safe-area-inset-right, 0px)); top: max(14px, env(safe-area-inset-top, 0px)); display: flex; align-items: center; gap: 4px; padding: 6px 14px 6px 6px; border-radius: 40px;
+  background: linear-gradient(180deg, rgba(16,21,32,0.86), rgba(6,9,15,0.9)); box-shadow: 0 10px 30px rgba(0,0,0,0.45), inset 0 0 0 1px rgba(255,255,255,0.08); font-variant-numeric: tabular-nums; }
+#perf .gr { --g: 50; --gc: var(--good); width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; background: conic-gradient(var(--gc) calc(var(--g) * 1%), rgba(255,255,255,0.1) 0); position: relative; }
+#perf .gr::before { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: #0b0f18; }
+#perf .gr b { position: relative; font: 900 italic 21px/1 var(--f-display); color: var(--gc); }
+#perf .gr.up { animation: gup .7s ease-out; }
+@keyframes gup { 0% { transform: scale(1.3); } 100% { transform: none; } }
+#perf .ps { display: flex; gap: 14px; padding-left: 10px; }
+#perf .ps span { display: grid; justify-items: center; font: 700 10px var(--f-body); letter-spacing: 0.12em; color: var(--steel); }
+#perf .ps i { font: 900 22px/1 var(--f-display); font-style: normal; color: var(--chalk); }
 #ticker { position: absolute; left: max(14px, env(safe-area-inset-left, 0px)); top: max(12px, env(safe-area-inset-top, 0px)); display: flex; flex-direction: column; gap: 4px; max-width: min(420px, 70vw); }
 #ticker div { font: 600 14px var(--f-body); background: rgba(10,14,22,0.72); padding: 5px 10px; border-left: 3px solid var(--wood); animation: tick 5s forwards; }
 @keyframes tick { 0% { opacity: 0; transform: translateX(-8px); } 6% { opacity: 1; transform: none; } 85% { opacity: 1; } 100% { opacity: 0; } }
@@ -382,15 +385,22 @@ table.box tr.tot td { font-weight: 700; color: var(--chalk); }
 #banner b { display: block; font: 900 italic clamp(40px, 8vw, 96px)/0.9 var(--f-display); text-transform: uppercase; color: #fff; text-shadow: 0 4px 24px rgba(0,0,0,0.55); -webkit-text-stroke: 1px rgba(0,0,0,0.25); white-space: nowrap; }
 #banner span { display: inline-block; margin-top: 8px; padding: 4px 14px; font: 800 18px var(--f-display); letter-spacing: 0.08em; text-transform: uppercase; background: var(--signal); color: var(--ink); transform: skewX(-12deg); }
 @keyframes banner { 0% { opacity: 0; transform: translateX(-50%) scale(1.4); } 10% { opacity: 1; transform: translateX(-50%) scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) scale(0.96); } }
-#ptag { position: absolute; left: max(14px, env(safe-area-inset-left, 0px)); bottom: max(14px, env(safe-area-inset-bottom, 0px)); display: flex; align-items: stretch; background: rgba(10,14,22,0.82); border-radius: 4px; overflow: hidden; min-width: 210px; }
-#ptag .num { display: grid; place-items: center; min-width: 50px; font: 900 italic 30px var(--f-display); color: #fff; }
-#ptag .inf { padding: 6px 12px; display: grid; gap: 2px; flex: 1; }
-#ptag b { font: 800 18px/1 var(--f-display); text-transform: uppercase; letter-spacing: 0.02em; }
-#ptag span { font: 600 12px var(--f-body); color: var(--steel); letter-spacing: 0.06em; }
-#ptag .stam { height: 4px; background: var(--ink-3); border-radius: 2px; overflow: hidden; margin-top: 3px; }
-#ptag .stam i { display: block; height: 100%; background: var(--good); width: 100%; transition: width .2s; }
-#hint { position: absolute; right: max(14px, env(safe-area-inset-right, 0px)); top: max(12px, env(safe-area-inset-top, 0px)); font: 600 13px var(--f-body); color: var(--chalk); background: rgba(10,14,22,0.7); padding: 7px 10px; border-radius: 4px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; max-width: 46vw; }
+/* controlled player: name and stamina, bottom centre */
+#ptag { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(18px, env(safe-area-inset-bottom, 0px)); display: grid; justify-items: center; gap: 7px; min-width: 260px; }
+#ptag .row { display: flex; align-items: center; gap: 9px; text-shadow: 0 2px 10px rgba(0,0,0,0.85); }
+#ptag .num { display: grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; font: 900 italic 18px var(--f-display); color: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,0.85), 0 4px 12px rgba(0,0,0,0.5); text-shadow: none; }
+#ptag b { font: 800 26px/1 var(--f-display); letter-spacing: 0.02em; }
+#ptag span { font: 700 12px var(--f-body); color: var(--chalk); opacity: 0.75; letter-spacing: 0.08em; }
+#ptag .stam { width: 240px; height: 8px; border-radius: 5px; background: rgba(6,9,15,0.75); box-shadow: inset 0 0 0 1px rgba(255,255,255,0.18), 0 4px 12px rgba(0,0,0,0.4); overflow: hidden; position: relative; }
+#ptag .stam::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(90deg, transparent 0 calc(33.33% - 2px), rgba(6,9,15,0.9) calc(33.33% - 2px) 33.33%); }
+#ptag .stam i { display: block; height: 100%; width: 100%; background: linear-gradient(180deg, #ffe680, #f0b429); transition: width .2s; }
+#hint { position: absolute; left: max(14px, env(safe-area-inset-left, 0px)); bottom: max(16px, env(safe-area-inset-bottom, 0px)); font: 600 12px var(--f-body); color: var(--chalk); background: rgba(10,14,22,0.66); padding: 6px 9px; border-radius: 4px; display: flex; gap: 6px 10px; flex-wrap: wrap; max-width: min(300px, 30vw); }
 #hint span { white-space: nowrap; }
+#hud.l3 #hint { display: none !important; }
+#hud.tch #bug { bottom: auto; top: max(12px, env(safe-area-inset-top, 0px)); width: 220px; }
+#hud.tch #bug .tm { height: 36px; } #hud.tch #bug .tm .sc { font-size: 26px; }
+#hud.tch #perf { display: none; }
+@media (max-width: 760px) { #perf { display: none; } #bug { width: 220px; } #bug .tm { height: 38px; } #bug .tm .sc { font-size: 26px; } }
 #meter { position: absolute; width: 12px; height: 78px; background: rgba(0,0,0,0.6); border: 2px solid rgba(255,255,255,0.85); border-radius: 7px; overflow: hidden; display: none; }
 #meter .fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: linear-gradient(0deg, #f3efe6, #fff); }
 #meter .win { position: absolute; left: 0; right: 0; background: var(--good); opacity: 0.9; }
@@ -656,15 +666,15 @@ table.box tr.tot td { font-weight: 700; color: var(--chalk); }
     <div id="intro"><div class="card"><span class="eyebrow" id="introEy">Tip-off</span><div class="teams" id="introTeams"></div></div></div>
     <div id="tphud"><div><span class="lb">TIME</span><span class="vl" id="tpTime">60.0</span></div><div><div class="racks" id="tpRacks"></div></div><div><span class="lb">SCORE</span><span class="vl" id="tpScore">0</span></div></div>
     <div id="bug">
-      <div class="tm" id="bugA"><img class="em" alt=""><div class="tn"><span class="ab"></span><span class="fl"><i></i><i></i><i></i><i></i><i></i></span></div><span class="sc">0</span><span class="bonus"></span><span class="pos"></span></div>
-      <div class="clk"><span class="q" id="bugQ">1ST</span><span class="t" id="bugT">3:00</span></div>
-      <div class="tm" id="bugB"><img class="em" alt=""><div class="tn"><span class="ab"></span><span class="fl"><i></i><i></i><i></i><i></i><i></i></span></div><span class="sc">0</span><span class="bonus"></span><span class="pos"></span></div>
-      <div class="shc" id="bugS">24</div>
+      <div class="tm" id="bugA"><img class="em" alt=""><div class="tn"><span class="ab"></span><span class="fl"><i></i><i></i><i></i><i></i><i></i></span></div><span class="bonus"></span><span class="pos"></span><span class="sc">0</span></div>
+      <div class="tm" id="bugB"><img class="em" alt=""><div class="tn"><span class="ab"></span><span class="fl"><i></i><i></i><i></i><i></i><i></i></span></div><span class="bonus"></span><span class="pos"></span><span class="sc">0</span></div>
+      <div class="clk"><span class="q" id="bugQ">1ST</span><span class="t" id="bugT">3:00</span><span class="shc" id="bugS">24</span></div>
     </div>
+    <div id="perf"><div class="gr" id="pfRing"><b id="pfGrade">B</b></div><div class="ps"><span><i id="pfPts">0</i>PTS</span><span><i id="pfReb">0</i>REB</span><span><i id="pfAst">0</i>AST</span><span><i id="pfFg">0%</i>FG</span></div></div>
     <div id="lineups"></div>
     <div id="lower3"></div>
     <div id="replayBug"><b>Replay</b><span>Press any button to skip</span></div>
-    <div id="ptag"><div class="num" id="ptNum">3</div><div class="inf"><b id="ptName">Player</b><span id="ptInfo">PG</span><div class="stam"><i id="ptStam"></i></div></div></div>
+    <div id="ptag"><div class="row"><div class="num" id="ptNum">3</div><b id="ptName">Player</b><span id="ptInfo">PG</span></div><div class="stam"><i id="ptStam"></i></div></div>
     <div id="hint"></div>
   </div>
 
