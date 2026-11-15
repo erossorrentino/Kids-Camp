@@ -628,8 +628,8 @@ function buildHoops() {
     post.position.set(s * 52.6, 8.9, 0); post.castShadow = true; grp.add(post);
     const arm = new THREE.Mesh(new THREE.BoxGeometry(10, 0.9, 0.9), padM);
     arm.position.set(s * 48.3, 12.9, 0); arm.rotation.z = s * -0.24; arm.castShadow = true; grp.add(arm);
-    const arm2 = new THREE.Mesh(new THREE.BoxGeometry(5.2, 0.45, 0.45), steel);
-    arm2.position.set(s * 45.5, 11.0, 0); grp.add(arm2);
+    const arm2 = new THREE.Mesh(new THREE.BoxGeometry(4.9, 0.45, 0.45), steel);
+    arm2.position.set(s * 45.6, 11.0, 0); grp.add(arm2);
     const glass = new THREE.Mesh(new THREE.BoxGeometry(0.12, 3.5, 6), new THREE.MeshStandardMaterial({ color: '#d8ecff', transparent: true, opacity: 0.16, roughness: 0.04, metalness: 0.0, envMapIntensity: 2.2, depthWrite: false }));
     glass.position.set(s * (CT.BB_X + 0.06), (CT.BB_BOT + CT.BB_TOP) / 2, 0); glass.renderOrder = 3; grp.add(glass);
     const frameMat = new THREE.MeshStandardMaterial({ color: '#f4f4f4', roughness: 0.4 });
@@ -644,7 +644,7 @@ function buildHoops() {
     const sc = mkCanvas(256, 96), sct = canvasTex(sc);
     const scf = hdrBasic('#ffffff', 1.6, { map: sct });
     const dark = stdMat('#0b0b0d', 0.5);
-    const scm = new THREE.Mesh(new THREE.BoxGeometry(0.7, 1.05, 2.3), [dark, dark, dark, dark, scf, scf]);
+    const scm = new THREE.Mesh(new THREE.BoxGeometry(2.3, 1.05, 0.7), [dark, dark, dark, dark, scf, scf]);
     scm.position.set(fx, CT.BB_TOP + 0.68, 0); scm.rotation.y = PI / 2; grp.add(scm);
     const rimMat = stdMat('#ff4f12', 0.3, { metalness: 0.45 });
     const rimG = new THREE.Group(); rimG.position.set(s * CT.RIM_X, CT.RIM_Y, 0); grp.add(rimG);

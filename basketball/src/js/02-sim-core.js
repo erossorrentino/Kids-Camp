@@ -118,20 +118,62 @@ function holdPos(p, out) {
   out.x = p.x + cf * fwd - sf * side;
   out.z = p.z + sf * fwd + cf * side;
   out.y = p.y + up;
+  if (out.y > CT.BB_BOT - 1 && Math.abs(out.x) > CT.BB_X - 1) {
+    const q = solidBox(HOOP_SOLIDS[0], out.x > 0 ? 1 : -1);
+    sphereBox(out, q[0], q[1], q[2], q[3], q[4], q[5], CT.BALL_R);
+  }
 }
 
 /* ---------- ball physics ---------- */
+/* Solid parts around each hoop as boxes [x0, x1, y0, y1, z0, z1] for the +x end (mirrored for -x):
+   restitution and tangential friction per part. The glass is a slab the ball bounces off on every side. */
+const HOOP_SOLIDS = [
+  { b: [CT.BB_X, CT.BB_X + 0.12, CT.BB_BOT, CT.BB_TOP, -CT.BB_HW, CT.BB_HW], e: 0.62, f: 0.95, board: true },
+  { b: [CT.BB_X - 0.11, CT.BB_X + 0.31, CT.BB_BOT - 0.38, CT.BB_BOT, -3.1, 3.1], e: 0.3, f: 0.8 },
+  { b: [CT.BB_X - 0.35, CT.BB_X + 0.35, CT.BB_TOP + 0.15, CT.BB_TOP + 1.2, -1.15, 1.15], e: 0.4, f: 0.85 },
+  { b: [CT.BB_X + 0.13, 48.1, 10.77, 11.23, -0.23, 0.23], e: 0.45, f: 0.85 },
+  { b: [43.4, 46.6, 13.1, 14.6, -0.45, 0.45], e: 0.35, f: 0.8 },
+  { b: [46.6, 49.9, 12.3, 13.8, -0.45, 0.45], e: 0.35, f: 0.8 },
+  { b: [49.9, 53.2, 11.5, 13.0, -0.45, 0.45], e: 0.35, f: 0.8 },
+  { b: [52.05, 53.15, 4.15, 13.65, -0.55, 0.55], e: 0.3, f: 0.8 },
+  { b: [51.1, 56.1, 0, 4.4, -3.2, 3.2], e: 0.28, f: 0.75 },
+];
+const _n = { x: 0, y: 0, z: 0 };
+/* push a sphere at b out of an axis-aligned box; returns the penetration (0 if no contact) and the normal in _n */
+function sphereBox(b, x0, x1, y0, y1, z0, z1, R) {
+  const cx = clamp(b.x, x0, x1), cy = clamp(b.y, y0, y1), cz = clamp(b.z, z0, z1);
+  let dx = b.x - cx, dy = b.y - cy, dz = b.z - cz;
+  const d2 = dx * dx + dy * dy + dz * dz;
+  if (d2 >= R * R) return 0;
+  if (d2 > 1e-10) {
+    const d = Math.sqrt(d2);
+    _n.x = dx / d; _n.y = dy / d; _n.z = dz / d;
+    b.x = cx + _n.x * R; b.y = cy + _n.y * R; b.z = cz + _n.z * R;
+    return R - d;
+  }
+  // centre inside the box: leave through the nearest face
+  const f = [[b.x - x0, -1, 0, 0], [x1 - b.x, 1, 0, 0], [b.y - y0, 0, -1, 0], [y1 - b.y, 0, 1, 0], [b.z - z0, 0, 0, -1], [z1 - b.z, 0, 0, 1]];
+  let m = f[0];
+  for (const q of f) if (q[0] < m[0]) m = q;
+  _n.x = m[1]; _n.y = m[2]; _n.z = m[3];
+  if (m[1]) b.x = (m[1] < 0 ? x0 : x1) + m[1] * R;
+  if (m[2]) b.y = (m[2] < 0 ? y0 : y1) + m[2] * R;
+  if (m[3]) b.z = (m[3] < 0 ? z0 : z1) + m[3] * R;
+  return R + m[0];
+}
+function solidBox(o, s) { const q = o.b; return s > 0 ? q : [-q[1], -q[0], q[2], q[3], q[4], q[5]]; }
 function hoopCollide(b, s, py, ev) {
   const R = CT.BALL_R;
-  // backboard (only the court-facing side)
-  if (Math.abs(b.z) < CT.BB_HW + R * 0.4 && b.y > CT.BB_BOT - R * 0.4 && b.y < CT.BB_TOP + R * 0.4) {
-    const pen = s * b.x + R - CT.BB_X;
-    if (pen > 0 && s * b.x < CT.BB_X + 0.15 && b.vx * s > 0) {
-      b.x = s * (CT.BB_X - R);
-      const v = Math.abs(b.vx);
-      b.vx = -b.vx * 0.62; b.vy *= 0.96; b.vz *= 0.94;
-      b.hitRim = true;
-      if (ev && v > 1.5) emit('backboard', { v });
+  for (const o of HOOP_SOLIDS) {
+    const q = solidBox(o, s);
+    if (!sphereBox(b, q[0], q[1], q[2], q[3], q[4], q[5], R)) continue;
+    const vn = b.vx * _n.x + b.vy * _n.y + b.vz * _n.z;
+    if (vn < 0) {
+      b.vx -= (1 + o.e) * vn * _n.x; b.vy -= (1 + o.e) * vn * _n.y; b.vz -= (1 + o.e) * vn * _n.z;
+      const tn = b.vx * _n.x + b.vy * _n.y + b.vz * _n.z;
+      b.vx = (b.vx - tn * _n.x) * o.f + tn * _n.x; b.vy = (b.vy - tn * _n.y) * o.f + tn * _n.y; b.vz = (b.vz - tn * _n.z) * o.f + tn * _n.z;
+      if (o.board) b.hitRim = true;
+      if (ev && -vn > 1.5) emit('backboard', { v: -vn });
     }
   }
   // rim ring
@@ -265,14 +307,20 @@ function contestOn(p, antic) {
   }
   return clamp(c + c2 * 0.25, 0, 1);
 }
+/* Make probability before defense. Distance matters: layups are easiest, two-point jumpers lose
+   accuracy with every foot, threes are hardest and fall off quickly past the line. */
 function baseProb(r, d, three, type) {
   if (type === 'dunk') return 0.97;
-  if (type === 'layup') return lerp(0.58, 0.86, rt(r.ins));
-  if (three) { let b = lerp(0.30, 0.52, rt(r.tpt)); const deep = d - 24.6; if (deep > 0) b -= deep * 0.035; return b; }
-  if (d > 10) return lerp(0.36, 0.56, rt(r.mid));
-  return lerp(0.42, 0.64, rt((r.mid + r.ins) / 2));
+  if (type === 'layup') return lerp(0.64, 0.9, rt(r.ins)) - Math.max(0, d - 4) * 0.012;
+  if (three) { let b = lerp(0.33, 0.51, rt(r.tpt)); const deep = d - 24.5; if (deep > 0) b -= deep * 0.04; return b; }
+  const sk = rt(d > 12 ? r.mid : (r.mid + r.ins) / 2);
+  return lerp(0.5, 0.7, sk) - Math.max(0, d - 6) * 0.0095;
 }
-function contestMult(type, c) { return type === 'dunk' ? 1 - 0.42 * c * c : type === 'layup' ? 1 - 0.4 * c : 1 - 0.34 * c; }
+/* the green window on the shot meter is wider close in and narrows with range */
+function windowScale(d) { return clamp(1.75 - d * 0.038, 0.5, 1.6); }
+/* how much a perfect release can lift the odds: certain up close, less so from deep */
+function perfectScale(d) { return clamp(1.2 - (d - 10) * 0.02, 0.62, 1); }
+function contestMult(type, c) { return type === 'dunk' ? 1 - 0.42 * c * c : type === 'layup' ? 1 - 0.36 * c : 1 - 0.34 * c; }
 function shotChance(p, S, c) {
   if (S.type === 'ft') return clamp(0.52 + 0.42 * rt(p.d.mid), 0.4, 0.95);
   let base = baseProb(p.d, S.dist, S.three, S.type) * contestMult(S.type, c);
@@ -371,7 +419,7 @@ function startShot(p, rim) {
     S.three = isThreeAt(p.x, p.z, s);
     S.ideal = 0.57 - 0.1 * rt(Math.max(p.d.tpt, p.d.mid));
     S.tJump = S.ideal * 0.42; S.vy0 = CT.G * (S.ideal + 0.06 - S.tJump); S.jumped = false;
-    if (user) { S.timed = true; S.win = G.diff.win * (0.85 + 0.4 * rt(S.three ? p.d.tpt : p.d.mid)); }
+    if (user) { S.timed = true; S.win = G.diff.win * (0.85 + 0.4 * rt(S.three ? p.d.tpt : p.d.mid)) * windowScale(d); }
     else S.tRel = S.ideal + randRange(-0.03, 0.03);
   } else {
     const stop = type === 'dunk' ? 1.2 : 1.9;
@@ -449,7 +497,7 @@ function releaseShot(p) {
     const lvl = ae <= w ? 0 : ae <= w * 2.7 ? 1 : ae <= w * 5.5 ? 2 : 3;
     grade = lvl === 0 ? 'perfect' : (err < 0 ? 'early' : 'late') + lvl;
     if (S.type === 'ft') prob = lvl === 0 ? 0.995 : lvl === 1 ? Math.min(0.97, prob + 0.12) : lvl === 2 ? prob * 0.6 : 0.08;
-    else if (lvl === 0) prob = prob + (1 - prob) * G.diff.boost * (1 - 0.5 * c);
+    else if (lvl === 0) prob = prob + (1 - prob) * G.diff.boost * (1 - 0.5 * c) * perfectScale(S.dist);
     else if (lvl === 1) prob *= 1.1; else if (lvl === 2) prob *= 0.55; else prob *= 0.1;
   } else if (G.userTeam >= 0 && T.idx !== G.userTeam && S.type !== 'ft') prob *= G.diff.cpuShot;
   prob = clamp(prob, 0.005, 0.995);

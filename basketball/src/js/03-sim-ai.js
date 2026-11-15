@@ -184,6 +184,13 @@ function aiDecide(p, mk, md, dRim) {
   const nz = () => randRange(-0.09, 0.09) * noise;
   const driving = A.plan === 'drive';
   const me = evalShot(p, 2), lane = laneOpen(p);
+  // never fire from behind the backboard unless the clock forces it: kick it out instead
+  if (s * p.x > CT.RIM_X - 0.6 && G.shotClock > 2.5) {
+    let best = null, be = -9;
+    for (const m of T.players) { if (m === p) continue; const r = passRisk(p, m); if (r > 0.5) continue; const e = evalShot(m, 3).ev - r * 0.7; if (e > be) { be = e; best = m; } }
+    if (best && A.holdT > 0.35) startPass(p, best);
+    return;
+  }
   if (dRim < 8.5 && (me.ev >= 0.86 || u > 0.5 || (lane > 0.5 && me.c < 0.7))) { startShot(p, true); return; }
   let bm = null, bev = -9, bsafe = null, bs = 9;
   for (const m of T.players) {
@@ -238,6 +245,10 @@ function aiHandler(p, dt) {
   const mk = markerOf(p);
   const md = mk ? hyp(mk.x - p.x, mk.z - p.z) : 99;
   if ((G.shotClock < 1.0 || G.clock < 0.9) && pa > -22) { startShot(p); return; }
+  if (s * p.x > CT.RIM_X - 0.6 && G.shotClock > 2.5) {          // under or behind the backboard: get back out front
+    if (A.plan === 'drive') { A.plan = 'survey'; A.driveCD = 1.4; A.thinkT = Math.min(A.thinkT, 0.25); }
+    A.sx = s * (CT.RIM_X - 9); A.sz = (p.z >= 0 ? 1 : -1) * 12;
+  }
   if (A.plan === 'bring') {
     const w = spotW(T, p);
     let tx = w[0], tz = w[1];
