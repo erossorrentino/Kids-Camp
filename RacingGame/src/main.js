@@ -1,5 +1,5 @@
 // Apex Velocity: app shell, main loop and game flow.
-import { Graphics } from './gfx/renderer.js';
+import { Graphics, QUALITY } from './gfx/renderer.js';
 import { Showroom } from './game/showroom.js';
 import { RaceScene } from './game/raceScene.js';
 import { Input } from './game/input.js';
@@ -15,9 +15,10 @@ import { hashString } from './core/rng.js';
 // Error reports (see index.html). A no-op outside the published page.
 const D = window.__diag || { log() {}, set() {}, send() { return false; }, hasDb: false, state: 'none' };
 const MARK = 'apexVelocity.loading'; // set while something heavy loads; if it is still there at next start-up, the page crashed
-const GFX_VERSION = 8;
+const GFX_VERSION = 9;
 const setMark = (v) => { try { if (v) localStorage.setItem(MARK, v); else localStorage.removeItem(MARK); } catch (e) { /* ignore */ } };
-const TIER_DOWN = { ultra: 'medium', high: 'medium', medium: 'low', low: 'lite' };
+const TIER_DOWN = { ultra: 'medium', high: 'medium', medium: 'low', low: 'lite' }; // broken picture: skip tiers that draw the same way
+const STEP_DOWN = { ultra: 'high', high: 'medium', medium: 'low', low: 'lite' }; // crash / out of graphics memory: one step
 
 class App {
   constructor() {
@@ -32,15 +33,16 @@ class App {
     this.root = root;
     this.isTouch = isTouchFirst();
     const st = this.profile.settings;
-    // Phones and Chromebooks get the new safe defaults once (a higher setting can be picked again in Settings)
-    if (st.gfxVersion !== GFX_VERSION) {
-      if (this.isTouch || /CrOS/.test(navigator.userAgent)) st.quality = null;
-      st.gfxVersion = GFX_VERSION;
-    }
-    // Did the page die while loading last time (out of memory, graphics crash)? Then use Lite.
+    // Graphics start on the highest setting (Ultra) on every device, once for old saves too
+    if (st.gfxVersion !== GFX_VERSION) { st.quality = null; st.liteLocked = false; st.gfxVersion = GFX_VERSION; } // null = auto = Ultra
+    // Did the page die while loading last time (out of memory, graphics crash)? Then go one step lower.
     try {
       const m = localStorage.getItem(MARK);
-      if (m) { D.log('crash-recovered', m, true); st.quality = 'lite'; st.liteLocked = true; this.crashRecovered = m; }
+      if (m) {
+        const was = st.quality || 'ultra', next = STEP_DOWN[was] || 'lite'; // (auto means Ultra)
+        D.log('crash-recovered', `${m} | ${was} -> ${next}`, true);
+        st.quality = next; this.crashRecovered = m; this.crashTier = next;
+      }
     } catch (e) { /* ignore */ }
     setMark('boot');
     window.addEventListener('pagehide', () => setMark(null));
@@ -64,12 +66,12 @@ class App {
     this.gfx.renderer.domElement.addEventListener('webglcontextlost', (ev) => {
       ev.preventDefault();
       this.contextLost = true;
-      const was = this.gfx.qualityName;
-      this.profile.settings.quality = 'lite';
-      this.profile.settings.liteLocked = true;
+      const was = this.gfx.qualityName, next = STEP_DOWN[was] || 'lite';
+      this.profile.settings.quality = next;
       this.save();
       setMark(null);
-      this.problem('E-LOST', 'Graphics restarting…', 'This device ran out of graphics memory, so the game is switching to Lite graphics. If nothing happens in a few seconds, tap Reload.',
+      const nice = QUALITY[next].name;
+      this.problem('E-LOST', 'Graphics restarting…', `This device ran out of graphics memory, so the game is switching to ${nice} graphics. If nothing happens in a few seconds, tap Reload.`,
         `context lost at ${was} in ${this.mode}`, [['Reload the game', () => location.reload()]]);
     });
     this.gfx.renderer.domElement.addEventListener('webglcontextrestored', () => {
@@ -78,11 +80,11 @@ class App {
       document.querySelector('.notice')?.remove();
       this.ui.pauseMenu(false);
       if (this.race) { try { this.race.dispose(); } catch (e) { /* ignore */ } this.race = null; }
-      this.gfx.setQuality('lite');
+      this.gfx.setQuality(this.profile.settings.quality || 'lite');
+      this.showroom.setLite(!!this.gfx.quality.lite);
       this.showroom.contextRestored();
-      this.showroom.setLite(true);
       this.enterMenu('home');
-      this.ui.toast('Graphics were switched to Lite so the game runs on this device.');
+      this.ui.toast(`Graphics were switched to ${this.gfx.quality.name} so the game runs on this device.`);
     });
     this.setQuality(this.profile.settings.quality || this.autoQuality(), false);
     D.log('app-start', `${this.gfx.qualityName}${this.profile.settings.quality ? ' (saved)' : ' (auto)'} touch=${this.isTouch}`);
@@ -113,7 +115,7 @@ class App {
     if (boot) { boot.style.transition = 'opacity .4s'; boot.style.opacity = '0'; setTimeout(() => boot.remove(), 450); }
     this.watch = { frames: 0, white: 0 };
     this.goodFrames = 0;
-    if (this.crashRecovered) setTimeout(() => this.ui.toast('The game closed unexpectedly last time, so graphics were set to Lite.'), 1200);
+    if (this.crashRecovered) setTimeout(() => this.ui.toast(`The game closed unexpectedly last time, so graphics were set to ${QUALITY[this.crashTier]?.name || 'a lower setting'}.`), 1200);
   }
 
   enableTouch() {
@@ -126,16 +128,12 @@ class App {
     }
   }
 
+  // Always the highest graphics, except where there is no real graphics chip at all
   autoQuality() {
-    const small = Math.min(window.innerWidth, window.innerHeight) < 600;
     const gpu = this.gfx.gpu || '';
-    if ((navigator.deviceMemory || 4) <= 2) return 'lite'; // very little memory
-    if (/SwiftShader|llvmpipe|Software|Mali-4|Mali-T|PowerVR|Adreno \(TM\) [2-5]\d\d\b/i.test(gpu)) return 'lite'; // old or software graphics
-    if (this.isTouch && small) return 'lite'; // phones: start safe (Settings can raise it)
-    if (/CrOS/.test(navigator.userAgent)) return 'low'; // Chromebooks
-    if (this.isTouch) return 'low'; // tablets
-    if (/Intel|Adreno|Mali|Apple GPU/i.test(gpu)) return 'medium';
-    return 'high';
+    if (/SwiftShader|llvmpipe|Software/i.test(gpu)) return 'lite'; // software drawing (no graphics chip)
+    if ((navigator.deviceMemory || 4) < 1) return 'lite'; // tiny-memory devices
+    return 'ultra';
   }
 
   // Full-screen notice that works even while the menus are hidden (during races)
@@ -181,25 +179,16 @@ class App {
     return this.notice(title, text, buttons, code, detail);
   }
 
-  // Performance watchdog: if frames stay very slow even at the lowest render
-  // resolution, step graphics down a level (e.g. Ultra picked on a Chromebook).
+  // Performance note: the graphics setting is never lowered for speed (the player
+  // wants the highest graphics); only the resolution adapts. Slow spells are logged.
   perfCheck(dt) {
-    const p = this.perf || (this.perf = { t: 0, n: 0, sum: 0, cool: 6 });
+    const p = this.perf || (this.perf = { t: 0, n: 0, sum: 0, cool: 6, logged: 0 });
     p.cool -= dt; p.sum += dt; p.n++; p.t += dt;
     if (p.t < 2) return;
     const avg = p.sum / p.n;
     p.t = 0; p.sum = 0; p.n = 0;
     if (p.cool > 0 || this.contextLost) return;
-    if (avg > 1 / 18 && this.gfx.renderScale <= 0.56) {
-      const q = this.gfx.qualityName;
-      const next = q === 'ultra' ? 'high' : q === 'high' ? 'medium' : q === 'medium' ? 'low' : q === 'low' ? 'lite' : null;
-      if (!next) return;
-      D.log('slow', `${Math.round(1 / avg)} fps at ${q} -> ${next}`);
-      this.applyQualityLive(next);
-      p.cool = 6;
-      const msg = `Graphics lowered to ${next[0].toUpperCase() + next.slice(1)} to keep the game smooth on this device.`;
-      if (this.mode === 'race' && this.race) this.race.hud?.toast(msg, 3); else this.ui.toast(msg);
-    }
+    if (avg > 1 / 18 && p.logged < 3) { p.logged++; p.cool = 20; D.log('slow', `${Math.round(1 / avg)} fps at ${this.gfx.qualityName} scale=${this.gfx.renderScale.toFixed(2)}`); }
   }
 
   // Switch quality while a race (or the menu) is on screen
@@ -392,9 +381,10 @@ class App {
     const pos = r.position;
     const fps = race ? race.avgFps() : 0;
     D.log('race-end', `P${pos} ${fps} fps ${this.gfx.qualityName} scale=${this.gfx.renderScale}`);
-    // ran smoothly on Lite and nothing has gone wrong on this device: offer nicer graphics
-    if (this.gfx.quality.lite && fps >= 45 && !p.settings.liteLocked) {
-      info.offerUpgrade = () => { D.log('upgrade-try', 'low'); this.applyQualityLive('low'); this.ui.toast('Graphics set to Low. If anything looks wrong the game will switch back by itself.'); };
+    // below the highest graphics, ran smoothly, and the picture never broke: offer a step back up
+    const up = { lite: 'low', low: 'medium', medium: 'high', high: 'ultra' }[this.gfx.qualityName];
+    if (up && fps >= 40 && !p.settings.liteLocked) {
+      info.offerUpgrade = () => { D.log('upgrade-try', up); this.applyQualityLive(up); this.ui.toast(`Graphics set to ${QUALITY[up].name}. If anything looks wrong the game will switch back by itself.`); };
     }
     if (after.kind === 'career') {
       const { series, event } = after;

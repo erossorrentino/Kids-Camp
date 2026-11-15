@@ -62,11 +62,13 @@ tablet, or host it anywhere. Progress saves in the browser.
   upshifts and nitro, rain spray.
 - Quality presets (Lite / Low / Medium / High / Ultra) plus automatic
   resolution scaling to keep the frame rate smooth.
-- **Lite** is the simplest look (no shadows, reflections or special
-  effects). Phones and very weak computers start on Lite; Chromebooks and
-  tablets start on Low. If the game sees a white or blank picture, loses
-  the graphics, or runs too slowly, it switches down a step by itself. You
-  can change it any time in Settings or the pause menu.
+- **Ultra graphics on every device.** The game always starts on Ultra and
+  never lowers the setting just because a device is slow (only the
+  resolution adapts). It steps down one level by itself only if the
+  picture actually breaks (white or blank screen), the graphics chip runs
+  out of memory, or the game crashed while loading. **Lite** (no shadows,
+  reflections or special effects) is there for devices that need it.
+  Change it any time in Settings or the pause menu.
 
 ### Sound
 
@@ -96,9 +98,14 @@ rather only steer, switch on *Auto accelerate* and *Auto brake* in Settings
 
 ### Kid-friendly assists (Settings)
 
-Racing line guide (green = go, red = brake), auto accelerate, auto brake,
-steering assist, ABS, traction control and stability control, plus Easy /
-Normal / Hard difficulty.
+**Smart steering** (on by default) keeps the car on the road (it slides
+along the edge instead of running off), stops spins, and straightens the
+car along the road when you let go of the steering. You still drive with
+GAS and BRAKE yourself.
+
+Also: racing line guide (green = go, red = brake), auto accelerate, auto
+brake, steering assist, ABS, traction control and stability control, plus
+Easy / Normal / Hard difficulty.
 
 ## Real-world price benchmarks
 
@@ -145,12 +152,12 @@ at. Reports contain no names or personal details.
 | E-SLOW | The game took too long to start | Asks you to reload |
 | E-BOOT | The game crashed while starting | Asks you to reload |
 | E-GL | The browser can't draw 3D graphics | Suggests the latest Chrome or Safari |
-| E-LOST | The graphics chip reset | Switches to Lite and goes back to the menu |
+| E-LOST | The graphics chip ran out of memory | Steps graphics down one level and goes back to the menu |
 | E-WHITE | The picture stayed white or blank | Switches down a graphics step; shows this only if Lite fails too |
 | E-RACE | A race failed to load | Retries once on Lite before showing this |
 | E-LOOP | The game kept hitting an error | Stops the race (or suggests a reload) |
 
-If the game crashes while loading, it starts on Lite graphics next time.
+If the game crashes while loading, it starts one graphics level lower next time.
 
 ## Building from source
 

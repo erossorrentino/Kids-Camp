@@ -589,11 +589,12 @@ export class UI {
     this.app.showroom.setFrame(0.3);
     const tog = (k, label, desc) => `<label class="toggle"><input type="checkbox" data-assist="${k}"${s.assists[k] ? ' checked' : ''}><span class="sw-ui"></span><div><b>${label}</b><small>${desc}</small></div></label>`;
     this.screenEl.innerHTML = `<div class="panel settings"><h1>Settings</h1>
-      <div class="f-h">Graphics quality</div><p class="sub" style="margin-bottom:8px">Lite is the simplest and runs on any phone or Chromebook. Higher settings look better but need a stronger device.</p><div class="chips">${Object.entries(QUALITY).map(([k, q]) => `<button class="chip${this.app.gfx.qualityName === k ? ' on' : ''}" data-q="${k}">${q.name}</button>`).join('')}</div>
+      <div class="f-h">Graphics quality</div><p class="sub" style="margin-bottom:8px">Ultra is the best looking and is used on every device. If a device can't draw it, the game steps down by itself. Lite is the simplest.</p><div class="chips">${Object.entries(QUALITY).map(([k, q]) => `<button class="chip${this.app.gfx.qualityName === k ? ' on' : ''}" data-q="${k}">${q.name}</button>`).join('')}</div>
       <div class="f-h">Difficulty</div><div class="chips">${['easy', 'normal', 'hard'].map((d) => `<button class="chip${s.difficulty === d ? ' on' : ''}" data-diff="${d}">${d[0].toUpperCase() + d.slice(1)}</button>`).join('')}</div>
       <div class="f-h">Driving assists</div>
       <div class="toggles">
         ${tog('line', 'Racing line', 'Coloured line on the track: green = go, red = brake')}
+        ${tog('smart', 'Smart steering', 'Keeps the car on the road, stops spins, and straightens the car when you let go of steering. Great for beginners!')}
         ${tog('autoGas', 'Auto accelerate', 'The car drives forward by itself: you just steer (and brake). Great on phones!')}
         ${tog('autoBrake', 'Auto brake', 'The car brakes for corners by itself (great for beginners)')}
         ${tog('steering', 'Steering assist', 'Helps catch slides')}

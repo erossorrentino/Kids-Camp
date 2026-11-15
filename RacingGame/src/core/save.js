@@ -8,7 +8,7 @@ const START_CREDITS = 25000;
 export const DEFAULT_SETTINGS = {
   quality: null, // auto
   difficulty: 'normal', // easy | normal | hard
-  assists: { abs: true, tcs: true, stability: true, steering: true, autoBrake: false, autoGas: false, line: true },
+  assists: { abs: true, tcs: true, stability: true, steering: true, smart: true, autoBrake: false, autoGas: false, line: true },
   manual: false,
   units: 'kmh',
   volume: 0.8,

@@ -9,6 +9,7 @@ import { buildCar, makeVisualSpec } from '../gfx/carModel.js';
 import { Effects, RacingLineGuide } from '../gfx/effects.js';
 import { Vehicle, SURFACES } from '../sim/vehicle.js';
 import { AIDriver, speedProfile } from '../sim/ai.js';
+import { smartSteer } from '../sim/assist.js';
 import { Race } from '../sim/race.js';
 import { RaceCamera, CAMERA_MODES } from './camera.js';
 import { HUD } from '../ui/hud.js';
@@ -198,9 +199,11 @@ export class RaceScene {
     const sdt = dt / sub;
     const playerDone = P.finished;
     const autopilot = playerDone; // after the flag the car cruises
+    // smart steering: when the driver lets go, the car follows the road
+    const drive = racing && this.opts.settings.assists.smart && !autopilot && !this.autoDrive ? smartSteer(veh, this.track, input) : input;
     for (let k = 0; k < sub; k++) {
       if (racing) {
-        let inp = input;
+        let inp = drive;
         if (autopilot || this.autoDrive) inp = this.autopilotInput(this.autoDrive && !autopilot ? 0.93 : 0.7);
         const safe = this.safeSpeed();
         veh.update(sdt, inp, { safeSpeed: safe });

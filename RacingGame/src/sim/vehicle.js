@@ -309,6 +309,47 @@ export class Vehicle {
 
     // ---- track contact
     this.groundFollow(dt);
+    if (A.smart) this.smartGuard(dt);
+  }
+
+  // Smart steering assist (player car): no spins, and a soft edge that keeps
+  // the car on the road (it slides along the edge instead of running off).
+  smartGuard(dt) {
+    const v = Math.hypot(this.vx, this.vz);
+    if (v < 2 || this.gear < 0) return;
+    const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
+    // 1) no spins: keep the direction of travel close to where the car points
+    const velH = Math.atan2(this.vx, this.vz);
+    const beta = wrap(velH - this.heading);
+    const ab = Math.abs(beta), maxB = 0.16;
+    if (ab > maxB && ab < Math.PI / 2) {
+      const fix = (ab - maxB) * Math.min(1, dt * 8);
+      const sg = Math.sign(beta);
+      const h2 = velH - sg * fix * 0.6, keep = 1 - fix * 0.25;
+      this.vx = Math.sin(h2) * v * keep; this.vz = Math.cos(h2) * v * keep;
+      this.heading += sg * fix * 0.4;
+      this.yawRate *= Math.max(0, 1 - fix * 4);
+    }
+    // 2) soft road edge: wheels stay on the asphalt or the curb
+    const tr = this.track, pr = this.proj, i = pr.i, d = pr.d;
+    const curb = d > 0 ? tr.curbL[i] : tr.curbR[i];
+    const edge = tr.hw[i] + (curb ? tr.curbW : 0) - this.halfW * 0.5;
+    const over = Math.abs(d) - edge, zone = 1.5;
+    if (over <= -zone) return;
+    const side = d >= 0 ? 1 : -1;
+    const nx = tr.lx[i] * side, nz = tr.lz[i] * side; // outward
+    const vn = this.vx * nx + this.vz * nz;
+    if (vn > 0) {
+      const s = clamp((over + zone) / zone, 0, 1);
+      const remove = over > 0 ? vn : vn * Math.min(1, s * s * dt * 12);
+      this.vx -= nx * remove; this.vz -= nz * remove;
+      const keep = 1 - Math.min(0.3, remove * 0.03); // a little scrub, like running wide over a rumble strip
+      this.vx *= keep; this.vz *= keep;
+      // turn the nose back along the road (not when driving the wrong way)
+      const dh = wrap(tr.heading[i] - this.heading);
+      if (Math.abs(dh) < Math.PI / 2) { const k = Math.min(1, s * dt * 4); this.heading += dh * k; this.yawRate *= 1 - k * 0.5; }
+    }
+    if (over > 0.25) { const back = (over - 0.25) * Math.min(1, dt * 10); this.x -= nx * back; this.z -= nz * back; }
   }
 
   shift(dir) {
