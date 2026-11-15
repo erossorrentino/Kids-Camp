@@ -38,11 +38,7 @@ class App {
     // Did the page die while loading last time (out of memory, graphics crash)? Then go one step lower.
     try {
       const m = localStorage.getItem(MARK);
-      if (m) {
-        const was = st.quality || 'ultra', next = STEP_DOWN[was] || 'lite'; // (auto means Ultra)
-        D.log('crash-recovered', `${m} | ${was} -> ${next}`, true);
-        st.quality = next; this.crashRecovered = m; this.crashTier = next;
-      }
+      if (m) this.crashRecovered = m; // handled once the graphics chip is known (below)
     } catch (e) { /* ignore */ }
     setMark('boot');
     window.addEventListener('pagehide', () => setMark(null));
@@ -86,6 +82,11 @@ class App {
       this.enterMenu('home');
       this.ui.toast(`Graphics were switched to ${this.gfx.quality.name} so the game runs on this device.`);
     });
+    if (this.crashRecovered) {
+      const was = st.quality || this.autoQuality(), next = STEP_DOWN[was] || 'lite';
+      D.log('crash-recovered', `${this.crashRecovered} | ${was} -> ${next}`, true);
+      st.quality = next; this.crashTier = next; this.save();
+    }
     this.setQuality(this.profile.settings.quality || this.autoQuality(), false);
     D.log('app-start', `${this.gfx.qualityName}${this.profile.settings.quality ? ' (saved)' : ' (auto)'} touch=${this.isTouch}`);
     audio.setVolume(this.profile.settings.volume);

@@ -98,6 +98,7 @@ export class HUD {
     // timers
     if (this.msgTimer > 0) { this.msgTimer -= dt; if (this.msgTimer <= 0) this.msgEl.classList.remove('show'); }
     if (this.toastTimer > 0) { this.toastTimer -= dt; if (this.toastTimer <= 0) this.toastEl.classList.remove('show'); }
+    if (this.lightsOutT > 0) { this.lightsOutT -= dt; if (this.lightsOutT <= 0) this.setLights(0, false); }
     this.compactT -= dt;
     if (this.compactT <= 0) { this.compactT = 0.5; this.compact = this.dig.offsetWidth > 0; }
     if (this.compact) this.drawDigital(info); else this.drawTach(info);

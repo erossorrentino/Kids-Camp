@@ -328,7 +328,7 @@ export class RaceScene {
         break;
       case 'go':
         hud.setLights(0, true);
-        setTimeout(() => hud.setLights(0, false), 600);
+        hud.lightsOutT = 0.6; // hidden by the HUD's own clock (works when slow or paused)
         this.venue.setStartLights(0);
         hud.message('GO!', 1.2, 'go');
         audio.beep(true);
