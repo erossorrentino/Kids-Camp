@@ -95,8 +95,9 @@ function holdPos(p, out) {
   const S = p.shot;
   if (p.act === 'shoot' && S) {
     if (S.type === 'jump' || S.type === 'ft') {
-      const u = smooth(clamp(p.actT / S.ideal, 0, 1));
-      fwd = lerp(0.85, 0.5, u); side = 0.3 * p.dribHand * (1 - u * 0.4); up = lerp(3.6 * p.sc, p.hgt + 0.8, u);
+      const u0 = clamp(p.actT / S.ideal, 0, 1), u = smooth(u0);
+      const dip = u0 < 0.35 ? Math.sin(Math.PI * u0 / 0.35) * 0.55 * p.sc : 0;   // the dip before the rise
+      fwd = lerp(0.85, 0.5, u); side = 0.3 * p.dribHand * (1 - u * 0.4); up = lerp(3.6 * p.sc, p.hgt + 0.8, u) - dip;
     } else {
       const u = smooth(clamp((p.actT - S.tg * 0.6) / Math.max(0.05, S.tRel - S.tg * 0.6), 0, 1));
       if (S.type === 'layup') { fwd = lerp(0.8, 1.0, u); side = 0.45 * p.dribHand; up = lerp(3.4 * p.sc, p.reach - 0.15, u); }
@@ -110,9 +111,17 @@ function holdPos(p, out) {
     fwd = 0.7 + sp * 0.035; side = 0.95 * p.dribHand;
     up = CT.BALL_R + (hH - CT.BALL_R) * Math.abs(Math.cos(Math.PI * p.dribPhase));
     if (p.act === 'move' && p.mv) {
-      const u = clamp(p.actT / p.actDur, 0, 1);
-      if (p.mv.kind === 'cross' || p.mv.kind === 'spin') side = lerp(-0.95 * p.dribHand, 0.95 * p.dribHand, smooth(u));
-      if (p.mv.kind === 'stepback') fwd = 0.9;
+      const u = clamp(p.actT / p.actDur, 0, 1), mk = p.mv.kind;
+      if (mk === 'cross') {            // one low bounce between the hands
+        side = lerp(-0.95 * p.dribHand, 0.95 * p.dribHand, smooth(u)); fwd = 0.85;
+        up = CT.BALL_R + (2.3 * p.sc - CT.BALL_R) * Math.abs(Math.cos(Math.PI * u));
+      } else if (mk === 'spin') {      // ball pulled tight to the hip through the pivot
+        side = lerp(-0.7 * p.dribHand, 0.75 * p.dribHand, smooth(u)); up = 2.9 * p.sc; fwd = 0.35;
+      } else if (mk === 'stepback') {  // gathered at the chest during the hop
+        fwd = 0.9; side = 0.4 * p.dribHand; if (u < 0.7) up = 3.2 * p.sc;
+      } else if (mk === 'hesi') {      // ball held at the hip on the pause, then pushed out on the burst
+        fwd = u < 0.45 ? 0.6 : 1.1; if (u < 0.45) up = 2.7 * p.sc;
+      }
     }
   }
   out.x = p.x + cf * fwd - sf * side;
@@ -600,7 +609,7 @@ function dribbleMove(p, mx, mz) {
   if (kind === 'cross' && md < 3.4 && fwd > 0.25 && rand() < 0.45) kind = 'spin';
   const top = (15.5 + 5.5 * rt(p.d.spd)) * 0.93;
   let sp = kind === 'stepback' ? 15 : kind === 'spin' ? top * 1.12 : top * 1.28;
-  p.act = 'move'; p.actT = 0; p.actDur = kind === 'stepback' ? 0.32 : kind === 'spin' ? 0.42 : 0.26;
+  p.act = 'move'; p.actT = 0; p.actDur = kind === 'stepback' ? 0.36 : kind === 'spin' ? 0.46 : kind === 'hesi' ? 0.44 : 0.3;
   p.mv = { kind, ix, iz, sp, face0: p.face };
   if (kind === 'cross' || kind === 'spin') p.dribHand = side >= 0 ? 1 : -1;
   if (kind === 'stepback') p.sbT = 0.8;
@@ -742,7 +751,7 @@ function stepPlayer(p, dt) {
     case 'move': {
       loco = false;
       const m = p.mv, u = p.actT / p.actDur;
-      const sp = m.sp * (u < 0.7 ? 1 : lerp(1, 0.75, (u - 0.7) / 0.3));
+      const sp = m.sp * (m.kind === 'hesi' ? (u < 0.45 ? 0.25 : 1.12) : (u < 0.7 ? 1 : lerp(1, 0.75, (u - 0.7) / 0.3)));
       p.vx = m.ix * sp; p.vz = m.iz * sp;
       if (m.kind === 'spin') p.face = m.face0 + TAU * smooth(clamp(u, 0, 1)) * p.dribHand;
       else if (m.kind !== 'stepback') p.face = turnToward(p.face, Math.atan2(m.iz, m.ix), 6 * dt);

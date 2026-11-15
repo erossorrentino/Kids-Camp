@@ -912,8 +912,9 @@ function holdPos(p, out) {
   const S = p.shot;
   if (p.act === 'shoot' && S) {
     if (S.type === 'jump' || S.type === 'ft') {
-      const u = smooth(clamp(p.actT / S.ideal, 0, 1));
-      fwd = lerp(0.85, 0.5, u); side = 0.3 * p.dribHand * (1 - u * 0.4); up = lerp(3.6 * p.sc, p.hgt + 0.8, u);
+      const u0 = clamp(p.actT / S.ideal, 0, 1), u = smooth(u0);
+      const dip = u0 < 0.35 ? Math.sin(Math.PI * u0 / 0.35) * 0.55 * p.sc : 0;   // the dip before the rise
+      fwd = lerp(0.85, 0.5, u); side = 0.3 * p.dribHand * (1 - u * 0.4); up = lerp(3.6 * p.sc, p.hgt + 0.8, u) - dip;
     } else {
       const u = smooth(clamp((p.actT - S.tg * 0.6) / Math.max(0.05, S.tRel - S.tg * 0.6), 0, 1));
       if (S.type === 'layup') { fwd = lerp(0.8, 1.0, u); side = 0.45 * p.dribHand; up = lerp(3.4 * p.sc, p.reach - 0.15, u); }
@@ -927,9 +928,17 @@ function holdPos(p, out) {
     fwd = 0.7 + sp * 0.035; side = 0.95 * p.dribHand;
     up = CT.BALL_R + (hH - CT.BALL_R) * Math.abs(Math.cos(Math.PI * p.dribPhase));
     if (p.act === 'move' && p.mv) {
-      const u = clamp(p.actT / p.actDur, 0, 1);
-      if (p.mv.kind === 'cross' || p.mv.kind === 'spin') side = lerp(-0.95 * p.dribHand, 0.95 * p.dribHand, smooth(u));
-      if (p.mv.kind === 'stepback') fwd = 0.9;
+      const u = clamp(p.actT / p.actDur, 0, 1), mk = p.mv.kind;
+      if (mk === 'cross') {            // one low bounce between the hands
+        side = lerp(-0.95 * p.dribHand, 0.95 * p.dribHand, smooth(u)); fwd = 0.85;
+        up = CT.BALL_R + (2.3 * p.sc - CT.BALL_R) * Math.abs(Math.cos(Math.PI * u));
+      } else if (mk === 'spin') {      // ball pulled tight to the hip through the pivot
+        side = lerp(-0.7 * p.dribHand, 0.75 * p.dribHand, smooth(u)); up = 2.9 * p.sc; fwd = 0.35;
+      } else if (mk === 'stepback') {  // gathered at the chest during the hop
+        fwd = 0.9; side = 0.4 * p.dribHand; if (u < 0.7) up = 3.2 * p.sc;
+      } else if (mk === 'hesi') {      // ball held at the hip on the pause, then pushed out on the burst
+        fwd = u < 0.45 ? 0.6 : 1.1; if (u < 0.45) up = 2.7 * p.sc;
+      }
     }
   }
   out.x = p.x + cf * fwd - sf * side;
@@ -1417,7 +1426,7 @@ function dribbleMove(p, mx, mz) {
   if (kind === 'cross' && md < 3.4 && fwd > 0.25 && rand() < 0.45) kind = 'spin';
   const top = (15.5 + 5.5 * rt(p.d.spd)) * 0.93;
   let sp = kind === 'stepback' ? 15 : kind === 'spin' ? top * 1.12 : top * 1.28;
-  p.act = 'move'; p.actT = 0; p.actDur = kind === 'stepback' ? 0.32 : kind === 'spin' ? 0.42 : 0.26;
+  p.act = 'move'; p.actT = 0; p.actDur = kind === 'stepback' ? 0.36 : kind === 'spin' ? 0.46 : kind === 'hesi' ? 0.44 : 0.3;
   p.mv = { kind, ix, iz, sp, face0: p.face };
   if (kind === 'cross' || kind === 'spin') p.dribHand = side >= 0 ? 1 : -1;
   if (kind === 'stepback') p.sbT = 0.8;
@@ -1559,7 +1568,7 @@ function stepPlayer(p, dt) {
     case 'move': {
       loco = false;
       const m = p.mv, u = p.actT / p.actDur;
-      const sp = m.sp * (u < 0.7 ? 1 : lerp(1, 0.75, (u - 0.7) / 0.3));
+      const sp = m.sp * (m.kind === 'hesi' ? (u < 0.45 ? 0.25 : 1.12) : (u < 0.7 ? 1 : lerp(1, 0.75, (u - 0.7) / 0.3)));
       p.vx = m.ix * sp; p.vz = m.iz * sp;
       if (m.kind === 'spin') p.face = m.face0 + TAU * smooth(clamp(u, 0, 1)) * p.dribHand;
       else if (m.kind !== 'stepback') p.face = turnToward(p.face, Math.atan2(m.iz, m.ix), 6 * dt);
@@ -4928,8 +4937,22 @@ function toLocal(p, wx, wy, wz) {
   const dx = wx - p.x, dz = wz - p.z;
   return { x: (dx * c + dz * s) / p.sc, y: (wy - p.y) / p.sc, z: (-dx * s + dz * c) / p.sc };
 }
+/* ---------------- locomotion: a real gait instead of a sine wave ----------------
+   One stride = two steps. Each leg spends a stance phase planted (the foot travels back
+   at exactly ground speed, so it doesn't skate) and a swing phase (heel kick, knee drive).
+   Walk, jog and sprint differ in cadence, stance share and joint ranges; sprints get a
+   flight phase where both feet are off the floor. */
+function legCycle(psi, A, st, run) {
+  psi -= Math.floor(psi);
+  if (psi < st) {
+    const u = psi / st;
+    return [lerp(0.85 * A, -A, u), -(0.1 + (0.2 + 0.28 * run) * Math.sin(Math.PI * u)), true, u];
+  }
+  const u = (psi - st) / (1 - st);
+  return [-A + 1.85 * A * smooth(u), -(0.14 + (0.72 + 1.1 * run) * Math.sin(Math.PI * Math.min(1, u * 1.1))), false, u];
+}
 function poseHumanoid(h, p, dt, px, py, pz, pf) {
-  const k = 1 - Math.exp(-16 * dt), kf = 1 - Math.exp(-28 * dt);
+  const k = 1 - Math.exp(-16 * dt), kf = 1 - Math.exp(-28 * dt), kg = 1 - Math.exp(-45 * dt);
   h.root.position.set(px, py, pz);
   h.root.rotation.y = -pf;
   h.blob.position.set(px, 0.03, pz);
@@ -4940,14 +4963,29 @@ function poseHumanoid(h, p, dt, px, py, pz, pf) {
   const fwdV = p.vx * cf + p.vz * sf, latV = -p.vx * sf + p.vz * cf;
   const air = py > 0.05;
   const S = p.shot, b = G.ball;
-  const def = !p.ref && p.team.idx !== G.offense && (G.state === 'live' || G.state === 'dead');
+  const live = G.state === 'live' || G.state === 'dead';
+  const def = !p.ref && p.team.idx !== G.offense && live;
   const J = h.j;
-  let lean = 0, crouch = 0, bob = 0, twist = 0;
-  const shuffle = !air && Math.abs(latV) > Math.abs(fwdV) * 1.1 && sp > 2;
-  const strideLen = shuffle ? 3.0 : 5.0 + sp * 0.13;
-  h.stride += sp * dt / strideLen * TAU;
-  const ph = h.stride, run = clamp(sp / 17, 0, 1);
+  // smoothed speed, acceleration and turn rate drive lean and banking
+  if (h.spS == null) { h.spS = sp; h.acc = 0; h.turn = 0; h.lastFace = p.face; h.gph = Math.random(); h.sph = 0; h.landT = 0; h.wasAir = false; }
+  const dts = Math.max(dt, 1e-4);
+  const spPrev = h.spS;
+  h.spS = damp(h.spS, sp, 10, dts);
+  h.acc = damp(h.acc, (h.spS - spPrev) / dts, 6, dts);
+  h.turn = damp(h.turn, angDiff(h.lastFace, p.face) / dts, 8, dts);
+  h.lastFace = p.face;
+  if (h.wasAir && !air) h.landT = 0.24;
+  h.wasAir = air;
+  if (h.landT > 0) h.landT -= dt;
+  let lean = 0, crouch = 0, bob = 0, twist = 0, roll = 0, hipYaw = 0, hipRoll = 0, headMode = 'ball';
   let legs = false, arms = false;
+  const spS = h.spS, run = clamp((spS - 5) / 12, 0, 1);
+  const handler = p.hasBall && !p.gather && p.holdT <= 0;
+  const hs = p.dribHand || 1;
+  const mv = p.act === 'move' && p.mv ? p.mv : null;
+  const mu = mv ? clamp(p.actT / p.actDur, 0, 1) : 0;
+
+  /* ---------- special actions ---------- */
   if (p.act === 'stumble') {
     const u = clamp(p.actT / p.actDur, 0, 1), fall = u < 0.45 ? smooth(u / 0.45) : u > 0.75 ? 1 - smooth((u - 0.75) / 0.25) : 1;
     lean = -0.75 * fall; crouch = 1.35 * fall;
@@ -4956,82 +4994,175 @@ function poseHumanoid(h, p, dt, px, py, pz, pf) {
     legs = arms = true;
   } else if (p.act === 'shoot' && S) {
     const bl = toLocal(p, b.x, b.y, b.z);
+    headMode = 'rim';
     if (S.type === 'jump' || S.type === 'ft') {
       const pre = !S.jumped;
-      crouch = pre ? 0.6 * smooth(clamp(p.actT / Math.max(0.08, S.tJump || 0.3), 0, 1)) : 0;
-      if (S.type === 'ft' && pre) crouch = 0.48 * Math.sin(clamp(p.actT / S.ideal, 0, 1) * PI);
-      const kb = pre ? -crouch * 1.7 : -0.12;
-      setLeg(h.legR, pre ? crouch * 0.95 : 0.1, 0, kb, kf); setLeg(h.legL, pre ? crouch * 0.95 : -0.06, 0, kb * 0.9, kf);
+      const u0 = clamp(p.actT / Math.max(0.08, S.tJump || 0.3), 0, 1);
+      crouch = pre ? 0.62 * Math.sin(Math.PI * Math.min(1, u0 * 0.9 + 0.1)) : 0;
+      if (S.type === 'ft' && pre) crouch = 0.5 * Math.sin(clamp(p.actT / S.ideal, 0, 1) * PI);
+      const kb = pre ? -crouch * 1.75 : -0.08;
+      setLeg(h.legR, pre ? crouch * 0.95 : 0.06, -0.05, kb, kf); setLeg(h.legL, pre ? crouch * 0.95 - 0.08 : -0.1, 0.05, pre ? kb * 0.9 : -0.18, kf);
       if (!S.released) {
-        armIK(h, h.armR, 1, bl.x - 0.16, bl.y - 0.22, bl.z + 0.22, kf);
-        armIK(h, h.armL, -1, bl.x + 0.02, bl.y, bl.z - 0.42, kf);
+        armIK(h, h.armR, 1, bl.x - 0.16, bl.y - 0.22, bl.z + 0.2, kf);
+        armIK(h, h.armL, -1, bl.x + 0.02, bl.y + 0.02, bl.z - 0.42, kf);
       } else {
-        setArm(h.armR, 2.8, -0.12, 0.06, kf); setArm(h.armL, 2.15, 0.38, 0.55, k * 0.6);
+        // follow-through: shooting arm high with a relaxed "gooseneck", guide hand peels away
+        const ft = clamp((p.actT - S.relT) / 0.12, 0, 1);
+        setArm(h.armR, 2.78, -0.1, 0.06 + 0.22 * ft, kf); setArm(h.armL, lerp(2.4, 1.6, ft), 0.5, 0.6, k);
       }
-      lean = -0.05;
+      lean = pre ? 0.08 * crouch : -0.04;
     } else if (!S.jumped) {
-      lean = 0.28; crouch = 0.22;
-      setLeg(h.legR, Math.sin(ph) * 0.95, 0, -0.55 - Math.max(0, Math.sin(ph + 1.2)) * 1.25, k);
-      setLeg(h.legL, -Math.sin(ph) * 0.95, 0, -0.55 - Math.max(0, -Math.sin(ph + 1.2)) * 1.25, k);
-      armIK(h, h.armR, 1, bl.x - 0.1, bl.y, bl.z + 0.2, kf);
+      // gather steps into the layup or dunk: low, driving, ball tucked
+      const g = legCycle(h.gph, 0.62, 0.42, 1);
+      const g2 = legCycle(h.gph + 0.5, 0.62, 0.42, 1);
+      h.gph += Math.max(1.3, spS / 13) * dt;
+      setLeg(h.legL, g[0], 0, g[1] - 0.2, kg); setLeg(h.legR, g2[0], 0, g2[1] - 0.2, kg);
+      lean = 0.3; crouch = 0.24;
+      armIK(h, h.armR, 1, bl.x - 0.1, bl.y, bl.z + 0.22, kf);
       armIK(h, h.armL, -1, bl.x, bl.y, bl.z - 0.38, kf);
     } else {
-      const lead = p.dribHand > 0 ? h.legL : h.legR, trail = p.dribHand > 0 ? h.legR : h.legL;
-      setLeg(lead, 1.5, 0, -1.65, kf); setLeg(trail, -0.35, 0, -0.45, kf);
-      const shoot = p.dribHand > 0 ? h.armR : h.armL, other = p.dribHand > 0 ? h.armL : h.armR, ss = p.dribHand > 0 ? 1 : -1;
+      const lead = hs > 0 ? h.legL : h.legR, trail = hs > 0 ? h.legR : h.legL;
+      setLeg(lead, 1.55, 0, -1.7, kf); setLeg(trail, -0.4, 0, -0.5, kf);
+      const shoot = hs > 0 ? h.armR : h.armL, other = hs > 0 ? h.armL : h.armR;
       if (!S.released) {
-        armIK(h, shoot, ss, bl.x - 0.1, bl.y - 0.25, bl.z, kf);
-        if (S.type === 'dunk') armIK(h, other, -ss, bl.x, bl.y - 0.2, bl.z - ss * 0.36, kf);
-        else setArm(other, 1.3, -ss * 0.6, 0.9, k);
-      } else {
-        setArm(shoot, S.type === 'dunk' ? 2.95 : 2.85, -ss * 0.08, 0.08, kf); setArm(other, S.type === 'dunk' ? 2.75 : 1.0, ss * 0.4, 0.6, k);
-      }
-      lean = S.type === 'dunk' ? 0.1 : 0.03;
-      twist = ss * 0.15;
+        if (S.type === 'dunk') {   // ball cocked back behind the head before the slam
+          armIK(h, shoot, hs, bl.x - 0.25, bl.y - 0.1, bl.z, kf);
+          armIK(h, other, -hs, bl.x - 0.15, bl.y - 0.15, bl.z - hs * 0.38, kf);
+        } else { armIK(h, shoot, hs, bl.x - 0.1, bl.y - 0.25, bl.z, kf); setArm(other, 1.3, -hs * 0.6, 0.9, k); }
+      } else if (S.type === 'dunk') {   // slam through, hands come down over the rim
+        const u = clamp((p.actT - S.relT) / 0.18, 0, 1);
+        setArm(shoot, lerp(2.9, 1.9, u), -hs * 0.05, 0.25, kf); setArm(other, lerp(2.8, 1.8, u), hs * 0.15, 0.3, kf);
+      } else { setArm(shoot, 2.85, -hs * 0.08, 0.08, kf); setArm(other, 1.0, hs * 0.4, 0.6, k); }
+      lean = S.type === 'dunk' ? 0.14 : 0.04;
+      twist = hs * 0.15;
     }
     legs = arms = true;
   } else if (p.act === 'jump') {
-    setLeg(h.legR, 0.28, 0, -0.55, kf); setLeg(h.legL, 0.08, 0, -0.35, kf);
-    setArm(h.armR, 2.95, -0.16, 0.08, kf); setArm(h.armL, 2.95, 0.16, 0.08, kf);
+    setLeg(h.legR, 0.32, -0.04, -0.62, kf); setLeg(h.legL, 0.1, 0.04, -0.38, kf);
+    const bl = toLocal(p, b.x, b.y, b.z);
+    if (b.state !== 'held' && hyp(bl.x, bl.z) < 4.5 && bl.y > 5) {   // reach for the ball on rebounds and blocks
+      armIK(h, h.armR, 1, bl.x, bl.y, bl.z + 0.3, kf); armIK(h, h.armL, -1, bl.x, bl.y, bl.z - 0.3, kf);
+    } else { setArm(h.armR, 2.95, -0.16, 0.08, kf); setArm(h.armL, 2.95, 0.16, 0.08, kf); }
     legs = arms = true;
   } else if (p.act === 'land') {
-    crouch = 0.5; setLeg(h.legR, 0.65, 0, -1.05, kf); setLeg(h.legL, 0.55, 0, -0.95, kf);
+    crouch = 0.55; setLeg(h.legR, 0.7, -0.1, -1.1, kf); setLeg(h.legL, 0.6, 0.1, -1.0, kf);
     legs = true;
   } else if (p.act === 'steal') {
     const u = clamp(p.actT / 0.42, 0, 1), e = Math.sin(u * PI);
-    lean = 0.5 * e; crouch = 0.4 * e; twist = -0.3 * e;
-    setArm(h.armR, 1.3 * e + 0.25, -0.12, 0.12, kf); setArm(h.armL, 0.35, 0.35, 0.6, k);
-    arms = true;
+    lean = 0.5 * e; crouch = 0.42 * e; twist = -0.3 * e;
+    const bl = toLocal(p, b.x, b.y, b.z);
+    if (e > 0.2 && hyp(bl.x, bl.z) < 4) armIK(h, h.armR, 1, lerp(1.6, bl.x, e), lerp(3.2, bl.y, e * 0.7), lerp(0.6, bl.z, e), kf);
+    else setArm(h.armR, 1.3 * e + 0.25, -0.12, 0.12, kf);
+    setArm(h.armL, 0.35, 0.35, 0.6, k);
+    setLeg(h.legR, 0.7 * e, -0.15, -0.9 * e - 0.3, kf); setLeg(h.legL, -0.3 * e, 0.15, -0.5, kf);
+    legs = arms = true;
   } else if (p.act === 'pass') {
     const u = clamp(p.actT / 0.24, 0, 1), e = u < 0.4 ? u / 0.4 : 1;
     setArm(h.armR, 0.9 + 0.75 * e, -0.15, 1.45 * (1 - e) + 0.08, kf); setArm(h.armL, 0.9 + 0.75 * e, 0.15, 1.45 * (1 - e) + 0.08, kf);
-    lean = 0.12 * e;
+    lean = 0.16 * e; headMode = 'target';
     arms = true;
   }
-  if (!legs) {
-    if (air) { setLeg(h.legR, 0.45, 0, -0.95, k); setLeg(h.legL, 0.12, 0, -0.6, k); }
-    else if (shuffle) {
-      const s = Math.sin(ph), dir = latV > 0 ? 1 : -1;
-      crouch = 0.62;
-      setLeg(h.legR, 0.4, -0.3 - Math.max(0, s * dir) * 0.34, -0.95, k);
-      setLeg(h.legL, 0.4, 0.3 + Math.max(0, -s * dir) * 0.34, -0.95, k);
-      bob = Math.abs(Math.sin(ph)) * 0.08;
-    } else if (sp > 1.2) {
-      const amp = 0.38 + 0.68 * run, s = Math.sin(ph);
-      setLeg(h.legR, s * amp, 0, -0.22 - Math.max(0, Math.sin(ph + 1.3)) * (0.75 + run * 1.05), k * 1.5);
-      setLeg(h.legL, -s * amp, 0, -0.22 - Math.max(0, Math.sin(ph + 1.3 + PI)) * (0.75 + run * 1.05), k * 1.5);
-      lean = Math.max(0, fwdV) * 0.011 + run * 0.12;
-      bob = Math.abs(Math.cos(ph)) * 0.2 * run;
-      crouch = 0.12 * run;
-      twist = s * 0.16 * run;
-    } else {
-      crouch = def ? 0.66 : p.hasBall ? 0.38 : 0.08;
-      const br = Math.sin(R.t * 2 + p.id) * 0.02;
-      setLeg(h.legR, crouch * 0.72, -0.14, -crouch * 1.3 + br, k);
-      setLeg(h.legL, crouch * 0.72 - 0.05, 0.14, -crouch * 1.3, k);
+
+  /* ---------- dribble moves ---------- */
+  if (mv && !legs) {
+    const k2 = mv.kind;
+    headMode = 'rim';
+    if (k2 === 'cross') {
+      // drop the hips, plant wide toward the new side, shoulders dip with the ball
+      const plant = hs > 0 ? h.legR : h.legL, other = hs > 0 ? h.legL : h.legR, ps = hs > 0 ? -1 : 1;
+      const e = Math.sin(Math.PI * mu);
+      crouch = 0.55 + 0.25 * e; lean = 0.32; roll = hs * 0.16 * e;
+      setLeg(plant, 0.55 + 0.25 * e, ps * (0.32 + 0.22 * e), -1.05 - 0.3 * e, kf);
+      setLeg(other, 0.35 - 0.2 * e, -ps * 0.16, -0.75, kf);
+      twist = -hs * 0.2 * e;
+    } else if (k2 === 'spin') {
+      // pivot on the inside foot, swing the other leg around, stay low with the ball on the hip
+      const pivot = hs > 0 ? h.legL : h.legR, swingL = hs > 0 ? h.legR : h.legL, ps = hs > 0 ? 1 : -1;
+      const e = Math.sin(Math.PI * mu);
+      crouch = 0.62; lean = 0.38;
+      setLeg(pivot, 0.45, -ps * 0.12, -1.0, kf);
+      setLeg(swingL, 0.2 + 0.6 * e, ps * (0.25 + 0.35 * e), -0.9 - 0.4 * e, kf);
+    } else if (k2 === 'hesi') {
+      // rise up and freeze for a beat, eyes to the rim, then explode out of it
+      const pause = mu < 0.45;
+      crouch = pause ? 0.18 : 0.5; lean = pause ? -0.06 : 0.4;
+      setLeg(h.legR, pause ? 0.15 : 0.75, -0.08, pause ? -0.3 : -1.0, kf); setLeg(h.legL, pause ? 0.05 : -0.35, 0.08, pause ? -0.25 : -0.6, kf);
+    } else if (k2 === 'stepback') {
+      // push off the front foot into a small hop backwards, land balanced on both feet
+      const hop = mu > 0.15 && mu < 0.7 ? Math.sin(Math.PI * (mu - 0.15) / 0.55) : 0;
+      bob = hop * 0.42; crouch = 0.5 - hop * 0.2; lean = -0.12;
+      setLeg(h.legR, 0.3 + 0.35 * hop, -0.12, -0.8 - 0.5 * hop, kf); setLeg(h.legL, 0.05 + 0.4 * hop, 0.12, -0.7 - 0.6 * hop, kf);
     }
-    if (crouch > 0.3 && !shuffle && sp <= 1.2) lean = crouch * 0.48;
-    if (def && shuffle) lean = 0.32;
+    legs = true;
+  }
+
+  /* ---------- feet: gait, defensive slides, backpedal, idle ---------- */
+  if (!legs) {
+    if (air) {
+      setLeg(h.legR, 0.45, -0.05, -0.95, k); setLeg(h.legL, 0.12, 0.05, -0.6, k);
+    } else {
+      const lateral = Math.abs(latV) > Math.abs(fwdV) * 1.05 && spS > 1.8;
+      const back = fwdV < -1.5 && Math.abs(fwdV) >= Math.abs(latV);
+      if (lateral && (def || spS < 13)) {
+        // defensive slide: lead foot steps out, trail foot closes, feet never cross
+        h.sph += spS * dt / 2.6;
+        const u = h.sph - Math.floor(h.sph), dir = latV > 0 ? 1 : -1;
+        const lead = dir > 0 ? h.legR : h.legL, trail = dir > 0 ? h.legL : h.legR, ls = dir > 0 ? -1 : 1;
+        const out = u < 0.5 ? smooth(u * 2) : 1 - smooth((u - 0.5) * 2);
+        crouch = 0.7;
+        setLeg(lead, 0.68, ls * (0.34 + 0.22 * out), -1.28 - 0.08 * out, kg);
+        setLeg(trail, 0.68, -ls * (0.34 - 0.08 * out), -1.28, kg);
+        bob = 0.05 * Math.sin(Math.PI * u * 2);
+        lean = def ? 0.34 : 0.2;
+      } else if (spS > 0.7) {
+        // walking, jogging, sprinting or backpedalling
+        const f = spS < 6 ? lerp(0.78, 1.05, spS / 6) : lerp(1.1, 1.58, clamp((spS - 6) / 15, 0, 1));
+        const st = lerp(0.6, 0.36, run);
+        const travel = spS * st / f / p.sc;
+        const A = Math.min(0.74, Math.asin(clamp(travel / 6.0, 0, 0.95))) * (back ? 0.7 : 1);
+        h.gph += f * dt * (back ? -1 : 1);
+        const gl = legCycle(h.gph, A, st, run), gr = legCycle(h.gph + 0.5, A, st, run);
+        setLeg(h.legL, gl[0], 0.04, gl[1] - (handler ? 0.15 : 0), kg);
+        setLeg(h.legR, gr[0], -0.04, gr[1] - (handler ? 0.15 : 0), kg);
+        // flight phase on the run: both feet off the floor between steps
+        const ph = h.gph - Math.floor(h.gph), fw = 0.5 - st;
+        if (run > 0.3 && fw > 0.02) {
+          const a = ph % 0.5;
+          if (a >= st && a < 0.5) bob = Math.sin(Math.PI * (a - st) / fw) * 0.22 * run;
+        }
+        hipYaw = (gr[0] - gl[0]) * 0.2;
+        hipRoll = (gl[2] ? 1 : -1) * 0.03 * (1 - run);
+        lean = (back ? -0.08 : 0.04 + run * 0.14) + (handler ? 0.08 : 0);
+        crouch = handler ? 0.22 : 0.06 * run;
+        h.armSwing = [gr[0], gl[0]];
+      } else {
+        // standing: athletic stance on defense (bouncing on the toes), relaxed weight shift on offense
+        h.armSwing = null;
+        if (def) {
+          crouch = 0.7; bob = 0.035 * Math.sin(R.t * 8.5 + p.id);
+          setLeg(h.legR, 0.68, -0.36, -1.28, k); setLeg(h.legL, 0.64, 0.36, -1.24, k);
+        } else if (handler) {
+          crouch = 0.45;
+          setLeg(h.legR, 0.4, -0.16, -0.82, k); setLeg(h.legL, 0.32, 0.16, -0.75, k);
+        } else {
+          const w = Math.sin(R.t * 0.9 + p.id * 1.7);
+          crouch = 0.08 + 0.04 * Math.abs(w);
+          setLeg(h.legR, 0.1 + 0.05 * w, -0.1, -0.18 - 0.1 * Math.max(0, w), k); setLeg(h.legL, 0.08 - 0.05 * w, 0.1, -0.16 - 0.1 * Math.max(0, -w), k);
+          hipRoll = 0.04 * w;
+        }
+      }
+      if (!lateral) { h.sph = 0; }
+    }
+  }
+
+  /* ---------- arms ---------- */
+  const tiredRest = !p.hasBall && p.stam < 35 && (G.state === 'dead' || G.state === 'ftcut' || G.state === 'ft') && spS < 1 && !arms;
+  if (tiredRest) {
+    // hands on knees during the stoppage
+    lean = 0.75; crouch = 0.35;
+    armIK(h, h.armR, 1, 0.75, 1.95, 0.42, k); armIK(h, h.armL, -1, 0.75, 1.95, -0.42, k);
+    headMode = 'down';
+    arms = true;
   }
   if (!arms && p.ref && p.signalT > 0) {
     if (p.signal === 'three') { setArm(h.armR, 3.0, -0.3, 0.05, kf); setArm(h.armL, 3.0, 0.3, 0.05, kf); }
@@ -5039,54 +5170,92 @@ function poseHumanoid(h, p, dt, px, py, pz, pf) {
     arms = true;
   }
   if (!arms) {
-    if (p.hasBall && !p.gather && p.holdT <= 0) {
-      const bl = toLocal(p, b.x, b.y, b.z), hs = p.dribHand;
-      armIK(h, hs > 0 ? h.armR : h.armL, hs, bl.x, bl.y + CT.BALL_R / p.sc, bl.z, kf);
-      setArm(hs > 0 ? h.armL : h.armR, 0.85, -hs * 0.38, 1.05, k);
+    if (handler && !mv) {
+      // the hand rides the top of the ball and lets it go near the floor; the other arm guards
+      const bl = toLocal(p, b.x, b.y, b.z);
+      const mk = markerOf(p), close = mk && hyp(mk.x - p.x, mk.z - p.z) < 5;
+      if (close) crouch = Math.max(crouch, 0.5);
+      armIK(h, hs > 0 ? h.armR : h.armL, hs, bl.x - 0.05, Math.max(bl.y + CT.BALL_R / p.sc + 0.05, 2.3), bl.z, kf);
+      if (close) setArm(hs > 0 ? h.armL : h.armR, 1.15, -hs * 0.45, 1.25, k);
+      else if (h.armSwing && spS > 6) { const a = hs > 0 ? h.armSwing[1] : h.armSwing[0]; setArm(hs > 0 ? h.armL : h.armR, -a * 1.1 + 0.25, -hs * 0.12, 1.2, kg); }
+      else setArm(hs > 0 ? h.armL : h.armR, 0.7, -hs * 0.3, 1.0, k);
+      headMode = 'rim';
+    } else if (mv && p.hasBall) {
+      const bl = toLocal(p, b.x, b.y, b.z);
+      const touch = mv.kind === 'cross' ? (mu < 0.5 ? -hs : hs) : hs;
+      armIK(h, touch > 0 ? h.armR : h.armL, touch, bl.x - 0.05, Math.max(bl.y + CT.BALL_R / p.sc, 2.2), bl.z, kf);
+      const free = touch > 0 ? h.armL : h.armR;
+      if (mv.kind === 'cross' || mv.kind === 'stepback') armIK(h, free, -touch, bl.x, Math.max(bl.y + 0.2, 2.6), bl.z - touch * 0.35, k);
+      else if (mv.kind === 'spin') setArm(free, 0.75, -touch * 0.35, 1.5, kf);          // forearm tucked as a guard through the pivot
+      else setArm(free, mu < 0.45 ? 0.25 : 0.6, -touch * 0.22, mu < 0.45 ? 0.5 : 1.1, k);   // relaxed on the pause, then into the burst
     } else if (p.hasBall) {
       const bl = toLocal(p, b.x, b.y, b.z);
       armIK(h, h.armR, 1, bl.x - 0.05, bl.y, bl.z + 0.36, kf);
       armIK(h, h.armL, -1, bl.x - 0.05, bl.y, bl.z - 0.36, kf);
-    } else if (p.expectPass || (b.state === 'pass' && b.passTo === p)) {
+    } else if (b.state === 'pass' && b.passTo === p) {
+      // reach out to meet the pass
+      const bl = toLocal(p, b.x, b.y, b.z), dist = hyp(bl.x, bl.z);
+      if (dist < 9) { armIK(h, h.armR, 1, Math.min(bl.x, 1.6), bl.y, bl.z + 0.3, kf); armIK(h, h.armL, -1, Math.min(bl.x, 1.6), bl.y, bl.z - 0.3, kf); }
+      else { setArm(h.armR, 1.4, -0.25, 0.32, k); setArm(h.armL, 1.4, 0.25, 0.32, k); }
+    } else if (p.expectPass) {
       setArm(h.armR, 1.4, -0.25, 0.32, k); setArm(h.armL, 1.4, 0.25, 0.32, k);
     } else if (p.handsUp) {
       setArm(h.armR, 2.92, -0.2, 0.12, k); setArm(h.armL, 2.92, 0.2, 0.12, k);
     } else if (p.celebT > 0) {
       const pump = Math.sin(p.celebT * 9) > 0 ? 3.0 : 2.35;
       setArm(h.armR, pump, -0.2, 0.65, k); setArm(h.armL, 0.25, 0.3, 0.7, k);
-    } else if (def && sp < 9) {
-      setArm(h.armR, 0.6, -1.08, 0.55, k); setArm(h.armL, 0.6, 1.08, 0.55, k);
-    } else if (sp > 1.2) {
-      const s = Math.sin(ph), amp = 0.3 + 0.8 * run;
-      setArm(h.armR, -s * amp + 0.18, -0.12, 0.5 + run * 0.95, k * 1.5);
-      setArm(h.armL, s * amp + 0.18, 0.12, 0.5 + run * 0.95, k * 1.5);
+    } else if (def && spS < 9) {
+      // active hands in the stance: one up to contest the pass, one low for the ball
+      const w = Math.sin(R.t * 3 + p.id);
+      setArm(h.armR, 1.0 + 0.18 * w, -0.62, 1.05, k); setArm(h.armL, 0.85 - 0.18 * w, 0.62, 1.1, k);
+    } else if (h.armSwing && spS > 0.7) {
+      // arms counter-swing to the legs; elbows bend more as the pace picks up
+      const ar = h.armSwing[0], al = h.armSwing[1], amp = 0.8 + 0.6 * run;
+      setArm(h.armR, -ar * amp + 0.18, -0.1, 0.35 + 1.15 * run + Math.max(0, -ar) * 0.4, kg);
+      setArm(h.armL, -al * amp + 0.18, 0.1, 0.35 + 1.15 * run + Math.max(0, -al) * 0.4, kg);
     } else {
-      setArm(h.armR, 0.12, -0.14, 0.28, k); setArm(h.armL, 0.12, 0.14, 0.28, k);
+      setArm(h.armR, 0.1, -0.13, 0.25, k); setArm(h.armL, 0.1, 0.13, 0.25, k);
     }
   }
   if (G.state === 'final' && p.celebT > 0) {
     setArm(h.armR, 3.0, -0.45, 0.2, k); setArm(h.armL, 3.0, 0.45, 0.2, k);
     bob = Math.abs(Math.sin(R.t * 7 + p.id)) * 0.6;
   }
+
+  /* ---------- body: landing, acceleration lean, banking into turns ---------- */
+  if (h.landT > 0) crouch += 0.45 * (h.landT / 0.24);
+  if (!air && !mv && p.act !== 'stumble') {
+    lean += clamp(h.acc * 0.011, -0.16, 0.16);
+    roll += clamp(h.turn * spS * 0.006, -0.26, 0.26);
+  }
   J.lean += (lean - J.lean) * k; J.crouch += (crouch - J.crouch) * k; J.twist += (twist - J.twist) * k;
-  h.hips.position.y = 3.35 - J.crouch * 0.9 + bob;
-  // plant the feet: put the lowest sole on the floor whenever the player is grounded
+  J.roll = (J.roll || 0) + (roll - (J.roll || 0)) * k;
+  J.hipYaw = (J.hipYaw || 0) + (hipYaw - (J.hipYaw || 0)) * kg;
+  h.hips.position.y = 3.35 - J.crouch * 0.9;
+  // plant the feet: the lowest sole sits on the floor whenever the player is grounded
   const sole = (leg) => { const a = leg.hp.rotation.z, kz = leg.kn.rotation.z; return h.hips.position.y - 0.08 - (1.6 * Math.cos(a) + 1.52 * Math.cos(a + kz)) * Math.cos(leg.hp.rotation.x) - 0.15; };
   const fmin = Math.min(sole(h.legR), sole(h.legL));
-  if (py < 0.05) h.hips.position.y += Math.max(-0.9, Math.min(0.9, -fmin)) + bob * 0.5;
+  if (py < 0.05) h.hips.position.y += Math.max(-0.9, Math.min(0.9, -fmin)) + bob;
   else if (fmin < -py / p.sc) h.hips.position.y += -py / p.sc - fmin;
-  h.hips.rotation.y = J.twist * 0.6;
+  h.hips.rotation.y = J.twist * 0.6 + J.hipYaw;
+  h.hips.rotation.x = hipRoll;
   h.torso.rotation.z = -J.lean;
-  h.torso.rotation.y = -J.twist * 1.4;
+  h.torso.rotation.y = -J.twist * 1.4 - J.hipYaw * 1.3;
   h.body.position.x = -J.lean * 0.25;
-  // keep the feet roughly flat on the floor
+  h.body.rotation.x = J.roll;
+  // feet stay flat while planted; toes point down in the air
   for (const leg of [h.legR, h.legL]) {
     const want = air ? 0.35 : -(leg.hp.rotation.z + leg.kn.rotation.z) * 0.9 + J.lean * 0.3;
     dampR(leg.ank.rotation, 'z', clamp(want, -0.8, 1.0), kf);
   }
-  const lb = toLocal(p, b.x, b.y, b.z);
-  const yaw = clamp(Math.atan2(lb.z, Math.max(0.2, lb.x)), -1.1, 1.1);
-  const pitch = clamp(Math.atan2(lb.y - 6.2, Math.max(1, hyp(lb.x, lb.z))), -0.5, 0.6);
+  // head: ball handlers keep their eyes up on the court; everyone else tracks the ball
+  let tx = b.x, ty = b.y, tz = b.z;
+  if (headMode === 'rim') { tx = p.team.dir * CT.RIM_X; ty = 9; tz = 0; if (p.ref) { tx = b.x; ty = b.y; tz = b.z; } }
+  else if (headMode === 'target' && b.passTo) { tx = b.passTo.x; ty = 5.5; tz = b.passTo.z; }
+  const lb = toLocal(p, tx, ty, tz);
+  let yaw = clamp(Math.atan2(lb.z, Math.max(0.2, lb.x)), -1.1, 1.1);
+  let pitch = clamp(Math.atan2(lb.y - 6.2, Math.max(1, hyp(lb.x, lb.z))), -0.5, 0.6);
+  if (headMode === 'down') { yaw = 0; pitch = -0.35; }
   h.headG.rotation.y += (-yaw - h.headG.rotation.y) * k;
   h.headG.rotation.z += (pitch * 0.6 + J.lean * 0.5 - h.headG.rotation.z) * k;
 }
