@@ -24,7 +24,7 @@
 // ---- Diagnostics: a small report (device, graphics chip, error text) that is
 // saved with the game so problems on a phone or Chromebook can be fixed.
 (function () {
-  var D = window.__diag = { build: '11', t0: Date.now(), ev: [], info: {}, sent: 0, state: 'init', hasDb: false };
+  var D = window.__diag = { build: '12', t0: Date.now(), ev: [], info: {}, sent: 0, state: 'init', hasDb: false };
   try {
     D.info = {
       ua: navigator.userAgent,
@@ -99,7 +99,9 @@
     el('boot-code').style.display = 'block'; el('boot-code').textContent = 'Error code: ' + code;
     el('boot-err').style.display = 'block'; el('boot-err').textContent = String(msg).slice(0, 500);
     el('boot-help').style.display = 'block';
-    el('boot-help').textContent = 'Tap "Reload the game" to try again. If it keeps happening, tell Claude the error code above.';
+    el('boot-help').textContent = code === 'E-GL'
+      ? 'Closing and opening the app again usually fixes this ("Reload the game" may not be enough). If it keeps happening, tell Claude the error code above.'
+      : 'Tap "Reload the game" to try again. If it keeps happening, tell Claude the error code above.';
     el('boot-actions').style.display = 'flex';
     el('boot-reload').onclick = function () { location.reload(); };
     var D = window.__diag;

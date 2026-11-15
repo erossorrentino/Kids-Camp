@@ -95,10 +95,28 @@ const CinematicShader = {
     }`,
 };
 
+// Phones and tablets: same effects, but buffers sized for a phone's graphics
+// memory (a full-resolution 4x MSAA HDR picture plus a 4096 shadow map came
+// to ~250 MB on a sharp phone screen and made the graphics chip reset).
+export function isMobileGPU() {
+  try { if (window.matchMedia('(pointer: coarse)').matches) return true; } catch (e) { /* ignore */ }
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Macintosh/.test(navigator.userAgent));
+}
+function mobileCaps(q) {
+  return { ...q, maxDpr: Math.min(q.maxDpr, 1.5), shadowMapSize: Math.min(q.shadowMapSize, 2048), msaa: Math.min(q.msaa, 2) };
+}
+
 export class Graphics {
   constructor(container) {
     this.container = container;
-    const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false, preserveDrawingBuffer: false });
+    this.mobile = isMobileGPU();
+    let renderer;
+    try {
+      renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false, preserveDrawingBuffer: false });
+    } catch (e) {
+      // some phones refuse a "high-performance" context: ask for a default one
+      renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'default', stencil: false, preserveDrawingBuffer: false });
+    }
     renderer.setClearColor(0x000000);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -132,7 +150,7 @@ export class Graphics {
 
   setQuality(name) {
     this.qualityName = QUALITY[name] ? name : 'high';
-    this.quality = QUALITY[this.qualityName];
+    this.quality = this.mobile ? mobileCaps(QUALITY[this.qualityName]) : QUALITY[this.qualityName];
     this.renderer.shadowMap.enabled = this.quality.shadows > 0;
     this.renderer.shadowMap.type = this.quality.shadows > 1 ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
     this.renderScale = 1;

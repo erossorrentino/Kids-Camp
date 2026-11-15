@@ -15,10 +15,12 @@ import { hashString } from './core/rng.js';
 // Error reports (see index.html). A no-op outside the published page.
 const D = window.__diag || { log() {}, set() {}, send() { return false; }, hasDb: false, state: 'none' };
 const MARK = 'apexVelocity.loading'; // set while something heavy loads; if it is still there at next start-up, the page crashed
-const GFX_VERSION = 9;
+const GFX_VERSION = 10;
 const setMark = (v) => { try { if (v) localStorage.setItem(MARK, v); else localStorage.removeItem(MARK); } catch (e) { /* ignore */ } };
 const TIER_DOWN = { ultra: 'medium', high: 'medium', medium: 'low', low: 'lite' }; // broken picture: skip tiers that draw the same way
-const STEP_DOWN = { ultra: 'high', high: 'medium', medium: 'low', low: 'lite' }; // crash / out of graphics memory: one step
+const STEP_DOWN = { ultra: 'high', high: 'medium', medium: 'low', low: 'lite' }; // crash while loading: one step
+const ORDER = ['lite', 'low', 'medium', 'high', 'ultra'];
+const LOST_KEY = 'apexVelocity.lostAt'; // when the graphics chip last reset (for the start-up message)
 
 class App {
   constructor() {
@@ -34,7 +36,7 @@ class App {
     this.isTouch = isTouchFirst();
     const st = this.profile.settings;
     // Graphics start on the highest setting (Ultra) on every device, once for old saves too
-    if (st.gfxVersion !== GFX_VERSION) { st.quality = null; st.liteLocked = false; st.gfxVersion = GFX_VERSION; } // null = auto = Ultra
+    if (st.gfxVersion !== GFX_VERSION) { st.quality = null; st.liteLocked = false; st.lostAt = null; st.gfxVersion = GFX_VERSION; } // null = auto = Ultra
     // Did the page die while loading last time (out of memory, graphics crash)? Then go one step lower.
     try {
       const m = localStorage.getItem(MARK);
@@ -53,7 +55,7 @@ class App {
       this.gfx = new Graphics(this.view);
     } catch (e) {
       setMark(null);
-      window.__bootError?.('This device or browser could not start 3D graphics (WebGL 2). Try opening the game in the latest Chrome or Safari.\n(' + (e && e.message ? e.message : e) + ')', 'E-GL');
+      window.__bootError?.(glHelp() + '\n(' + (e && e.message ? e.message : e) + ')', 'E-GL');
       throw e;
     }
     D.set('gpu', this.gfx.gpu);
@@ -61,14 +63,31 @@ class App {
     // if the GPU drops the 3D context (common on phones when memory is low), recover
     this.gfx.renderer.domElement.addEventListener('webglcontextlost', (ev) => {
       ev.preventDefault();
+      if (this.contextLost) return;
       this.contextLost = true;
-      const was = this.gfx.qualityName, next = STEP_DOWN[was] || 'lite';
-      this.profile.settings.quality = next;
+      // The graphics chip reset. Phones often refuse to start 3D again straight away
+      // (even after a reload), so drop to Low - it needs no extra picture buffers -
+      // and never offer the setting that crashed again on this device.
+      const was = this.gfx.qualityName, next = was === 'lite' || was === 'low' ? 'lite' : 'low';
+      const st2 = this.profile.settings;
+      st2.quality = next;
+      if (!st2.lostAt || ORDER.indexOf(was) < ORDER.indexOf(st2.lostAt)) st2.lostAt = was;
       this.save();
       setMark(null);
+      try { localStorage.setItem(LOST_KEY, String(Date.now())); } catch (e) { /* ignore */ }
       const nice = QUALITY[next].name;
-      this.problem('E-LOST', 'Graphics restarting…', `This device ran out of graphics memory, so the game is switching to ${nice} graphics. If nothing happens in a few seconds, tap Reload.`,
-        `context lost at ${was} in ${this.mode}`, [['Reload the game', () => location.reload()]]);
+      const n = this.problem('E-LOST', 'Graphics restarting…', `The graphics chip on this device ran out of memory. The game is switching to ${nice} graphics so it can keep running.`,
+        `context lost at ${was} in ${this.mode}`, []);
+      // if the device doesn't give the 3D graphics back by itself, say exactly what to do
+      setTimeout(() => {
+        if (!this.contextLost || !n.isConnected) return;
+        D.log('context-not-restored', was);
+        n.querySelector('p').textContent = `Your device paused the 3D graphics. Close the app completely (swipe it away from your recent apps), then open it again. The game will start with ${nice} graphics.`;
+        const b = document.createElement('button');
+        b.className = 'btn'; b.textContent = 'Try again';
+        b.onclick = () => location.reload();
+        n.querySelector('.n-actions')?.appendChild(b);
+      }, 5000);
     });
     this.gfx.renderer.domElement.addEventListener('webglcontextrestored', () => {
       this.contextLost = false;
@@ -383,8 +402,10 @@ class App {
     const fps = race ? race.avgFps() : 0;
     D.log('race-end', `P${pos} ${fps} fps ${this.gfx.qualityName} scale=${this.gfx.renderScale}`);
     // below the highest graphics, ran smoothly, and the picture never broke: offer a step back up
+    // (never to a setting that made this device's graphics chip reset)
     const up = { lite: 'low', low: 'medium', medium: 'high', high: 'ultra' }[this.gfx.qualityName];
-    if (up && fps >= 40 && !p.settings.liteLocked) {
+    const lostAt = p.settings.lostAt;
+    if (up && fps >= 40 && !p.settings.liteLocked && (!lostAt || ORDER.indexOf(up) < ORDER.indexOf(lostAt))) {
       info.offerUpgrade = () => { D.log('upgrade-try', up); this.applyQualityLive(up); this.ui.toast(`Graphics set to ${QUALITY[up].name}. If anything looks wrong the game will switch back by itself.`); };
     }
     if (after.kind === 'career') {
@@ -571,21 +592,56 @@ function loadFont() {
   } catch (e) { /* fonts are optional */ }
 }
 
+// What to tell the player when 3D graphics can't start
+function glHelp() {
+  let recent = false;
+  try { recent = Date.now() - Number(localStorage.getItem(LOST_KEY) || 0) < 3 * 3600 * 1000; } catch (e) { /* ignore */ }
+  return recent
+    ? 'Your device paused 3D graphics after its graphics chip ran out of memory. Close the app completely (swipe it away from your recent apps), then open it again. The game will use lighter graphics.'
+    : 'This device or browser could not start 3D graphics. Close the app completely and open it again, or try the latest Chrome or Safari.';
+}
+
+// Can this page get a WebGL 2 context right now? (After the graphics chip resets,
+// phones can refuse for a little while.)
+function canStartGL() {
+  try {
+    const c = document.createElement('canvas');
+    const gl = c.getContext('webgl2', { powerPreference: 'default' });
+    if (!gl) return false;
+    gl.getExtension('WEBGL_lose_context')?.loseContext(); // hand the probe back straight away
+    return true;
+  } catch (e) { return false; }
+}
+
 function boot() {
   loadFont();
   const msg = document.getElementById('boot-msg'), bar = document.getElementById('boot-bar');
   if (msg) msg.textContent = 'Starting the engines…';
   if (bar) bar.style.width = '96%';
-  // let the loading screen paint before the heavy start-up work
-  setTimeout(() => {
-    try { new App(); } catch (e) {
-      console.error(e);
-      setMark(null);
-      const shown = document.getElementById('boot-err')?.textContent;
-      const where = e && e.stack ? ' @ ' + String(e.stack).split('\n').slice(1, 3).join(' ').trim() : '';
-      if (!shown) window.__bootError?.((e && e.message ? e.message : String(e)) + where, 'E-BOOT');
+  // 3D not available yet: wait and try again a few times before showing an error
+  const waits = [1500, 3000, 5000, 8000];
+  let tries = 0;
+  const start = () => {
+    if (!canStartGL() && tries < waits.length) {
+      D.log('gl-wait', 'try ' + (tries + 1));
+      if (msg) msg.textContent = 'Starting the 3D graphics…';
+      setTimeout(start, waits[tries++]);
+      return;
     }
-  }, 40);
+    run();
+  };
+  // let the loading screen paint before the heavy start-up work
+  setTimeout(start, 40);
+}
+
+function run() {
+  try { new App(); } catch (e) {
+    console.error(e);
+    setMark(null);
+    const shown = document.getElementById('boot-err')?.textContent;
+    const where = e && e.stack ? ' @ ' + String(e.stack).split('\n').slice(1, 3).join(' ').trim() : '';
+    if (!shown) window.__bootError?.((e && e.message ? e.message : String(e)) + where, 'E-BOOT');
+  }
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
 else boot();

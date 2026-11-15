@@ -64,11 +64,14 @@ tablet, or host it anywhere. Progress saves in the browser.
   resolution scaling to keep the frame rate smooth.
 - **Ultra graphics on every device.** The game always starts on Ultra and
   never lowers the setting just because a device is slow (only the
-  resolution adapts). It steps down one level by itself only if the
-  picture actually breaks (white or blank screen), the graphics chip runs
-  out of memory, or the game crashed while loading. **Lite** (no shadows,
-  reflections or special effects) is there for devices that need it.
-  Change it any time in Settings or the pause menu.
+  resolution adapts). On phones and tablets Ultra keeps every effect but
+  sizes its picture buffers for a phone (about 80 MB of graphics memory
+  instead of about 280 MB on a sharp phone screen). If the graphics chip
+  still runs out of memory, the game switches to Low and never offers the
+  setting that crashed again on that device. A white or blank picture
+  steps down a level; a crash while loading starts one level lower next
+  time. **Lite** (no shadows, reflections or special effects) is there for
+  devices that need it. Change it any time in Settings or the pause menu.
 
 ### Sound
 
@@ -151,8 +154,8 @@ at. Reports contain no names or personal details.
 | E-DL | The game file didn't download | Tries again once, then asks you to reload |
 | E-SLOW | The game took too long to start | Asks you to reload |
 | E-BOOT | The game crashed while starting | Asks you to reload |
-| E-GL | The browser can't draw 3D graphics | Suggests the latest Chrome or Safari |
-| E-LOST | The graphics chip ran out of memory | Steps graphics down one level and goes back to the menu |
+| E-GL | 3D graphics could not start | Waits and retries for about 15 seconds first; then asks you to close and reopen the app |
+| E-LOST | The graphics chip ran out of memory | Switches to Low graphics and goes back to the menu (or asks you to reopen the app) |
 | E-WHITE | The picture stayed white or blank | Switches down a graphics step; shows this only if Lite fails too |
 | E-RACE | A race failed to load | Retries once on Lite before showing this |
 | E-LOOP | The game kept hitting an error | Stops the race (or suggests a reload) |
