@@ -9,7 +9,7 @@ const $ = (s, r) => (r || document).querySelector(s);
 const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
 const APP = { screen: null, back: null, running: false, paused: false, mode: 'attract', focus: 0, finalT: 0, shownFinal: false,
   mu: { a: 0, b: 1, kind: 'play', shooter: 0 }, hudCache: {}, meterHold: 0, introT: 0, isTouch: false };
-const SET = { v: 2, quality: 'auto', camera: 'third', difficulty: 'pro', qLen: 180, autoSwitch: true, meter: true, voice: false, master: 80, crowd: 80, music: 50, touch: 'auto', side: 'home' };
+const SET = { v: 2, replays: true, quality: 'auto', camera: 'third', difficulty: 'pro', qLen: 180, autoSwitch: true, meter: true, voice: false, master: 80, crowd: 80, music: 50, touch: 'auto', side: 'home' };
 const OPTS = {
   camera: [['third', 'Third person'], ['broadcast', 'Broadcast'], ['close', 'Close'], ['sky', 'Skycam']],
   difficulty: [['rookie', 'Rookie'], ['pro', 'Pro'], ['allstar', 'All-Star'], ['legend', 'Legend']],
@@ -20,9 +20,10 @@ const OPTS = {
   music: [[0, '0'], [20, '20'], [40, '40'], [60, '60'], [80, '80'], [100, '100']],
   touch: [['auto', 'Auto'], ['on', 'On'], ['off', 'Off']],
   quality: [['auto', 'Auto'], ['high', 'High'], ['medium', 'Medium'], ['low', 'Low']],
+  replays: [[true, 'On'], [false, 'Off']],
   side: [['home', 'Home'], ['away', 'Away']],
 };
-const SET_LABELS = { quality: 'Graphics', camera: 'Camera', difficulty: 'Difficulty', qLen: 'Quarter length', autoSwitch: 'Auto-switch on defense', meter: 'Shot meter', voice: 'Announcer voice', master: 'Master volume', crowd: 'Crowd volume', music: 'Menu music', touch: 'Touch controls', side: 'Your court' };
+const SET_LABELS = { replays: 'Instant replays', quality: 'Graphics', camera: 'Camera', difficulty: 'Difficulty', qLen: 'Quarter length', autoSwitch: 'Auto-switch on defense', meter: 'Shot meter', voice: 'Announcer voice', master: 'Master volume', crowd: 'Crowd volume', music: 'Menu music', touch: 'Touch controls', side: 'Your court' };
 
 function loadSettings() {
   try {
@@ -191,7 +192,7 @@ function cycleOpt(key, d) {
   setFocus(keep);
 }
 function renderSettings() {
-  const keys = ['quality', 'camera', 'difficulty', 'qLen', 'autoSwitch', 'meter', 'voice', 'master', 'crowd', 'music', 'touch'];
+  const keys = ['quality', 'camera', 'replays', 'difficulty', 'qLen', 'autoSwitch', 'meter', 'voice', 'master', 'crowd', 'music', 'touch'];
   $('#setList').innerHTML = keys.map((k) => `<button class="opt" data-key="${k}"><span class="l">${SET_LABELS[k]}</span><span class="v">${optLabel(k)}</span></button>`).join('');
   setFocus(APP.focus);
 }
@@ -207,6 +208,7 @@ function startFromMatchup() {
 }
 function startGame(cfg) {
   APP.last = cfg;
+  replayReset(); hideLower3();
   newGame({ mode: cfg.mode === 'threept' ? 'threept' : 'game', home: cfg.home, away: cfg.away, userTeam: cfg.userTeam == null ? 0 : cfg.userTeam,
     auto: cfg.mode === 'watch', difficulty: cfg.difficulty || SET.difficulty, qLen: SET.qLen, autoSwitch: SET.autoSwitch && SET.camera !== 'third', shooter: cfg.shooter });
   R.tpYaw = null;
@@ -220,7 +222,7 @@ function startGame(cfg) {
   $('#ticker').innerHTML = '';
   musicStop(); crowdBase(0.13); if (AU.on) AU.sfx.gain.setTargetAtTime(AU.vol.sfx, now(), 0.1);
   drawRibbon(cfg.mode === 'threept' ? 'THREE-POINT CONTEST  •  HARDWOOD KINGS  •  ' : null);
-  if (cfg.mode !== 'threept') { showIntro(cfg.home, cfg.away); startShow(cfg.home, cfg.away); APP.introT = R.showDur + 0.4; }
+  if (cfg.mode !== 'threept') { R.showDur = 5.4; startShow(cfg.home, cfg.away); showLineups(); APP.introT = 0; }
   else showIntroTP();
 }
 function restartGame() { if (APP.last) startGame(APP.last); }
@@ -240,6 +242,41 @@ function pauseGame() {
   if (window.speechSynthesis) try { speechSynthesis.cancel(); } catch (e) { /* ignore */ }
 }
 function resumeGame() { showScreen(null); APP.paused = false; }
+/* ---------------- broadcast presentation ---------------- */
+const EMBLEM = {};
+function emblemURL(def) {
+  const key = def.id + def.c1 + def.c3;
+  if (!EMBLEM[key]) { const c = mkCanvas(128, 128), g = c.getContext('2d'); drawEmblem(g, def, 64, 64, 60); EMBLEM[key] = c.toDataURL(); }
+  return EMBLEM[key];
+}
+function cardFor(d, def) {
+  if (d.cid && CARD[d.cid]) return CARD[d.cid];
+  return POOL.find((c) => c.n === d.n && c.team === def) || null;
+}
+function showLineups() {
+  const el = $('#lineups');
+  const col = (T, label) => `<div class="lu-team" style="--tc:${T.def.c1}"><div class="lu-head"><img src="${emblemURL(T.def)}" alt=""><div><span>${label}</span><b>${T.def.city} ${T.def.name}</b></div></div>
+    <div class="lu-cards">${T.players.map((p, i) => { const c = cardFor(p.d, T.def); return c ? `<div class="lu-c" style="--d:${i}">${cardHTML(c, { cls: 'sm' })}</div>` : ''; }).join('')}</div></div>`;
+  el.innerHTML = `<div class="lu-title"><span class="eyebrow">Tonight</span><h2 class="h-2">Starting lineups</h2></div>${col(G.teams[1], 'Away')}${col(G.teams[0], 'Home')}`;
+  hydratePortraits(el);
+  el.classList.add('on');
+}
+function hideLineups() { $('#lineups').classList.remove('on'); }
+const LOWER = { shownAt: {}, t: 0 };
+function hideLower3() { $('#lower3').classList.remove('on'); LOWER.t = 0; }
+function maybeLower3(p) {
+  const s = p.st, key = p.id;
+  if (s.pts < 8 || G.time - (LOWER.shownAt[key] || -99) < 30 || LOWER.t > 0) return;
+  LOWER.shownAt[key] = G.time;
+  const c = cardFor(p.d, p.team.def);
+  const el = $('#lower3');
+  el.style.setProperty('--tc', p.team.def.c1);
+  el.innerHTML = `<div class="l3-pt">${c ? `<img class="dc-pt" data-card="${c.id}" alt="">` : ''}</div><div class="l3-info"><span class="l3-team">${p.team.def.city} ${p.team.def.name} · #${p.d.num} ${p.d.pos}</span><b>${p.d.n}</b>
+    <div class="l3-stats"><span><i>${s.pts}</i>PTS</span><span><i>${s.fgm}/${s.fga}</i>FG</span><span><i>${s.tpm}</i>3PM</span><span><i>${s.reb}</i>REB</span><span><i>${s.ast}</i>AST</span></div></div>`;
+  hydratePortraits(el);
+  el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+  LOWER.t = 5;
+}
 function startAttract() {
   const a = Math.floor(Math.random() * 8); let b = Math.floor(Math.random() * 7); if (b >= a) b++;
   newGame({ mode: 'game', home: TEAMS[a], away: TEAMS[b], userTeam: -1, auto: true, difficulty: 'allstar', qLen: 150, autoSwitch: true });
@@ -268,11 +305,14 @@ function updateHUD(rdt) {
   else {
     const T0 = G.teams[0], T1 = G.teams[1];
     [[$('#bugA'), T1], [$('#bugB'), T0]].forEach(([el, T]) => {
-      if (el.dataset.t !== T.def.id) {
-        el.dataset.t = T.def.id;
-        $('.sw', el).style.background = T.def.c1;
+      if (el.dataset.t !== T.def.id + T.def.c1) {
+        el.dataset.t = T.def.id + T.def.c1;
+        el.style.setProperty('--tc', T.def.c1);
+        $('.em', el).src = emblemURL(T.def);
         $('.ab', el).textContent = T.def.id;
       }
+      const fl = Math.min(5, T.fouls), dots = $$('.fl i', el);
+      dots.forEach((d, i) => d.classList.toggle('on', i < fl));
       const sc = $('.sc', el), v = String(T.score);
       if (sc.textContent !== v) { sc.textContent = v; sc.classList.remove('flash'); void sc.offsetWidth; sc.classList.add('flash'); }
       setTxt($('.bonus', el), G.teams[1 - T.idx].fouls >= 5 ? 'BONUS' : '');
@@ -298,8 +338,10 @@ function updateHUD(rdt) {
   }
   updateHint(c, show);
   updateMeter(rdt);
-  // intro card
+  // intro card, starting lineups, lower third
   if (APP.introT > 0) { APP.introT -= rdt; if (APP.introT <= 0) $('#intro').classList.remove('on'); }
+  if ($('#lineups').classList.contains('on') && !(R.show > 0.35)) hideLineups();
+  if (LOWER.t > 0) { LOWER.t -= rdt; if (LOWER.t <= 0) $('#lower3').classList.remove('on'); }
   // touch controls
   const wantTouch = SET.touch === 'on' || (SET.touch === 'auto' && APP.isTouch && IN.device === 'touch');
   const tOn = wantTouch && APP.running && !APP.paused && !APP.screen && G.userTeam >= 0 && !G.auto;
@@ -415,7 +457,9 @@ function showBox(kind) {
   const pool = fin ? G.teams[win].players : G.players;
   for (const p of pool) if (!best || gameScore(p) > gameScore(best)) best = p;
   const s = best.st;
-  $('#boxPog').innerHTML = `<span class="eyebrow">${fin ? 'Player of the game' : 'Top performer'}</span><b>${best.d.n}</b><span class="muted">${best.team.def.id} · ${s.pts} PTS · ${s.reb} REB · ${s.ast} AST · ${s.fgm}/${s.fga} FG</span>`;
+  const pc = cardFor(best.d, best.team.def);
+  $('#boxPog').innerHTML = `${pc ? `<div class="pog-pt" style="--tc:${best.team.def.c1}"><img class="dc-pt" data-card="${pc.id}" alt=""></div>` : ''}<div class="pog-tx"><span class="eyebrow">${fin ? 'Player of the game' : 'Top performer'}</span><b>${best.d.n}</b><span class="muted">${best.team.def.id} · ${s.pts} PTS · ${s.reb} REB · ${s.ast} AST · ${s.fgm}/${s.fga} FG</span></div>`;
+  hydratePortraits($('#boxPog'));
   $('#boxTable').innerHTML = `<thead><tr><th>Player</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>FG</th><th>3PT</th><th>FT</th><th>OREB</th><th>TO</th><th>PF</th></tr></thead><tbody>${boxRows(T1)}${boxRows(T0)}</tbody>`;
   $('#boxActions').innerHTML = fin ? '<button class="btn ghost" data-act="menu">Main menu</button><button class="btn" data-act="again">Rematch</button>'
     : half ? '<button class="btn" data-act="continue">Start 2nd half</button>' : '<button class="btn" data-act="boxback">Back</button>';
@@ -467,7 +511,7 @@ function handleEvents() {
       case 'dunk':
         R.shake = 1; R.excite = Math.max(R.excite, 1); R.flashRate = Math.max(R.flashRate, 0.3); rimShake(e.p.team.dir);
         if (!quiet) R.flash = 0.18;
-        if (!quiet || Math.random() < 0.5) { R.slowmo = 0.75; R.slowSide = e.p.team.dir; }
+        if (SET.replays === false && (!quiet || Math.random() < 0.5)) { R.slowmo = 0.75; R.slowSide = e.p.team.dir; }
         break;
       case 'release':
         if (e.user && !quiet) {
@@ -526,8 +570,10 @@ function handleEvents() {
 }
 function onScoreEv(e, quiet) {
   const p = e.p, T = p.team;
+  if (!quiet && !e.ft && G.mode !== 'threept') setTimeout(() => maybeLower3(p), 1600);
   if (AU.on && e.swish) SFX.swish();
   netSwish(T.dir);
+  if (!e.ft && !e.tp && (e.dunk || e.three || G.clockExpired)) replayFlag(e.dunk ? 'dunk' : 'three', p);
   if (e.three && !e.tp) refSignal('three', p.x, p.z);
   const homeTeam = e.team === 0;
   const big = e.three || e.dunk || G.clockExpired;

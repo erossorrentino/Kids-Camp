@@ -12,9 +12,9 @@ const HAIRC = ['#14100c', '#221710', '#35261a', '#6a4a2a', '#c9a35e'];
 
 /* ---------- atlas layout: 1024 x 1024 canvas, uv v = 1 - y / 1024 ---------- */
 const AT = 1024;
-const REG = { jersey: [0, 0, 1024, 512], shortsR: [0, 512, 512, 256], shortsL: [512, 512, 512, 256], pelvis: [512, 896, 512, 128], face: [0, 768, 256, 256], hair: [256, 768, 256, 256] };
+const REG = { jersey: [0, 0, 1024, 512], shortsR: [0, 512, 512, 256], shortsL: [512, 512, 512, 256], pelvis: [512, 896, 512, 128], face: [0, 768, 256, 256], hair: [256, 768, 256, 128], limb: [256, 896, 256, 128] };
 const PATCH = { skin: 0, sock: 1, shoe: 2, sole: 3, accent: 4, trim: 5, dark: 6, white: 7, band: 8, sleeve: 9, lip: 10, kit: 11, hairSolid: 12, shoe2: 13, pants: 14, shirt: 15 };
-const ROUGH = { jersey: 0.74, shortsR: 0.6, shortsL: 0.6, pelvis: 0.6, face: 0.5, hair: 0.85,
+const ROUGH = { jersey: 0.74, shortsR: 0.6, shortsL: 0.6, pelvis: 0.6, face: 0.5, hair: 0.85, limb: 0.46,
   patch: [0.47, 0.85, 0.32, 0.55, 0.38, 0.6, 0.35, 0.6, 0.8, 0.5, 0.4, 0.6, 0.82, 0.3, 0.7, 0.72] };
 function patchXY(i) { return [512 + (i % 8) * 64, 768 + Math.floor(i / 8) * 64]; }
 function patchUV(name) { const [x, y] = patchXY(PATCH[name]); return [(x + 32) / AT, 1 - (y + 32) / AT]; }
@@ -53,8 +53,7 @@ function piece(g, off, weights, ao) {
   for (let i = 0; i < n; i++) {
     const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
     const w = weights(x, y, z);
-    si[i * 4] = w[0]; sw[i * 4] = w[1];
-    if (w.length > 2) { si[i * 4 + 1] = w[2]; sw[i * 4 + 1] = w[3]; }
+    for (let q = 0; q < Math.min(4, w.length / 2); q++) { si[i * 4 + q] = w[q * 2]; sw[i * 4 + q] = w[q * 2 + 1]; }
     const a = ao ? ao(x, y, z, nrm.getX(i), nrm.getY(i), nrm.getZ(i)) : 1;
     col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = a;
   }
@@ -215,12 +214,18 @@ function paintAtlas(T, home, d, C) {
   const hl = g.createLinearGradient(0, fy, 0, fy + 70); hl.addColorStop(0, C.hair); hl.addColorStop(C.bald ? 0.2 : 0.75, C.hair); hl.addColorStop(1, 'rgba(0,0,0,0)');
   g.fillStyle = hl; g.globalAlpha = C.bald ? 0.5 : 0.95; g.fillRect(fx, fy, 256, 70); g.globalAlpha = 1;
   // hair: strands
-  g.fillStyle = C.hair; g.fillRect(256, 768, 256, 256);
+  g.fillStyle = C.hair; g.fillRect(256, 768, 256, 128);
   for (let i = 0; i < 2600; i++) {
-    const x = 256 + Math.random() * 256, y = 768 + Math.random() * 256, l = 3 + Math.random() * 8;
+    const x = 256 + Math.random() * 256, y = 768 + Math.random() * 120, l = 3 + Math.random() * 6;
     g.strokeStyle = Math.random() < 0.5 ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.25)'; g.lineWidth = 1;
     g.beginPath(); g.moveTo(x, y); g.lineTo(x + (Math.random() - 0.5) * 3, y + l); g.stroke();
   }
+  // limb skin (u around the limb, v from wrist/ankle at the bottom to shoulder/hip at the top)
+  g.fillStyle = C.skin; g.fillRect(256, 896, 256, 128);
+  { const gr = g.createLinearGradient(256, 0, 512, 0);
+    gr.addColorStop(0, 'rgba(0,0,0,0.06)'); gr.addColorStop(0.25, 'rgba(255,255,255,0.04)'); gr.addColorStop(0.5, 'rgba(0,0,0,0.06)'); gr.addColorStop(0.75, 'rgba(0,0,0,0.1)'); gr.addColorStop(1, 'rgba(0,0,0,0.06)');
+    g.fillStyle = gr; g.fillRect(256, 896, 256, 128); }
+  for (let i = 0; i < 900; i++) { g.fillStyle = Math.random() < 0.5 ? 'rgba(0,0,0,0.04)' : 'rgba(255,220,200,0.04)'; g.fillRect(256 + Math.random() * 256, 896 + Math.random() * 128, 2, 2); }
   // solid patches
   const pc = { skin: C.skin, sock: C.sock, shoe: C.shoe, sole: C.sole, accent: C.accent, trim, dark: '#140d09', white: '#f2f2f2', band: C.band, sleeve: C.sleeve, lip: C.lip, kit, hairSolid: C.hair, shoe2: C.shoe2, pants: C.pants || C.skin, shirt: C.shirt || kit };
   for (const k in PATCH) { const [x, y] = patchXY(PATCH[k]); g.fillStyle = pc[k]; g.fillRect(x, y, 64, 64); }
@@ -230,9 +235,9 @@ let ROUGH_TEX = null;
 function roughAtlas() {
   if (ROUGH_TEX) return ROUGH_TEX;
   const c = mkCanvas(256, 256), g = c.getContext('2d'), k = 256 / AT;
-  const v = (r) => { const n = Math.round(r * 255); return `rgb(${n},${n},${n})`; };
-  for (const r in REG) { const [x, y, w, h] = REG[r]; g.fillStyle = v(ROUGH[r]); g.fillRect(x * k, y * k, w * k, h * k); }
-  for (const p in PATCH) { const i = PATCH[p], [x, y] = patchXY(i); g.fillStyle = v(ROUGH.patch[i]); g.fillRect(x * k, y * k, 64 * k, 64 * k); }
+  const v = (r, skin) => { const n = Math.round(r * 255); return `rgb(${skin ? 255 : 0},${n},${n})`; };
+  for (const r in REG) { const [x, y, w, h] = REG[r]; g.fillStyle = v(ROUGH[r], r === 'face' || r === 'limb'); g.fillRect(x * k, y * k, w * k, h * k); }
+  for (const p in PATCH) { const i = PATCH[p], [x, y] = patchXY(i); g.fillStyle = v(ROUGH.patch[i], p === 'skin' || p === 'lip'); g.fillRect(x * k, y * k, 64 * k, 64 * k); }
   ROUGH_TEX = new THREE.CanvasTexture(c);
   return ROUGH_TEX;
 }
@@ -246,13 +251,28 @@ function detailAtlas() {
   g.fillStyle = 'rgb(108,108,108)';
   for (let y = 1; y < 512; y += 3) for (let x = (y / 3 % 2) * 1.5; x < 1024; x += 3) g.fillRect(x, y, 1, 1);
   for (let x = 0; x < 1024; x += 2) { g.fillStyle = x % 4 ? 'rgb(134,134,134)' : 'rgb(122,122,122)'; g.fillRect(x, 512, 1, 256); }
-  for (let i = 0; i < 3000; i++) { const x = 256 + Math.random() * 256, y = 768 + Math.random() * 256; g.fillStyle = Math.random() < 0.5 ? 'rgb(90,90,90)' : 'rgb(170,170,170)'; g.fillRect(x, y, 1, 4 + Math.random() * 6); }
+  for (let i = 0; i < 1600; i++) { const x = 256 + Math.random() * 256, y = 768 + Math.random() * 124; g.fillStyle = Math.random() < 0.5 ? 'rgb(90,90,90)' : 'rgb(170,170,170)'; g.fillRect(x, y, 1, 3 + Math.random() * 4); }
+  // muscle definition on the limbs: bulges front (biceps, quads) and back (triceps, calves), with tendon lines
+  { const blob = (u, vv, ru, rv, a) => { const cx = 256 + u * 256, cy = 896 + (1 - vv) * 128; const gr = g.createRadialGradient(cx, cy, 0, cx, cy, 1); gr.addColorStop(0, `rgba(255,255,255,${a})`); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.save(); g.translate(cx, cy); g.scale(ru, rv); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, 1, 0, TAU); g.fill(); g.restore(); };
+    for (const off of [0, 1]) {
+      blob(0.25 + off * 0, 0.72, 34, 22, 0.55); blob(0.75, 0.68, 30, 24, 0.45); blob(0.75, 0.3, 30, 18, 0.55); blob(0.25, 0.36, 26, 16, 0.35);
+      blob(0.0 + off, 0.55, 16, 30, 0.25); blob(0.5, 0.55, 16, 30, 0.25);
+    }
+    g.strokeStyle = 'rgba(60,60,60,0.35)'; g.lineWidth = 2;
+    for (const u of [0.12, 0.38, 0.62, 0.88]) { g.beginPath(); g.moveTo(256 + u * 256, 1024); g.lineTo(256 + u * 256, 1000); g.stroke(); } }
+  // soft fabric folds hanging from the armpits and across the waist
+  for (let i = 0; i < 18; i++) {
+    const x0 = Math.random() * 1024, y0 = 150 + Math.random() * 120, x1 = x0 + (Math.random() - 0.5) * 120, y1 = 470;
+    g.strokeStyle = Math.random() < 0.5 ? 'rgba(70,70,70,0.5)' : 'rgba(185,185,185,0.45)'; g.lineWidth = 6 + Math.random() * 8;
+    g.beginPath(); g.moveTo(x0, y0); g.quadraticCurveTo((x0 + x1) / 2 + 20, (y0 + y1) / 2, x1, y1); g.stroke();
+  }
+  for (const y of [420, 452]) { g.strokeStyle = 'rgba(80,80,80,0.4)'; g.lineWidth = 8; g.beginPath(); for (let x = 0; x <= 1024; x += 16) g.lineTo(x, y + Math.sin(x * 0.05) * 6); g.stroke(); }
   DETAIL_TEX = new THREE.CanvasTexture(c);
   return DETAIL_TEX;
 }
 
 /* ---------- the model ---------- */
-const BI = { body: 0, hips: 1, torso: 2, head: 3, shR: 4, elR: 5, shL: 6, elL: 7, hipR: 8, knR: 9, ankR: 10, hipL: 11, knL: 12, ankL: 13 };
+const BI = { body: 0, hips: 1, torso: 2, head: 3, shR: 4, elR: 5, shL: 6, elL: 7, hipR: 8, knR: 9, ankR: 10, hipL: 11, knL: 12, ankL: 13, hem: 14 };
 function buildHumanoid(pl, home) {
   const d = pl.d, T = pl.team.def, ref = !!pl.ref;
   const hsh = nameHash(d.n), bulk = { PG: 0.94, SG: 0.97, SF: 1.0, PF: 1.06, C: 1.12 }[d.pos];
@@ -271,8 +291,8 @@ function buildHumanoid(pl, home) {
   const J = { hips: [0, 3.35, 0], head: [0, 5.77, 0], shR: [0, 5.25, 0.76 * b], shL: [0, 5.25, -0.76 * b], hipR: [0, 3.27, 0.32 * b], hipL: [0, 3.27, -0.32 * b] };
   const P = [];
   // torso / jersey: lower third follows the hips, upper body follows the spine
-  P.push(piece(regionUV(lathe([[0.53, 0.12], [0.54, 0.45], [0.58, 0.85], [0.66, 1.3], [0.72, 1.6], [0.75, 1.82], [0.68, 1.99], [0.44, 2.11], [0.25, 2.2]], 28, 0.62, b), 'jersey'), J.hips,
-    (x, y) => blend(BI.hips, BI.torso, sstep(3.6, 4.3, y)),
+  P.push(piece(regionUV(lathe([[0.56, 0.08], [0.55, 0.45], [0.58, 0.85], [0.66, 1.3], [0.72, 1.6], [0.75, 1.82], [0.68, 1.99], [0.44, 2.11], [0.25, 2.2]], 28, 0.62, b), 'jersey'), J.hips,
+    (x, y) => { const t = sstep(3.6, 4.3, y), hw = 0.8 * (1 - sstep(3.45, 4.15, y)); return [BI.hips, (1 - t) * (1 - hw), BI.torso, t * (1 - hw), BI.hem, hw]; },
     (x, y, z, nx, ny, nz) => 1 - 0.14 * (1 - sstep(3.45, 4.1, y)) - 0.18 * sstep(0.45, 0.7, Math.abs(z)) * sstep(4.6, 5.0, y) * (1 - sstep(5.15, 5.35, y))));
   // shorts top
   P.push(piece(regionUV(lathe([[0.54, -0.5], [0.64, -0.3], [0.68, -0.05], [0.65, 0.16], [0.58, 0.32]], 20, 0.74 * b, b), 'pelvis'), J.hips,
@@ -289,12 +309,17 @@ function buildHumanoid(pl, home) {
       x *= 0.98; y *= 1.13; z *= 0.88;
       if (dy < 0) { z *= 1 - 0.24 * -dy; if (dx > -0.2) x += 0.07 * -dy * Math.max(0, dx + 0.2); y *= 1 + 0.08 * -dy; }
       if (dy > 0.25 && dx < 0) x *= 1.06;
+      const fz = Math.abs(z / 0.34);
+      if (dx > 0.55 && dy > 0.12 && dy < 0.38) x += 0.022 * (1 - Math.abs(dy - 0.25) / 0.13);                 // brow ridge
+      if (dx > 0.7 && dy > 0.0 && dy < 0.2 && fz > 0.15 && fz < 0.5) x -= 0.016 * Math.sin(Math.PI * (fz - 0.15) / 0.35);   // eye sockets
+      if (dx > 0.25 && dy > -0.25 && dy < 0.08 && fz > 0.5) { z *= 1.035; x += 0.01; }                          // cheekbones
       p.setXYZ(i, x + 0.02, y + 0.33, z);
     }
     sk.computeVertexNormals(); }
   const headW = () => [BI.head, 1];
   P.push(piece(regionUV(sk, 'face'), J.head, headW, (x, y, z, nx, ny) => (ny < -0.5 ? 0.82 : 1)));
   P.push(piece(constUV(sphereG(0.058, 8, 6, 1.15, 1.45, 0.9, 0.35, 0.27, 0), 'skin'), J.head, headW));
+  { const nb = boxG(0.05, 0.13, 0.055, 0.335, 0.34, 0); P.push(piece(constUV(nb, 'skin'), J.head, headW)); }
   for (const s of [-1, 1]) P.push(piece(constUV(sphereG(0.078, 8, 6, 0.45, 1.0, 0.38, -0.01, 0.32, s * 0.31), 'skin'), J.head, headW, () => 0.86));
   const hairUV = (g) => regionUV(g, 'hair');
   const hs = d.hair;
@@ -310,7 +335,7 @@ function buildHumanoid(pl, home) {
     const sh = s > 0 ? BI.shR : BI.shL, el = s > 0 ? BI.elR : BI.elL, j = s > 0 ? J.shR : J.shL;
     const ys = j[1];
     const armAO = (x, y, z, nx, ny, nz) => { const inner = clamp(-nz * s, 0, 1); return 1 - 0.18 * inner - 0.2 * inner * sstep(ys - 0.7, ys - 0.1, y); };
-    P.push(piece(constUV(lathe([[0.095, -2.22], [0.1, -2.12], [0.13, -1.85], [0.156, -1.55], [0.142, -1.3], [0.132, -1.18], [0.15, -1.02], [0.19, -0.75], [0.212, -0.48], [0.2, -0.2], [0.17, 0.05]], 16, b, b), 'skin'), j,
+    P.push(piece(regionUV(lathe([[0.095, -2.22], [0.1, -2.12], [0.13, -1.85], [0.156, -1.55], [0.142, -1.3], [0.132, -1.18], [0.15, -1.02], [0.19, -0.75], [0.212, -0.48], [0.2, -0.2], [0.17, 0.05]], 16, b, b), 'limb'), j,
       (x, y) => blend(sh, el, sstep(ys - 0.98, ys - 1.32, y) === 0 ? 0 : sstep(ys - 0.98, ys - 1.32, y)), armAO));
     P.push(piece(constUV(sphereG(0.215, 16, 12, 1.0, 1.08, 0.8, 0, -0.07, -s * 0.03), 'skin'), j,
       () => [sh, 1], armAO));
@@ -333,7 +358,8 @@ function buildHumanoid(pl, home) {
     const legW = (x, y) => { if (y > yk + 0.2) return [hp, 1]; if (y > yk - 0.18) return blend(hp, kn, sstep(yk + 0.2, yk - 0.18, y)); if (y > ya + 0.1) return [kn, 1]; return blend(kn, an, sstep(ya + 0.1, ya - 0.02, y)); };
     const legAO = (x, y, z, nx, ny, nz) => 1 - 0.22 * clamp(-nz * s, 0, 1) * sstep(yk + 0.5, yh - 0.6, y) - 0.1 * clamp(-nx, 0, 1) * (1 - Math.min(1, Math.abs(y - yk) / 0.4));
     const lp = ref ? 'pants' : 'skin', lw = ref ? 1.18 : 1;
-    P.push(piece(constUV(lathe([[0.115 * lw, -3.14], [0.12 * lw, -3.05], [0.14 * lw, -2.9], [0.176 * lw, -2.6], [0.212 * lw, -2.22], [0.2 * lw, -1.95], [0.19 * lw, -1.75], [0.2 * lw, -1.6], [0.23 * lw, -1.4], [0.28 * lw, -1.0], [0.31 * lw, -0.55], [0.31 * lw, -0.2], [0.29 * lw, 0.02]], 16, b, b), lp), j, legW, legAO));
+    { const lg = lathe([[0.115 * lw, -3.14], [0.12 * lw, -3.05], [0.14 * lw, -2.9], [0.176 * lw, -2.6], [0.212 * lw, -2.22], [0.2 * lw, -1.95], [0.19 * lw, -1.75], [0.2 * lw, -1.6], [0.23 * lw, -1.4], [0.28 * lw, -1.0], [0.31 * lw, -0.55], [0.31 * lw, -0.2], [0.29 * lw, 0.02]], 16, b, b);
+      P.push(piece(ref ? constUV(lg, lp) : regionUV(lg, 'limb'), j, legW, legAO)); }
     P.push(piece(constUV(sphereG(0.19 * lw, 12, 9, 1.05, 1, 1, 0.02, -1.6, 0), lp), j, legW, legAO));
     if (!ref) P.push(piece(regionUV(lathe([[0.43, -1.42], [0.452, -1.2], [0.46, -0.6], [0.45, -0.12], [0.4, 0.06]], 20, b, b), s > 0 ? 'shortsR' : 'shortsL'), j,
       (x, y) => blend(BI.hips, hp, sstep(yh + 0.05, yh - 0.35, y)),
@@ -353,14 +379,19 @@ function buildHumanoid(pl, home) {
   const bShR = bone(bTorso, 0, 1.9, 0.76 * b), bElR = bone(bShR, 0, -1.15, 0), bShL = bone(bTorso, 0, 1.9, -0.76 * b), bElL = bone(bShL, 0, -1.15, 0);
   const bHipR = bone(bHips, 0, -0.08, 0.32 * b), bKnR = bone(bHipR, 0, -1.6, 0), bAnkR = bone(bKnR, 0, -1.52, 0);
   const bHipL = bone(bHips, 0, -0.08, -0.32 * b), bKnL = bone(bHipL, 0, -1.6, 0), bAnkL = bone(bKnL, 0, -1.52, 0);
+  const bHem = bone(bTorso, 0, 0.75, 0);
   const skel = new THREE.Skeleton(bones);
   const atlas = canvasTex(paintAtlas(T, home, d, C));
   const mat = new THREE.MeshStandardMaterial({ map: atlas, roughnessMap: roughAtlas(), bumpMap: detailAtlas(), bumpScale: 0.05, roughness: 1, metalness: 0, vertexColors: true, skinning: true, envMapIntensity: 0.65 });
   mat.onBeforeCompile = (sh) => {
     sh.fragmentShader = sh.fragmentShader.replace('#include <tonemapping_fragment>',
-      'gl_FragColor.rgb += vec3(0.5, 0.58, 0.72) * pow(1.0 - clamp(dot(normalize(geometryNormal), normalize(vViewPosition)), 0.0, 1.0), 3.0) * 0.32;\n#include <tonemapping_fragment>');
+      `float skinM = texture2D(roughnessMap, vUv).r;
+       float ndv = clamp(dot(normalize(geometryNormal), normalize(vViewPosition)), 0.0, 1.0);
+       gl_FragColor.rgb += diffuseColor.rgb * vec3(0.5, 0.16, 0.07) * skinM * (0.1 + 0.45 * pow(1.0 - ndv, 2.0));
+       gl_FragColor.rgb += vec3(0.5, 0.58, 0.72) * pow(1.0 - ndv, 3.0) * 0.32 * (1.0 - 0.45 * skinM);
+       #include <tonemapping_fragment>`);
   };
-  mat.customProgramCacheKey = () => 'player-rim';
+  mat.customProgramCacheKey = () => 'player-skin-rim';
   const mesh = new THREE.SkinnedMesh(geo, mat);
   mesh.add(bBody);
   mesh.bind(skel);
@@ -371,7 +402,7 @@ function buildHumanoid(pl, home) {
   blob.rotation.x = -PI / 2; blob.position.y = 0.03;
   R.scene.add(root); R.scene.add(blob);
   return { root, mesh, skel, atlas, mat, body: bBody, hips: bHips, torso: bTorso, headG: bHead,
-    armR: { sh: bShR, el: bElR }, armL: { sh: bShL, el: bElL }, legR: { hp: bHipR, kn: bKnR, ank: bAnkR }, legL: { hp: bHipL, kn: bKnL, ank: bAnkL },
+    hem: bHem, armR: { sh: bShR, el: bElR }, armL: { sh: bShL, el: bElL }, legR: { hp: bHipR, kn: bKnR, ank: bAnkR }, legL: { hp: bHipL, kn: bKnL, ank: bAnkL },
     blob, stride: 0, j: { lean: 0, crouch: 0, twist: 0 } };
 }
 /* three officials: purely visual, they follow the play with standard lead / trail / centre mechanics */
@@ -774,6 +805,15 @@ function poseHumanoid(h, p, dt, px, py, pz, pf) {
   h.torso.rotation.y = -J.twist * 1.4 - J.hipYaw * 1.3;
   h.body.position.x = -J.lean * 0.25;
   h.body.rotation.x = J.roll;
+  // the jersey hem swings with momentum: lags on acceleration, flares out in turns, bounces on the run
+  if (h.hem) {
+    const H = h.hemS || (h.hemS = { z: 0, vz: 0, x: 0, vx: 0 });
+    const tz = -clamp(h.acc * 0.012, -0.32, 0.32) + (run > 0.3 && !air ? Math.sin(h.gph * TAU * 2) * 0.05 * run : 0) + (air ? 0.12 : 0);
+    const tx = clamp(-h.turn * spS * 0.004, -0.25, 0.25);
+    H.vz += (60 * (tz - H.z) - 7 * H.vz) * dts; H.z += H.vz * dts;
+    H.vx += (60 * (tx - H.x) - 7 * H.vx) * dts; H.x += H.vx * dts;
+    h.hem.rotation.z = clamp(H.z, -0.4, 0.4); h.hem.rotation.x = clamp(H.x, -0.35, 0.35);
+  }
   // feet stay flat while planted; toes point down in the air
   for (const leg of [h.legR, h.legL]) {
     const want = air ? 0.35 : -(leg.hp.rotation.z + leg.kn.rotation.z) * 0.9 + J.lean * 0.3;

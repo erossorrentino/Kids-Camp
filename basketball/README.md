@@ -88,6 +88,12 @@ Phones and tablets get an on-screen joystick and buttons.
   and a team badge, faces, hair, fingers, fabric detail and a broadcast rim light.
   Arms use IK to dribble, shoot and catch; feet stay planted on the floor.
 - Three referees, bench players, coaches, photographers and courtside fans.
+- Broadcast presentation: a starting-lineups intro with 3D player cards,
+  instant replays of big dunks and threes (logo wipe, slow motion, cinematic
+  camera, skippable), pop-up stat graphics for hot players, a scorebug with
+  team logos and foul dots, and a player-of-the-game portrait.
+- Skin with a warm subsurface-style scatter, muscle definition on the limbs,
+  sculpted faces, and jerseys whose hem swings with momentum.
 - Fans hold up signs on big moments, courtside rows clap, and bright lights
   throw a subtle anamorphic streak.
 - Deformable nets, rim shake on dunks, backboard LEDs at the buzzer, and a

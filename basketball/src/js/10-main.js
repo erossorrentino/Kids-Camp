@@ -22,12 +22,14 @@ function tick(rdt) {
     I.mx = w.x; I.mz = w.z; I.sprint = inp.sprint; I.shoot = inp.shoot;
     I.pShoot = I.pShoot || inp.pShoot; I.pPass = I.pPass || inp.pPass; I.pMove = I.pMove || inp.pMove; I.pAlt = I.pAlt || inp.pAlt;
   }
+  if (APP.running && R.show > 0.4 && (inp.pShoot || inp.pPass || inp.mOk)) R.show = 0.35;   // skip the intro
+  if (APP.running && !APP.paused && !APP.screen && replayTick(rdt, inp)) { updateHUD(rdt); crowdUpdate(rdt); return; }
   let scale = 1;
   if (R.slowmo > 0) { R.slowmo -= rdt; scale = 0.3; }
   if (simOn && G.state !== 'none') {
     acc += rdt * scale;
     let n = 0;
-    while (acc >= DT && n < 8) { snapshotPrev(); stepGame(DT); handleEvents(); acc -= DT; n++; }
+    while (acc >= DT && n < 8) { snapshotPrev(); stepGame(DT); if (APP.running) replayRecord(); handleEvents(); acc -= DT; n++; }
     if (n === 8) acc = 0;
     R.alpha = clamp(acc / DT, 0, 1);
   }

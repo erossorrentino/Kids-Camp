@@ -303,6 +303,59 @@ table.box tr.tot td { font-weight: 700; color: var(--chalk); }
   .scell { flex-direction: column; align-items: flex-start; }
   .dcard.sm { --cw: 88px; }
 }
+
+/* ---------- broadcast package ---------- */
+#bug { height: 52px; border-radius: 8px; overflow: hidden; background: linear-gradient(180deg, #1a2232, #0a0e16); box-shadow: 0 10px 30px rgba(0,0,0,0.5), inset 0 1px 0 rgba(255,255,255,0.12); }
+#bug .tm { background: transparent; padding: 0 14px 0 8px; gap: 10px; min-width: 150px; border-bottom: 3px solid var(--tc, #888); }
+#bug .tm .em { width: 36px; height: 36px; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.5)); }
+#bug .tm .tn { display: grid; gap: 3px; }
+#bug .tm .fl { display: flex; gap: 3px; }
+#bug .tm .fl i { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.18); }
+#bug .tm .fl i.on { background: var(--warn); }
+#bug .tm .sc { font-size: 32px; }
+#bug .tm .bonus { left: auto; right: 54px; bottom: 4px; }
+#bug .tm .pos { top: auto; bottom: -1px; right: auto; left: 50%; transform: translateX(-50%); border-top: 0; border-bottom: 6px solid var(--warn); }
+#bug .clk { background: linear-gradient(180deg, #f6f2ea, #d9d3c7); min-width: 92px; }
+#bug .shc { background: #050608; }
+#lineups { position: absolute; inset: 0; display: none; align-content: center; justify-content: center; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px 40px; padding: 0 max(20px, env(safe-area-inset-left, 0px)); background: linear-gradient(180deg, rgba(4,6,10,0.15), rgba(4,6,10,0.55)); }
+#lineups.on { display: grid; animation: fadein .4s; }
+.lu-title { grid-column: 1 / -1; text-align: center; }
+.lu-team { display: grid; gap: 10px; justify-items: center; }
+.lu-head { display: flex; align-items: center; gap: 10px; }
+.lu-head img { width: 54px; height: 54px; }
+.lu-head span { display: block; font: 700 11px var(--f-body); letter-spacing: 0.18em; text-transform: uppercase; color: var(--wood); }
+.lu-head b { font: 900 italic clamp(22px, 2.6vw, 34px)/1 var(--f-display); text-transform: uppercase; }
+.lu-cards { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.lu-c { animation: deal .6s cubic-bezier(.2,.9,.3,1.2) backwards; animation-delay: calc(0.4s + var(--d) * 0.12s); }
+.lu-team:last-child .lu-c { animation-delay: calc(1.1s + var(--d) * 0.12s); }
+#lower3 { position: absolute; left: max(14px, env(safe-area-inset-left, 0px)); bottom: 86px; display: none; align-items: stretch; background: linear-gradient(90deg, rgba(10,14,22,0.96), rgba(10,14,22,0.88)); border-left: 5px solid var(--tc, #888); border-radius: 4px; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.5); max-width: min(560px, 92vw); }
+#lower3.on { display: flex; animation: l3in 5s ease-out forwards; }
+@keyframes l3in { 0% { transform: translateX(-30px); opacity: 0; } 7% { transform: none; opacity: 1; } 90% { opacity: 1; } 100% { opacity: 0; transform: translateX(-20px); } }
+.l3-pt { width: 92px; background: var(--tc); position: relative; overflow: hidden; }
+.l3-pt .dc-pt { position: absolute; inset: 0; width: 100%; height: 130%; object-fit: cover; object-position: center top; bottom: auto; }
+.l3-info { padding: 10px 16px; display: grid; gap: 4px; min-width: 0; }
+.l3-team { font: 700 11px var(--f-body); letter-spacing: 0.14em; text-transform: uppercase; color: var(--steel); }
+.l3-info b { font: 900 italic 26px/1 var(--f-display); text-transform: uppercase; }
+.l3-stats { display: flex; gap: 14px; flex-wrap: wrap; font: 700 11px var(--f-body); letter-spacing: 0.1em; color: var(--steel); }
+.l3-stats span { display: grid; justify-items: start; }
+.l3-stats i { font: 900 22px/1 var(--f-display); font-style: normal; color: var(--chalk); font-variant-numeric: tabular-nums; }
+#replayBug { position: absolute; left: 50%; transform: translateX(-50%); top: max(74px, env(safe-area-inset-top, 0px)); display: none; align-items: center; gap: 10px; }
+#hud.rep #ticker, #hud.rep #banner, #hud.rep #hint, #hud.rep #ptag, #hud.rep #meter, #hud.rep #fb, #hud.rep #lower3 { display: none !important; }
+#replayBug.on { display: flex; }
+#replayBug b { font: 900 italic 22px var(--f-display); text-transform: uppercase; background: var(--bad); color: #fff; padding: 2px 12px; transform: skewX(-12deg); animation: blinkR 1.2s steps(2) infinite; }
+#replayBug span { font: 600 12px var(--f-body); color: var(--chalk); background: rgba(10,14,22,0.7); padding: 4px 8px; border-radius: 3px; }
+@keyframes blinkR { 50% { opacity: 0.75; } }
+#wipe { position: fixed; inset: 0; pointer-events: none; z-index: 30; overflow: hidden; }
+#wipe .wb { position: absolute; top: -20%; bottom: -20%; left: -60%; width: 55%; background: linear-gradient(90deg, transparent, var(--wc, #ff7a1a) 18%, var(--wc, #ff7a1a) 82%, transparent); transform: skewX(-18deg) translateX(-30%); opacity: 0; }
+#wipe .wl { position: absolute; top: 50%; left: -20%; transform: translate(-50%, -50%); font: 900 italic 120px/1 var(--f-display); color: #fff; text-shadow: 0 6px 30px rgba(0,0,0,0.5); opacity: 0; }
+#wipe.go .wb { animation: wipeb .6s ease-in-out; }
+#wipe.go .wl { animation: wipel .6s ease-in-out; }
+@keyframes wipeb { 0% { opacity: 1; transform: skewX(-18deg) translateX(0); } 100% { opacity: 1; transform: skewX(-18deg) translateX(330%); } }
+@keyframes wipel { 0% { opacity: 1; left: -20%; } 100% { opacity: 1; left: 120%; } }
+.pog-pt { width: 74px; height: 92px; border-radius: 6px; overflow: hidden; background: var(--tc); flex: none; position: relative; }
+.pog-pt .dc-pt { position: absolute; inset: 0; width: 100%; height: 125%; object-fit: cover; object-position: center top; }
+.pog-tx { display: grid; gap: 2px; }
+@media (max-width: 760px) { #lineups { grid-template-columns: 1fr; align-content: start; padding-top: 70px; overflow-y: auto; } #lower3 { bottom: 20px; } .l3-pt { width: 70px; } }
 /* ---------- HUD ---------- */
 #hud { position: absolute; inset: 0; display: none; pointer-events: none; }
 .screen.on ~ #hud { display: none !important; }
@@ -602,6 +655,7 @@ table.box tr.tot td { font-weight: 700; color: var(--chalk); }
     </div>
   </section>
   <div id="dyToast" role="status"></div>
+  <div id="wipe"><div class="wb"></div><div class="wl">HK</div></div>
   <div id="hud">
     <div id="ticker" aria-live="polite"></div>
     <div id="banner"><b></b><span></span></div>
@@ -610,11 +664,14 @@ table.box tr.tot td { font-weight: 700; color: var(--chalk); }
     <div id="intro"><div class="card"><span class="eyebrow" id="introEy">Tip-off</span><div class="teams" id="introTeams"></div></div></div>
     <div id="tphud"><div><span class="lb">TIME</span><span class="vl" id="tpTime">60.0</span></div><div><div class="racks" id="tpRacks"></div></div><div><span class="lb">SCORE</span><span class="vl" id="tpScore">0</span></div></div>
     <div id="bug">
-      <div class="tm" id="bugA"><span class="sw"></span><span class="ab"></span><span class="sc">0</span><span class="bonus"></span><span class="pos"></span></div>
+      <div class="tm" id="bugA"><img class="em" alt=""><div class="tn"><span class="ab"></span><span class="fl"><i></i><i></i><i></i><i></i><i></i></span></div><span class="sc">0</span><span class="bonus"></span><span class="pos"></span></div>
       <div class="clk"><span class="q" id="bugQ">1ST</span><span class="t" id="bugT">3:00</span></div>
-      <div class="tm" id="bugB"><span class="sw"></span><span class="ab"></span><span class="sc">0</span><span class="bonus"></span><span class="pos"></span></div>
+      <div class="tm" id="bugB"><img class="em" alt=""><div class="tn"><span class="ab"></span><span class="fl"><i></i><i></i><i></i><i></i><i></i></span></div><span class="sc">0</span><span class="bonus"></span><span class="pos"></span></div>
       <div class="shc" id="bugS">24</div>
     </div>
+    <div id="lineups"></div>
+    <div id="lower3"></div>
+    <div id="replayBug"><b>Replay</b><span>Press any button to skip</span></div>
     <div id="ptag"><div class="num" id="ptNum">3</div><div class="inf"><b id="ptName">Player</b><span id="ptInfo">PG</span><div class="stam"><i id="ptStam"></i></div></div></div>
     <div id="hint"></div>
   </div>
@@ -3174,6 +3231,7 @@ const CAMS = {
 };
 function camTargets(dt) {
   if (R.debugCam) return { pos: R.debugCam.pos.clone(), look: R.debugCam.look.clone(), fov: R.debugCam.fov || 40 };
+  if (REP.active) { const rc = replayCam(); if (rc) { R.camRate = [3, 4]; return rc; } }
   const b = G.ball, C = CAMS[R.camMode] || CAMS.broadcast;
   let fx = b.x, fz = b.z;
   if (b.state === 'held' && b.holder) { fx = b.holder.x + b.holder.vx * 0.35; fz = b.holder.z; }
@@ -4489,9 +4547,9 @@ const HAIRC = ['#14100c', '#221710', '#35261a', '#6a4a2a', '#c9a35e'];
 
 /* ---------- atlas layout: 1024 x 1024 canvas, uv v = 1 - y / 1024 ---------- */
 const AT = 1024;
-const REG = { jersey: [0, 0, 1024, 512], shortsR: [0, 512, 512, 256], shortsL: [512, 512, 512, 256], pelvis: [512, 896, 512, 128], face: [0, 768, 256, 256], hair: [256, 768, 256, 256] };
+const REG = { jersey: [0, 0, 1024, 512], shortsR: [0, 512, 512, 256], shortsL: [512, 512, 512, 256], pelvis: [512, 896, 512, 128], face: [0, 768, 256, 256], hair: [256, 768, 256, 128], limb: [256, 896, 256, 128] };
 const PATCH = { skin: 0, sock: 1, shoe: 2, sole: 3, accent: 4, trim: 5, dark: 6, white: 7, band: 8, sleeve: 9, lip: 10, kit: 11, hairSolid: 12, shoe2: 13, pants: 14, shirt: 15 };
-const ROUGH = { jersey: 0.74, shortsR: 0.6, shortsL: 0.6, pelvis: 0.6, face: 0.5, hair: 0.85,
+const ROUGH = { jersey: 0.74, shortsR: 0.6, shortsL: 0.6, pelvis: 0.6, face: 0.5, hair: 0.85, limb: 0.46,
   patch: [0.47, 0.85, 0.32, 0.55, 0.38, 0.6, 0.35, 0.6, 0.8, 0.5, 0.4, 0.6, 0.82, 0.3, 0.7, 0.72] };
 function patchXY(i) { return [512 + (i % 8) * 64, 768 + Math.floor(i / 8) * 64]; }
 function patchUV(name) { const [x, y] = patchXY(PATCH[name]); return [(x + 32) / AT, 1 - (y + 32) / AT]; }
@@ -4530,8 +4588,7 @@ function piece(g, off, weights, ao) {
   for (let i = 0; i < n; i++) {
     const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
     const w = weights(x, y, z);
-    si[i * 4] = w[0]; sw[i * 4] = w[1];
-    if (w.length > 2) { si[i * 4 + 1] = w[2]; sw[i * 4 + 1] = w[3]; }
+    for (let q = 0; q < Math.min(4, w.length / 2); q++) { si[i * 4 + q] = w[q * 2]; sw[i * 4 + q] = w[q * 2 + 1]; }
     const a = ao ? ao(x, y, z, nrm.getX(i), nrm.getY(i), nrm.getZ(i)) : 1;
     col[i * 3] = col[i * 3 + 1] = col[i * 3 + 2] = a;
   }
@@ -4692,12 +4749,18 @@ function paintAtlas(T, home, d, C) {
   const hl = g.createLinearGradient(0, fy, 0, fy + 70); hl.addColorStop(0, C.hair); hl.addColorStop(C.bald ? 0.2 : 0.75, C.hair); hl.addColorStop(1, 'rgba(0,0,0,0)');
   g.fillStyle = hl; g.globalAlpha = C.bald ? 0.5 : 0.95; g.fillRect(fx, fy, 256, 70); g.globalAlpha = 1;
   // hair: strands
-  g.fillStyle = C.hair; g.fillRect(256, 768, 256, 256);
+  g.fillStyle = C.hair; g.fillRect(256, 768, 256, 128);
   for (let i = 0; i < 2600; i++) {
-    const x = 256 + Math.random() * 256, y = 768 + Math.random() * 256, l = 3 + Math.random() * 8;
+    const x = 256 + Math.random() * 256, y = 768 + Math.random() * 120, l = 3 + Math.random() * 6;
     g.strokeStyle = Math.random() < 0.5 ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.25)'; g.lineWidth = 1;
     g.beginPath(); g.moveTo(x, y); g.lineTo(x + (Math.random() - 0.5) * 3, y + l); g.stroke();
   }
+  // limb skin (u around the limb, v from wrist/ankle at the bottom to shoulder/hip at the top)
+  g.fillStyle = C.skin; g.fillRect(256, 896, 256, 128);
+  { const gr = g.createLinearGradient(256, 0, 512, 0);
+    gr.addColorStop(0, 'rgba(0,0,0,0.06)'); gr.addColorStop(0.25, 'rgba(255,255,255,0.04)'); gr.addColorStop(0.5, 'rgba(0,0,0,0.06)'); gr.addColorStop(0.75, 'rgba(0,0,0,0.1)'); gr.addColorStop(1, 'rgba(0,0,0,0.06)');
+    g.fillStyle = gr; g.fillRect(256, 896, 256, 128); }
+  for (let i = 0; i < 900; i++) { g.fillStyle = Math.random() < 0.5 ? 'rgba(0,0,0,0.04)' : 'rgba(255,220,200,0.04)'; g.fillRect(256 + Math.random() * 256, 896 + Math.random() * 128, 2, 2); }
   // solid patches
   const pc = { skin: C.skin, sock: C.sock, shoe: C.shoe, sole: C.sole, accent: C.accent, trim, dark: '#140d09', white: '#f2f2f2', band: C.band, sleeve: C.sleeve, lip: C.lip, kit, hairSolid: C.hair, shoe2: C.shoe2, pants: C.pants || C.skin, shirt: C.shirt || kit };
   for (const k in PATCH) { const [x, y] = patchXY(PATCH[k]); g.fillStyle = pc[k]; g.fillRect(x, y, 64, 64); }
@@ -4707,9 +4770,9 @@ let ROUGH_TEX = null;
 function roughAtlas() {
   if (ROUGH_TEX) return ROUGH_TEX;
   const c = mkCanvas(256, 256), g = c.getContext('2d'), k = 256 / AT;
-  const v = (r) => { const n = Math.round(r * 255); return `rgb(${n},${n},${n})`; };
-  for (const r in REG) { const [x, y, w, h] = REG[r]; g.fillStyle = v(ROUGH[r]); g.fillRect(x * k, y * k, w * k, h * k); }
-  for (const p in PATCH) { const i = PATCH[p], [x, y] = patchXY(i); g.fillStyle = v(ROUGH.patch[i]); g.fillRect(x * k, y * k, 64 * k, 64 * k); }
+  const v = (r, skin) => { const n = Math.round(r * 255); return `rgb(${skin ? 255 : 0},${n},${n})`; };
+  for (const r in REG) { const [x, y, w, h] = REG[r]; g.fillStyle = v(ROUGH[r], r === 'face' || r === 'limb'); g.fillRect(x * k, y * k, w * k, h * k); }
+  for (const p in PATCH) { const i = PATCH[p], [x, y] = patchXY(i); g.fillStyle = v(ROUGH.patch[i], p === 'skin' || p === 'lip'); g.fillRect(x * k, y * k, 64 * k, 64 * k); }
   ROUGH_TEX = new THREE.CanvasTexture(c);
   return ROUGH_TEX;
 }
@@ -4723,13 +4786,28 @@ function detailAtlas() {
   g.fillStyle = 'rgb(108,108,108)';
   for (let y = 1; y < 512; y += 3) for (let x = (y / 3 % 2) * 1.5; x < 1024; x += 3) g.fillRect(x, y, 1, 1);
   for (let x = 0; x < 1024; x += 2) { g.fillStyle = x % 4 ? 'rgb(134,134,134)' : 'rgb(122,122,122)'; g.fillRect(x, 512, 1, 256); }
-  for (let i = 0; i < 3000; i++) { const x = 256 + Math.random() * 256, y = 768 + Math.random() * 256; g.fillStyle = Math.random() < 0.5 ? 'rgb(90,90,90)' : 'rgb(170,170,170)'; g.fillRect(x, y, 1, 4 + Math.random() * 6); }
+  for (let i = 0; i < 1600; i++) { const x = 256 + Math.random() * 256, y = 768 + Math.random() * 124; g.fillStyle = Math.random() < 0.5 ? 'rgb(90,90,90)' : 'rgb(170,170,170)'; g.fillRect(x, y, 1, 3 + Math.random() * 4); }
+  // muscle definition on the limbs: bulges front (biceps, quads) and back (triceps, calves), with tendon lines
+  { const blob = (u, vv, ru, rv, a) => { const cx = 256 + u * 256, cy = 896 + (1 - vv) * 128; const gr = g.createRadialGradient(cx, cy, 0, cx, cy, 1); gr.addColorStop(0, `rgba(255,255,255,${a})`); gr.addColorStop(1, 'rgba(255,255,255,0)'); g.save(); g.translate(cx, cy); g.scale(ru, rv); g.fillStyle = gr; g.beginPath(); g.arc(0, 0, 1, 0, TAU); g.fill(); g.restore(); };
+    for (const off of [0, 1]) {
+      blob(0.25 + off * 0, 0.72, 34, 22, 0.55); blob(0.75, 0.68, 30, 24, 0.45); blob(0.75, 0.3, 30, 18, 0.55); blob(0.25, 0.36, 26, 16, 0.35);
+      blob(0.0 + off, 0.55, 16, 30, 0.25); blob(0.5, 0.55, 16, 30, 0.25);
+    }
+    g.strokeStyle = 'rgba(60,60,60,0.35)'; g.lineWidth = 2;
+    for (const u of [0.12, 0.38, 0.62, 0.88]) { g.beginPath(); g.moveTo(256 + u * 256, 1024); g.lineTo(256 + u * 256, 1000); g.stroke(); } }
+  // soft fabric folds hanging from the armpits and across the waist
+  for (let i = 0; i < 18; i++) {
+    const x0 = Math.random() * 1024, y0 = 150 + Math.random() * 120, x1 = x0 + (Math.random() - 0.5) * 120, y1 = 470;
+    g.strokeStyle = Math.random() < 0.5 ? 'rgba(70,70,70,0.5)' : 'rgba(185,185,185,0.45)'; g.lineWidth = 6 + Math.random() * 8;
+    g.beginPath(); g.moveTo(x0, y0); g.quadraticCurveTo((x0 + x1) / 2 + 20, (y0 + y1) / 2, x1, y1); g.stroke();
+  }
+  for (const y of [420, 452]) { g.strokeStyle = 'rgba(80,80,80,0.4)'; g.lineWidth = 8; g.beginPath(); for (let x = 0; x <= 1024; x += 16) g.lineTo(x, y + Math.sin(x * 0.05) * 6); g.stroke(); }
   DETAIL_TEX = new THREE.CanvasTexture(c);
   return DETAIL_TEX;
 }
 
 /* ---------- the model ---------- */
-const BI = { body: 0, hips: 1, torso: 2, head: 3, shR: 4, elR: 5, shL: 6, elL: 7, hipR: 8, knR: 9, ankR: 10, hipL: 11, knL: 12, ankL: 13 };
+const BI = { body: 0, hips: 1, torso: 2, head: 3, shR: 4, elR: 5, shL: 6, elL: 7, hipR: 8, knR: 9, ankR: 10, hipL: 11, knL: 12, ankL: 13, hem: 14 };
 function buildHumanoid(pl, home) {
   const d = pl.d, T = pl.team.def, ref = !!pl.ref;
   const hsh = nameHash(d.n), bulk = { PG: 0.94, SG: 0.97, SF: 1.0, PF: 1.06, C: 1.12 }[d.pos];
@@ -4748,8 +4826,8 @@ function buildHumanoid(pl, home) {
   const J = { hips: [0, 3.35, 0], head: [0, 5.77, 0], shR: [0, 5.25, 0.76 * b], shL: [0, 5.25, -0.76 * b], hipR: [0, 3.27, 0.32 * b], hipL: [0, 3.27, -0.32 * b] };
   const P = [];
   // torso / jersey: lower third follows the hips, upper body follows the spine
-  P.push(piece(regionUV(lathe([[0.53, 0.12], [0.54, 0.45], [0.58, 0.85], [0.66, 1.3], [0.72, 1.6], [0.75, 1.82], [0.68, 1.99], [0.44, 2.11], [0.25, 2.2]], 28, 0.62, b), 'jersey'), J.hips,
-    (x, y) => blend(BI.hips, BI.torso, sstep(3.6, 4.3, y)),
+  P.push(piece(regionUV(lathe([[0.56, 0.08], [0.55, 0.45], [0.58, 0.85], [0.66, 1.3], [0.72, 1.6], [0.75, 1.82], [0.68, 1.99], [0.44, 2.11], [0.25, 2.2]], 28, 0.62, b), 'jersey'), J.hips,
+    (x, y) => { const t = sstep(3.6, 4.3, y), hw = 0.8 * (1 - sstep(3.45, 4.15, y)); return [BI.hips, (1 - t) * (1 - hw), BI.torso, t * (1 - hw), BI.hem, hw]; },
     (x, y, z, nx, ny, nz) => 1 - 0.14 * (1 - sstep(3.45, 4.1, y)) - 0.18 * sstep(0.45, 0.7, Math.abs(z)) * sstep(4.6, 5.0, y) * (1 - sstep(5.15, 5.35, y))));
   // shorts top
   P.push(piece(regionUV(lathe([[0.54, -0.5], [0.64, -0.3], [0.68, -0.05], [0.65, 0.16], [0.58, 0.32]], 20, 0.74 * b, b), 'pelvis'), J.hips,
@@ -4766,12 +4844,17 @@ function buildHumanoid(pl, home) {
       x *= 0.98; y *= 1.13; z *= 0.88;
       if (dy < 0) { z *= 1 - 0.24 * -dy; if (dx > -0.2) x += 0.07 * -dy * Math.max(0, dx + 0.2); y *= 1 + 0.08 * -dy; }
       if (dy > 0.25 && dx < 0) x *= 1.06;
+      const fz = Math.abs(z / 0.34);
+      if (dx > 0.55 && dy > 0.12 && dy < 0.38) x += 0.022 * (1 - Math.abs(dy - 0.25) / 0.13);                 // brow ridge
+      if (dx > 0.7 && dy > 0.0 && dy < 0.2 && fz > 0.15 && fz < 0.5) x -= 0.016 * Math.sin(Math.PI * (fz - 0.15) / 0.35);   // eye sockets
+      if (dx > 0.25 && dy > -0.25 && dy < 0.08 && fz > 0.5) { z *= 1.035; x += 0.01; }                          // cheekbones
       p.setXYZ(i, x + 0.02, y + 0.33, z);
     }
     sk.computeVertexNormals(); }
   const headW = () => [BI.head, 1];
   P.push(piece(regionUV(sk, 'face'), J.head, headW, (x, y, z, nx, ny) => (ny < -0.5 ? 0.82 : 1)));
   P.push(piece(constUV(sphereG(0.058, 8, 6, 1.15, 1.45, 0.9, 0.35, 0.27, 0), 'skin'), J.head, headW));
+  { const nb = boxG(0.05, 0.13, 0.055, 0.335, 0.34, 0); P.push(piece(constUV(nb, 'skin'), J.head, headW)); }
   for (const s of [-1, 1]) P.push(piece(constUV(sphereG(0.078, 8, 6, 0.45, 1.0, 0.38, -0.01, 0.32, s * 0.31), 'skin'), J.head, headW, () => 0.86));
   const hairUV = (g) => regionUV(g, 'hair');
   const hs = d.hair;
@@ -4787,7 +4870,7 @@ function buildHumanoid(pl, home) {
     const sh = s > 0 ? BI.shR : BI.shL, el = s > 0 ? BI.elR : BI.elL, j = s > 0 ? J.shR : J.shL;
     const ys = j[1];
     const armAO = (x, y, z, nx, ny, nz) => { const inner = clamp(-nz * s, 0, 1); return 1 - 0.18 * inner - 0.2 * inner * sstep(ys - 0.7, ys - 0.1, y); };
-    P.push(piece(constUV(lathe([[0.095, -2.22], [0.1, -2.12], [0.13, -1.85], [0.156, -1.55], [0.142, -1.3], [0.132, -1.18], [0.15, -1.02], [0.19, -0.75], [0.212, -0.48], [0.2, -0.2], [0.17, 0.05]], 16, b, b), 'skin'), j,
+    P.push(piece(regionUV(lathe([[0.095, -2.22], [0.1, -2.12], [0.13, -1.85], [0.156, -1.55], [0.142, -1.3], [0.132, -1.18], [0.15, -1.02], [0.19, -0.75], [0.212, -0.48], [0.2, -0.2], [0.17, 0.05]], 16, b, b), 'limb'), j,
       (x, y) => blend(sh, el, sstep(ys - 0.98, ys - 1.32, y) === 0 ? 0 : sstep(ys - 0.98, ys - 1.32, y)), armAO));
     P.push(piece(constUV(sphereG(0.215, 16, 12, 1.0, 1.08, 0.8, 0, -0.07, -s * 0.03), 'skin'), j,
       () => [sh, 1], armAO));
@@ -4810,7 +4893,8 @@ function buildHumanoid(pl, home) {
     const legW = (x, y) => { if (y > yk + 0.2) return [hp, 1]; if (y > yk - 0.18) return blend(hp, kn, sstep(yk + 0.2, yk - 0.18, y)); if (y > ya + 0.1) return [kn, 1]; return blend(kn, an, sstep(ya + 0.1, ya - 0.02, y)); };
     const legAO = (x, y, z, nx, ny, nz) => 1 - 0.22 * clamp(-nz * s, 0, 1) * sstep(yk + 0.5, yh - 0.6, y) - 0.1 * clamp(-nx, 0, 1) * (1 - Math.min(1, Math.abs(y - yk) / 0.4));
     const lp = ref ? 'pants' : 'skin', lw = ref ? 1.18 : 1;
-    P.push(piece(constUV(lathe([[0.115 * lw, -3.14], [0.12 * lw, -3.05], [0.14 * lw, -2.9], [0.176 * lw, -2.6], [0.212 * lw, -2.22], [0.2 * lw, -1.95], [0.19 * lw, -1.75], [0.2 * lw, -1.6], [0.23 * lw, -1.4], [0.28 * lw, -1.0], [0.31 * lw, -0.55], [0.31 * lw, -0.2], [0.29 * lw, 0.02]], 16, b, b), lp), j, legW, legAO));
+    { const lg = lathe([[0.115 * lw, -3.14], [0.12 * lw, -3.05], [0.14 * lw, -2.9], [0.176 * lw, -2.6], [0.212 * lw, -2.22], [0.2 * lw, -1.95], [0.19 * lw, -1.75], [0.2 * lw, -1.6], [0.23 * lw, -1.4], [0.28 * lw, -1.0], [0.31 * lw, -0.55], [0.31 * lw, -0.2], [0.29 * lw, 0.02]], 16, b, b);
+      P.push(piece(ref ? constUV(lg, lp) : regionUV(lg, 'limb'), j, legW, legAO)); }
     P.push(piece(constUV(sphereG(0.19 * lw, 12, 9, 1.05, 1, 1, 0.02, -1.6, 0), lp), j, legW, legAO));
     if (!ref) P.push(piece(regionUV(lathe([[0.43, -1.42], [0.452, -1.2], [0.46, -0.6], [0.45, -0.12], [0.4, 0.06]], 20, b, b), s > 0 ? 'shortsR' : 'shortsL'), j,
       (x, y) => blend(BI.hips, hp, sstep(yh + 0.05, yh - 0.35, y)),
@@ -4830,14 +4914,19 @@ function buildHumanoid(pl, home) {
   const bShR = bone(bTorso, 0, 1.9, 0.76 * b), bElR = bone(bShR, 0, -1.15, 0), bShL = bone(bTorso, 0, 1.9, -0.76 * b), bElL = bone(bShL, 0, -1.15, 0);
   const bHipR = bone(bHips, 0, -0.08, 0.32 * b), bKnR = bone(bHipR, 0, -1.6, 0), bAnkR = bone(bKnR, 0, -1.52, 0);
   const bHipL = bone(bHips, 0, -0.08, -0.32 * b), bKnL = bone(bHipL, 0, -1.6, 0), bAnkL = bone(bKnL, 0, -1.52, 0);
+  const bHem = bone(bTorso, 0, 0.75, 0);
   const skel = new THREE.Skeleton(bones);
   const atlas = canvasTex(paintAtlas(T, home, d, C));
   const mat = new THREE.MeshStandardMaterial({ map: atlas, roughnessMap: roughAtlas(), bumpMap: detailAtlas(), bumpScale: 0.05, roughness: 1, metalness: 0, vertexColors: true, skinning: true, envMapIntensity: 0.65 });
   mat.onBeforeCompile = (sh) => {
     sh.fragmentShader = sh.fragmentShader.replace('#include <tonemapping_fragment>',
-      'gl_FragColor.rgb += vec3(0.5, 0.58, 0.72) * pow(1.0 - clamp(dot(normalize(geometryNormal), normalize(vViewPosition)), 0.0, 1.0), 3.0) * 0.32;\n#include <tonemapping_fragment>');
+      `float skinM = texture2D(roughnessMap, vUv).r;
+       float ndv = clamp(dot(normalize(geometryNormal), normalize(vViewPosition)), 0.0, 1.0);
+       gl_FragColor.rgb += diffuseColor.rgb * vec3(0.5, 0.16, 0.07) * skinM * (0.1 + 0.45 * pow(1.0 - ndv, 2.0));
+       gl_FragColor.rgb += vec3(0.5, 0.58, 0.72) * pow(1.0 - ndv, 3.0) * 0.32 * (1.0 - 0.45 * skinM);
+       #include <tonemapping_fragment>`);
   };
-  mat.customProgramCacheKey = () => 'player-rim';
+  mat.customProgramCacheKey = () => 'player-skin-rim';
   const mesh = new THREE.SkinnedMesh(geo, mat);
   mesh.add(bBody);
   mesh.bind(skel);
@@ -4848,7 +4937,7 @@ function buildHumanoid(pl, home) {
   blob.rotation.x = -PI / 2; blob.position.y = 0.03;
   R.scene.add(root); R.scene.add(blob);
   return { root, mesh, skel, atlas, mat, body: bBody, hips: bHips, torso: bTorso, headG: bHead,
-    armR: { sh: bShR, el: bElR }, armL: { sh: bShL, el: bElL }, legR: { hp: bHipR, kn: bKnR, ank: bAnkR }, legL: { hp: bHipL, kn: bKnL, ank: bAnkL },
+    hem: bHem, armR: { sh: bShR, el: bElR }, armL: { sh: bShL, el: bElL }, legR: { hp: bHipR, kn: bKnR, ank: bAnkR }, legL: { hp: bHipL, kn: bKnL, ank: bAnkL },
     blob, stride: 0, j: { lean: 0, crouch: 0, twist: 0 } };
 }
 /* three officials: purely visual, they follow the play with standard lead / trail / centre mechanics */
@@ -5251,6 +5340,15 @@ function poseHumanoid(h, p, dt, px, py, pz, pf) {
   h.torso.rotation.y = -J.twist * 1.4 - J.hipYaw * 1.3;
   h.body.position.x = -J.lean * 0.25;
   h.body.rotation.x = J.roll;
+  // the jersey hem swings with momentum: lags on acceleration, flares out in turns, bounces on the run
+  if (h.hem) {
+    const H = h.hemS || (h.hemS = { z: 0, vz: 0, x: 0, vx: 0 });
+    const tz = -clamp(h.acc * 0.012, -0.32, 0.32) + (run > 0.3 && !air ? Math.sin(h.gph * TAU * 2) * 0.05 * run : 0) + (air ? 0.12 : 0);
+    const tx = clamp(-h.turn * spS * 0.004, -0.25, 0.25);
+    H.vz += (60 * (tz - H.z) - 7 * H.vz) * dts; H.z += H.vz * dts;
+    H.vx += (60 * (tx - H.x) - 7 * H.vx) * dts; H.x += H.vx * dts;
+    h.hem.rotation.z = clamp(H.z, -0.4, 0.4); h.hem.rotation.x = clamp(H.x, -0.35, 0.35);
+  }
   // feet stay flat while planted; toes point down in the air
   for (const leg of [h.legR, h.legL]) {
     const want = air ? 0.35 : -(leg.hp.rotation.z + leg.kn.rotation.z) * 0.9 + J.lean * 0.3;
@@ -5266,6 +5364,135 @@ function poseHumanoid(h, p, dt, px, py, pz, pf) {
   if (headMode === 'down') { yaw = 0; pitch = -0.35; }
   h.headG.rotation.y += (-yaw - h.headG.rotation.y) * k;
   h.headG.rotation.z += (pitch * 0.6 + J.lean * 0.5 - h.headG.rotation.z) * k;
+}
+
+/* ---- 06b-replay.js ---- */
+/* ============================================================
+   Instant replay: the last six seconds of play are recorded
+   every simulation step. After a big play (a dunk, a made
+   three, a buzzer beater) the broadcast cuts away at the next
+   dead ball, wipes to a slow-motion replay from a cinematic
+   angle, then wipes back to live action.
+   ============================================================ */
+
+const REP = { buf: [], max: 380, active: null, pending: null, lastAt: -99 };
+
+function repSnap() {
+  const b = G.ball, idx = (p) => (p ? G.players.indexOf(p) : -1);
+  return {
+    time: G.time, state: G.state, offense: G.offense,
+    b: { x: b.x, y: b.y, z: b.z, vx: b.vx, vy: b.vy, vz: b.vz, state: b.state, visible: b.visible, holder: idx(b.holder), passTo: idx(b.passTo), shooter: idx(b.shooter), shotLive: b.shotLive },
+    p: G.players.map((p) => ({
+      x: p.x, y: p.y, z: p.z, face: p.face, vx: p.vx, vz: p.vz, act: p.act, actT: p.actT, actDur: p.actDur,
+      mk: p.mv ? p.mv.kind : null, hasBall: p.hasBall, gather: p.gather, holdT: p.holdT, dribHand: p.dribHand, dribPhase: p.dribPhase,
+      handsUp: p.handsUp, expectPass: p.expectPass, celebT: p.celebT, stam: p.stam,
+      s: p.shot ? { type: p.shot.type, jumped: p.shot.jumped, released: p.shot.released, relT: p.shot.relT, ideal: p.shot.ideal, tJump: p.shot.tJump, tRel: p.shot.tRel, made: p.shot.made, timed: p.shot.timed } : null,
+    })),
+  };
+}
+function repApply(s) {
+  const b = G.ball, at = (i) => (i >= 0 ? G.players[i] : null);
+  G.state = s.state; G.offense = s.offense;
+  Object.assign(b, { x: s.b.x, y: s.b.y, z: s.b.z, vx: s.b.vx, vy: s.b.vy, vz: s.b.vz, state: s.b.state, visible: s.b.visible, shotLive: s.b.shotLive });
+  b.holder = at(s.b.holder); b.passTo = at(s.b.passTo); b.shooter = at(s.b.shooter);
+  s.p.forEach((q, i) => {
+    const p = G.players[i];
+    p.x = q.x; p.y = q.y; p.z = q.z; p.face = q.face; p.vx = q.vx; p.vz = q.vz; p.act = q.act; p.actT = q.actT; p.actDur = q.actDur;
+    p.hasBall = q.hasBall; p.gather = q.gather; p.holdT = q.holdT; p.dribHand = q.dribHand; p.dribPhase = q.dribPhase;
+    p.handsUp = q.handsUp; p.expectPass = q.expectPass; p.celebT = q.celebT; p.stam = q.stam;
+    p.mv = q.mk ? (p._repMv || (p._repMv = {})) : null; if (p.mv) p.mv.kind = q.mk;
+    p.shot = q.s ? Object.assign(p._repShot || (p._repShot = {}), q.s) : null;
+  });
+}
+/* keep the real objects so the live game resumes exactly where it stopped */
+function repSave() {
+  const s = repSnap();
+  s.refs = G.players.map((p) => ({ shot: p.shot, mv: p.mv }));
+  return s;
+}
+function repRestore(s) {
+  repApply(s);
+  G.players.forEach((p, i) => { p.shot = s.refs[i].shot; p.mv = s.refs[i].mv; });
+}
+function replayRecord() {
+  if (G.state === 'none' || G.mode === 'threept' || G.attract) return;
+  REP.buf.push(repSnap());
+  if (REP.buf.length > REP.max) REP.buf.shift();
+}
+function replayReset() { REP.buf.length = 0; REP.pending = null; REP.active = null; REP.lastAt = -99; }
+function replayFlag(kind, p) {
+  if (SET.replays === false || G.attract || G.mode === 'threept' || REP.active) return;
+  if (G.time - REP.lastAt < 18) return;
+  REP.pending = { t: G.time, kind, idx: G.players.indexOf(p), side: p.team.dir };
+}
+/* called every frame; returns true while a replay owns the screen */
+function replayTick(rdt, inp) {
+  const A = REP.active;
+  if (!A) {
+    const P = REP.pending;
+    if (P && !APP.screen && !APP.paused) {
+      const since = G.time - P.t;
+      if (since > 4) REP.pending = null;
+      else if (since > 1.0 && (G.state === 'dead' || G.state === 'whistle' || G.state === 'ftcut' || G.state === 'periodEnd')) replayStart();
+    }
+    return false;
+  }
+  if (inp && (inp.pShoot || inp.pPass || inp.pMove || inp.mOk) && A.pos > 20) A.end = true;
+  A.pos += rdt * 60 * A.speed;
+  const i0 = Math.floor(A.pos);
+  if (A.end || i0 >= A.frames.length - 1) { replayEnd(); return true; }
+  repApply(A.frames[i0]); snapshotPrev();
+  repApply(A.frames[i0 + 1]);
+  R.alpha = A.pos - i0;
+  // ease into extra-slow motion right around the moment itself
+  const near = Math.abs(A.frames[i0].time - A.t);
+  A.speed = near < 0.6 ? 0.32 : 0.55;
+  renderFrame(rdt * A.speed, rdt);
+  return true;
+}
+function replayStart() {
+  const P = REP.pending; REP.pending = null;
+  const frames = REP.buf.filter((f) => f.time >= P.t - 3.0 && f.time <= P.t + 0.9);
+  if (frames.length < 60) return;
+  REP.saved = repSave();
+  REP.active = { frames, pos: 0, speed: 0.55, kind: P.kind, idx: P.idx, side: P.side, t: P.t, end: false };
+  REP.lastAt = G.time;
+  R.snapCam = true;
+  replayWipe(true);
+  $('#replayBug').classList.add('on'); $('#hud').classList.add('rep');
+  if (AU.on) { const t = now(); noiseHit(t, 'bandpass', 1400, 0.7, 0.35, 0.25, AU.sfx, 0.12); }
+}
+function replayEnd() {
+  repRestore(REP.saved);
+  snapshotPrev();
+  REP.active = null; REP.saved = null;
+  R.snapCam = true; R.alpha = 1;
+  replayWipe(false);
+  $('#replayBug').classList.remove('on'); $('#hud').classList.remove('rep');
+}
+function replayWipe() {
+  const w = $('#wipe');
+  if (!w) return;
+  const pl = REP.active ? G.players[REP.active.idx] : null, T = pl ? pl.team : G.teams[0];
+  w.style.setProperty('--wc', T.def.c1);
+  w.classList.remove('go'); void w.offsetWidth; w.classList.add('go');
+}
+/* cinematic replay camera */
+function replayCam() {
+  const A = REP.active;
+  if (!A) return null;
+  const p = G.players[A.idx], b = G.ball, s = A.side;
+  const u = A.pos / A.frames.length;
+  if (A.kind === 'dunk') {
+    const ang = lerp(-0.5, 0.2, u);
+    return { pos: V3(s * (CT.RIM_X - 22 * Math.cos(ang)), lerp(10, 12.5, u), 22 * Math.sin(ang) + 6), look: V3(s * (CT.RIM_X - 3), lerp(6.5, 8.5, u), 0), fov: 38 };
+  }
+  // jump shots: low and in front of the shooter, then follow the ball toward the rim
+  const toRim = V3(s * CT.RIM_X - p.x, 0, -p.z).normalize();
+  const side = V3(-toRim.z, 0, toRim.x);
+  const track = b.state === 'shot' || b.shotLive ? 0.7 : 0.2;
+  const look = V3(lerp(p.x, b.x, track), lerp(5, b.y, track), lerp(p.z, b.z, track));
+  return { pos: V3(p.x + toRim.x * 11 + side.x * 11, 6.5, p.z + toRim.z * 11 + side.z * 11), look, fov: 42 };
 }
 
 /* ---- 07-audio.js ---- */
@@ -5643,7 +5870,7 @@ const $ = (s, r) => (r || document).querySelector(s);
 const $$ = (s, r) => Array.from((r || document).querySelectorAll(s));
 const APP = { screen: null, back: null, running: false, paused: false, mode: 'attract', focus: 0, finalT: 0, shownFinal: false,
   mu: { a: 0, b: 1, kind: 'play', shooter: 0 }, hudCache: {}, meterHold: 0, introT: 0, isTouch: false };
-const SET = { v: 2, quality: 'auto', camera: 'third', difficulty: 'pro', qLen: 180, autoSwitch: true, meter: true, voice: false, master: 80, crowd: 80, music: 50, touch: 'auto', side: 'home' };
+const SET = { v: 2, replays: true, quality: 'auto', camera: 'third', difficulty: 'pro', qLen: 180, autoSwitch: true, meter: true, voice: false, master: 80, crowd: 80, music: 50, touch: 'auto', side: 'home' };
 const OPTS = {
   camera: [['third', 'Third person'], ['broadcast', 'Broadcast'], ['close', 'Close'], ['sky', 'Skycam']],
   difficulty: [['rookie', 'Rookie'], ['pro', 'Pro'], ['allstar', 'All-Star'], ['legend', 'Legend']],
@@ -5654,9 +5881,10 @@ const OPTS = {
   music: [[0, '0'], [20, '20'], [40, '40'], [60, '60'], [80, '80'], [100, '100']],
   touch: [['auto', 'Auto'], ['on', 'On'], ['off', 'Off']],
   quality: [['auto', 'Auto'], ['high', 'High'], ['medium', 'Medium'], ['low', 'Low']],
+  replays: [[true, 'On'], [false, 'Off']],
   side: [['home', 'Home'], ['away', 'Away']],
 };
-const SET_LABELS = { quality: 'Graphics', camera: 'Camera', difficulty: 'Difficulty', qLen: 'Quarter length', autoSwitch: 'Auto-switch on defense', meter: 'Shot meter', voice: 'Announcer voice', master: 'Master volume', crowd: 'Crowd volume', music: 'Menu music', touch: 'Touch controls', side: 'Your court' };
+const SET_LABELS = { replays: 'Instant replays', quality: 'Graphics', camera: 'Camera', difficulty: 'Difficulty', qLen: 'Quarter length', autoSwitch: 'Auto-switch on defense', meter: 'Shot meter', voice: 'Announcer voice', master: 'Master volume', crowd: 'Crowd volume', music: 'Menu music', touch: 'Touch controls', side: 'Your court' };
 
 function loadSettings() {
   try {
@@ -5825,7 +6053,7 @@ function cycleOpt(key, d) {
   setFocus(keep);
 }
 function renderSettings() {
-  const keys = ['quality', 'camera', 'difficulty', 'qLen', 'autoSwitch', 'meter', 'voice', 'master', 'crowd', 'music', 'touch'];
+  const keys = ['quality', 'camera', 'replays', 'difficulty', 'qLen', 'autoSwitch', 'meter', 'voice', 'master', 'crowd', 'music', 'touch'];
   $('#setList').innerHTML = keys.map((k) => `<button class="opt" data-key="${k}"><span class="l">${SET_LABELS[k]}</span><span class="v">${optLabel(k)}</span></button>`).join('');
   setFocus(APP.focus);
 }
@@ -5841,6 +6069,7 @@ function startFromMatchup() {
 }
 function startGame(cfg) {
   APP.last = cfg;
+  replayReset(); hideLower3();
   newGame({ mode: cfg.mode === 'threept' ? 'threept' : 'game', home: cfg.home, away: cfg.away, userTeam: cfg.userTeam == null ? 0 : cfg.userTeam,
     auto: cfg.mode === 'watch', difficulty: cfg.difficulty || SET.difficulty, qLen: SET.qLen, autoSwitch: SET.autoSwitch && SET.camera !== 'third', shooter: cfg.shooter });
   R.tpYaw = null;
@@ -5854,7 +6083,7 @@ function startGame(cfg) {
   $('#ticker').innerHTML = '';
   musicStop(); crowdBase(0.13); if (AU.on) AU.sfx.gain.setTargetAtTime(AU.vol.sfx, now(), 0.1);
   drawRibbon(cfg.mode === 'threept' ? 'THREE-POINT CONTEST  •  HARDWOOD KINGS  •  ' : null);
-  if (cfg.mode !== 'threept') { showIntro(cfg.home, cfg.away); startShow(cfg.home, cfg.away); APP.introT = R.showDur + 0.4; }
+  if (cfg.mode !== 'threept') { R.showDur = 5.4; startShow(cfg.home, cfg.away); showLineups(); APP.introT = 0; }
   else showIntroTP();
 }
 function restartGame() { if (APP.last) startGame(APP.last); }
@@ -5874,6 +6103,41 @@ function pauseGame() {
   if (window.speechSynthesis) try { speechSynthesis.cancel(); } catch (e) { /* ignore */ }
 }
 function resumeGame() { showScreen(null); APP.paused = false; }
+/* ---------------- broadcast presentation ---------------- */
+const EMBLEM = {};
+function emblemURL(def) {
+  const key = def.id + def.c1 + def.c3;
+  if (!EMBLEM[key]) { const c = mkCanvas(128, 128), g = c.getContext('2d'); drawEmblem(g, def, 64, 64, 60); EMBLEM[key] = c.toDataURL(); }
+  return EMBLEM[key];
+}
+function cardFor(d, def) {
+  if (d.cid && CARD[d.cid]) return CARD[d.cid];
+  return POOL.find((c) => c.n === d.n && c.team === def) || null;
+}
+function showLineups() {
+  const el = $('#lineups');
+  const col = (T, label) => `<div class="lu-team" style="--tc:${T.def.c1}"><div class="lu-head"><img src="${emblemURL(T.def)}" alt=""><div><span>${label}</span><b>${T.def.city} ${T.def.name}</b></div></div>
+    <div class="lu-cards">${T.players.map((p, i) => { const c = cardFor(p.d, T.def); return c ? `<div class="lu-c" style="--d:${i}">${cardHTML(c, { cls: 'sm' })}</div>` : ''; }).join('')}</div></div>`;
+  el.innerHTML = `<div class="lu-title"><span class="eyebrow">Tonight</span><h2 class="h-2">Starting lineups</h2></div>${col(G.teams[1], 'Away')}${col(G.teams[0], 'Home')}`;
+  hydratePortraits(el);
+  el.classList.add('on');
+}
+function hideLineups() { $('#lineups').classList.remove('on'); }
+const LOWER = { shownAt: {}, t: 0 };
+function hideLower3() { $('#lower3').classList.remove('on'); LOWER.t = 0; }
+function maybeLower3(p) {
+  const s = p.st, key = p.id;
+  if (s.pts < 8 || G.time - (LOWER.shownAt[key] || -99) < 30 || LOWER.t > 0) return;
+  LOWER.shownAt[key] = G.time;
+  const c = cardFor(p.d, p.team.def);
+  const el = $('#lower3');
+  el.style.setProperty('--tc', p.team.def.c1);
+  el.innerHTML = `<div class="l3-pt">${c ? `<img class="dc-pt" data-card="${c.id}" alt="">` : ''}</div><div class="l3-info"><span class="l3-team">${p.team.def.city} ${p.team.def.name} · #${p.d.num} ${p.d.pos}</span><b>${p.d.n}</b>
+    <div class="l3-stats"><span><i>${s.pts}</i>PTS</span><span><i>${s.fgm}/${s.fga}</i>FG</span><span><i>${s.tpm}</i>3PM</span><span><i>${s.reb}</i>REB</span><span><i>${s.ast}</i>AST</span></div></div>`;
+  hydratePortraits(el);
+  el.classList.remove('on'); void el.offsetWidth; el.classList.add('on');
+  LOWER.t = 5;
+}
 function startAttract() {
   const a = Math.floor(Math.random() * 8); let b = Math.floor(Math.random() * 7); if (b >= a) b++;
   newGame({ mode: 'game', home: TEAMS[a], away: TEAMS[b], userTeam: -1, auto: true, difficulty: 'allstar', qLen: 150, autoSwitch: true });
@@ -5902,11 +6166,14 @@ function updateHUD(rdt) {
   else {
     const T0 = G.teams[0], T1 = G.teams[1];
     [[$('#bugA'), T1], [$('#bugB'), T0]].forEach(([el, T]) => {
-      if (el.dataset.t !== T.def.id) {
-        el.dataset.t = T.def.id;
-        $('.sw', el).style.background = T.def.c1;
+      if (el.dataset.t !== T.def.id + T.def.c1) {
+        el.dataset.t = T.def.id + T.def.c1;
+        el.style.setProperty('--tc', T.def.c1);
+        $('.em', el).src = emblemURL(T.def);
         $('.ab', el).textContent = T.def.id;
       }
+      const fl = Math.min(5, T.fouls), dots = $$('.fl i', el);
+      dots.forEach((d, i) => d.classList.toggle('on', i < fl));
       const sc = $('.sc', el), v = String(T.score);
       if (sc.textContent !== v) { sc.textContent = v; sc.classList.remove('flash'); void sc.offsetWidth; sc.classList.add('flash'); }
       setTxt($('.bonus', el), G.teams[1 - T.idx].fouls >= 5 ? 'BONUS' : '');
@@ -5932,8 +6199,10 @@ function updateHUD(rdt) {
   }
   updateHint(c, show);
   updateMeter(rdt);
-  // intro card
+  // intro card, starting lineups, lower third
   if (APP.introT > 0) { APP.introT -= rdt; if (APP.introT <= 0) $('#intro').classList.remove('on'); }
+  if ($('#lineups').classList.contains('on') && !(R.show > 0.35)) hideLineups();
+  if (LOWER.t > 0) { LOWER.t -= rdt; if (LOWER.t <= 0) $('#lower3').classList.remove('on'); }
   // touch controls
   const wantTouch = SET.touch === 'on' || (SET.touch === 'auto' && APP.isTouch && IN.device === 'touch');
   const tOn = wantTouch && APP.running && !APP.paused && !APP.screen && G.userTeam >= 0 && !G.auto;
@@ -6049,7 +6318,9 @@ function showBox(kind) {
   const pool = fin ? G.teams[win].players : G.players;
   for (const p of pool) if (!best || gameScore(p) > gameScore(best)) best = p;
   const s = best.st;
-  $('#boxPog').innerHTML = `<span class="eyebrow">${fin ? 'Player of the game' : 'Top performer'}</span><b>${best.d.n}</b><span class="muted">${best.team.def.id} · ${s.pts} PTS · ${s.reb} REB · ${s.ast} AST · ${s.fgm}/${s.fga} FG</span>`;
+  const pc = cardFor(best.d, best.team.def);
+  $('#boxPog').innerHTML = `${pc ? `<div class="pog-pt" style="--tc:${best.team.def.c1}"><img class="dc-pt" data-card="${pc.id}" alt=""></div>` : ''}<div class="pog-tx"><span class="eyebrow">${fin ? 'Player of the game' : 'Top performer'}</span><b>${best.d.n}</b><span class="muted">${best.team.def.id} · ${s.pts} PTS · ${s.reb} REB · ${s.ast} AST · ${s.fgm}/${s.fga} FG</span></div>`;
+  hydratePortraits($('#boxPog'));
   $('#boxTable').innerHTML = `<thead><tr><th>Player</th><th>PTS</th><th>REB</th><th>AST</th><th>STL</th><th>BLK</th><th>FG</th><th>3PT</th><th>FT</th><th>OREB</th><th>TO</th><th>PF</th></tr></thead><tbody>${boxRows(T1)}${boxRows(T0)}</tbody>`;
   $('#boxActions').innerHTML = fin ? '<button class="btn ghost" data-act="menu">Main menu</button><button class="btn" data-act="again">Rematch</button>'
     : half ? '<button class="btn" data-act="continue">Start 2nd half</button>' : '<button class="btn" data-act="boxback">Back</button>';
@@ -6101,7 +6372,7 @@ function handleEvents() {
       case 'dunk':
         R.shake = 1; R.excite = Math.max(R.excite, 1); R.flashRate = Math.max(R.flashRate, 0.3); rimShake(e.p.team.dir);
         if (!quiet) R.flash = 0.18;
-        if (!quiet || Math.random() < 0.5) { R.slowmo = 0.75; R.slowSide = e.p.team.dir; }
+        if (SET.replays === false && (!quiet || Math.random() < 0.5)) { R.slowmo = 0.75; R.slowSide = e.p.team.dir; }
         break;
       case 'release':
         if (e.user && !quiet) {
@@ -6160,8 +6431,10 @@ function handleEvents() {
 }
 function onScoreEv(e, quiet) {
   const p = e.p, T = p.team;
+  if (!quiet && !e.ft && G.mode !== 'threept') setTimeout(() => maybeLower3(p), 1600);
   if (AU.on && e.swish) SFX.swish();
   netSwish(T.dir);
+  if (!e.ft && !e.tp && (e.dunk || e.three || G.clockExpired)) replayFlag(e.dunk ? 'dunk' : 'three', p);
   if (e.three && !e.tp) refSignal('three', p.x, p.z);
   const homeTeam = e.team === 0;
   const big = e.three || e.dunk || G.clockExpired;
@@ -6286,7 +6559,7 @@ const CARD = Object.fromEntries(POOL.map((c) => [c.id, c]));
 const BY_TIER = {};
 for (const t of TIERS) BY_TIER[t.id] = POOL.filter((c) => c.tier === t.id);
 function cardD(c) {
-  return Object.assign({ n: c.n, pos: c.pos, h: c.h, num: c.num, skin: c.skin, hair: c.hair, acc: c.acc, ovr: c.ovr }, c.r);
+  return Object.assign({ cid: c.id, n: c.n, pos: c.pos, h: c.h, num: c.num, skin: c.skin, hair: c.hair, acc: c.acc, ovr: c.ovr }, c.r);
 }
 
 /* ---------------- profile ---------------- */
@@ -6715,12 +6988,14 @@ function tick(rdt) {
     I.mx = w.x; I.mz = w.z; I.sprint = inp.sprint; I.shoot = inp.shoot;
     I.pShoot = I.pShoot || inp.pShoot; I.pPass = I.pPass || inp.pPass; I.pMove = I.pMove || inp.pMove; I.pAlt = I.pAlt || inp.pAlt;
   }
+  if (APP.running && R.show > 0.4 && (inp.pShoot || inp.pPass || inp.mOk)) R.show = 0.35;   // skip the intro
+  if (APP.running && !APP.paused && !APP.screen && replayTick(rdt, inp)) { updateHUD(rdt); crowdUpdate(rdt); return; }
   let scale = 1;
   if (R.slowmo > 0) { R.slowmo -= rdt; scale = 0.3; }
   if (simOn && G.state !== 'none') {
     acc += rdt * scale;
     let n = 0;
-    while (acc >= DT && n < 8) { snapshotPrev(); stepGame(DT); handleEvents(); acc -= DT; n++; }
+    while (acc >= DT && n < 8) { snapshotPrev(); stepGame(DT); if (APP.running) replayRecord(); handleEvents(); acc -= DT; n++; }
     if (n === 8) acc = 0;
     R.alpha = clamp(acc / DT, 0, 1);
   }

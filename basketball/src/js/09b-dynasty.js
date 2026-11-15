@@ -99,7 +99,7 @@ const CARD = Object.fromEntries(POOL.map((c) => [c.id, c]));
 const BY_TIER = {};
 for (const t of TIERS) BY_TIER[t.id] = POOL.filter((c) => c.tier === t.id);
 function cardD(c) {
-  return Object.assign({ n: c.n, pos: c.pos, h: c.h, num: c.num, skin: c.skin, hair: c.hair, acc: c.acc, ovr: c.ovr }, c.r);
+  return Object.assign({ cid: c.id, n: c.n, pos: c.pos, h: c.h, num: c.num, skin: c.skin, hair: c.hair, acc: c.acc, ovr: c.ovr }, c.r);
 }
 
 /* ---------------- profile ---------------- */

@@ -374,6 +374,7 @@ const CAMS = {
 };
 function camTargets(dt) {
   if (R.debugCam) return { pos: R.debugCam.pos.clone(), look: R.debugCam.look.clone(), fov: R.debugCam.fov || 40 };
+  if (REP.active) { const rc = replayCam(); if (rc) { R.camRate = [3, 4]; return rc; } }
   const b = G.ball, C = CAMS[R.camMode] || CAMS.broadcast;
   let fx = b.x, fz = b.z;
   if (b.state === 'held' && b.holder) { fx = b.holder.x + b.holder.vx * 0.35; fz = b.holder.z; }
