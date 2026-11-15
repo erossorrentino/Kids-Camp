@@ -120,7 +120,7 @@ function holdPos(p, out) {
       } else if (mk === 'stepback') {  // gathered at the chest during the hop
         fwd = 0.9; side = 0.4 * p.dribHand; if (u < 0.7) up = 3.2 * p.sc;
       } else if (mk === 'hesi') {      // ball held at the hip on the pause, then pushed out on the burst
-        fwd = u < 0.45 ? 0.6 : 1.1; if (u < 0.45) up = 2.7 * p.sc;
+        fwd = u < 0.4 ? 0.6 : 1.1; if (u < 0.4) up = 2.7 * p.sc;
       }
     }
   }
@@ -609,7 +609,7 @@ function dribbleMove(p, mx, mz) {
   if (kind === 'cross' && md < 3.4 && fwd > 0.25 && rand() < 0.45) kind = 'spin';
   const top = (15.5 + 5.5 * rt(p.d.spd)) * 0.93;
   let sp = kind === 'stepback' ? 15 : kind === 'spin' ? top * 1.12 : top * 1.28;
-  p.act = 'move'; p.actT = 0; p.actDur = kind === 'stepback' ? 0.36 : kind === 'spin' ? 0.46 : kind === 'hesi' ? 0.44 : 0.3;
+  p.act = 'move'; p.actT = 0; p.actDur = kind === 'stepback' ? 0.33 : kind === 'spin' ? 0.43 : kind === 'hesi' ? 0.36 : 0.27;
   p.mv = { kind, ix, iz, sp, face0: p.face };
   if (kind === 'cross' || kind === 'spin') p.dribHand = side >= 0 ? 1 : -1;
   if (kind === 'stepback') p.sbT = 0.8;
@@ -617,7 +617,7 @@ function dribbleMove(p, mx, mz) {
   if (mk && md < 5.5 && mk !== G.ctrl) {
     const edge = rt(p.d.hnd) - rt(mk.d.def);
     let react = G.userTeam >= 0 && mk.team.idx !== G.userTeam ? G.diff.react : 1.1;
-    mk.ai.freezeT = clamp((0.14 + 0.28 * edge + rand() * 0.14) * react, 0.04, 0.6);
+    mk.ai.freezeT = clamp((0.14 + 0.28 * edge + rand() * 0.14 + (kind === 'hesi' ? 0.16 : 0)) * react, 0.04, 0.7);
     const against = (mk.vx * ix + mk.vz * iz) < -2.5;
     if (kind !== 'hesi' && against && rand() < 0.05 + 0.13 * rt(p.d.hnd) - 0.07 * rt(mk.d.def)) {
       mk.act = 'stumble'; mk.actT = 0; mk.actDur = 0.95;
@@ -751,7 +751,7 @@ function stepPlayer(p, dt) {
     case 'move': {
       loco = false;
       const m = p.mv, u = p.actT / p.actDur;
-      const sp = m.sp * (m.kind === 'hesi' ? (u < 0.45 ? 0.25 : 1.12) : (u < 0.7 ? 1 : lerp(1, 0.75, (u - 0.7) / 0.3)));
+      const sp = m.sp * (m.kind === 'hesi' ? (u < 0.4 ? 0.3 : 1.25) : (u < 0.7 ? 1 : lerp(1, 0.75, (u - 0.7) / 0.3)));
       p.vx = m.ix * sp; p.vz = m.iz * sp;
       if (m.kind === 'spin') p.face = m.face0 + TAU * smooth(clamp(u, 0, 1)) * p.dribHand;
       else if (m.kind !== 'stepback') p.face = turnToward(p.face, Math.atan2(m.iz, m.ix), 6 * dt);

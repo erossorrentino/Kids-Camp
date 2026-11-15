@@ -615,7 +615,7 @@ function poseHumanoid(h, p, dt, px, py, pz, pf) {
       setLeg(swingL, 0.2 + 0.6 * e, ps * (0.25 + 0.35 * e), -0.9 - 0.4 * e, kf);
     } else if (k2 === 'hesi') {
       // rise up and freeze for a beat, eyes to the rim, then explode out of it
-      const pause = mu < 0.45;
+      const pause = mu < 0.4;
       crouch = pause ? 0.18 : 0.5; lean = pause ? -0.06 : 0.4;
       setLeg(h.legR, pause ? 0.15 : 0.75, -0.08, pause ? -0.3 : -1.0, kf); setLeg(h.legL, pause ? 0.05 : -0.35, 0.08, pause ? -0.25 : -0.6, kf);
     } else if (k2 === 'stepback') {
@@ -718,7 +718,7 @@ function poseHumanoid(h, p, dt, px, py, pz, pf) {
       const free = touch > 0 ? h.armL : h.armR;
       if (mv.kind === 'cross' || mv.kind === 'stepback') armIK(h, free, -touch, bl.x, Math.max(bl.y + 0.2, 2.6), bl.z - touch * 0.35, k);
       else if (mv.kind === 'spin') setArm(free, 0.75, -touch * 0.35, 1.5, kf);          // forearm tucked as a guard through the pivot
-      else setArm(free, mu < 0.45 ? 0.25 : 0.6, -touch * 0.22, mu < 0.45 ? 0.5 : 1.1, k);   // relaxed on the pause, then into the burst
+      else setArm(free, mu < 0.4 ? 0.25 : 0.6, -touch * 0.22, mu < 0.4 ? 0.5 : 1.1, k);   // relaxed on the pause, then into the burst
     } else if (p.hasBall) {
       const bl = toLocal(p, b.x, b.y, b.z);
       armIK(h, h.armR, 1, bl.x - 0.05, bl.y, bl.z + 0.36, kf);

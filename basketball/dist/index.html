@@ -937,7 +937,7 @@ function holdPos(p, out) {
       } else if (mk === 'stepback') {  // gathered at the chest during the hop
         fwd = 0.9; side = 0.4 * p.dribHand; if (u < 0.7) up = 3.2 * p.sc;
       } else if (mk === 'hesi') {      // ball held at the hip on the pause, then pushed out on the burst
-        fwd = u < 0.45 ? 0.6 : 1.1; if (u < 0.45) up = 2.7 * p.sc;
+        fwd = u < 0.4 ? 0.6 : 1.1; if (u < 0.4) up = 2.7 * p.sc;
       }
     }
   }
@@ -1426,7 +1426,7 @@ function dribbleMove(p, mx, mz) {
   if (kind === 'cross' && md < 3.4 && fwd > 0.25 && rand() < 0.45) kind = 'spin';
   const top = (15.5 + 5.5 * rt(p.d.spd)) * 0.93;
   let sp = kind === 'stepback' ? 15 : kind === 'spin' ? top * 1.12 : top * 1.28;
-  p.act = 'move'; p.actT = 0; p.actDur = kind === 'stepback' ? 0.36 : kind === 'spin' ? 0.46 : kind === 'hesi' ? 0.44 : 0.3;
+  p.act = 'move'; p.actT = 0; p.actDur = kind === 'stepback' ? 0.33 : kind === 'spin' ? 0.43 : kind === 'hesi' ? 0.36 : 0.27;
   p.mv = { kind, ix, iz, sp, face0: p.face };
   if (kind === 'cross' || kind === 'spin') p.dribHand = side >= 0 ? 1 : -1;
   if (kind === 'stepback') p.sbT = 0.8;
@@ -1434,7 +1434,7 @@ function dribbleMove(p, mx, mz) {
   if (mk && md < 5.5 && mk !== G.ctrl) {
     const edge = rt(p.d.hnd) - rt(mk.d.def);
     let react = G.userTeam >= 0 && mk.team.idx !== G.userTeam ? G.diff.react : 1.1;
-    mk.ai.freezeT = clamp((0.14 + 0.28 * edge + rand() * 0.14) * react, 0.04, 0.6);
+    mk.ai.freezeT = clamp((0.14 + 0.28 * edge + rand() * 0.14 + (kind === 'hesi' ? 0.16 : 0)) * react, 0.04, 0.7);
     const against = (mk.vx * ix + mk.vz * iz) < -2.5;
     if (kind !== 'hesi' && against && rand() < 0.05 + 0.13 * rt(p.d.hnd) - 0.07 * rt(mk.d.def)) {
       mk.act = 'stumble'; mk.actT = 0; mk.actDur = 0.95;
@@ -1568,7 +1568,7 @@ function stepPlayer(p, dt) {
     case 'move': {
       loco = false;
       const m = p.mv, u = p.actT / p.actDur;
-      const sp = m.sp * (m.kind === 'hesi' ? (u < 0.45 ? 0.25 : 1.12) : (u < 0.7 ? 1 : lerp(1, 0.75, (u - 0.7) / 0.3)));
+      const sp = m.sp * (m.kind === 'hesi' ? (u < 0.4 ? 0.3 : 1.25) : (u < 0.7 ? 1 : lerp(1, 0.75, (u - 0.7) / 0.3)));
       p.vx = m.ix * sp; p.vz = m.iz * sp;
       if (m.kind === 'spin') p.face = m.face0 + TAU * smooth(clamp(u, 0, 1)) * p.dribHand;
       else if (m.kind !== 'stepback') p.face = turnToward(p.face, Math.atan2(m.iz, m.ix), 6 * dt);
@@ -5084,7 +5084,7 @@ function poseHumanoid(h, p, dt, px, py, pz, pf) {
       setLeg(swingL, 0.2 + 0.6 * e, ps * (0.25 + 0.35 * e), -0.9 - 0.4 * e, kf);
     } else if (k2 === 'hesi') {
       // rise up and freeze for a beat, eyes to the rim, then explode out of it
-      const pause = mu < 0.45;
+      const pause = mu < 0.4;
       crouch = pause ? 0.18 : 0.5; lean = pause ? -0.06 : 0.4;
       setLeg(h.legR, pause ? 0.15 : 0.75, -0.08, pause ? -0.3 : -1.0, kf); setLeg(h.legL, pause ? 0.05 : -0.35, 0.08, pause ? -0.25 : -0.6, kf);
     } else if (k2 === 'stepback') {
@@ -5187,7 +5187,7 @@ function poseHumanoid(h, p, dt, px, py, pz, pf) {
       const free = touch > 0 ? h.armL : h.armR;
       if (mv.kind === 'cross' || mv.kind === 'stepback') armIK(h, free, -touch, bl.x, Math.max(bl.y + 0.2, 2.6), bl.z - touch * 0.35, k);
       else if (mv.kind === 'spin') setArm(free, 0.75, -touch * 0.35, 1.5, kf);          // forearm tucked as a guard through the pivot
-      else setArm(free, mu < 0.45 ? 0.25 : 0.6, -touch * 0.22, mu < 0.45 ? 0.5 : 1.1, k);   // relaxed on the pause, then into the burst
+      else setArm(free, mu < 0.4 ? 0.25 : 0.6, -touch * 0.22, mu < 0.4 ? 0.5 : 1.1, k);   // relaxed on the pause, then into the burst
     } else if (p.hasBall) {
       const bl = toLocal(p, b.x, b.y, b.z);
       armIK(h, h.armR, 1, bl.x - 0.05, bl.y, bl.z + 0.36, kf);
