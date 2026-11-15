@@ -70,7 +70,7 @@ function showScreen(id, back) {
 function focusables() {
   if (!APP.screen) return [];
   const el = $('#' + APP.screen);
-  return $$('.tcard[data-nav], .item, .opt, .btn', el).filter((e) => e.offsetParent !== null);
+  return $$('.tcard[data-nav], .item, .opt, .btn, .tile, .chal, .swatch, .chip, .mini, .slot', el).filter((e) => e.offsetParent !== null);
 }
 function setFocus(i) {
   const f = focusables();
@@ -105,7 +105,9 @@ function activate(el) {
   const a = el.dataset.act;
   if (!a) return;
   SFX.ui('ok');
+  if (a.startsWith('dy-')) { dyAction(a, el); return; }
   switch (a) {
+    case 'dynasty': dyEnter(); break;
     case 'play': APP.mu.kind = 'play'; showScreen('matchup', 'home'); break;
     case 'watch': APP.mu.kind = 'watch'; showScreen('matchup', 'home'); break;
     case 'threept': APP.mu.kind = 'threept'; APP.mu.shooter = bestShooter(TEAMS[APP.mu.a]); showScreen('matchup', 'home'); break;
@@ -125,7 +127,7 @@ function activate(el) {
 }
 function wireScreens() {
   document.addEventListener('click', (e) => {
-    const el = e.target.closest('.item, .opt, .btn, .tcard[data-nav], .arrow');
+    const el = e.target.closest('[data-act], .item, .opt, .btn, .tcard[data-nav], .arrow');
     if (!el || !APP.screen) return;
     if (el.classList.contains('arrow')) { cycleTeam(el.dataset.team, +el.dataset.d); SFX.ui('move'); e.stopPropagation(); return; }
     const f = focusables(), i = f.indexOf(el);
@@ -206,7 +208,7 @@ function startFromMatchup() {
 function startGame(cfg) {
   APP.last = cfg;
   newGame({ mode: cfg.mode === 'threept' ? 'threept' : 'game', home: cfg.home, away: cfg.away, userTeam: cfg.userTeam == null ? 0 : cfg.userTeam,
-    auto: cfg.mode === 'watch', difficulty: SET.difficulty, qLen: SET.qLen, autoSwitch: SET.autoSwitch && SET.camera !== 'third', shooter: cfg.shooter });
+    auto: cfg.mode === 'watch', difficulty: cfg.difficulty || SET.difficulty, qLen: SET.qLen, autoSwitch: SET.autoSwitch && SET.camera !== 'third', shooter: cfg.shooter });
   R.tpYaw = null;
   G.attract = false;
   buildPlayers(); R.snapCam = true; R.slowmo = 0;
@@ -223,10 +225,11 @@ function startGame(cfg) {
 }
 function restartGame() { if (APP.last) startGame(APP.last); }
 function quitToMenu() {
+  const wasDy = APP.mode === 'dynasty';
   APP.running = false; APP.paused = false; if (R.show > 0) R.show = 0.01;
   $('#hud').classList.remove('on');
   startAttract();
-  showScreen('home');
+  if (wasDy && DY.p) { dyRenderHub(); showScreen('dyhub', 'home'); } else showScreen('home');
 }
 function pauseGame() {
   if (!APP.running || APP.paused || G.state === 'final') return;
@@ -378,7 +381,7 @@ function feedback(p, text, color, sub) {
   f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
 }
 function showIntro(home, away) {
-  $('#introEy').textContent = `${DIFFS[SET.difficulty].name} · ${SET.qLen / 60}-minute quarters`;
+  $('#introEy').textContent = `${APP.mode === 'dynasty' ? 'Dynasty · ' : ''}${G.diff.name} · ${SET.qLen / 60}-minute quarters`;
   $('#introTeams').innerHTML = `<div style="background:${away.c1}">${away.city} ${away.name}</div><span class="vs2">at</span><div style="background:${home.c1}">${home.city} ${home.name}</div>`;
   $('#intro').classList.add('on'); APP.introT = 2.6;
 }

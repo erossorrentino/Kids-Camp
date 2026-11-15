@@ -135,8 +135,177 @@ table.box thead th { font: 700 11px var(--f-body); letter-spacing: 0.12em; color
 table.box tr.team td { font: 800 15px var(--f-display); text-transform: uppercase; letter-spacing: 0.04em; color: var(--wood); background: var(--ink-3); }
 table.box tr.tot td { font-weight: 700; color: var(--chalk); }
 
+
+/* ---------- Dynasty ---------- */
+.dy-wrap { max-width: 1120px; margin: 0 auto; min-height: 100%; display: flex; flex-direction: column; gap: 18px; justify-content: center; }
+.dy-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.dy-head .h-display { font-size: clamp(34px, 5vw, 64px); }
+.pills { display: flex; gap: 8px; flex-wrap: wrap; }
+.pill { display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: rgba(18,26,40,0.85); border: 1px solid var(--line); border-radius: 999px; font: 800 20px var(--f-display); font-variant-numeric: tabular-nums; }
+.pill small { font: 700 11px var(--f-body); letter-spacing: 0.14em; color: var(--steel); text-transform: uppercase; }
+.pill.gold { border-color: rgba(255,210,90,0.45); color: #ffd86e; }
+.coin { display: inline-block; width: 1em; height: 1em; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff3b0 0 18%, #f2c03c 40%, #a8730e 100%); box-shadow: inset 0 0 0 2px rgba(120,80,0,0.55); vertical-align: -0.12em; margin-right: 6px; }
+.dy-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.tile { position: relative; overflow: hidden; text-align: left; cursor: pointer; border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; background: linear-gradient(135deg, rgba(27,38,56,0.95), rgba(12,17,27,0.95)); color: var(--chalk); display: grid; gap: 4px; min-width: 0; }
+.tile b { font: 900 italic 28px/1 var(--f-display); text-transform: uppercase; }
+.tile span { font: 600 13px var(--f-body); color: var(--steel); }
+.tile.hot { background: linear-gradient(135deg, #ff7a1a, #b8420a); border-color: #ffb36b; }
+.tile.hot span { color: rgba(255,255,255,0.85); }
+.tile.dim { opacity: 0.55; }
+.tile.sel, .chal.sel, .swatch.sel, .chip.sel, .mini.sel, .slot.sel { outline: 2px solid var(--warn); outline-offset: 2px; }
+.chals { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.chal { text-align: left; cursor: pointer; border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; background: rgba(14,20,31,0.92); color: var(--chalk); display: grid; gap: 4px; min-width: 0; }
+.chal .cn { font: 900 italic 24px/1 var(--f-display); text-transform: uppercase; }
+.chal .cr { font: 700 13px var(--f-body); color: #ffd86e; }
+.chal .cs { font: 500 12px var(--f-body); color: var(--steel); }
+.chal:hover, .tile:hover { border-color: rgba(255,255,255,0.4); }
+.note { font: 600 14px var(--f-body); color: var(--warn); }
+.swatches { display: flex; gap: 10px; flex-wrap: wrap; }
+.swatch { cursor: pointer; border: 2px solid transparent; background: rgba(14,20,31,0.9); border-radius: 8px; padding: 8px 10px; display: flex; align-items: center; gap: 8px; color: var(--chalk); font: 700 13px var(--f-body); }
+.swatch i { width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg, var(--a) 0 60%, var(--b) 60%); box-shadow: 0 0 0 2px rgba(255,255,255,0.2); }
+.swatch.on { border-color: var(--chalk); }
+.field { display: grid; gap: 6px; max-width: 360px; }
+.field label { font: 700 11px var(--f-body); letter-spacing: 0.16em; text-transform: uppercase; color: var(--steel); }
+.field input { font: 800 24px var(--f-display); text-transform: uppercase; color: var(--chalk); background: rgba(14,20,31,0.92); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; -webkit-user-select: text; user-select: text; }
+.field input:focus { outline: 2px solid var(--warn); }
+.fields { display: flex; gap: 12px; flex-wrap: wrap; }
+.slots { display: flex; gap: 12px; flex-wrap: wrap; }
+.slot { cursor: pointer; display: grid; gap: 6px; justify-items: center; padding: 6px; border-radius: 10px; border: 2px solid transparent; }
+.slot.on { border-color: var(--warn); background: rgba(255,210,63,0.08); }
+.slot .sp { font: 800 13px var(--f-body); letter-spacing: 0.14em; color: var(--steel); }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.chip { cursor: pointer; border: 1px solid var(--line); background: rgba(14,20,31,0.9); color: var(--chalk); border-radius: 999px; padding: 6px 12px; font: 800 14px var(--f-display); }
+.chip.on { background: var(--chalk); color: var(--ink); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 14px; }
+.gcell { display: grid; gap: 6px; justify-items: center; }
+.gcell.used .dcard { opacity: 0.55; }
+.gact { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
+.mini { cursor: pointer; border: 0; border-radius: 4px; padding: 4px 8px; font: 800 12px var(--f-body); background: var(--signal); color: var(--ink); }
+.mini.ghost { background: var(--ink-3); color: var(--chalk); }
+.mini.arm { background: var(--bad); color: #fff; }
+.tag { font: 700 11px var(--f-body); letter-spacing: 0.1em; text-transform: uppercase; color: var(--good); }
+.dim { opacity: 0.6; }
+.sgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.scell { display: flex; gap: 16px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: rgba(14,20,31,0.92); align-items: center; min-width: 0; }
+.sinfo { display: grid; gap: 6px; min-width: 0; }
+.sinfo h3 { margin: 0; font: 900 italic 26px var(--f-display); text-transform: uppercase; }
+.sinfo p { margin: 0; font-size: 14px; color: var(--steel); }
+.odds { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 12px; }
+.odds b { color: var(--chalk); }
+.ot { display: inline-block; padding: 1px 6px; border-radius: 3px; margin: 1px 2px 1px 0; font-weight: 700; background: linear-gradient(135deg, var(--t1), var(--t2)); color: var(--ink2); }
+.sbtns { display: flex; gap: 8px; flex-wrap: wrap; }
+.sbtns .btn { font-size: 20px; padding: 8px 20px; }
+#dyToast { position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: rgba(10,14,22,0.94); border: 1px solid rgba(255,210,90,0.45); color: var(--chalk); padding: 10px 18px; border-radius: 6px; font: 600 15px var(--f-body); opacity: 0; pointer-events: none; z-index: 40; white-space: nowrap; max-width: 92vw; overflow: hidden; text-overflow: ellipsis; }
+#dyToast.go { animation: toast 3s ease-out forwards; }
+@keyframes toast { 0% { opacity: 0; transform: translate(-50%, 10px); } 8% { opacity: 1; transform: translate(-50%, 0); } 85% { opacity: 1; } 100% { opacity: 0; } }
+.res-rows { display: grid; gap: 6px; max-width: 420px; }
+.res-rows div { display: flex; justify-content: space-between; font: 600 16px var(--f-body); padding: 8px 12px; background: rgba(14,20,31,0.9); border-radius: 6px; }
+.res-rows b { color: #ffd86e; font: 800 20px var(--f-display); }
+.res-bal { font: 900 clamp(40px, 7vw, 72px)/1 var(--f-display); color: #ffd86e; display: flex; align-items: center; gap: 6px; }
+.h-display.win { color: #ffd86e; } .h-display.loss { color: var(--steel); }
+
+/* tier palettes */
+.t-bronze { --t1: #4e2c14; --t2: #c98a52; --t3: #f0c08c; --tg: #e3a066; --ink2: #fff3e6; }
+.t-silver { --t1: #535d68; --t2: #dfe5ec; --t3: #ffffff; --tg: #f2f6fb; --ink2: #15181d; }
+.t-gold { --t1: #6e4b0c; --t2: #f3cf6a; --t3: #fff1b8; --tg: #ffd86e; --ink2: #241703; }
+.t-emerald { --t1: #032e22; --t2: #22c08a; --t3: #a9ffe0; --tg: #3cffb4; --ink2: #effff8; }
+.t-sapphire { --t1: #071740; --t2: #3f7dff; --t3: #b8d3ff; --tg: #5aa8ff; --ink2: #f0f5ff; }
+.t-ruby { --t1: #3d0410; --t2: #f02a52; --t3: #ffb3c2; --tg: #ff3b5c; --ink2: #fff1f4; }
+.t-onyx { --t1: #040406; --t2: #2a2a35; --t3: #9a88c8; --tg: #c9a7ff; --ink2: #f6eeff; }
+
+/* cards */
+.dcard { --cw: 150px; position: relative; width: var(--cw); aspect-ratio: 5 / 7; flex: none; max-width: 100%; }
+.dcard.sm { --cw: 116px; }
+.dcard.big { --cw: clamp(118px, 17vw, 200px); }
+.dc-face, .dc-back { position: absolute; inset: 0; border-radius: 9px; overflow: hidden; }
+.dc-face { background: var(--t1); box-shadow: 0 10px 28px rgba(0,0,0,0.55), 0 0 0 2px var(--t2), inset 0 0 0 1px rgba(255,255,255,0.25); }
+.dc-bg { position: absolute; inset: 0;
+  background: radial-gradient(120% 70% at 50% 0%, var(--t3) 0%, transparent 55%),
+    repeating-linear-gradient(115deg, rgba(255,255,255,0.07) 0 2px, transparent 2px 9px),
+    linear-gradient(160deg, var(--t2) 0%, var(--t1) 62%, var(--t1) 100%); }
+.dc-bg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, var(--tc) 0%, transparent 38%); opacity: 0.55; }
+.dc-team { position: absolute; right: -4%; bottom: 22%; font: 900 italic calc(var(--cw) * 0.42)/1 var(--f-display); color: rgba(255,255,255,0.08); }
+.dc-pt { position: absolute; left: 0; right: 0; bottom: 21%; width: 100%; height: 74%; object-fit: cover; object-position: center top; opacity: 0; transition: opacity .35s; filter: drop-shadow(0 6px 10px rgba(0,0,0,0.45)); }
+.dc-pt.in { opacity: 1; }
+.dc-ovr { position: absolute; left: 7%; top: 4%; display: grid; justify-items: center; font: 900 calc(var(--cw) * 0.24)/0.9 var(--f-display); color: var(--ink2); text-shadow: 0 2px 6px rgba(0,0,0,0.35); }
+.dc-ovr small { font: 800 calc(var(--cw) * 0.1)/1 var(--f-display); letter-spacing: 0.04em; }
+.dc-tier { position: absolute; right: 6%; top: 5%; font: 800 calc(var(--cw) * 0.075)/1 var(--f-body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink2); opacity: 0.9; }
+.dc-name { position: absolute; left: 0; right: 0; bottom: 14%; padding: 3% 6%; font: 800 calc(var(--cw) * 0.1)/1.05 var(--f-display); text-transform: uppercase; text-align: center; color: #fff; background: linear-gradient(90deg, transparent, rgba(0,0,0,0.6) 15%, rgba(0,0,0,0.6) 85%, transparent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dc-stats { position: absolute; left: 0; right: 0; bottom: 2.5%; display: flex; justify-content: space-around; font: 700 calc(var(--cw) * 0.06)/1 var(--f-body); color: var(--ink2); letter-spacing: 0.06em; }
+.dc-stats span { display: grid; justify-items: center; gap: 1px; }
+.dc-stats b { font: 800 calc(var(--cw) * 0.095)/1 var(--f-display); }
+.dc-shine { position: absolute; inset: -40%; background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.0) 44%, rgba(255,255,255,0.35) 50%, rgba(255,255,255,0) 56%, transparent 60%); transform: translateX(-60%); pointer-events: none; mix-blend-mode: overlay; }
+.t-emerald .dc-shine, .t-sapphire .dc-shine, .t-ruby .dc-shine, .t-gold .dc-shine { animation: shine 3.6s ease-in-out infinite; }
+.t-onyx .dc-shine { animation: shine 2.8s ease-in-out infinite; background: linear-gradient(105deg, transparent 38%, rgba(255,0,180,0.35) 44%, rgba(0,220,255,0.45) 50%, rgba(255,240,0,0.35) 56%, transparent 62%); mix-blend-mode: screen; }
+.t-onyx .dc-face { box-shadow: 0 10px 28px rgba(0,0,0,0.6), 0 0 0 2px #b9a2ff, 0 0 22px rgba(170,140,255,0.45); }
+.t-ruby .dc-face { box-shadow: 0 10px 28px rgba(0,0,0,0.6), 0 0 0 2px var(--t2), 0 0 18px rgba(255,59,92,0.4); }
+@keyframes shine { 0%, 55% { transform: translateX(-60%); } 100% { transform: translateX(60%); } }
+.dcard.empty { border: 2px dashed rgba(255,255,255,0.22); border-radius: 9px; display: grid; place-items: center; font: 800 18px var(--f-display); color: var(--steel); background: rgba(10,14,22,0.5); }
+.dc-back { background: radial-gradient(circle at 50% 40%, #1d2a44, #070a12 70%); box-shadow: 0 10px 28px rgba(0,0,0,0.55), 0 0 0 2px #c9a14a, inset 0 0 0 6px rgba(201,161,74,0.25); display: grid; place-items: center;
+  background-image: radial-gradient(circle at 50% 40%, #1d2a44, #070a12 70%), repeating-linear-gradient(45deg, rgba(201,161,74,0.08) 0 2px, transparent 2px 12px); }
+.dc-logo { font: 900 italic calc(var(--cw) * 0.36)/1 var(--f-display); color: #c9a14a; text-shadow: 0 0 18px rgba(201,161,74,0.5); }
+
+/* packs */
+.dpack { position: relative; width: 150px; aspect-ratio: 3 / 4.3; border-radius: 6px 6px 10px 10px; overflow: hidden; flex: none; box-shadow: 0 16px 40px rgba(0,0,0,0.6); cursor: pointer; isolation: isolate; }
+.dpack.big { width: clamp(170px, 24vw, 250px); }
+.dp-foil { position: absolute; inset: 0; background: linear-gradient(150deg, var(--p2), var(--p1) 55%, #050608); }
+.dp-foil::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(60deg, rgba(255,255,255,0.08) 0 3px, transparent 3px 14px), radial-gradient(80% 50% at 50% 30%, rgba(255,255,255,0.25), transparent 70%); }
+.dp-top { position: absolute; left: 0; right: 0; top: 0; height: 13%; background: linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.05)); clip-path: polygon(0 0, 100% 0, 100% 75%, 95% 100%, 90% 75%, 85% 100%, 80% 75%, 75% 100%, 70% 75%, 65% 100%, 60% 75%, 55% 100%, 50% 75%, 45% 100%, 40% 75%, 35% 100%, 30% 75%, 25% 100%, 20% 75%, 15% 100%, 10% 75%, 5% 100%, 0 75%); }
+.dp-logo { position: absolute; left: 0; right: 0; top: 24%; text-align: center; font: 900 italic calc(var(--pw, 150px) * 0.0 + 64px)/1 var(--f-display); color: rgba(255,255,255,0.92); text-shadow: 0 4px 18px rgba(0,0,0,0.5); }
+.dpack.big .dp-logo { font-size: clamp(70px, 9vw, 104px); }
+.dp-name { position: absolute; left: 0; right: 0; bottom: 18%; text-align: center; font: 900 italic 28px/1 var(--f-display); text-transform: uppercase; color: #fff; letter-spacing: 0.02em; }
+.dpack.big .dp-name { font-size: clamp(30px, 4vw, 44px); }
+.dp-sub { position: absolute; left: 0; right: 0; bottom: 9%; text-align: center; font: 700 12px var(--f-body); letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.75); }
+.dp-shine { position: absolute; inset: -50%; background: linear-gradient(110deg, transparent 42%, rgba(255,255,255,0.45) 50%, transparent 58%); animation: shine 3s ease-in-out infinite; mix-blend-mode: overlay; }
+.p-rookie { --p1: #5a3418; --p2: #d08e54; }
+.p-pro { --p1: #6a4a0c; --p2: #ffd970; }
+.p-allstar { --p1: #052f6b; --p2: #36c3ff; }
+.p-legend { --p1: #2b0838; --p2: #ff4fd8; }
+.dpack.shake { animation: pshake .9s ease-in; }
+@keyframes pshake { 0% { transform: none; } 20% { transform: rotate(-3deg) scale(1.02); } 40% { transform: rotate(3deg) scale(1.04); } 60% { transform: rotate(-4deg) scale(1.06); } 80% { transform: rotate(4deg) scale(1.08); filter: brightness(1.4); } 100% { transform: scale(1.1); filter: brightness(1.8); } }
+.dpack.torn { transform: scale(1.1); filter: brightness(2); transition: transform .5s, opacity .5s; opacity: 0; }
+.dpack.torn .dp-top { transform: translate(30px, -140px) rotate(-25deg); transition: transform .45s ease-out; }
+
+/* pack opening stage */
+#dypack { background: radial-gradient(70% 60% at 50% 45%, rgba(30,40,64,0.9), rgba(4,6,10,0.97)); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); overflow: hidden; }
+#dypack .dy-wrap { align-items: center; text-align: center; }
+#dpStage { display: grid; place-items: center; min-height: 260px; }
+.dp-wrap { animation: float 3s ease-in-out infinite; }
+@keyframes float { 0%, 100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-10px) rotate(1deg); } }
+#dpCards { display: flex; gap: clamp(8px, 1.6vw, 18px); justify-content: center; flex-wrap: wrap; perspective: 1100px; }
+.flip { cursor: pointer; animation: deal .7s cubic-bezier(.2,.9,.3,1.2) backwards; animation-delay: calc(var(--i) * 0.09s); }
+@keyframes deal { from { opacity: 0; transform: translateY(-120px) scale(0.4) rotate(-12deg); } to { opacity: 1; transform: none; } }
+.flip .dcard { transform-style: preserve-3d; transition: transform .7s cubic-bezier(.3,1.4,.5,1); }
+.flip .dc-face, .flip .dc-back { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.flip .dc-face { transform: rotateY(180deg); }
+.flip.open .dcard { transform: rotateY(180deg); }
+.flip.charging .dcard { animation: charge .65s ease-in-out infinite; }
+.flip.charging .dc-back { box-shadow: 0 0 0 3px var(--tg), 0 0 40px var(--tg), 0 0 90px var(--tg); }
+.flip.c-ruby .dc-back, .flip.c-onyx .dc-back { box-shadow: 0 0 0 3px var(--tg), 0 0 60px var(--tg), 0 0 140px var(--tg); }
+@keyframes charge { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-8px) scale(1.04); } }
+.flip.open .dc-face { animation: glowpop 1.2s ease-out; }
+@keyframes glowpop { 0% { box-shadow: 0 0 0 2px var(--t2), 0 0 70px var(--tg); } 100% { } }
+.flip.open.t-hi .dcard { animation: none; }
+#dypack::before { content: ""; position: absolute; inset: -50%; background: conic-gradient(from 0deg, transparent 0 10deg, var(--wk, #ff3b5c) 12deg 16deg, transparent 18deg 40deg, var(--wk, #ff3b5c) 42deg 45deg, transparent 47deg 70deg); opacity: 0; pointer-events: none; mix-blend-mode: screen; }
+#dypack.walkout::before { animation: rays 2.6s ease-out; }
+@keyframes rays { 0% { opacity: 0; transform: rotate(0deg); } 15% { opacity: 0.55; } 100% { opacity: 0; transform: rotate(90deg); } }
+#dypack::after { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 50% 45%, #fff, transparent 60%); opacity: 0; pointer-events: none; }
+#dypack.burst::after { animation: burst .9s ease-out; }
+@keyframes burst { 0% { opacity: 0.95; } 100% { opacity: 0; } }
+.dypack-ruby { --wk: #ff3b5c; } .dypack-onyx { --wk: #c9a7ff; } .dypack-sapphire { --wk: #5aa8ff; } .dypack-emerald { --wk: #3cffb4; }
+#dpHint { font: 600 15px var(--f-body); color: var(--steel); min-height: 1.4em; }
+#dpActions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+@media (max-width: 760px) {
+  .tiles { grid-template-columns: 1fr; }
+  .chals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sgrid { grid-template-columns: 1fr; }
+  .scell { flex-direction: column; align-items: flex-start; }
+  .dcard.sm { --cw: 88px; }
+}
 /* ---------- HUD ---------- */
 #hud { position: absolute; inset: 0; display: none; pointer-events: none; }
+.screen.on ~ #hud { display: none !important; }
 #hud.on { display: block; }
 #bug { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(14px, env(safe-area-inset-bottom, 0px)); display: flex; align-items: stretch; height: 46px; box-shadow: 0 8px 30px rgba(0,0,0,0.45); font-variant-numeric: tabular-nums; }
 #bug .tm { display: flex; align-items: center; gap: 10px; padding: 0 12px 0 0; background: #0d121c; min-width: 128px; position: relative; }
@@ -252,6 +421,7 @@ table.box tr.tot td { font-weight: 700; color: var(--chalk); }
         <p class="tag">Full 5-on-5 basketball with timed shooting, dribble moves, real fouls and a CPU that runs plays.</p>
       </div>
       <nav class="menu" data-nav>
+        <button class="item" data-act="dynasty">Dynasty<small>Open packs, build your squad, win coins</small></button>
         <button class="item" data-act="play">Play now<small>Pick two teams and tip it off</small></button>
         <button class="item" data-act="threept">3-point contest<small>60 seconds, 25 balls, money racks</small></button>
         <button class="item" data-act="watch">Watch CPU vs CPU<small>Sit courtside for a full game</small></button>
@@ -341,6 +511,97 @@ table.box tr.tot td { font-weight: 700; color: var(--chalk); }
     </div>
   </section>
 
+
+  <section id="dycreate" class="screen scrim-full" aria-label="Create your Dynasty">
+    <div class="dy-wrap">
+      <div><span class="eyebrow">Dynasty</span><h2 class="h-2">Found your franchise</h2></div>
+      <p class="muted" style="max-width:60ch;margin:0">Build a team from player cards. You start with three free Rookie packs. Win games to earn coins, then buy better packs: the rarer the pack, the better the cards.</p>
+      <div class="fields">
+        <div class="field"><label for="dyCity">City</label><input id="dyCity" maxlength="16" placeholder="Hometown" autocomplete="off"></div>
+        <div class="field"><label for="dyName">Team name</label><input id="dyName" maxlength="16" placeholder="Hoopers" autocomplete="off"></div>
+      </div>
+      <div class="field" style="max-width:none"><label>Team colors</label><div class="swatches" id="dyColors"></div></div>
+      <div class="row-actions" style="justify-content:flex-start">
+        <button class="btn ghost" data-act="back">Back</button>
+        <button class="btn" data-act="dy-create">Claim 3 free packs</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="dyhub" class="screen scrim-full" aria-label="Dynasty">
+    <div class="dy-wrap">
+      <div class="dy-head">
+        <div><span class="eyebrow">Dynasty</span><h2 class="h-display" id="dyTeamName">Team</h2></div>
+        <div class="pills">
+          <div class="pill gold"><i class="coin"></i><span id="dyCoins">0</span></div>
+          <div class="pill"><small>Record</small><span id="dyRecord">0–0</span></div>
+          <div class="pill"><small>Team OVR</small><span id="dyOvr">—</span></div>
+        </div>
+      </div>
+      <div class="dy-row" id="dyLineup"></div>
+      <p class="note" id="dyNeed">Open your packs to fill your starting five.</p>
+      <div class="tiles">
+        <button class="tile hot" id="dyOpenBtn" data-act="dy-openany"><b>Open packs</b><span id="dyPackCount">3 unopened</span></button>
+        <button class="tile" data-act="dy-store"><b>Pack store</b><span>Spend coins on better packs</span></button>
+        <button class="tile" data-act="dy-team"><b>My team</b><span>Set your lineup, sell spare cards</span></button>
+      </div>
+      <div><span class="eyebrow">Play a game · win coins</span></div>
+      <div class="chals" id="dyChal"></div>
+      <div class="row-actions" style="justify-content:space-between">
+        <button class="btn ghost" data-act="dy-reset-arm" style="font-size:16px">Start over</button>
+        <button class="btn ghost" data-act="back">Main menu</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="dyteam" class="screen scrim-full" aria-label="My team">
+    <div class="dy-wrap">
+      <div class="dy-head">
+        <div><span class="eyebrow">My team</span><h2 class="h-2">Starting five</h2></div>
+        <div class="pills"><div class="pill"><small>Team OVR</small><span id="dyTeamOvr">—</span></div><button class="btn ghost" data-act="dy-autofill" style="font-size:18px">Auto-fill best</button></div>
+      </div>
+      <p class="muted" style="margin:0">Tap a position to pick it, then choose a card below. Sell cards you don't need for coins.</p>
+      <div class="slots" id="dySlots"></div>
+      <div class="dy-head"><div class="chips" id="dyFilters"></div><span class="muted" id="dyCount"></span></div>
+      <div class="grid" id="dyGrid"></div>
+      <div class="row-actions"><button class="btn" data-act="dy-hub">Done</button></div>
+    </div>
+  </section>
+
+  <section id="dystore" class="screen scrim-full" aria-label="Pack store">
+    <div class="dy-wrap">
+      <div class="dy-head">
+        <div><span class="eyebrow">Pack store</span><h2 class="h-2">The rarer the pack, the better the cards</h2></div>
+        <div class="pills"><div class="pill gold"><i class="coin"></i><span id="dyStoreCoins">0</span></div></div>
+      </div>
+      <div class="sgrid" id="dyStoreGrid"></div>
+      <div class="row-actions"><button class="btn" data-act="dy-hub">Back</button></div>
+    </div>
+  </section>
+
+  <section id="dypack" class="screen" aria-label="Opening a pack">
+    <div class="dy-wrap">
+      <div id="dpStage"></div>
+      <div id="dpCards"></div>
+      <p id="dpHint"></p>
+      <div id="dpActions"></div>
+    </div>
+  </section>
+
+  <section id="dyresult" class="screen scrim-full" aria-label="Game result">
+    <div class="dy-wrap">
+      <div><span class="eyebrow">Dynasty · Final</span><h2 class="h-display" id="dyResTitle">Victory</h2></div>
+      <div class="final-score" id="dyResScore"></div>
+      <div class="res-rows" id="dyResRows"></div>
+      <div><span class="eyebrow">Coins</span><div class="res-bal"><i class="coin"></i><span id="dyResCoins">0</span></div></div>
+      <div class="row-actions" style="justify-content:flex-start">
+        <button class="btn" data-act="dy-hub">Continue</button>
+        <button class="btn ghost" data-act="dy-again">Play again</button>
+        <button class="btn ghost" data-act="dy-store">Pack store</button>
+      </div>
+    </div>
+  </section>
+  <div id="dyToast" role="status"></div>
   <div id="hud">
     <div id="ticker" aria-live="polite"></div>
     <div id="banner"><b></b><span></span></div>
@@ -2794,7 +3055,7 @@ function initPost() {
   P.mComp = ppMat(`
     uniform sampler2D tScene; uniform sampler2D tBloom; uniform vec2 uRes;
     uniform float uBloom; uniform float uExposure; uniform float uTime; uniform float uVig; uniform float uGrain;
-    uniform float uFlash; uniform float uCine; uniform float uCA; uniform float uSat;
+    uniform float uFlash; uniform float uCine; uniform float uCA; uniform float uSat; uniform float uStreak;
     varying vec2 vUv;
     vec3 rrt(vec3 v){ vec3 a = v * (v + 0.0245786) - 0.000090537; vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081; return a / b; }
     vec3 aces(vec3 c){
@@ -2809,6 +3070,9 @@ function initPost() {
       float ca = uCA * dot(d, d);
       vec3 col = vec3(texture2D(tScene, uv - d * ca).r, texture2D(tScene, uv).g, texture2D(tScene, uv + d * ca).b);
       col += texture2D(tBloom, uv).rgb * uBloom;
+      vec3 st = vec3(0.0);
+      for (int i = 1; i <= 6; i++) { float o = float(i) * 0.02; st += (texture2D(tBloom, uv + vec2(o, 0.0)).rgb + texture2D(tBloom, uv - vec2(o, 0.0)).rgb) * (1.0 - float(i) / 7.0); }
+      col += st * uStreak * vec3(0.55, 0.72, 1.0);
       col = aces(col * uExposure);
       float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
       col = max(mix(vec3(l), col, uSat - uCine * 0.3), 0.0);
@@ -2823,7 +3087,7 @@ function initPost() {
       gl_FragColor = vec4(col, 1.0);
     }`, { tScene: { value: null }, tBloom: { value: null }, uRes: { value: new THREE.Vector2(1, 1) }, uBloom: { value: 0.45 },
     uExposure: { value: 1.12 }, uTime: { value: 0 }, uVig: { value: 0.32 }, uGrain: { value: 0.028 }, uFlash: { value: 0 },
-    uCine: { value: 0 }, uCA: { value: 0.006 }, uSat: { value: 1.1 } });
+    uCine: { value: 0 }, uCA: { value: 0.006 }, uSat: { value: 1.1 }, uStreak: { value: 0.045 } });
 }
 function resizePost(w, h) {
   const P = R.pp;
@@ -3442,6 +3706,7 @@ function buildArena() {
   R.crowdLower = buildCrowdMesh(ls); R.scene.add(R.crowdLower); R.reflHide.push(R.crowdLower);
   R.crowdUpper = buildCrowdMesh(us, true); R.scene.add(R.crowdUpper); R.reflHide.push(R.crowdUpper);
   R.seatsAll = ls.concat(us);
+  buildSigns(ls);
   // 360-degree ribbon board on the lower bowl fascia, and the suite level above it
   R.ribbonC = mkCanvas(4096, 96); R.ribbonT = canvasTex(R.ribbonC); R.ribbonT.wrapS = THREE.RepeatWrapping;
   const fasc = ringBand(lower.ax + 17 * 2.7, lower.az + 17 * 2.7, lower.rc + 17 * 2.7, 24.2, 27.4, hdrBasic('#ffffff', 1.9, { map: R.ribbonT }), 6);
@@ -3504,6 +3769,60 @@ function buildArena() {
   R.courtsideSeats = cs;
   buildCeiling();
   buildJumbotron();
+}
+/* fans holding up signs: an instanced quad per sign, painted from an 8-design atlas, raised on big moments */
+function buildSigns(seats) {
+  const pickS = seats.filter((q) => q.row <= 10);
+  const N = Math.min(150, pickS.length), chosen = [];
+  for (let i = 0; i < N; i++) chosen.push(pickS[Math.floor(Math.random() * pickS.length)]);
+  const geo = new THREE.PlaneGeometry(2.8, 1.76);
+  const cell = new Float32Array(N), seed = new Float32Array(N);
+  for (let i = 0; i < N; i++) { cell[i] = i % 8; seed[i] = Math.random(); }
+  geo.setAttribute('aCell', new THREE.InstancedBufferAttribute(cell, 1));
+  geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seed, 1));
+  R.signC = mkCanvas(1024, 512); R.signT = canvasTex(R.signC);
+  const m = new THREE.MeshBasicMaterial({ map: R.signT, color: new THREE.Color(0.82, 0.82, 0.82), side: THREE.DoubleSide, toneMapped: true });
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, R.crowdU);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float aCell; attribute float aSeed; uniform float uTime; uniform float uExcite;')
+      .replace('#include <uv_vertex>', '#include <uv_vertex>\n#ifdef USE_UV\nvUv = vUv * vec2(0.25, 0.5) + vec2(mod(aCell, 4.0) * 0.25, 0.5 * (1.0 - floor(aCell / 4.0)));\n#endif')
+      .replace('#include <begin_vertex>', `vec3 transformed = vec3(position);
+        float up = clamp(uExcite * (1.4 + aSeed) - 0.35, 0.0, 1.0);
+        float sway = sin(uTime * (2.0 + aSeed * 2.0) + aSeed * 30.0);
+        transformed.xy = mat2(cos(sway * 0.12 * up), -sin(sway * 0.12 * up), sin(sway * 0.12 * up), cos(sway * 0.12 * up)) * transformed.xy;
+        transformed.y += mix(-2.2, 0.0, up) + abs(sway) * 0.25 * up;
+        transformed *= mix(0.6, 1.0, up);`);
+  };
+  m.customProgramCacheKey = () => 'crowd-signs';
+  const im = new THREE.InstancedMesh(geo, m, N);
+  const d = new THREE.Object3D();
+  chosen.forEach((q, i) => {
+    d.position.set(q.x, q.y + 3.3, q.z);
+    d.rotation.set(0, PI / 2 - q.face, 0); d.updateMatrix();
+    im.setMatrixAt(i, d.matrix);
+  });
+  im.frustumCulled = false;
+  R.scene.add(im); R.signs = im; R.reflHide.push(im);
+}
+function drawSigns(home) {
+  const c = R.signC, g = c.getContext('2d');
+  const designs = [
+    (x, y) => { bg(x, y, '#ffffff'); txt(x, y, 'DEFENSE', '#111', 70); fence(x, y); },
+    (x, y) => { bg(x, y, home.c1); txt(x, y - 34, "LET'S GO", '#fff', 46); txt(x, y + 30, home.name.toUpperCase(), home.c3, 58); },
+    (x, y) => { bg(x, y, home.c2); drawEmblem(g, home, x, y, 72); },
+    (x, y) => { bg(x, y, '#ffd23f'); txt(x, y, 'MVP!', '#111', 96); },
+    (x, y) => { bg(x, y, '#111111'); txt(x, y, 'BUCKETS', '#ff7a1a', 66); },
+    (x, y) => { bg(x, y, '#ffffff'); txt(x, y - 22, 'SLAM', home.c1, 74); txt(x, y + 44, 'CITY', '#111', 44); },
+    (x, y) => { bg(x, y, home.c1); txt(x, y - 26, 'HOME', '#fff', 60); txt(x, y + 34, 'COURT', home.c3, 60); },
+    (x, y) => { bg(x, y, '#f4f1ea'); txt(x, y - 26, '\u2665', '#e0193b', 64); txt(x, y + 40, home.city.toUpperCase(), '#111', 40); },
+  ];
+  function bg(x, y, col) { g.fillStyle = col; g.fillRect(x - 124, y - 78, 248, 156); g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 6; g.strokeRect(x - 124, y - 78, 248, 156); }
+  function txt(x, y, t, col, size) { g.fillStyle = col; g.textAlign = 'center'; g.textBaseline = 'middle'; let fs = size; g.font = `900 italic ${fs}px ${FONT_D}`; while (g.measureText(t).width > 228 && fs > 20) { fs -= 2; g.font = `900 italic ${fs}px ${FONT_D}`; } g.fillText(t, x, y); }
+  function fence(x, y) { g.fillStyle = '#111'; for (let i = -4; i <= 4; i++) g.fillRect(x + i * 22 - 3, y + 40, 6, 30); g.fillRect(x - 96, y + 48, 192, 5); }
+  g.clearRect(0, 0, 1024, 512);
+  designs.forEach((fn, i) => fn((i % 4) * 256 + 128, Math.floor(i / 4) * 256 + 128));
+  R.signT.needsUpdate = true;
 }
 function ringBand(ax, az, rc, y0, y1, mat, repeatU) {
   const P = rrPath(ax, az, rc, 16), n = P.length;
@@ -3621,6 +3940,7 @@ function paintArena(home, away) {
     });
     a.needsUpdate = true; }
   drawReflCrowd(home, away);
+  if (R.signC) drawSigns(home);
   R.jumboRing.color.set(home.c1).multiplyScalar(2.2);
   for (const h of R.hoops) { drawPad(h, home); }
   drawRibbon(); drawTable(); drawJumbo(true);
@@ -5215,7 +5535,7 @@ function showScreen(id, back) {
 function focusables() {
   if (!APP.screen) return [];
   const el = $('#' + APP.screen);
-  return $$('.tcard[data-nav], .item, .opt, .btn', el).filter((e) => e.offsetParent !== null);
+  return $$('.tcard[data-nav], .item, .opt, .btn, .tile, .chal, .swatch, .chip, .mini, .slot', el).filter((e) => e.offsetParent !== null);
 }
 function setFocus(i) {
   const f = focusables();
@@ -5250,7 +5570,9 @@ function activate(el) {
   const a = el.dataset.act;
   if (!a) return;
   SFX.ui('ok');
+  if (a.startsWith('dy-')) { dyAction(a, el); return; }
   switch (a) {
+    case 'dynasty': dyEnter(); break;
     case 'play': APP.mu.kind = 'play'; showScreen('matchup', 'home'); break;
     case 'watch': APP.mu.kind = 'watch'; showScreen('matchup', 'home'); break;
     case 'threept': APP.mu.kind = 'threept'; APP.mu.shooter = bestShooter(TEAMS[APP.mu.a]); showScreen('matchup', 'home'); break;
@@ -5270,7 +5592,7 @@ function activate(el) {
 }
 function wireScreens() {
   document.addEventListener('click', (e) => {
-    const el = e.target.closest('.item, .opt, .btn, .tcard[data-nav], .arrow');
+    const el = e.target.closest('[data-act], .item, .opt, .btn, .tcard[data-nav], .arrow');
     if (!el || !APP.screen) return;
     if (el.classList.contains('arrow')) { cycleTeam(el.dataset.team, +el.dataset.d); SFX.ui('move'); e.stopPropagation(); return; }
     const f = focusables(), i = f.indexOf(el);
@@ -5351,7 +5673,7 @@ function startFromMatchup() {
 function startGame(cfg) {
   APP.last = cfg;
   newGame({ mode: cfg.mode === 'threept' ? 'threept' : 'game', home: cfg.home, away: cfg.away, userTeam: cfg.userTeam == null ? 0 : cfg.userTeam,
-    auto: cfg.mode === 'watch', difficulty: SET.difficulty, qLen: SET.qLen, autoSwitch: SET.autoSwitch && SET.camera !== 'third', shooter: cfg.shooter });
+    auto: cfg.mode === 'watch', difficulty: cfg.difficulty || SET.difficulty, qLen: SET.qLen, autoSwitch: SET.autoSwitch && SET.camera !== 'third', shooter: cfg.shooter });
   R.tpYaw = null;
   G.attract = false;
   buildPlayers(); R.snapCam = true; R.slowmo = 0;
@@ -5368,10 +5690,11 @@ function startGame(cfg) {
 }
 function restartGame() { if (APP.last) startGame(APP.last); }
 function quitToMenu() {
+  const wasDy = APP.mode === 'dynasty';
   APP.running = false; APP.paused = false; if (R.show > 0) R.show = 0.01;
   $('#hud').classList.remove('on');
   startAttract();
-  showScreen('home');
+  if (wasDy && DY.p) { dyRenderHub(); showScreen('dyhub', 'home'); } else showScreen('home');
 }
 function pauseGame() {
   if (!APP.running || APP.paused || G.state === 'final') return;
@@ -5523,7 +5846,7 @@ function feedback(p, text, color, sub) {
   f.classList.remove('go'); void f.offsetWidth; f.classList.add('go');
 }
 function showIntro(home, away) {
-  $('#introEy').textContent = `${DIFFS[SET.difficulty].name} · ${SET.qLen / 60}-minute quarters`;
+  $('#introEy').textContent = `${APP.mode === 'dynasty' ? 'Dynasty · ' : ''}${G.diff.name} · ${SET.qLen / 60}-minute quarters`;
   $('#introTeams').innerHTML = `<div style="background:${away.c1}">${away.city} ${away.name}</div><span class="vs2">at</span><div style="background:${home.c1}">${home.city} ${home.name}</div>`;
   $('#intro').classList.add('on'); APP.introT = 2.6;
 }
@@ -5693,6 +6016,512 @@ function onScoreEv(e, quiet) {
   else if (e.three) say(pick([`${n} for three. Bang!`, `${n} from deep. Got it!`]), false);
 }
 
+/* ---- 09b-dynasty.js ---- */
+/* ============================================================
+   Dynasty: build a squad from player cards. Open packs (rarer
+   packs, better cards), win games for coins, buy more packs,
+   set your starting five. Cards show live 3D portraits of the
+   actual player models.
+   ============================================================ */
+
+const TIERS = [
+  { id: 'bronze', name: 'Bronze', min: 56, max: 64, sell: 30 },
+  { id: 'silver', name: 'Silver', min: 65, max: 72, sell: 90 },
+  { id: 'gold', name: 'Gold', min: 73, max: 79, sell: 300 },
+  { id: 'emerald', name: 'Emerald', min: 80, max: 84, sell: 800 },
+  { id: 'sapphire', name: 'Sapphire', min: 85, max: 89, sell: 2000 },
+  { id: 'ruby', name: 'Ruby', min: 90, max: 94, sell: 5000 },
+  { id: 'onyx', name: 'Onyx', min: 95, max: 99, sell: 12000 },
+];
+const TIER_GLOW = { bronze: '#e3a066', silver: '#e6eef8', gold: '#ffd86e', emerald: '#3cffb4', sapphire: '#5aa8ff', ruby: '#ff3b5c', onyx: '#c9a7ff' };
+function tierOf(ovr) { for (let i = TIERS.length - 1; i >= 0; i--) if (ovr >= TIERS[i].min) return TIERS[i]; return TIERS[0]; }
+function tierIdx(id) { return TIERS.findIndex((t) => t.id === id); }
+
+const PACKS = [
+  { id: 'rookie', name: 'Rookie Pack', price: 600, n: 5, odds: { bronze: 70, silver: 26, gold: 4 }, blurb: 'Mostly Bronze and Silver. Where every dynasty starts.' },
+  { id: 'pro', name: 'Pro Pack', price: 2500, n: 5, first: { gold: 85, emerald: 13, sapphire: 2 }, odds: { bronze: 30, silver: 45, gold: 22, emerald: 3 }, blurb: 'One guaranteed Gold or better.' },
+  { id: 'allstar', name: 'All-Star Pack', price: 7500, n: 5, first: { emerald: 70, sapphire: 25, ruby: 5 }, odds: { silver: 30, gold: 50, emerald: 17, sapphire: 3 }, blurb: 'One guaranteed Emerald or better.' },
+  { id: 'legend', name: 'Legend Pack', price: 20000, n: 3, first: { sapphire: 65, ruby: 30, onyx: 5 }, odds: { gold: 30, emerald: 50, sapphire: 17, ruby: 3 }, blurb: 'One guaranteed Sapphire or better, with a shot at Onyx.' },
+];
+const DY_CHAL = [
+  { id: 'rookie', name: 'Rookie', tiers: ['bronze', 'silver'], diff: 'rookie', win: 700, loss: 150, note: 'Bronze and Silver squads' },
+  { id: 'pro', name: 'Pro', tiers: ['silver', 'gold'], diff: 'pro', win: 1400, loss: 300, note: 'Silver and Gold squads' },
+  { id: 'allstar', name: 'All-Star', tiers: ['gold', 'emerald', 'sapphire'], diff: 'allstar', win: 2400, loss: 500, note: 'Gold to Sapphire squads' },
+  { id: 'legend', name: 'Legend', tiers: ['sapphire', 'ruby', 'onyx'], diff: 'legend', win: 4000, loss: 800, note: 'Sapphire to Onyx squads' },
+];
+const DY_COLORS = [
+  { c1: '#d4202c', c2: '#1a1a1e', c3: '#f2c94c', label: 'Crimson' },
+  { c1: '#1f5fd1', c2: '#0b1a33', c3: '#f2f2f2', label: 'Royal' },
+  { c1: '#0f8a5f', c2: '#0b231a', c3: '#e8d48b', label: 'Forest' },
+  { c1: '#6c2bd9', c2: '#160b2e', c3: '#39e6c4', label: 'Violet' },
+  { c1: '#f07a12', c2: '#1d1208', c3: '#ffffff', label: 'Blaze' },
+  { c1: '#16171b', c2: '#000000', c3: '#d6b04a', label: 'Midnight' },
+];
+const LEGENDS_DEF = { id: 'LGD', city: 'All-Time', name: 'Legends', c1: '#141418', c2: '#050506', c3: '#d4af37' };
+
+/* ---------------- card pool (deterministic, so saved collections stay valid) ---------------- */
+const FIRSTS = ['Adrian', 'Bennett', 'Calvin', 'Darnell', 'Elijah', 'Felix', 'Gideon', 'Harlan', 'Jasper', 'Keon', 'Lionel', 'Marlon', 'Nolan', 'Orlando', 'Percy', 'Quentin', 'Rashad', 'Silas', 'Tobias', 'Vernon', 'Wendell', 'Xavier', 'Yusuf', 'Zane', 'Amos', 'Brock', 'Cyrus', 'Desmond', 'Emeka', 'Fabian', 'Garrett', 'Hollis', 'Jerome', 'Kasim', 'Leland', 'Montel', 'Nash', 'Otis', 'Quincy', 'Roland', 'Sterling', 'Thaddeus', 'Vince', 'Wyatt', 'Arlo', 'Booker', 'Cassius', 'Dorian', 'Everett', 'Grady', 'Jett', 'Kellan', 'Lamont', 'Mekhi', 'Niko', 'Royce', 'Tariq', 'Ulrich', 'Bram', 'Caden'];
+const LASTS = ['Abernathy', 'Ballard', 'Castellanos', 'Dunmore', 'Ellsworth', 'Faulkner', 'Galloway', 'Hargrove', 'Jessup', 'Kincaid', 'Lockhart', 'Mayfield', 'Northcutt', 'Ogletree', 'Pendergast', 'Quarles', 'Rutledge', 'Satterfield', 'Thibault', 'Underwood', 'Whitaker', 'Yancey', 'Blackwood', 'Crenshaw', 'Delacroix', 'Eberhardt', 'Fairbanks', 'Hawthorne', 'Lomax', 'Merriweather', 'Nkemelu', 'Pruitt', 'Ransome', 'Treadwell', 'Upshaw', 'Varnell', 'Yardley', 'Bramwell', 'Dorsey', 'Easterling', 'Fontaine', 'Goodwin', 'Holloway', 'Ivey', 'Kettering', 'Langston', 'Mabry', 'Oyelowo', 'Prescott', 'Rourke', 'Sandoval', 'Tolliver', 'Vasquez', 'Wakefield', 'Zamora', 'Achebe', 'Brightwater', 'Coltrane', 'Duvall', 'Everly'];
+const LEGEND_NAMES = ['Thaddeus "Sky" Holloway', 'Cassius Monroe', 'Big Emeka Achebe', 'Royce "Glide" Langston', 'Dorian Kettering', 'Montel "Iceman" Mabry', 'Silas Brightwater', 'Jett Coltrane'];
+const ARCH = {
+  PG: { tpt: 0.82, mid: 0.82, ins: 0.72, dnk: 0.45, hnd: 0.96, pas: 0.95, spd: 0.95, def: 0.66, stl: 0.82, blk: 0.2, reb: 0.32 },
+  SG: { tpt: 0.92, mid: 0.86, ins: 0.74, dnk: 0.62, hnd: 0.82, pas: 0.7, spd: 0.86, def: 0.7, stl: 0.72, blk: 0.3, reb: 0.4 },
+  SF: { tpt: 0.76, mid: 0.8, ins: 0.84, dnk: 0.8, hnd: 0.72, pas: 0.66, spd: 0.8, def: 0.84, stl: 0.66, blk: 0.55, reb: 0.62 },
+  PF: { tpt: 0.6, mid: 0.72, ins: 0.88, dnk: 0.84, hnd: 0.5, pas: 0.56, spd: 0.66, def: 0.86, stl: 0.46, blk: 0.76, reb: 0.88 },
+  C: { tpt: 0.3, mid: 0.56, ins: 0.93, dnk: 0.88, hnd: 0.36, pas: 0.5, spd: 0.52, def: 0.9, stl: 0.36, blk: 0.94, reb: 0.96 },
+};
+const HEIGHTS = { PG: [72, 76], SG: [75, 79], SF: [78, 81], PF: [80, 83], C: [82, 87] };
+const POSL = ['PG', 'SG', 'SF', 'PF', 'C'];
+const STATK = ['tpt', 'mid', 'ins', 'dnk', 'hnd', 'pas', 'spd', 'def', 'stl', 'blk', 'reb'];
+function genRatings(pos, target, rng) {
+  const a = ARCH[pos], noise = {};
+  for (const k of STATK) noise[k] = (rng() - 0.5) * 12;
+  const r = { pos };
+  let off = target - 10;
+  for (let it = 0; it < 40; it++) {
+    for (const k of STATK) r[k] = Math.round(clamp(off + (a[k] - 0.72) * 62 + noise[k], 25, 99));
+    const o = playerOvr(r);
+    if (o === target) break;
+    off += (target - o) * 0.9;
+  }
+  return r;
+}
+function buildPool() {
+  const rng = mulberry32(424242), pool = [];
+  let uid = 1;
+  for (const T of TEAMS) for (const p of T.roster) {
+    pool.push({ id: 'L' + uid++, n: p.n, pos: p.pos, h: p.h, num: p.num, skin: p.skin, hair: p.hair, acc: p.acc, team: T, ovr: p.ovr, r: Object.fromEntries(STATK.map((k) => [k, p[k]])) });
+  }
+  const plan = { bronze: 46, silver: 46, gold: 42, emerald: 18, sapphire: 14, ruby: 9, onyx: 8 };
+  let li = 0;
+  for (const t of TIERS) {
+    for (let i = 0; i < plan[t.id]; i++) {
+      const pos = POSL[(i + tierIdx(t.id)) % 5];
+      const target = t.min + Math.floor(rng() * (t.max - t.min + 1));
+      const hr = HEIGHTS[pos], h = hr[0] + Math.floor(rng() * (hr[1] - hr[0] + 1));
+      const r = genRatings(pos, target, rng);
+      const legend = t.id === 'onyx';
+      const n = legend ? LEGEND_NAMES[li++ % LEGEND_NAMES.length] : FIRSTS[Math.floor(rng() * FIRSTS.length)] + ' ' + LASTS[Math.floor(rng() * LASTS.length)];
+      const card = { id: 'G' + uid++, n, pos, h, num: Math.floor(rng() * 55), skin: Math.floor(rng() * 6), hair: Math.floor(rng() * 5), acc: rng() < 0.25 ? 1 + Math.floor(rng() * 2) : 0,
+        team: legend ? LEGENDS_DEF : TEAMS[Math.floor(rng() * TEAMS.length)], r: {} };
+      for (const k of STATK) card.r[k] = r[k];
+      card.ovr = playerOvr(Object.assign({ pos }, card.r));
+      pool.push(card);
+    }
+  }
+  for (const c of pool) c.tier = tierOf(c.ovr).id;
+  return pool;
+}
+const POOL = buildPool();
+const CARD = Object.fromEntries(POOL.map((c) => [c.id, c]));
+const BY_TIER = {};
+for (const t of TIERS) BY_TIER[t.id] = POOL.filter((c) => c.tier === t.id);
+function cardD(c) {
+  return Object.assign({ n: c.n, pos: c.pos, h: c.h, num: c.num, skin: c.skin, hair: c.hair, acc: c.acc, ovr: c.ovr }, c.r);
+}
+
+/* ---------------- profile ---------------- */
+const DY = { p: null, slot: -1, filter: 'ALL', sellArm: null, pack: null, lastResult: null };
+function dyLoad() {
+  try { const s = JSON.parse(localStorage.getItem('hk-dynasty-v1') || 'null'); if (s && Array.isArray(s.cards)) DY.p = s; } catch (e) { /* storage unavailable */ }
+  if (DY.p) DY.p.cards = DY.p.cards.filter((c) => CARD[c.id]);
+}
+function dySave() { try { localStorage.setItem('hk-dynasty-v1', JSON.stringify(DY.p)); } catch (e) { /* ignore */ } }
+function dyCreate(city, name, col) {
+  const cw = city.trim().split(/\s+/).filter(Boolean);
+  const abbr = (cw.length >= 2 ? cw.map((w) => w[0]).join('') + name.trim()[0] : (cw[0] || name)).replace(/[^A-Za-z]/g, '').slice(0, 3).toUpperCase().padEnd(3, 'X');
+  DY.p = { v: 1, city, name, abbr, c1: col.c1, c2: col.c2, c3: col.c3, coins: 0, packs: { rookie: 3 }, cards: [], lineup: [null, null, null, null, null], next: 1, w: 0, l: 0, opened: 0 };
+  dySave();
+}
+function dyOwned(uid) { return DY.p.cards.find((c) => c.u === uid); }
+function dyAdd(id) { const u = DY.p.next++; DY.p.cards.push({ u, id }); return u; }
+function dyLineupCards() { return DY.p.lineup.map((u) => (u == null ? null : dyOwned(u))).map((o) => (o ? CARD[o.id] : null)); }
+function dyTeamOvr() {
+  const cs = dyLineupCards().filter(Boolean);
+  if (!cs.length) return 0;
+  return Math.round(cs.reduce((a, c) => a + c.ovr, 0) / 5);
+}
+/* fill empty or invalid lineup slots with the best available card for each position */
+function dyAutoFill(replaceAll) {
+  const used = new Set(), usedIds = new Set();
+  const L = replaceAll ? [null, null, null, null, null] : DY.p.lineup.map((u) => (u != null && dyOwned(u) ? u : null));
+  L.forEach((u) => { if (u != null) { used.add(u); usedIds.add(dyOwned(u).id); } });
+  const sorted = DY.p.cards.slice().sort((a, b) => CARD[b.id].ovr - CARD[a.id].ovr);
+  for (let s = 0; s < 5; s++) {
+    if (L[s] != null) continue;
+    let pickC = sorted.find((c) => !used.has(c.u) && !usedIds.has(c.id) && CARD[c.id].pos === POSL[s]);
+    if (!pickC) pickC = sorted.find((c) => !used.has(c.u) && !usedIds.has(c.id));
+    if (pickC) { L[s] = pickC.u; used.add(pickC.u); usedIds.add(pickC.id); }
+  }
+  DY.p.lineup = L;
+  dySave();
+}
+function dyTeamDef() {
+  dyAutoFill(false);
+  const roster = dyLineupCards().map((c) => cardD(c));
+  const def = { id: DY.p.abbr, city: DY.p.city, name: DY.p.name, c1: DY.p.c1, c2: DY.p.c2, c3: DY.p.c3, style: 'Your Dynasty squad', roster };
+  for (const p of def.roster) p.ovr = playerOvr(p);
+  def.rt = teamRatings(def);
+  return def;
+}
+function dyOpponent(ch) {
+  const base = TEAMS[Math.floor(Math.random() * TEAMS.length)];
+  const roster = POSL.map((pos) => {
+    const tier = ch.tiers[Math.floor(Math.random() * ch.tiers.length)];
+    let list = BY_TIER[tier].filter((c) => c.pos === pos);
+    if (!list.length) list = BY_TIER[tier];
+    return cardD(list[Math.floor(Math.random() * list.length)]);
+  });
+  const def = { id: base.id, city: base.city, name: base.name, c1: base.c1, c2: base.c2, c3: base.c3, style: ch.name + ' challenge', roster };
+  for (const p of def.roster) p.ovr = playerOvr(p);
+  def.rt = teamRatings(def);
+  return def;
+}
+function rollTier(odds) {
+  const tot = Object.values(odds).reduce((a, b) => a + b, 0);
+  let r = Math.random() * tot;
+  for (const k in odds) { r -= odds[k]; if (r <= 0) return k; }
+  return Object.keys(odds)[0];
+}
+function dyOpenPack(packId) {
+  const P = PACKS.find((q) => q.id === packId);
+  const got = [];
+  for (let i = 0; i < P.n; i++) {
+    const tier = i === 0 && P.first ? rollTier(P.first) : rollTier(P.odds);
+    const list = BY_TIER[tier];
+    const c = list[Math.floor(Math.random() * list.length)];
+    got.push({ u: dyAdd(c.id), id: c.id });
+  }
+  got.sort((a, b) => CARD[a.id].ovr - CARD[b.id].ovr);
+  DY.p.opened++;
+  dySave();
+  return got;
+}
+function dyReward(ch, my, opp) {
+  const won = my > opp;
+  const base = won ? ch.win : ch.loss;
+  const margin = won ? Math.min(400, (my - opp) * 10) : 0;
+  DY.p.coins += base + margin;
+  if (won) DY.p.w++; else DY.p.l++;
+  dySave();
+  return { won, base, margin, total: base + margin };
+}
+
+/* ---------------- 3D portraits of the real player models ---------------- */
+const PORTRAIT = { url: {}, queue: [], scene: null };
+function requestPortrait(id) { if (!PORTRAIT.url[id] && !PORTRAIT.queue.includes(id)) PORTRAIT.queue.push(id); }
+function portraitStep() {
+  if (!PORTRAIT.queue.length || !R.ready) return;
+  const id = PORTRAIT.queue.shift();
+  if (!PORTRAIT.url[id]) { try { PORTRAIT.url[id] = renderPortrait(CARD[id]); } catch (e) { console.error(e); PORTRAIT.url[id] = 'none'; } }
+  if (PORTRAIT.url[id] !== 'none') document.querySelectorAll(`img.dc-pt[data-card="${id}"]`).forEach((img) => { img.src = PORTRAIT.url[id]; img.classList.add('in'); });
+}
+function hydratePortraits(root) {
+  (root || document).querySelectorAll('img.dc-pt').forEach((img) => {
+    const id = img.dataset.card;
+    if (PORTRAIT.url[id] && PORTRAIT.url[id] !== 'none') { img.src = PORTRAIT.url[id]; img.classList.add('in'); } else requestPortrait(id);
+  });
+}
+function renderPortrait(c) {
+  const r = R.r, P = PORTRAIT, W = 400, H = 500;
+  if (!P.scene) {
+    P.scene = new THREE.Scene(); P.scene.environment = R.env;
+    P.cam = new THREE.PerspectiveCamera(24, W / H, 0.5, 60);
+    P.key = new THREE.DirectionalLight('#fff3e6', 1.7); P.key.position.set(6, 7, 3.5);
+    P.hemi = new THREE.HemisphereLight('#d4dcff', '#1a120c', 0.45);
+    P.rimA = new THREE.DirectionalLight('#ffffff', 2.2); P.rimA.position.set(-5, 6, -6);
+    P.rimB = new THREE.DirectionalLight('#ffffff', 1.6); P.rimB.position.set(-5, 4, 6);
+    P.scene.add(P.key, P.hemi, P.rimA, P.rimB);
+    P.rt = new THREE.WebGLRenderTarget(W, H, { format: THREE.RGBAFormat });
+    P.rt.texture.encoding = THREE.sRGBEncoding;
+    P.buf = new Uint8Array(W * H * 4);
+    P.canvas = mkCanvas(W, H);
+  }
+  const glow = new THREE.Color(TIER_GLOW[c.tier]);
+  P.rimA.color.copy(glow); P.rimB.color.copy(glow).lerp(new THREE.Color('#ffffff'), 0.4);
+  const d = cardD(c), hgt = c.h / 12;
+  const pl = { d, team: { def: c.team, idx: 0 }, sc: hgt / 6.5, hgt };
+  const h = buildHumanoid(pl, true);
+  R.scene.remove(h.root); R.scene.remove(h.blob);
+  P.scene.add(h.root);
+  // pose: arms folded across the chest, chin up, facing the camera a little off-axis
+  h.root.rotation.y = -0.32;
+  armIK(h, h.armR, 1, 0.62, 4.82, -0.52, 1);
+  armIK(h, h.armL, -1, 0.55, 4.95, 0.52, 1);
+  h.headG.rotation.set(0, 0.22, 0.06);
+  h.torso.rotation.y = 0.05;
+  h.root.updateMatrixWorld(true);
+  const headY = 6.12 * pl.sc;
+  P.cam.position.set(9.6, headY - 0.55, 1.7); P.cam.lookAt(0, headY - 1.05, 0.25);
+  const tm = r.toneMapping, ex = r.toneMappingExposure, cc = r.getClearColor(new THREE.Color()), ca = r.getClearAlpha(), sm = r.shadowMap.enabled;
+  r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.15; r.setClearColor(0x000000, 0); r.shadowMap.enabled = false;
+  r.setRenderTarget(P.rt); r.clear(); r.render(P.scene, P.cam);
+  r.readRenderTargetPixels(P.rt, 0, 0, W, H, P.buf);
+  r.setRenderTarget(null);
+  r.toneMapping = tm; r.toneMappingExposure = ex; r.setClearColor(cc, ca); r.shadowMap.enabled = sm;
+  P.scene.remove(h.root);
+  disposeHumanoid(h);
+  const g = P.canvas.getContext('2d'), img = g.createImageData(W, H);
+  for (let y = 0; y < H; y++) img.data.set(P.buf.subarray((H - 1 - y) * W * 4, (H - y) * W * 4), y * W * 4);
+  g.putImageData(img, 0, 0);
+  return P.canvas.toDataURL('image/png');
+}
+
+/* ---------------- card markup ---------------- */
+function statLine(c) {
+  const r = c.r;
+  const pairs = c.pos === 'C' || c.pos === 'PF' ? [['INS', r.ins], ['REB', r.reb], ['BLK', r.blk]] : c.pos === 'PG' ? [['3PT', r.tpt], ['HND', r.hnd], ['PAS', r.pas]] : [['3PT', r.tpt], ['INS', r.ins], ['DEF', r.def]];
+  return pairs.map(([k, v]) => `<span><b>${v}</b>${k}</span>`).join('');
+}
+function cardHTML(c, o) {
+  o = o || {};
+  const t = TIERS[tierIdx(c.tier)];
+  return `<div class="dcard t-${c.tier}${o.cls ? ' ' + o.cls : ''}"${o.uid != null ? ` data-uid="${o.uid}"` : ''}${o.nav ? ' data-nav="1"' : ''} style="--tc:${c.team.c1}">
+    <div class="dc-face">
+      <div class="dc-bg"></div><div class="dc-team">${c.team.id}</div>
+      <img class="dc-pt" data-card="${c.id}" alt="">
+      <div class="dc-ovr">${c.ovr}<small>${c.pos}</small></div>
+      <div class="dc-tier">${t.name}</div>
+      <div class="dc-name">${cardName(c)}</div>
+      <div class="dc-stats">${statLine(c)}</div>
+      <div class="dc-shine"></div>
+    </div>
+    ${o.back ? '<div class="dc-back"><div class="dc-logo">HK</div></div>' : ''}
+  </div>`;
+}
+function cardName(c) {
+  const q = c.n.match(/"([^"]+)"/);
+  if (q) return q[1];
+  const parts = c.n.split(' ');
+  return parts.length > 1 ? parts.slice(1).join(' ') : c.n;
+}
+function coinStr(n) { return n.toLocaleString('en-US'); }
+
+/* ---------------- screens ---------------- */
+function dyEnter() {
+  if (!DY.p) dyLoad();
+  if (!DY.p) { dyRenderCreate(); showScreen('dycreate', 'home'); return; }
+  dyRenderHub(); showScreen('dyhub', 'home');
+}
+function dyRenderCreate() {
+  $('#dyColors').innerHTML = DY_COLORS.map((c, i) => `<button class="swatch${i === (DY.colIdx || 0) ? ' on' : ''}" data-act="dy-col" data-i="${i}" style="--a:${c.c1};--b:${c.c3}" aria-label="${c.label}"><i></i><span>${c.label}</span></button>`).join('');
+}
+function dyRenderHub() {
+  const p = DY.p;
+  dyAutoFill(false);
+  $('#dyTeamName').innerHTML = `<span style="color:${p.c1 === '#16171b' ? p.c3 : p.c1}">${p.city}</span> ${p.name}`;
+  $('#dyCoins').textContent = coinStr(p.coins);
+  $('#dyRecord').textContent = `${p.w}–${p.l}`;
+  $('#dyOvr').textContent = dyTeamOvr() || '—';
+  const L = dyLineupCards();
+  $('#dyLineup').innerHTML = L.map((c, i) => (c ? cardHTML(c, { cls: 'sm' }) : `<div class="dcard empty sm"><span>${POSL[i]}</span></div>`)).join('');
+  hydratePortraits($('#dyLineup'));
+  const owned = Object.values(p.packs).reduce((a, b) => a + b, 0);
+  $('#dyPackCount').textContent = owned ? `${owned} unopened` : 'None yet';
+  $('#dyOpenBtn').classList.toggle('dim', !owned);
+  $('#dyChal').innerHTML = DY_CHAL.map((ch) => `<button class="chal" data-act="dy-play" data-ch="${ch.id}"><span class="cn">${ch.name}</span><span class="cr"><i class="coin"></i>${coinStr(ch.win)} win · ${coinStr(ch.loss)} loss</span><span class="cs">${ch.note}</span></button>`).join('');
+  const full = L.every(Boolean);
+  $('#dyNeed').hidden = full;
+}
+function dyRenderTeam() {
+  const p = DY.p;
+  const L = dyLineupCards();
+  $('#dySlots').innerHTML = L.map((c, i) => `<div class="slot${DY.slot === i ? ' on' : ''}" data-act="dy-slot" data-i="${i}"><span class="sp">${POSL[i]}</span>${c ? cardHTML(c, { cls: 'sm' }) : '<div class="dcard empty sm"><span>Empty</span></div>'}</div>`).join('');
+  $('#dyTeamOvr').textContent = dyTeamOvr() || '—';
+  const inLine = new Set(p.lineup.filter((u) => u != null));
+  let list = p.cards.slice().sort((a, b) => CARD[b.id].ovr - CARD[a.id].ovr);
+  if (DY.filter !== 'ALL') list = list.filter((o) => CARD[o.id].pos === DY.filter);
+  $('#dyFilters').innerHTML = ['ALL'].concat(POSL).map((f) => `<button class="chip${DY.filter === f ? ' on' : ''}" data-act="dy-filter" data-f="${f}">${f === 'ALL' ? 'All' : f}</button>`).join('');
+  $('#dyCount').textContent = `${p.cards.length} card${p.cards.length === 1 ? '' : 's'}`;
+  $('#dyGrid').innerHTML = list.length ? list.map((o) => {
+    const c = CARD[o.id], used = inLine.has(o.u), armed = DY.sellArm === o.u;
+    return `<div class="gcell${used ? ' used' : ''}">${cardHTML(c, { uid: o.u, cls: 'pick' })}
+      <div class="gact">${used ? '<span class="tag">Starting</span>' : `<button class="mini" data-act="dy-assign" data-u="${o.u}">${DY.slot >= 0 ? 'Put in ' + POSL[DY.slot] : 'Start'}</button><button class="mini ghost${armed ? ' arm' : ''}" data-act="dy-sell" data-u="${o.u}">${armed ? 'Confirm' : 'Sell ' + coinStr(TIERS[tierIdx(c.tier)].sell)}</button>`}</div></div>`;
+  }).join('') : '<p class="muted">No cards here yet. Open a pack.</p>';
+  hydratePortraits($('#dyteam'));
+}
+function packArt(P, big) {
+  return `<div class="dpack p-${P.id}${big ? ' big' : ''}"><div class="dp-foil"></div><div class="dp-top"></div><div class="dp-logo">HK</div><div class="dp-name">${P.name.replace(' Pack', '')}</div><div class="dp-sub">${P.n} cards</div><div class="dp-shine"></div></div>`;
+}
+function oddsHTML(P) {
+  const rows = [];
+  if (P.first) rows.push(`<li><b>Card 1:</b> ${Object.entries(P.first).map(([k, v]) => `<span class="ot t-${k}">${TIERS[tierIdx(k)].name} ${v}%</span>`).join(' ')}</li>`);
+  rows.push(`<li><b>${P.first ? 'Others' : 'Each card'}:</b> ${Object.entries(P.odds).map(([k, v]) => `<span class="ot t-${k}">${TIERS[tierIdx(k)].name} ${v}%</span>`).join(' ')}</li>`);
+  return `<ul class="odds">${rows.join('')}</ul>`;
+}
+function dyRenderStore() {
+  const p = DY.p;
+  $('#dyStoreCoins').textContent = coinStr(p.coins);
+  $('#dyStoreGrid').innerHTML = PACKS.map((P) => {
+    const own = p.packs[P.id] || 0, can = p.coins >= P.price;
+    return `<div class="scell">${packArt(P)}<div class="sinfo"><h3>${P.name}</h3><p>${P.blurb}</p>${oddsHTML(P)}
+      <div class="sbtns"><button class="btn${can ? '' : ' ghost dim'}" data-act="dy-buy" data-p="${P.id}"><i class="coin"></i>${coinStr(P.price)}</button>
+      ${own ? `<button class="btn ghost" data-act="dy-open" data-p="${P.id}">Open (${own})</button>` : ''}</div></div></div>`;
+  }).join('');
+}
+function dyToast(msg) {
+  const t = $('#dyToast'); t.textContent = msg; t.classList.remove('go'); void t.offsetWidth; t.classList.add('go');
+}
+
+/* ---------------- pack opening ---------------- */
+function dyStartPack(packId) {
+  const p = DY.p;
+  if (!p.packs[packId]) return;
+  p.packs[packId]--; if (!p.packs[packId]) delete p.packs[packId];
+  const P = PACKS.find((q) => q.id === packId);
+  const got = dyOpenPack(packId);
+  got.forEach((g) => requestPortrait(g.id));
+  DY.pack = { P, got, stage: 'sealed', flipped: 0 };
+  const best = got.reduce((a, g) => Math.max(a, tierIdx(CARD[g.id].tier)), 0);
+  const el = $('#dypack');
+  el.className = 'screen on dypack-' + TIERS[best].id;
+  $('#dpStage').innerHTML = `<div class="dp-wrap">${packArt(P, true)}</div>`;
+  $('#dpCards').innerHTML = '';
+  $('#dpHint').textContent = 'Tap the pack to open it';
+  $('#dpActions').innerHTML = '<button class="btn" data-act="dy-tear">Open pack</button>';
+  showScreen('dypack', 'dyhub');
+  $('#dypack').className = 'screen on dypack-' + TIERS[best].id;
+  $('#dpStage .dpack').addEventListener('click', dyTearPack, { once: true });
+  if (AU.on) SFX.ui('ok');
+}
+function dyTearPack() {
+  const D = DY.pack;
+  if (!D || D.stage !== 'sealed') return;
+  D.stage = 'tearing';
+  const pk = $('#dpStage .dpack');
+  pk.classList.add('shake');
+  $('#dpHint').textContent = '';
+  if (AU.on) { const t = now(); noiseHit(t, 'bandpass', 900, 0.6, 0.5, 0.25, AU.sfx, 0.25); }
+  setTimeout(() => {
+    pk.classList.add('torn');
+    $('#dypack').classList.add('burst');
+    if (AU.on) { const t = now(); noiseHit(t, 'highpass', 2500, 0.5, 0.35, 0.35, AU.sfx); tone('sine', 220, 880, t, 0.5, 0.15, AU.sfx); }
+  }, 900);
+  setTimeout(() => {
+    $('#dpStage').innerHTML = '';
+    $('#dpCards').innerHTML = D.got.map((g, i) => `<div class="flip" style="--i:${i};--n:${D.got.length}">${cardHTML(CARD[g.id], { back: true, cls: 'big' })}</div>`).join('');
+    hydratePortraits($('#dpCards'));
+    D.stage = 'reveal';
+    $('#dpHint').textContent = 'Tap a card to flip it';
+    $('#dpActions').innerHTML = '<button class="btn ghost" data-act="dy-flipall">Reveal all</button>';
+    $$('#dpCards .flip').forEach((f, i) => f.addEventListener('click', () => dyFlip(i)));
+  }, 1500);
+}
+function dyFlip(i) {
+  const D = DY.pack;
+  if (!D || D.stage !== 'reveal') return;
+  const f = $$('#dpCards .flip')[i];
+  if (!f || f.classList.contains('open') || f.classList.contains('charging')) return;
+  const c = CARD[D.got[i].id], ti = tierIdx(c.tier);
+  const go = () => {
+    f.classList.remove('charging'); f.classList.add('open');
+    D.flipped++;
+    if (AU.on) { const t = now(); tone('triangle', 500 + ti * 120, 900 + ti * 160, t, 0.25, 0.12, AU.sfx); if (ti >= 3) { tone('sine', 660 + ti * 80, 660 + ti * 80, t + 0.05, 0.6, 0.1, AU.sfx); tone('sine', 990 + ti * 80, 990 + ti * 80, t + 0.12, 0.7, 0.08, AU.sfx); } }
+    if (ti >= 5) { $('#dypack').classList.add('walkout'); crowdRoar(1, 3); setTimeout(() => $('#dypack').classList.remove('walkout'), 2600); }
+    if (D.flipped === D.got.length) dyPackDone();
+  };
+  if (ti >= 3) { f.classList.add('charging', 'c-' + c.tier); if (AU.on) tone('sine', 120, 480, now(), 0.7, 0.12, AU.sfx); setTimeout(go, ti >= 5 ? 1300 : 650); }
+  else go();
+}
+function dyFlipAll() {
+  const D = DY.pack; if (!D) return;
+  $$('#dpCards .flip').forEach((f, i) => setTimeout(() => dyFlip(i), i * 420));
+}
+function dyPackDone() {
+  const D = DY.pack;
+  D.stage = 'done';
+  const value = D.got.reduce((a, g) => a + TIERS[tierIdx(CARD[g.id].tier)].sell, 0);
+  $('#dpHint').textContent = `Added to your collection · quick-sell value ${coinStr(value)} coins`;
+  const more = Object.values(DY.p.packs).reduce((a, b) => a + b, 0);
+  $('#dpActions').innerHTML = `${more ? `<button class="btn ghost" data-act="dy-nextpack">Open next pack (${more})</button>` : ''}<button class="btn" data-act="dy-team">Set lineup</button><button class="btn ghost" data-act="dy-hub">Done</button>`;
+  dyAutoFill(false);
+}
+
+/* ---------------- game flow ---------------- */
+function dyPlay(chId) {
+  const ch = DY_CHAL.find((c) => c.id === chId);
+  if (!DY.p.cards.length) { dyToast('Open your free packs first'); return; }
+  DY.chal = ch;
+  const me = dyTeamDef(), opp = dyOpponent(ch);
+  startGame({ mode: 'dynasty', home: me, away: opp, userTeam: 0, difficulty: ch.diff });
+}
+function dyResult() {
+  const T0 = G.teams[0], T1 = G.teams[1];
+  const res = dyReward(DY.chal, T0.score, T1.score);
+  DY.lastResult = res;
+  $('#dyResTitle').textContent = res.won ? 'Victory' : 'Defeat';
+  $('#dyResTitle').className = 'h-display ' + (res.won ? 'win' : 'loss');
+  $('#dyResScore').innerHTML = [T0, T1].map((T) => `<div class="ts"><span class="sw" style="background:${T.def.c1}"></span>${T.def.id} ${T.score}</div>`).join('<span class="muted">–</span>');
+  $('#dyResRows').innerHTML = `<div><span>${res.won ? 'Win' : 'Played'} · ${DY.chal.name}</span><b>+${coinStr(res.base)}</b></div>${res.margin ? `<div><span>Margin bonus</span><b>+${coinStr(res.margin)}</b></div>` : ''}`;
+  const el = $('#dyResCoins'), from = DY.p.coins - res.total, to = DY.p.coins, t0 = performance.now();
+  const anim = () => { const u = Math.min(1, (performance.now() - t0) / 1400); el.textContent = coinStr(Math.round(from + (to - from) * (1 - Math.pow(1 - u, 3)))); if (u < 1) requestAnimationFrame(anim); };
+  anim();
+  showScreen('dyresult');
+  if (AU.on && res.won) SFX.ui('perfect');
+}
+
+/* ---------------- actions ---------------- */
+function dyLeaveGame() {
+  if (!APP.running) return;
+  APP.running = false; APP.paused = false;
+  $('#hud').classList.remove('on');
+  startAttract();
+}
+function dyAction(a, el) {
+  const p = DY.p;
+  switch (a) {
+    case 'dy-col': DY.colIdx = +el.dataset.i; dyRenderCreate(); break;
+    case 'dy-create': {
+      const city = ($('#dyCity').value || '').trim().slice(0, 16) || 'Hometown';
+      const name = ($('#dyName').value || '').trim().slice(0, 16) || 'Hoopers';
+      dyCreate(city, name, DY_COLORS[DY.colIdx || 0]);
+      dyRenderHub(); showScreen('dyhub', 'home');
+      dyToast('3 free Rookie packs are waiting for you');
+      break;
+    }
+    case 'dy-hub': dyLeaveGame(); dyRenderHub(); showScreen('dyhub', 'home'); break;
+    case 'dy-team': DY.slot = -1; DY.sellArm = null; dyRenderTeam(); showScreen('dyteam', 'dyhub'); break;
+    case 'dy-store': dyLeaveGame(); dyRenderStore(); showScreen('dystore', 'dyhub'); break;
+    case 'dy-tear': dyTearPack(); break;
+    case 'dy-openany': case 'dy-nextpack': {
+      const id = PACKS.map((q) => q.id).find((k) => p.packs[k]);
+      if (id) dyStartPack(id); else { dyRenderStore(); showScreen('dystore', 'dyhub'); dyToast('No packs left. Win games to earn coins.'); }
+      break;
+    }
+    case 'dy-open': dyStartPack(el.dataset.p); break;
+    case 'dy-buy': {
+      const P = PACKS.find((q) => q.id === el.dataset.p);
+      if (p.coins < P.price) { dyToast(`You need ${coinStr(P.price - p.coins)} more coins. Win games to earn them.`); break; }
+      p.coins -= P.price; p.packs[P.id] = (p.packs[P.id] || 0) + 1; dySave();
+      dyStartPack(P.id);
+      break;
+    }
+    case 'dy-flipall': dyFlipAll(); break;
+    case 'dy-slot': DY.slot = DY.slot === +el.dataset.i ? -1 : +el.dataset.i; dyRenderTeam(); break;
+    case 'dy-filter': DY.filter = el.dataset.f; dyRenderTeam(); break;
+    case 'dy-assign': {
+      const u = +el.dataset.u, c = CARD[dyOwned(u).id];
+      let s = DY.slot >= 0 ? DY.slot : POSL.indexOf(c.pos);
+      const dupe = p.lineup.findIndex((x, i) => x != null && i !== s && dyOwned(x) && dyOwned(x).id === c.id);
+      if (dupe >= 0) { dyToast(`${c.n} is already in your lineup`); break; }
+      p.lineup[s] = u; DY.slot = -1; dySave(); dyRenderTeam();
+      break;
+    }
+    case 'dy-sell': {
+      const u = +el.dataset.u;
+      if (DY.sellArm !== u) { DY.sellArm = u; dyRenderTeam(); break; }
+      const o = dyOwned(u), c = CARD[o.id], v = TIERS[tierIdx(c.tier)].sell;
+      p.cards = p.cards.filter((x) => x.u !== u); p.coins += v; DY.sellArm = null; dySave();
+      dyToast(`Sold ${c.n} for ${coinStr(v)} coins`); dyRenderTeam();
+      break;
+    }
+    case 'dy-autofill': dyAutoFill(true); dyRenderTeam(); dyToast('Best available lineup set'); break;
+    case 'dy-play': dyPlay(el.dataset.ch); break;
+    case 'dy-again': dyPlay(DY.chal.id); break;
+    case 'dy-reset-arm': { const b = el; if (b.dataset.armed) { try { localStorage.removeItem('hk-dynasty-v1'); } catch (e) { /* ignore */ } DY.p = null; dyRenderCreate(); showScreen('dycreate', 'home'); } else { b.dataset.armed = '1'; b.textContent = 'Tap again to erase your Dynasty'; } break; }
+  }
+}
+
 /* ---- 10-main.js ---- */
 /* ============================================================
    Boot and main loop: fixed 60 Hz simulation, interpolated
@@ -5728,13 +6557,14 @@ function tick(rdt) {
   }
   if (APP.running && APP.finalT > 0 && !APP.paused && !APP.screen) {
     APP.finalT -= rdt;
-    if (APP.finalT <= 0 && !APP.shownFinal) { APP.shownFinal = true; if (APP.mode === 'threept') showTPResult(); else showBox('final'); }
+    if (APP.finalT <= 0 && !APP.shownFinal) { APP.shownFinal = true; if (APP.mode === 'threept') showTPResult(); else if (APP.mode === 'dynasty') dyResult(); else showBox('final'); }
   }
   if (APP.mode === 'attract' && G.state === 'final') {
     APP.attractT = (APP.attractT || 0) + rdt;
     if (APP.attractT > 5) { APP.attractT = 0; startAttract(); }
   }
   autoQuality(rdt);
+  portraitStep();
   updateHUD(rdt);
   crowdUpdate(rdt);
   renderFrame(simOn ? rdt * scale : 0, rdt);

@@ -33,13 +33,14 @@ function tick(rdt) {
   }
   if (APP.running && APP.finalT > 0 && !APP.paused && !APP.screen) {
     APP.finalT -= rdt;
-    if (APP.finalT <= 0 && !APP.shownFinal) { APP.shownFinal = true; if (APP.mode === 'threept') showTPResult(); else showBox('final'); }
+    if (APP.finalT <= 0 && !APP.shownFinal) { APP.shownFinal = true; if (APP.mode === 'threept') showTPResult(); else if (APP.mode === 'dynasty') dyResult(); else showBox('final'); }
   }
   if (APP.mode === 'attract' && G.state === 'final') {
     APP.attractT = (APP.attractT || 0) + rdt;
     if (APP.attractT > 5) { APP.attractT = 0; startAttract(); }
   }
   autoQuality(rdt);
+  portraitStep();
   updateHUD(rdt);
   crowdUpdate(rdt);
   renderFrame(simOn ? rdt * scale : 0, rdt);

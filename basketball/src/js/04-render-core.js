@@ -264,7 +264,7 @@ function initPost() {
   P.mComp = ppMat(`
     uniform sampler2D tScene; uniform sampler2D tBloom; uniform vec2 uRes;
     uniform float uBloom; uniform float uExposure; uniform float uTime; uniform float uVig; uniform float uGrain;
-    uniform float uFlash; uniform float uCine; uniform float uCA; uniform float uSat;
+    uniform float uFlash; uniform float uCine; uniform float uCA; uniform float uSat; uniform float uStreak;
     varying vec2 vUv;
     vec3 rrt(vec3 v){ vec3 a = v * (v + 0.0245786) - 0.000090537; vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081; return a / b; }
     vec3 aces(vec3 c){
@@ -279,6 +279,9 @@ function initPost() {
       float ca = uCA * dot(d, d);
       vec3 col = vec3(texture2D(tScene, uv - d * ca).r, texture2D(tScene, uv).g, texture2D(tScene, uv + d * ca).b);
       col += texture2D(tBloom, uv).rgb * uBloom;
+      vec3 st = vec3(0.0);
+      for (int i = 1; i <= 6; i++) { float o = float(i) * 0.02; st += (texture2D(tBloom, uv + vec2(o, 0.0)).rgb + texture2D(tBloom, uv - vec2(o, 0.0)).rgb) * (1.0 - float(i) / 7.0); }
+      col += st * uStreak * vec3(0.55, 0.72, 1.0);
       col = aces(col * uExposure);
       float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
       col = max(mix(vec3(l), col, uSat - uCine * 0.3), 0.0);
@@ -293,7 +296,7 @@ function initPost() {
       gl_FragColor = vec4(col, 1.0);
     }`, { tScene: { value: null }, tBloom: { value: null }, uRes: { value: new THREE.Vector2(1, 1) }, uBloom: { value: 0.45 },
     uExposure: { value: 1.12 }, uTime: { value: 0 }, uVig: { value: 0.32 }, uGrain: { value: 0.028 }, uFlash: { value: 0 },
-    uCine: { value: 0 }, uCA: { value: 0.006 }, uSat: { value: 1.1 } });
+    uCine: { value: 0 }, uCA: { value: 0.006 }, uSat: { value: 1.1 }, uStreak: { value: 0.045 } });
 }
 function resizePost(w, h) {
   const P = R.pp;

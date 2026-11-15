@@ -130,8 +130,177 @@ table.box thead th { font: 700 11px var(--f-body); letter-spacing: 0.12em; color
 table.box tr.team td { font: 800 15px var(--f-display); text-transform: uppercase; letter-spacing: 0.04em; color: var(--wood); background: var(--ink-3); }
 table.box tr.tot td { font-weight: 700; color: var(--chalk); }
 
+
+/* ---------- Dynasty ---------- */
+.dy-wrap { max-width: 1120px; margin: 0 auto; min-height: 100%; display: flex; flex-direction: column; gap: 18px; justify-content: center; }
+.dy-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 16px; flex-wrap: wrap; }
+.dy-head .h-display { font-size: clamp(34px, 5vw, 64px); }
+.pills { display: flex; gap: 8px; flex-wrap: wrap; }
+.pill { display: flex; align-items: center; gap: 8px; padding: 8px 14px; background: rgba(18,26,40,0.85); border: 1px solid var(--line); border-radius: 999px; font: 800 20px var(--f-display); font-variant-numeric: tabular-nums; }
+.pill small { font: 700 11px var(--f-body); letter-spacing: 0.14em; color: var(--steel); text-transform: uppercase; }
+.pill.gold { border-color: rgba(255,210,90,0.45); color: #ffd86e; }
+.coin { display: inline-block; width: 1em; height: 1em; border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fff3b0 0 18%, #f2c03c 40%, #a8730e 100%); box-shadow: inset 0 0 0 2px rgba(120,80,0,0.55); vertical-align: -0.12em; margin-right: 6px; }
+.dy-row { display: flex; gap: 12px; flex-wrap: wrap; align-items: flex-end; }
+.tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.tile { position: relative; overflow: hidden; text-align: left; cursor: pointer; border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; background: linear-gradient(135deg, rgba(27,38,56,0.95), rgba(12,17,27,0.95)); color: var(--chalk); display: grid; gap: 4px; min-width: 0; }
+.tile b { font: 900 italic 28px/1 var(--f-display); text-transform: uppercase; }
+.tile span { font: 600 13px var(--f-body); color: var(--steel); }
+.tile.hot { background: linear-gradient(135deg, #ff7a1a, #b8420a); border-color: #ffb36b; }
+.tile.hot span { color: rgba(255,255,255,0.85); }
+.tile.dim { opacity: 0.55; }
+.tile.sel, .chal.sel, .swatch.sel, .chip.sel, .mini.sel, .slot.sel { outline: 2px solid var(--warn); outline-offset: 2px; }
+.chals { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.chal { text-align: left; cursor: pointer; border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; background: rgba(14,20,31,0.92); color: var(--chalk); display: grid; gap: 4px; min-width: 0; }
+.chal .cn { font: 900 italic 24px/1 var(--f-display); text-transform: uppercase; }
+.chal .cr { font: 700 13px var(--f-body); color: #ffd86e; }
+.chal .cs { font: 500 12px var(--f-body); color: var(--steel); }
+.chal:hover, .tile:hover { border-color: rgba(255,255,255,0.4); }
+.note { font: 600 14px var(--f-body); color: var(--warn); }
+.swatches { display: flex; gap: 10px; flex-wrap: wrap; }
+.swatch { cursor: pointer; border: 2px solid transparent; background: rgba(14,20,31,0.9); border-radius: 8px; padding: 8px 10px; display: flex; align-items: center; gap: 8px; color: var(--chalk); font: 700 13px var(--f-body); }
+.swatch i { width: 26px; height: 26px; border-radius: 50%; background: linear-gradient(135deg, var(--a) 0 60%, var(--b) 60%); box-shadow: 0 0 0 2px rgba(255,255,255,0.2); }
+.swatch.on { border-color: var(--chalk); }
+.field { display: grid; gap: 6px; max-width: 360px; }
+.field label { font: 700 11px var(--f-body); letter-spacing: 0.16em; text-transform: uppercase; color: var(--steel); }
+.field input { font: 800 24px var(--f-display); text-transform: uppercase; color: var(--chalk); background: rgba(14,20,31,0.92); border: 1px solid var(--line); border-radius: 6px; padding: 8px 12px; -webkit-user-select: text; user-select: text; }
+.field input:focus { outline: 2px solid var(--warn); }
+.fields { display: flex; gap: 12px; flex-wrap: wrap; }
+.slots { display: flex; gap: 12px; flex-wrap: wrap; }
+.slot { cursor: pointer; display: grid; gap: 6px; justify-items: center; padding: 6px; border-radius: 10px; border: 2px solid transparent; }
+.slot.on { border-color: var(--warn); background: rgba(255,210,63,0.08); }
+.slot .sp { font: 800 13px var(--f-body); letter-spacing: 0.14em; color: var(--steel); }
+.chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.chip { cursor: pointer; border: 1px solid var(--line); background: rgba(14,20,31,0.9); color: var(--chalk); border-radius: 999px; padding: 6px 12px; font: 800 14px var(--f-display); }
+.chip.on { background: var(--chalk); color: var(--ink); }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(124px, 1fr)); gap: 14px; }
+.gcell { display: grid; gap: 6px; justify-items: center; }
+.gcell.used .dcard { opacity: 0.55; }
+.gact { display: flex; gap: 4px; flex-wrap: wrap; justify-content: center; }
+.mini { cursor: pointer; border: 0; border-radius: 4px; padding: 4px 8px; font: 800 12px var(--f-body); background: var(--signal); color: var(--ink); }
+.mini.ghost { background: var(--ink-3); color: var(--chalk); }
+.mini.arm { background: var(--bad); color: #fff; }
+.tag { font: 700 11px var(--f-body); letter-spacing: 0.1em; text-transform: uppercase; color: var(--good); }
+.dim { opacity: 0.6; }
+.sgrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.scell { display: flex; gap: 16px; padding: 14px; border: 1px solid var(--line); border-radius: 10px; background: rgba(14,20,31,0.92); align-items: center; min-width: 0; }
+.sinfo { display: grid; gap: 6px; min-width: 0; }
+.sinfo h3 { margin: 0; font: 900 italic 26px var(--f-display); text-transform: uppercase; }
+.sinfo p { margin: 0; font-size: 14px; color: var(--steel); }
+.odds { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 12px; }
+.odds b { color: var(--chalk); }
+.ot { display: inline-block; padding: 1px 6px; border-radius: 3px; margin: 1px 2px 1px 0; font-weight: 700; background: linear-gradient(135deg, var(--t1), var(--t2)); color: var(--ink2); }
+.sbtns { display: flex; gap: 8px; flex-wrap: wrap; }
+.sbtns .btn { font-size: 20px; padding: 8px 20px; }
+#dyToast { position: fixed; left: 50%; bottom: max(24px, env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: rgba(10,14,22,0.94); border: 1px solid rgba(255,210,90,0.45); color: var(--chalk); padding: 10px 18px; border-radius: 6px; font: 600 15px var(--f-body); opacity: 0; pointer-events: none; z-index: 40; white-space: nowrap; max-width: 92vw; overflow: hidden; text-overflow: ellipsis; }
+#dyToast.go { animation: toast 3s ease-out forwards; }
+@keyframes toast { 0% { opacity: 0; transform: translate(-50%, 10px); } 8% { opacity: 1; transform: translate(-50%, 0); } 85% { opacity: 1; } 100% { opacity: 0; } }
+.res-rows { display: grid; gap: 6px; max-width: 420px; }
+.res-rows div { display: flex; justify-content: space-between; font: 600 16px var(--f-body); padding: 8px 12px; background: rgba(14,20,31,0.9); border-radius: 6px; }
+.res-rows b { color: #ffd86e; font: 800 20px var(--f-display); }
+.res-bal { font: 900 clamp(40px, 7vw, 72px)/1 var(--f-display); color: #ffd86e; display: flex; align-items: center; gap: 6px; }
+.h-display.win { color: #ffd86e; } .h-display.loss { color: var(--steel); }
+
+/* tier palettes */
+.t-bronze { --t1: #4e2c14; --t2: #c98a52; --t3: #f0c08c; --tg: #e3a066; --ink2: #fff3e6; }
+.t-silver { --t1: #535d68; --t2: #dfe5ec; --t3: #ffffff; --tg: #f2f6fb; --ink2: #15181d; }
+.t-gold { --t1: #6e4b0c; --t2: #f3cf6a; --t3: #fff1b8; --tg: #ffd86e; --ink2: #241703; }
+.t-emerald { --t1: #032e22; --t2: #22c08a; --t3: #a9ffe0; --tg: #3cffb4; --ink2: #effff8; }
+.t-sapphire { --t1: #071740; --t2: #3f7dff; --t3: #b8d3ff; --tg: #5aa8ff; --ink2: #f0f5ff; }
+.t-ruby { --t1: #3d0410; --t2: #f02a52; --t3: #ffb3c2; --tg: #ff3b5c; --ink2: #fff1f4; }
+.t-onyx { --t1: #040406; --t2: #2a2a35; --t3: #9a88c8; --tg: #c9a7ff; --ink2: #f6eeff; }
+
+/* cards */
+.dcard { --cw: 150px; position: relative; width: var(--cw); aspect-ratio: 5 / 7; flex: none; max-width: 100%; }
+.dcard.sm { --cw: 116px; }
+.dcard.big { --cw: clamp(118px, 17vw, 200px); }
+.dc-face, .dc-back { position: absolute; inset: 0; border-radius: 9px; overflow: hidden; }
+.dc-face { background: var(--t1); box-shadow: 0 10px 28px rgba(0,0,0,0.55), 0 0 0 2px var(--t2), inset 0 0 0 1px rgba(255,255,255,0.25); }
+.dc-bg { position: absolute; inset: 0;
+  background: radial-gradient(120% 70% at 50% 0%, var(--t3) 0%, transparent 55%),
+    repeating-linear-gradient(115deg, rgba(255,255,255,0.07) 0 2px, transparent 2px 9px),
+    linear-gradient(160deg, var(--t2) 0%, var(--t1) 62%, var(--t1) 100%); }
+.dc-bg::after { content: ""; position: absolute; inset: 0; background: linear-gradient(0deg, var(--tc) 0%, transparent 38%); opacity: 0.55; }
+.dc-team { position: absolute; right: -4%; bottom: 22%; font: 900 italic calc(var(--cw) * 0.42)/1 var(--f-display); color: rgba(255,255,255,0.08); }
+.dc-pt { position: absolute; left: 0; right: 0; bottom: 21%; width: 100%; height: 74%; object-fit: cover; object-position: center top; opacity: 0; transition: opacity .35s; filter: drop-shadow(0 6px 10px rgba(0,0,0,0.45)); }
+.dc-pt.in { opacity: 1; }
+.dc-ovr { position: absolute; left: 7%; top: 4%; display: grid; justify-items: center; font: 900 calc(var(--cw) * 0.24)/0.9 var(--f-display); color: var(--ink2); text-shadow: 0 2px 6px rgba(0,0,0,0.35); }
+.dc-ovr small { font: 800 calc(var(--cw) * 0.1)/1 var(--f-display); letter-spacing: 0.04em; }
+.dc-tier { position: absolute; right: 6%; top: 5%; font: 800 calc(var(--cw) * 0.075)/1 var(--f-body); letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink2); opacity: 0.9; }
+.dc-name { position: absolute; left: 0; right: 0; bottom: 14%; padding: 3% 6%; font: 800 calc(var(--cw) * 0.1)/1.05 var(--f-display); text-transform: uppercase; text-align: center; color: #fff; background: linear-gradient(90deg, transparent, rgba(0,0,0,0.6) 15%, rgba(0,0,0,0.6) 85%, transparent); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dc-stats { position: absolute; left: 0; right: 0; bottom: 2.5%; display: flex; justify-content: space-around; font: 700 calc(var(--cw) * 0.06)/1 var(--f-body); color: var(--ink2); letter-spacing: 0.06em; }
+.dc-stats span { display: grid; justify-items: center; gap: 1px; }
+.dc-stats b { font: 800 calc(var(--cw) * 0.095)/1 var(--f-display); }
+.dc-shine { position: absolute; inset: -40%; background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.0) 44%, rgba(255,255,255,0.35) 50%, rgba(255,255,255,0) 56%, transparent 60%); transform: translateX(-60%); pointer-events: none; mix-blend-mode: overlay; }
+.t-emerald .dc-shine, .t-sapphire .dc-shine, .t-ruby .dc-shine, .t-gold .dc-shine { animation: shine 3.6s ease-in-out infinite; }
+.t-onyx .dc-shine { animation: shine 2.8s ease-in-out infinite; background: linear-gradient(105deg, transparent 38%, rgba(255,0,180,0.35) 44%, rgba(0,220,255,0.45) 50%, rgba(255,240,0,0.35) 56%, transparent 62%); mix-blend-mode: screen; }
+.t-onyx .dc-face { box-shadow: 0 10px 28px rgba(0,0,0,0.6), 0 0 0 2px #b9a2ff, 0 0 22px rgba(170,140,255,0.45); }
+.t-ruby .dc-face { box-shadow: 0 10px 28px rgba(0,0,0,0.6), 0 0 0 2px var(--t2), 0 0 18px rgba(255,59,92,0.4); }
+@keyframes shine { 0%, 55% { transform: translateX(-60%); } 100% { transform: translateX(60%); } }
+.dcard.empty { border: 2px dashed rgba(255,255,255,0.22); border-radius: 9px; display: grid; place-items: center; font: 800 18px var(--f-display); color: var(--steel); background: rgba(10,14,22,0.5); }
+.dc-back { background: radial-gradient(circle at 50% 40%, #1d2a44, #070a12 70%); box-shadow: 0 10px 28px rgba(0,0,0,0.55), 0 0 0 2px #c9a14a, inset 0 0 0 6px rgba(201,161,74,0.25); display: grid; place-items: center;
+  background-image: radial-gradient(circle at 50% 40%, #1d2a44, #070a12 70%), repeating-linear-gradient(45deg, rgba(201,161,74,0.08) 0 2px, transparent 2px 12px); }
+.dc-logo { font: 900 italic calc(var(--cw) * 0.36)/1 var(--f-display); color: #c9a14a; text-shadow: 0 0 18px rgba(201,161,74,0.5); }
+
+/* packs */
+.dpack { position: relative; width: 150px; aspect-ratio: 3 / 4.3; border-radius: 6px 6px 10px 10px; overflow: hidden; flex: none; box-shadow: 0 16px 40px rgba(0,0,0,0.6); cursor: pointer; isolation: isolate; }
+.dpack.big { width: clamp(170px, 24vw, 250px); }
+.dp-foil { position: absolute; inset: 0; background: linear-gradient(150deg, var(--p2), var(--p1) 55%, #050608); }
+.dp-foil::after { content: ""; position: absolute; inset: 0; background: repeating-linear-gradient(60deg, rgba(255,255,255,0.08) 0 3px, transparent 3px 14px), radial-gradient(80% 50% at 50% 30%, rgba(255,255,255,0.25), transparent 70%); }
+.dp-top { position: absolute; left: 0; right: 0; top: 0; height: 13%; background: linear-gradient(180deg, rgba(0,0,0,0.35), rgba(0,0,0,0.05)); clip-path: polygon(0 0, 100% 0, 100% 75%, 95% 100%, 90% 75%, 85% 100%, 80% 75%, 75% 100%, 70% 75%, 65% 100%, 60% 75%, 55% 100%, 50% 75%, 45% 100%, 40% 75%, 35% 100%, 30% 75%, 25% 100%, 20% 75%, 15% 100%, 10% 75%, 5% 100%, 0 75%); }
+.dp-logo { position: absolute; left: 0; right: 0; top: 24%; text-align: center; font: 900 italic calc(var(--pw, 150px) * 0.0 + 64px)/1 var(--f-display); color: rgba(255,255,255,0.92); text-shadow: 0 4px 18px rgba(0,0,0,0.5); }
+.dpack.big .dp-logo { font-size: clamp(70px, 9vw, 104px); }
+.dp-name { position: absolute; left: 0; right: 0; bottom: 18%; text-align: center; font: 900 italic 28px/1 var(--f-display); text-transform: uppercase; color: #fff; letter-spacing: 0.02em; }
+.dpack.big .dp-name { font-size: clamp(30px, 4vw, 44px); }
+.dp-sub { position: absolute; left: 0; right: 0; bottom: 9%; text-align: center; font: 700 12px var(--f-body); letter-spacing: 0.2em; text-transform: uppercase; color: rgba(255,255,255,0.75); }
+.dp-shine { position: absolute; inset: -50%; background: linear-gradient(110deg, transparent 42%, rgba(255,255,255,0.45) 50%, transparent 58%); animation: shine 3s ease-in-out infinite; mix-blend-mode: overlay; }
+.p-rookie { --p1: #5a3418; --p2: #d08e54; }
+.p-pro { --p1: #6a4a0c; --p2: #ffd970; }
+.p-allstar { --p1: #052f6b; --p2: #36c3ff; }
+.p-legend { --p1: #2b0838; --p2: #ff4fd8; }
+.dpack.shake { animation: pshake .9s ease-in; }
+@keyframes pshake { 0% { transform: none; } 20% { transform: rotate(-3deg) scale(1.02); } 40% { transform: rotate(3deg) scale(1.04); } 60% { transform: rotate(-4deg) scale(1.06); } 80% { transform: rotate(4deg) scale(1.08); filter: brightness(1.4); } 100% { transform: scale(1.1); filter: brightness(1.8); } }
+.dpack.torn { transform: scale(1.1); filter: brightness(2); transition: transform .5s, opacity .5s; opacity: 0; }
+.dpack.torn .dp-top { transform: translate(30px, -140px) rotate(-25deg); transition: transform .45s ease-out; }
+
+/* pack opening stage */
+#dypack { background: radial-gradient(70% 60% at 50% 45%, rgba(30,40,64,0.9), rgba(4,6,10,0.97)); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); overflow: hidden; }
+#dypack .dy-wrap { align-items: center; text-align: center; }
+#dpStage { display: grid; place-items: center; min-height: 260px; }
+.dp-wrap { animation: float 3s ease-in-out infinite; }
+@keyframes float { 0%, 100% { transform: translateY(0) rotate(-1deg); } 50% { transform: translateY(-10px) rotate(1deg); } }
+#dpCards { display: flex; gap: clamp(8px, 1.6vw, 18px); justify-content: center; flex-wrap: wrap; perspective: 1100px; }
+.flip { cursor: pointer; animation: deal .7s cubic-bezier(.2,.9,.3,1.2) backwards; animation-delay: calc(var(--i) * 0.09s); }
+@keyframes deal { from { opacity: 0; transform: translateY(-120px) scale(0.4) rotate(-12deg); } to { opacity: 1; transform: none; } }
+.flip .dcard { transform-style: preserve-3d; transition: transform .7s cubic-bezier(.3,1.4,.5,1); }
+.flip .dc-face, .flip .dc-back { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+.flip .dc-face { transform: rotateY(180deg); }
+.flip.open .dcard { transform: rotateY(180deg); }
+.flip.charging .dcard { animation: charge .65s ease-in-out infinite; }
+.flip.charging .dc-back { box-shadow: 0 0 0 3px var(--tg), 0 0 40px var(--tg), 0 0 90px var(--tg); }
+.flip.c-ruby .dc-back, .flip.c-onyx .dc-back { box-shadow: 0 0 0 3px var(--tg), 0 0 60px var(--tg), 0 0 140px var(--tg); }
+@keyframes charge { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-8px) scale(1.04); } }
+.flip.open .dc-face { animation: glowpop 1.2s ease-out; }
+@keyframes glowpop { 0% { box-shadow: 0 0 0 2px var(--t2), 0 0 70px var(--tg); } 100% { } }
+.flip.open.t-hi .dcard { animation: none; }
+#dypack::before { content: ""; position: absolute; inset: -50%; background: conic-gradient(from 0deg, transparent 0 10deg, var(--wk, #ff3b5c) 12deg 16deg, transparent 18deg 40deg, var(--wk, #ff3b5c) 42deg 45deg, transparent 47deg 70deg); opacity: 0; pointer-events: none; mix-blend-mode: screen; }
+#dypack.walkout::before { animation: rays 2.6s ease-out; }
+@keyframes rays { 0% { opacity: 0; transform: rotate(0deg); } 15% { opacity: 0.55; } 100% { opacity: 0; transform: rotate(90deg); } }
+#dypack::after { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 50% 45%, #fff, transparent 60%); opacity: 0; pointer-events: none; }
+#dypack.burst::after { animation: burst .9s ease-out; }
+@keyframes burst { 0% { opacity: 0.95; } 100% { opacity: 0; } }
+.dypack-ruby { --wk: #ff3b5c; } .dypack-onyx { --wk: #c9a7ff; } .dypack-sapphire { --wk: #5aa8ff; } .dypack-emerald { --wk: #3cffb4; }
+#dpHint { font: 600 15px var(--f-body); color: var(--steel); min-height: 1.4em; }
+#dpActions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+@media (max-width: 760px) {
+  .tiles { grid-template-columns: 1fr; }
+  .chals { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sgrid { grid-template-columns: 1fr; }
+  .scell { flex-direction: column; align-items: flex-start; }
+  .dcard.sm { --cw: 88px; }
+}
 /* ---------- HUD ---------- */
 #hud { position: absolute; inset: 0; display: none; pointer-events: none; }
+.screen.on ~ #hud { display: none !important; }
 #hud.on { display: block; }
 #bug { position: absolute; left: 50%; transform: translateX(-50%); bottom: max(14px, env(safe-area-inset-bottom, 0px)); display: flex; align-items: stretch; height: 46px; box-shadow: 0 8px 30px rgba(0,0,0,0.45); font-variant-numeric: tabular-nums; }
 #bug .tm { display: flex; align-items: center; gap: 10px; padding: 0 12px 0 0; background: #0d121c; min-width: 128px; position: relative; }
@@ -244,6 +413,7 @@ table.box tr.tot td { font-weight: 700; color: var(--chalk); }
         <p class="tag">Full 5-on-5 basketball with timed shooting, dribble moves, real fouls and a CPU that runs plays.</p>
       </div>
       <nav class="menu" data-nav>
+        <button class="item" data-act="dynasty">Dynasty<small>Open packs, build your squad, win coins</small></button>
         <button class="item" data-act="play">Play now<small>Pick two teams and tip it off</small></button>
         <button class="item" data-act="threept">3-point contest<small>60 seconds, 25 balls, money racks</small></button>
         <button class="item" data-act="watch">Watch CPU vs CPU<small>Sit courtside for a full game</small></button>
@@ -333,6 +503,97 @@ table.box tr.tot td { font-weight: 700; color: var(--chalk); }
     </div>
   </section>
 
+
+  <section id="dycreate" class="screen scrim-full" aria-label="Create your Dynasty">
+    <div class="dy-wrap">
+      <div><span class="eyebrow">Dynasty</span><h2 class="h-2">Found your franchise</h2></div>
+      <p class="muted" style="max-width:60ch;margin:0">Build a team from player cards. You start with three free Rookie packs. Win games to earn coins, then buy better packs: the rarer the pack, the better the cards.</p>
+      <div class="fields">
+        <div class="field"><label for="dyCity">City</label><input id="dyCity" maxlength="16" placeholder="Hometown" autocomplete="off"></div>
+        <div class="field"><label for="dyName">Team name</label><input id="dyName" maxlength="16" placeholder="Hoopers" autocomplete="off"></div>
+      </div>
+      <div class="field" style="max-width:none"><label>Team colors</label><div class="swatches" id="dyColors"></div></div>
+      <div class="row-actions" style="justify-content:flex-start">
+        <button class="btn ghost" data-act="back">Back</button>
+        <button class="btn" data-act="dy-create">Claim 3 free packs</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="dyhub" class="screen scrim-full" aria-label="Dynasty">
+    <div class="dy-wrap">
+      <div class="dy-head">
+        <div><span class="eyebrow">Dynasty</span><h2 class="h-display" id="dyTeamName">Team</h2></div>
+        <div class="pills">
+          <div class="pill gold"><i class="coin"></i><span id="dyCoins">0</span></div>
+          <div class="pill"><small>Record</small><span id="dyRecord">0–0</span></div>
+          <div class="pill"><small>Team OVR</small><span id="dyOvr">—</span></div>
+        </div>
+      </div>
+      <div class="dy-row" id="dyLineup"></div>
+      <p class="note" id="dyNeed">Open your packs to fill your starting five.</p>
+      <div class="tiles">
+        <button class="tile hot" id="dyOpenBtn" data-act="dy-openany"><b>Open packs</b><span id="dyPackCount">3 unopened</span></button>
+        <button class="tile" data-act="dy-store"><b>Pack store</b><span>Spend coins on better packs</span></button>
+        <button class="tile" data-act="dy-team"><b>My team</b><span>Set your lineup, sell spare cards</span></button>
+      </div>
+      <div><span class="eyebrow">Play a game · win coins</span></div>
+      <div class="chals" id="dyChal"></div>
+      <div class="row-actions" style="justify-content:space-between">
+        <button class="btn ghost" data-act="dy-reset-arm" style="font-size:16px">Start over</button>
+        <button class="btn ghost" data-act="back">Main menu</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="dyteam" class="screen scrim-full" aria-label="My team">
+    <div class="dy-wrap">
+      <div class="dy-head">
+        <div><span class="eyebrow">My team</span><h2 class="h-2">Starting five</h2></div>
+        <div class="pills"><div class="pill"><small>Team OVR</small><span id="dyTeamOvr">—</span></div><button class="btn ghost" data-act="dy-autofill" style="font-size:18px">Auto-fill best</button></div>
+      </div>
+      <p class="muted" style="margin:0">Tap a position to pick it, then choose a card below. Sell cards you don't need for coins.</p>
+      <div class="slots" id="dySlots"></div>
+      <div class="dy-head"><div class="chips" id="dyFilters"></div><span class="muted" id="dyCount"></span></div>
+      <div class="grid" id="dyGrid"></div>
+      <div class="row-actions"><button class="btn" data-act="dy-hub">Done</button></div>
+    </div>
+  </section>
+
+  <section id="dystore" class="screen scrim-full" aria-label="Pack store">
+    <div class="dy-wrap">
+      <div class="dy-head">
+        <div><span class="eyebrow">Pack store</span><h2 class="h-2">The rarer the pack, the better the cards</h2></div>
+        <div class="pills"><div class="pill gold"><i class="coin"></i><span id="dyStoreCoins">0</span></div></div>
+      </div>
+      <div class="sgrid" id="dyStoreGrid"></div>
+      <div class="row-actions"><button class="btn" data-act="dy-hub">Back</button></div>
+    </div>
+  </section>
+
+  <section id="dypack" class="screen" aria-label="Opening a pack">
+    <div class="dy-wrap">
+      <div id="dpStage"></div>
+      <div id="dpCards"></div>
+      <p id="dpHint"></p>
+      <div id="dpActions"></div>
+    </div>
+  </section>
+
+  <section id="dyresult" class="screen scrim-full" aria-label="Game result">
+    <div class="dy-wrap">
+      <div><span class="eyebrow">Dynasty · Final</span><h2 class="h-display" id="dyResTitle">Victory</h2></div>
+      <div class="final-score" id="dyResScore"></div>
+      <div class="res-rows" id="dyResRows"></div>
+      <div><span class="eyebrow">Coins</span><div class="res-bal"><i class="coin"></i><span id="dyResCoins">0</span></div></div>
+      <div class="row-actions" style="justify-content:flex-start">
+        <button class="btn" data-act="dy-hub">Continue</button>
+        <button class="btn ghost" data-act="dy-again">Play again</button>
+        <button class="btn ghost" data-act="dy-store">Pack store</button>
+      </div>
+    </div>
+  </section>
+  <div id="dyToast" role="status"></div>
   <div id="hud">
     <div id="ticker" aria-live="polite"></div>
     <div id="banner"><b></b><span></span></div>

@@ -430,6 +430,7 @@ function buildArena() {
   R.crowdLower = buildCrowdMesh(ls); R.scene.add(R.crowdLower); R.reflHide.push(R.crowdLower);
   R.crowdUpper = buildCrowdMesh(us, true); R.scene.add(R.crowdUpper); R.reflHide.push(R.crowdUpper);
   R.seatsAll = ls.concat(us);
+  buildSigns(ls);
   // 360-degree ribbon board on the lower bowl fascia, and the suite level above it
   R.ribbonC = mkCanvas(4096, 96); R.ribbonT = canvasTex(R.ribbonC); R.ribbonT.wrapS = THREE.RepeatWrapping;
   const fasc = ringBand(lower.ax + 17 * 2.7, lower.az + 17 * 2.7, lower.rc + 17 * 2.7, 24.2, 27.4, hdrBasic('#ffffff', 1.9, { map: R.ribbonT }), 6);
@@ -492,6 +493,60 @@ function buildArena() {
   R.courtsideSeats = cs;
   buildCeiling();
   buildJumbotron();
+}
+/* fans holding up signs: an instanced quad per sign, painted from an 8-design atlas, raised on big moments */
+function buildSigns(seats) {
+  const pickS = seats.filter((q) => q.row <= 10);
+  const N = Math.min(150, pickS.length), chosen = [];
+  for (let i = 0; i < N; i++) chosen.push(pickS[Math.floor(Math.random() * pickS.length)]);
+  const geo = new THREE.PlaneGeometry(2.8, 1.76);
+  const cell = new Float32Array(N), seed = new Float32Array(N);
+  for (let i = 0; i < N; i++) { cell[i] = i % 8; seed[i] = Math.random(); }
+  geo.setAttribute('aCell', new THREE.InstancedBufferAttribute(cell, 1));
+  geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seed, 1));
+  R.signC = mkCanvas(1024, 512); R.signT = canvasTex(R.signC);
+  const m = new THREE.MeshBasicMaterial({ map: R.signT, color: new THREE.Color(0.82, 0.82, 0.82), side: THREE.DoubleSide, toneMapped: true });
+  m.onBeforeCompile = (sh) => {
+    Object.assign(sh.uniforms, R.crowdU);
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float aCell; attribute float aSeed; uniform float uTime; uniform float uExcite;')
+      .replace('#include <uv_vertex>', '#include <uv_vertex>\n#ifdef USE_UV\nvUv = vUv * vec2(0.25, 0.5) + vec2(mod(aCell, 4.0) * 0.25, 0.5 * (1.0 - floor(aCell / 4.0)));\n#endif')
+      .replace('#include <begin_vertex>', `vec3 transformed = vec3(position);
+        float up = clamp(uExcite * (1.4 + aSeed) - 0.35, 0.0, 1.0);
+        float sway = sin(uTime * (2.0 + aSeed * 2.0) + aSeed * 30.0);
+        transformed.xy = mat2(cos(sway * 0.12 * up), -sin(sway * 0.12 * up), sin(sway * 0.12 * up), cos(sway * 0.12 * up)) * transformed.xy;
+        transformed.y += mix(-2.2, 0.0, up) + abs(sway) * 0.25 * up;
+        transformed *= mix(0.6, 1.0, up);`);
+  };
+  m.customProgramCacheKey = () => 'crowd-signs';
+  const im = new THREE.InstancedMesh(geo, m, N);
+  const d = new THREE.Object3D();
+  chosen.forEach((q, i) => {
+    d.position.set(q.x, q.y + 3.3, q.z);
+    d.rotation.set(0, PI / 2 - q.face, 0); d.updateMatrix();
+    im.setMatrixAt(i, d.matrix);
+  });
+  im.frustumCulled = false;
+  R.scene.add(im); R.signs = im; R.reflHide.push(im);
+}
+function drawSigns(home) {
+  const c = R.signC, g = c.getContext('2d');
+  const designs = [
+    (x, y) => { bg(x, y, '#ffffff'); txt(x, y, 'DEFENSE', '#111', 70); fence(x, y); },
+    (x, y) => { bg(x, y, home.c1); txt(x, y - 34, "LET'S GO", '#fff', 46); txt(x, y + 30, home.name.toUpperCase(), home.c3, 58); },
+    (x, y) => { bg(x, y, home.c2); drawEmblem(g, home, x, y, 72); },
+    (x, y) => { bg(x, y, '#ffd23f'); txt(x, y, 'MVP!', '#111', 96); },
+    (x, y) => { bg(x, y, '#111111'); txt(x, y, 'BUCKETS', '#ff7a1a', 66); },
+    (x, y) => { bg(x, y, '#ffffff'); txt(x, y - 22, 'SLAM', home.c1, 74); txt(x, y + 44, 'CITY', '#111', 44); },
+    (x, y) => { bg(x, y, home.c1); txt(x, y - 26, 'HOME', '#fff', 60); txt(x, y + 34, 'COURT', home.c3, 60); },
+    (x, y) => { bg(x, y, '#f4f1ea'); txt(x, y - 26, '\u2665', '#e0193b', 64); txt(x, y + 40, home.city.toUpperCase(), '#111', 40); },
+  ];
+  function bg(x, y, col) { g.fillStyle = col; g.fillRect(x - 124, y - 78, 248, 156); g.strokeStyle = 'rgba(0,0,0,0.35)'; g.lineWidth = 6; g.strokeRect(x - 124, y - 78, 248, 156); }
+  function txt(x, y, t, col, size) { g.fillStyle = col; g.textAlign = 'center'; g.textBaseline = 'middle'; let fs = size; g.font = `900 italic ${fs}px ${FONT_D}`; while (g.measureText(t).width > 228 && fs > 20) { fs -= 2; g.font = `900 italic ${fs}px ${FONT_D}`; } g.fillText(t, x, y); }
+  function fence(x, y) { g.fillStyle = '#111'; for (let i = -4; i <= 4; i++) g.fillRect(x + i * 22 - 3, y + 40, 6, 30); g.fillRect(x - 96, y + 48, 192, 5); }
+  g.clearRect(0, 0, 1024, 512);
+  designs.forEach((fn, i) => fn((i % 4) * 256 + 128, Math.floor(i / 4) * 256 + 128));
+  R.signT.needsUpdate = true;
 }
 function ringBand(ax, az, rc, y0, y1, mat, repeatU) {
   const P = rrPath(ax, az, rc, 16), n = P.length;
@@ -609,6 +664,7 @@ function paintArena(home, away) {
     });
     a.needsUpdate = true; }
   drawReflCrowd(home, away);
+  if (R.signC) drawSigns(home);
   R.jumboRing.color.set(home.c1).multiplyScalar(2.2);
   for (const h of R.hoops) { drawPad(h, home); }
   drawRibbon(); drawTable(); drawJumbo(true);

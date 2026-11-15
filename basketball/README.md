@@ -11,6 +11,19 @@ fonts from their CDNs. There is nothing to install.
 
 ## Modes
 
+- **Dynasty**: build your own team from player cards. You start with three
+  free Rookie packs (mostly Bronze and Silver). Win games to earn coins,
+  then buy rarer packs with better odds: Rookie (600), Pro (2,500, one
+  guaranteed Gold+), All-Star (7,500, one guaranteed Emerald+) and Legend
+  (20,000, one guaranteed Sapphire+, a shot at Onyx). Seven card tiers run
+  Bronze, Silver, Gold, Emerald, Sapphire, Ruby, Onyx across about 220 cards,
+  including every league player and eight Onyx legends. Set your starting
+  five, quick-sell spare cards for coins, and play Rookie to Legend
+  challenges against squads built from the same card pool (wins pay 700 to
+  4,000 coins plus a margin bonus; losses still pay a little). Cards show a
+  live 3D portrait of the actual player model, lit in the tier's colour, and
+  big pulls get a walkout when you open the pack. Progress saves in your
+  browser.
 - **Play now**: pick your team and the CPU's, a difficulty (Rookie, Pro,
   All-Star, Legend), a quarter length (2 to 12 minutes) and home or away.
   Halftime report, overtime, box scores and player of the game included.
@@ -75,6 +88,8 @@ Phones and tablets get an on-screen joystick and buttons.
   and a team badge, faces, hair, fingers, fabric detail and a broadcast rim light.
   Arms use IK to dribble, shoot and catch; feet stay planted on the floor.
 - Three referees, bench players, coaches, photographers and courtside fans.
+- Fans hold up signs on big moments, courtside rows clap, and bright lights
+  throw a subtle anamorphic streak.
 - Deformable nets, rim shake on dunks, backboard LEDs at the buzzer, and a
   green ball trail on a perfect release.
 - Graphics setting: Auto (steps down if the frame rate drops), High, Medium, Low.
