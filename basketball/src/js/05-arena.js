@@ -141,6 +141,34 @@ function drawCourt(home, W) {
   g.fillStyle = grd; g.fillRect(0, 0, W, H);
   return c;
 }
+/* height map for the floor: same plank layout as the colour texture, with seams and grain */
+function drawCourtBump(W) {
+  const H = Math.round(W * 66 / 110), k = W / 110;
+  const c = mkCanvas(W, H), g = c.getContext('2d');
+  const X = (x) => (x + 55) * k, Y = (z) => (z + 33) * k;
+  const rnd = mulberry32(7);
+  g.fillStyle = 'rgb(128,128,128)'; g.fillRect(0, 0, W, H);
+  const plank = 0.19;
+  for (let z = -25; z < 25; z += plank) {
+    let x = -47 - rnd() * 9;
+    rnd();
+    while (x < 47) {
+      const len = 3 + rnd() * 9, t = rnd();
+      const x0 = Math.max(x, -47), x1 = Math.min(x + len, 47), v = 122 + t * 12;
+      g.fillStyle = `rgb(${v | 0},${v | 0},${v | 0})`; g.fillRect(X(x0), Y(z), (x1 - x0) * k + 1, plank * k + 1);
+      g.fillStyle = 'rgb(70,70,70)'; g.fillRect(X(x1) - 1, Y(z), 1.5, plank * k);
+      x += len;
+    }
+    g.fillStyle = 'rgb(84,84,84)'; g.fillRect(X(-47), Y(z), 94 * k, Math.max(1, k * 0.014));
+  }
+  const gr = mulberry32(19);
+  for (let i = 0; i < 30000; i++) {
+    const v = gr() < 0.5 ? 100 : 150;
+    g.fillStyle = `rgba(${v},${v},${v},0.25)`;
+    g.fillRect(X(-47 + gr() * 94), Y(-25 + gr() * 50), 3 + gr() * k * 1.6, Math.max(1, k * 0.018));
+  }
+  return c;
+}
 /* roughness map: lacquered maple is glossy, painted lanes and apron a little less, per-plank variation */
 function drawCourtRough(W) {
   const H = Math.round(W * 66 / 110), k = W / 110;
@@ -177,7 +205,7 @@ function makeFloorMat() {
       .replace('#include <common>', '#include <common>\nuniform sampler2D tRefl;\nuniform float reflStr;\nuniform vec2 reflTexel;\nvarying vec4 vReflUv;')
       .replace('#include <tonemapping_fragment>', `
         if (reflStr > 0.0) {
-          vec2 ruv = vReflUv.xy / vReflUv.w;
+          vec2 ruv = vReflUv.xy / vReflUv.w + (normal.xy - geometryNormal.xy) * 0.035;
           float blur = 0.8 + roughnessFactor * 4.0;
           vec3 rc = vec3(0.0); float tot = 0.0;
           for (int i = -4; i <= 4; i++) {
@@ -309,13 +337,19 @@ function crowdMat() {
         float ex = clamp(uExcite * amp, 0.0, 1.6);
         float stand = clamp(ex * 1.3 + wave * 1.2 + aAnim.w, 0.0, 1.0);
         float jump = max(0.0, sin(uTime * (6.5 + amp * 3.0) + ph)) * clamp(ex - 0.25, 0.0, 1.0) * 0.8;
-        if (aPart > 1.5) {
+        if (aPart > 1.5 && aPart < 3.5) {
           float side = aPart > 2.5 ? 1.0 : -1.0;
-          float raise = clamp(ex * (0.75 + 0.5 * sin(uTime * 8.0 + ph * 3.0 + side)) + wave * 1.5, 0.0, 1.0) * 2.75;
+          float clapper = step(0.45, fract(ph * 3.17));
+          float clap = clamp((uExcite * amp - 0.1) * 3.0, 0.0, 1.0) * clapper * (1.0 - wave) * (1.0 - step(0.85, ex));
+          float up = clamp(ex * (0.75 + 0.5 * sin(uTime * 8.0 + ph * 3.0 + side)) + wave * 1.5, 0.0, 1.0) * (1.0 - clap);
+          float raise = up * 2.75 + clap * 1.3;
           vec3 sh = vec3(0.0, 2.05, side * 0.56);
           vec3 p = transformed - sh;
           float c = cos(raise), s = sin(raise);
-          p = vec3(p.x * c - p.y * s, p.x * s + p.y * c, p.z + side * 0.12 * sin(raise));
+          p = vec3(p.x * c - p.y * s, p.x * s + p.y * c, p.z + side * 0.12 * sin(raise) * up);
+          float inward = side * clap * (0.42 + 0.14 * sin(uTime * 15.0 + ph * 5.0));
+          float ci = cos(inward), si = sin(inward);
+          p = vec3(p.x * ci + p.z * si, p.y, -p.x * si + p.z * ci);
           transformed = sh + p;
         }
         if (aPart < 0.5 && position.y < 1.0) transformed.x -= stand * 0.35;
@@ -436,6 +470,21 @@ function buildArena() {
     for (let i = 0; i < 8; i++) if (i !== 4) cs.push({ x: s * (20 + i * 2.15), y: 1.0, z: -30.45, face: -PI / 2, ang: 9, row: 0, kind: i === 0 ? 'coach' : 'bench', side: s });
     for (let i = 0; i < 4; i++) cs.push({ x: s * (49.2 + (i % 2) * 0.9), y: -0.45, z: (i < 2 ? 1 : -1) * (9 + i * 2.6), face: s > 0 ? PI : 0, ang: 9, row: 0, kind: 'photo' });
   }
+  // two rows of courtside seats along the near sideline
+  const cf = [];
+  for (const [z, y] of [[29.4, 0.8], [31.5, 1.35]]) for (let x = -43; x <= 43; x += 2.25) cf.push({ x: x + vrr(-0.15, 0.15), y, z, face: -PI / 2, ang: Math.atan2(z, x), row: 0 });
+  R.courtFans = buildCrowdMesh(cf); R.scene.add(R.courtFans); R.courtFansSeats = cf;
+  { const seatG = new THREE.BoxGeometry(1.5, 0.3, 1.4), backG = new THREE.BoxGeometry(1.5, 1.4, 0.2);
+    const cm = stdMat('#1d2027', 0.55);
+    const seats = new THREE.InstancedMesh(seatG, cm, cf.length), backs = new THREE.InstancedMesh(backG, cm, cf.length);
+    const d = new THREE.Object3D();
+    cf.forEach((c, i) => {
+      d.position.set(c.x, c.y + 0.6, c.z); d.rotation.set(0, 0, 0); d.updateMatrix(); seats.setMatrixAt(i, d.matrix);
+      d.position.set(c.x, c.y + 1.35, c.z + 0.65); d.updateMatrix(); backs.setMatrixAt(i, d.matrix);
+    });
+    R.scene.add(seats); R.scene.add(backs); }
+  const nearRib = new THREE.Mesh(new THREE.PlaneGeometry(96, 1.6), hdrBasic('#ffffff', 1.8, { map: R.ribbonT }));
+  nearRib.position.set(0, 0.8, 27.6); nearRib.rotation.y = PI; R.scene.add(nearRib);
   R.courtside = buildCrowdMesh(cs); R.scene.add(R.courtside);
   { const a = R.courtside.geometry.attributes.aAnim; cs.forEach((c, i) => { a.array[i * 4 + 3] = c.stand ? 1 : 0; a.array[i * 4 + 1] = c.kind === 'photo' ? 0.2 : 0.9; }); a.needsUpdate = true;
     const d = new THREE.Object3D(); cs.forEach((c, i) => { const sc = c.kind === 'bench' ? 1.22 : 1.05; d.position.set(c.x, c.y, c.z); d.rotation.set(0, -c.face, 0); d.scale.set(sc, sc, sc); d.updateMatrix(); R.courtside.setMatrixAt(i, d.matrix); });
@@ -546,10 +595,12 @@ function paintArena(home, away) {
   if (R.floorRough) R.floorRough.dispose();
   R.floorTex = canvasTex(drawCourt(home, R.courtW));
   R.floorRough = canvasTex(drawCourtRough(R.courtW >> 1), false);
-  R.floorMat.map = R.floorTex; R.floorMat.roughnessMap = R.floorRough; R.floorMat.needsUpdate = true;
+  if (!R.floorBump) { R.floorBump = canvasTex(drawCourtBump(R.courtW >> 1), false); }
+  R.floorMat.map = R.floorTex; R.floorMat.roughnessMap = R.floorRough; R.floorMat.bumpMap = R.floorBump; R.floorMat.bumpScale = 0.012;
+  R.floorMat.needsUpdate = true;
   R.benchMats[0].color.set(shade(home.c1, -0.55)); R.benchMats[1].color.set(shade(away.c1, -0.55));
   R.bowlMat.color.set(shade(home.c2, -0.1)).lerp(new THREE.Color('#3a3f4a'), 0.6);
-  colorCrowd(R.crowdLower, home, away); colorCrowd(R.crowdUpper, home, away);
+  colorCrowd(R.crowdLower, home, away); colorCrowd(R.crowdUpper, home, away); colorCrowd(R.courtFans, home, away);
   { const a = R.courtside.geometry.attributes.aShirt, col = new THREE.Color();
     R.courtsideSeats.forEach((c, i) => {
       col.set(c.kind === 'bench' ? (c.side < 0 ? home.c1 : away.c1) : c.kind === 'coach' ? '#1c1f26' : '#2a2c31');

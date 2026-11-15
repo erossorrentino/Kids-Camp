@@ -12,9 +12,9 @@ const HAIRC = ['#14100c', '#221710', '#35261a', '#6a4a2a', '#c9a35e'];
 
 /* ---------- atlas layout: 1024 x 1024 canvas, uv v = 1 - y / 1024 ---------- */
 const AT = 1024;
-const REG = { jersey: [0, 0, 1024, 512], shorts: [0, 512, 512, 256], pelvis: [512, 512, 512, 256], face: [0, 768, 256, 256], hair: [256, 768, 256, 256] };
+const REG = { jersey: [0, 0, 1024, 512], shortsR: [0, 512, 512, 256], shortsL: [512, 512, 512, 256], pelvis: [512, 896, 512, 128], face: [0, 768, 256, 256], hair: [256, 768, 256, 256] };
 const PATCH = { skin: 0, sock: 1, shoe: 2, sole: 3, accent: 4, trim: 5, dark: 6, white: 7, band: 8, sleeve: 9, lip: 10, kit: 11, hairSolid: 12, shoe2: 13, pants: 14, shirt: 15 };
-const ROUGH = { jersey: 0.74, shorts: 0.6, pelvis: 0.6, face: 0.5, hair: 0.85,
+const ROUGH = { jersey: 0.74, shortsR: 0.6, shortsL: 0.6, pelvis: 0.6, face: 0.5, hair: 0.85,
   patch: [0.47, 0.85, 0.32, 0.55, 0.38, 0.6, 0.35, 0.6, 0.8, 0.5, 0.4, 0.6, 0.82, 0.3, 0.7, 0.72] };
 function patchXY(i) { return [512 + (i % 8) * 64, 768 + Math.floor(i / 8) * 64]; }
 function patchUV(name) { const [x, y] = patchXY(PATCH[name]); return [(x + 32) / AT, 1 - (y + 32) / AT]; }
@@ -163,20 +163,28 @@ function paintAtlas(T, home, d, C) {
   }
   // shorts legs (u 0/1 = +z side, 0.5 = -z side; v 0 = hem at the bottom of the region)
   const kitB = C.ref ? C.pants : kit;
-  g.fillStyle = kitB; g.fillRect(0, 512, 512, 256);
-  folds(g, 0, 512, 512, 256, 26, 0.09);
-  const sh = g.createLinearGradient(0, 640, 0, 768); sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(0,0,0,0.2)');
-  g.fillStyle = sh; g.fillRect(0, 640, 512, 128);
-  g.fillStyle = trim;
-  for (const x of [0, 498, 242]) g.fillRect(x, 512, x === 242 ? 28 : 14, 256);
-  g.fillRect(0, 740, 512, 14);
-  g.save(); g.beginPath(); g.arc(128, 580, 30, 0, TAU); g.fillStyle = home ? T.c2 : T.c1; g.fill();
-  g.font = `900 italic 30px ${FONT_D}`; g.fillStyle = '#fff'; g.fillText(T.id, 128, 582); g.restore();
+  for (const x0 of [0, 512]) {
+    g.fillStyle = kitB; g.fillRect(x0, 512, 512, 256);
+    folds(g, x0, 512, 512, 256, 26, 0.09);
+    const sh = g.createLinearGradient(0, 640, 0, 768); sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(0,0,0,0.2)');
+    g.fillStyle = sh; g.fillRect(x0, 640, 512, 128);
+    if (!C.ref) {
+      g.fillStyle = trim;
+      for (const x of [0, 498, 242]) g.fillRect(x0 + x, 512, x === 242 ? 28 : 14, 256);
+      g.fillRect(x0, 740, 512, 14);
+    }
+  }
+  // one team badge on the outside front of the left leg (u 0.375 on that leg)
+  if (!C.ref) {
+    g.save(); g.beginPath(); g.arc(512 + 192, 636, 30, 0, TAU); g.fillStyle = home ? T.c2 : T.c1; g.fill();
+    g.lineWidth = 4; g.strokeStyle = trim; g.stroke();
+    g.font = `900 italic 28px ${FONT_D}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff'; g.fillText(T.id, 512 + 192, 638); g.restore();
+  }
   // shorts pelvis with waistband
-  g.fillStyle = kitB; g.fillRect(512, 512, 512, 256);
-  folds(g, 512, 512, 512, 256, 20, 0.07);
-  g.fillStyle = trim; g.fillRect(512, 512, 512, 46);
-  g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(512, 558, 512, 6);
+  g.fillStyle = kitB; g.fillRect(512, 896, 512, 128);
+  folds(g, 512, 896, 512, 128, 14, 0.07);
+  g.fillStyle = C.ref ? '#0c0c0c' : trim; g.fillRect(512, 896, 512, 26);
+  g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(512, 922, 512, 4);
   // face: u 0.5 = front, v 1 = crown
   const fx = 0, fy = 768;
   g.fillStyle = C.skin; g.fillRect(fx, fy, 256, 256);
@@ -227,6 +235,20 @@ function roughAtlas() {
   for (const p in PATCH) { const i = PATCH[p], [x, y] = patchXY(i); g.fillStyle = v(ROUGH.patch[i]); g.fillRect(x * k, y * k, 64 * k, 64 * k); }
   ROUGH_TEX = new THREE.CanvasTexture(c);
   return ROUGH_TEX;
+}
+
+/* fabric detail as a height map in the same layout: mesh holes on the jersey, a fine twill on the shorts, strands in the hair */
+let DETAIL_TEX = null;
+function detailAtlas() {
+  if (DETAIL_TEX) return DETAIL_TEX;
+  const c = mkCanvas(1024, 1024), g = c.getContext('2d');
+  g.fillStyle = 'rgb(128,128,128)'; g.fillRect(0, 0, 1024, 1024);
+  g.fillStyle = 'rgb(108,108,108)';
+  for (let y = 1; y < 512; y += 3) for (let x = (y / 3 % 2) * 1.5; x < 1024; x += 3) g.fillRect(x, y, 1, 1);
+  for (let x = 0; x < 1024; x += 2) { g.fillStyle = x % 4 ? 'rgb(134,134,134)' : 'rgb(122,122,122)'; g.fillRect(x, 512, 1, 256); }
+  for (let i = 0; i < 3000; i++) { const x = 256 + Math.random() * 256, y = 768 + Math.random() * 256; g.fillStyle = Math.random() < 0.5 ? 'rgb(90,90,90)' : 'rgb(170,170,170)'; g.fillRect(x, y, 1, 4 + Math.random() * 6); }
+  DETAIL_TEX = new THREE.CanvasTexture(c);
+  return DETAIL_TEX;
 }
 
 /* ---------- the model ---------- */
@@ -292,8 +314,13 @@ function buildHumanoid(pl, home) {
       (x, y) => blend(sh, el, sstep(ys - 0.98, ys - 1.32, y) === 0 ? 0 : sstep(ys - 0.98, ys - 1.32, y)), armAO));
     P.push(piece(constUV(sphereG(0.215, 16, 12, 1.0, 1.08, 0.8, 0, -0.07, -s * 0.03), 'skin'), j,
       () => [sh, 1], armAO));
-    P.push(piece(constUV(sphereG(0.155, 12, 9, 0.62, 1.3, 1.0, 0.01, -2.35, 0), 'skin'), j, () => [el, 1], () => 0.92));
-    P.push(piece(constUV(sphereG(0.06, 8, 6, 1, 1.6, 1, 0.08, -2.26, s * 0.1), 'skin'), j, () => [el, 1]));
+    P.push(piece(constUV(sphereG(0.13, 12, 9, 0.6, 1.05, 1.0, 0.01, -2.31, 0), 'skin'), j, () => [el, 1], () => 0.92));
+    for (let f = 0; f < 4; f++) {
+      const fz = (f - 1.5) * 0.058, fl = [0.17, 0.2, 0.19, 0.15][f];
+      const fg = boxG(0.052, fl, 0.05, 0, -fl / 2, 0); fg.rotateZ(0.15); fg.translate(0.03, -2.41, fz);
+      P.push(piece(constUV(fg, 'skin'), j, () => [el, 1], () => 0.88));
+    }
+    { const th = boxG(0.055, 0.15, 0.055, 0, -0.075, 0); th.rotateX(-s * 0.5); th.rotateZ(0.35); th.translate(0.08, -2.27, s * 0.1); P.push(piece(constUV(th, 'skin'), j, () => [el, 1])); }
     if (d.acc === 2 && s > 0) P.push(piece(constUV(lathe([[0.108, -2.05], [0.14, -1.85], [0.165, -1.55], [0.148, -1.3], [0.14, -1.18], [0.158, -1.02], [0.2, -0.75], [0.222, -0.48], [0.21, -0.25]], 16, b, b), 'sleeve'), j,
       (x, y) => blend(sh, el, sstep(ys - 0.98, ys - 1.32, y))));
     if (d.acc === 2 && s < 0) P.push(piece(constUV(cylG(0.108, 0.1, 0.16, 14, 0, -2.08, 0), 'band'), j, () => [el, 1]));
@@ -308,7 +335,7 @@ function buildHumanoid(pl, home) {
     const lp = ref ? 'pants' : 'skin', lw = ref ? 1.18 : 1;
     P.push(piece(constUV(lathe([[0.115 * lw, -3.14], [0.12 * lw, -3.05], [0.14 * lw, -2.9], [0.176 * lw, -2.6], [0.212 * lw, -2.22], [0.2 * lw, -1.95], [0.19 * lw, -1.75], [0.2 * lw, -1.6], [0.23 * lw, -1.4], [0.28 * lw, -1.0], [0.31 * lw, -0.55], [0.31 * lw, -0.2], [0.29 * lw, 0.02]], 16, b, b), lp), j, legW, legAO));
     P.push(piece(constUV(sphereG(0.19 * lw, 12, 9, 1.05, 1, 1, 0.02, -1.6, 0), lp), j, legW, legAO));
-    if (!ref) P.push(piece(regionUV(lathe([[0.43, -1.42], [0.452, -1.2], [0.46, -0.6], [0.45, -0.12], [0.4, 0.06]], 20, b, b), 'shorts'), j,
+    if (!ref) P.push(piece(regionUV(lathe([[0.43, -1.42], [0.452, -1.2], [0.46, -0.6], [0.45, -0.12], [0.4, 0.06]], 20, b, b), s > 0 ? 'shortsR' : 'shortsL'), j,
       (x, y) => blend(BI.hips, hp, sstep(yh + 0.05, yh - 0.35, y)),
       (x, y, z, nx, ny, nz) => 1 - 0.2 * clamp(-nz * s, 0, 1) - 0.12 * (1 - sstep(yh - 1.42, yh - 1.1, y))));
     P.push(piece(constUV(lathe([[0.127, -3.14], [0.133, -2.98], [0.158, -2.75], [0.183, -2.54], [0.179, -2.5]], 16, b, b), 'sock'), j, legW, legAO));
@@ -328,7 +355,12 @@ function buildHumanoid(pl, home) {
   const bHipL = bone(bHips, 0, -0.08, -0.32 * b), bKnL = bone(bHipL, 0, -1.6, 0), bAnkL = bone(bKnL, 0, -1.52, 0);
   const skel = new THREE.Skeleton(bones);
   const atlas = canvasTex(paintAtlas(T, home, d, C));
-  const mat = new THREE.MeshStandardMaterial({ map: atlas, roughnessMap: roughAtlas(), roughness: 1, metalness: 0, vertexColors: true, skinning: true, envMapIntensity: 0.65 });
+  const mat = new THREE.MeshStandardMaterial({ map: atlas, roughnessMap: roughAtlas(), bumpMap: detailAtlas(), bumpScale: 0.05, roughness: 1, metalness: 0, vertexColors: true, skinning: true, envMapIntensity: 0.65 });
+  mat.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader.replace('#include <tonemapping_fragment>',
+      'gl_FragColor.rgb += vec3(0.5, 0.58, 0.72) * pow(1.0 - clamp(dot(normalize(geometryNormal), normalize(vViewPosition)), 0.0, 1.0), 3.0) * 0.32;\n#include <tonemapping_fragment>');
+  };
+  mat.customProgramCacheKey = () => 'player-rim';
   const mesh = new THREE.SkinnedMesh(geo, mat);
   mesh.add(bBody);
   mesh.bind(skel);

@@ -50,7 +50,12 @@ Phones and tablets get an on-screen joystick and buttons.
   rolled for make or miss first, then the flight is solved so it actually
   goes in or rims out the way it was rolled.
 - Shot quality from distance, ratings, defender distance, angle, height and
-  hands up. Release timing grades from "Excellent" to "Very late".
+  hands up. Release timing grades from "Excellent" to "Very late". Range
+  matters: the green window is wider and makes are likelier up close, and
+  deep threes stay hard even with a perfect release.
+- A solid backboard and stanchion: the ball banks and bounces off every side
+  of the glass, its pads, the shot clock and the support arm (`tools/boardtest.js`
+  fires 4,000 balls at it and checks none get through).
 - Layups, dunks, reverse layups, blocks, steals, deflections, rebounding,
   shooting fouls, and-ones, reach-ins, charges, the bonus, shot clock,
   backcourt and out-of-bounds violations, and buzzer beaters.
@@ -65,9 +70,11 @@ Phones and tablets get an on-screen joystick and buttons.
 - Spotlit arena: rounded two-tier bowl with suites, about 7,000 GPU-animated
   fans who stand, cheer and do the wave, a 360° ribbon board, a center-hung
   scoreboard, ceiling light rig with haze, camera flashes and confetti.
-- Procedural players with muscle-profiled limbs, tank-top jerseys with
-  names and numbers, baggy shorts, high-top sneakers, faces, hair styles,
-  headbands and sleeves. Arms use IK to dribble, shoot and catch.
+- Players are single skinned meshes on a 14-bone skeleton, painted from a
+  per-player texture atlas: jerseys with names and numbers, shorts with stripes
+  and a team badge, faces, hair, fingers, fabric detail and a broadcast rim light.
+  Arms use IK to dribble, shoot and catch; feet stay planted on the floor.
+- Three referees, bench players, coaches, photographers and courtside fans.
 - Deformable nets, rim shake on dunks, backboard LEDs at the buzzer, and a
   green ball trail on a perfect release.
 - Graphics setting: Auto (steps down if the frame rate drops), High, Medium, Low.
@@ -83,6 +90,7 @@ the browser's speech engine.
 node tools/build.js       # concatenates src/ into dist/
 node tools/simtest.js 8   # 8 CPU-vs-CPU games headless, prints league-style stats
 node tools/usertest.js 4  # 4 games through the human-input path with a scripted player
+node tools/boardtest.js   # 4,000 balls at the backboard; fails if any pass through
 ```
 
 The simulation has no DOM or renderer dependencies, so the test tools run it

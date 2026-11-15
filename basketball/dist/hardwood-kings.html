@@ -3153,6 +3153,34 @@ function drawCourt(home, W) {
   g.fillStyle = grd; g.fillRect(0, 0, W, H);
   return c;
 }
+/* height map for the floor: same plank layout as the colour texture, with seams and grain */
+function drawCourtBump(W) {
+  const H = Math.round(W * 66 / 110), k = W / 110;
+  const c = mkCanvas(W, H), g = c.getContext('2d');
+  const X = (x) => (x + 55) * k, Y = (z) => (z + 33) * k;
+  const rnd = mulberry32(7);
+  g.fillStyle = 'rgb(128,128,128)'; g.fillRect(0, 0, W, H);
+  const plank = 0.19;
+  for (let z = -25; z < 25; z += plank) {
+    let x = -47 - rnd() * 9;
+    rnd();
+    while (x < 47) {
+      const len = 3 + rnd() * 9, t = rnd();
+      const x0 = Math.max(x, -47), x1 = Math.min(x + len, 47), v = 122 + t * 12;
+      g.fillStyle = `rgb(${v | 0},${v | 0},${v | 0})`; g.fillRect(X(x0), Y(z), (x1 - x0) * k + 1, plank * k + 1);
+      g.fillStyle = 'rgb(70,70,70)'; g.fillRect(X(x1) - 1, Y(z), 1.5, plank * k);
+      x += len;
+    }
+    g.fillStyle = 'rgb(84,84,84)'; g.fillRect(X(-47), Y(z), 94 * k, Math.max(1, k * 0.014));
+  }
+  const gr = mulberry32(19);
+  for (let i = 0; i < 30000; i++) {
+    const v = gr() < 0.5 ? 100 : 150;
+    g.fillStyle = `rgba(${v},${v},${v},0.25)`;
+    g.fillRect(X(-47 + gr() * 94), Y(-25 + gr() * 50), 3 + gr() * k * 1.6, Math.max(1, k * 0.018));
+  }
+  return c;
+}
 /* roughness map: lacquered maple is glossy, painted lanes and apron a little less, per-plank variation */
 function drawCourtRough(W) {
   const H = Math.round(W * 66 / 110), k = W / 110;
@@ -3189,7 +3217,7 @@ function makeFloorMat() {
       .replace('#include <common>', '#include <common>\nuniform sampler2D tRefl;\nuniform float reflStr;\nuniform vec2 reflTexel;\nvarying vec4 vReflUv;')
       .replace('#include <tonemapping_fragment>', `
         if (reflStr > 0.0) {
-          vec2 ruv = vReflUv.xy / vReflUv.w;
+          vec2 ruv = vReflUv.xy / vReflUv.w + (normal.xy - geometryNormal.xy) * 0.035;
           float blur = 0.8 + roughnessFactor * 4.0;
           vec3 rc = vec3(0.0); float tot = 0.0;
           for (int i = -4; i <= 4; i++) {
@@ -3321,13 +3349,19 @@ function crowdMat() {
         float ex = clamp(uExcite * amp, 0.0, 1.6);
         float stand = clamp(ex * 1.3 + wave * 1.2 + aAnim.w, 0.0, 1.0);
         float jump = max(0.0, sin(uTime * (6.5 + amp * 3.0) + ph)) * clamp(ex - 0.25, 0.0, 1.0) * 0.8;
-        if (aPart > 1.5) {
+        if (aPart > 1.5 && aPart < 3.5) {
           float side = aPart > 2.5 ? 1.0 : -1.0;
-          float raise = clamp(ex * (0.75 + 0.5 * sin(uTime * 8.0 + ph * 3.0 + side)) + wave * 1.5, 0.0, 1.0) * 2.75;
+          float clapper = step(0.45, fract(ph * 3.17));
+          float clap = clamp((uExcite * amp - 0.1) * 3.0, 0.0, 1.0) * clapper * (1.0 - wave) * (1.0 - step(0.85, ex));
+          float up = clamp(ex * (0.75 + 0.5 * sin(uTime * 8.0 + ph * 3.0 + side)) + wave * 1.5, 0.0, 1.0) * (1.0 - clap);
+          float raise = up * 2.75 + clap * 1.3;
           vec3 sh = vec3(0.0, 2.05, side * 0.56);
           vec3 p = transformed - sh;
           float c = cos(raise), s = sin(raise);
-          p = vec3(p.x * c - p.y * s, p.x * s + p.y * c, p.z + side * 0.12 * sin(raise));
+          p = vec3(p.x * c - p.y * s, p.x * s + p.y * c, p.z + side * 0.12 * sin(raise) * up);
+          float inward = side * clap * (0.42 + 0.14 * sin(uTime * 15.0 + ph * 5.0));
+          float ci = cos(inward), si = sin(inward);
+          p = vec3(p.x * ci + p.z * si, p.y, -p.x * si + p.z * ci);
           transformed = sh + p;
         }
         if (aPart < 0.5 && position.y < 1.0) transformed.x -= stand * 0.35;
@@ -3448,6 +3482,21 @@ function buildArena() {
     for (let i = 0; i < 8; i++) if (i !== 4) cs.push({ x: s * (20 + i * 2.15), y: 1.0, z: -30.45, face: -PI / 2, ang: 9, row: 0, kind: i === 0 ? 'coach' : 'bench', side: s });
     for (let i = 0; i < 4; i++) cs.push({ x: s * (49.2 + (i % 2) * 0.9), y: -0.45, z: (i < 2 ? 1 : -1) * (9 + i * 2.6), face: s > 0 ? PI : 0, ang: 9, row: 0, kind: 'photo' });
   }
+  // two rows of courtside seats along the near sideline
+  const cf = [];
+  for (const [z, y] of [[29.4, 0.8], [31.5, 1.35]]) for (let x = -43; x <= 43; x += 2.25) cf.push({ x: x + vrr(-0.15, 0.15), y, z, face: -PI / 2, ang: Math.atan2(z, x), row: 0 });
+  R.courtFans = buildCrowdMesh(cf); R.scene.add(R.courtFans); R.courtFansSeats = cf;
+  { const seatG = new THREE.BoxGeometry(1.5, 0.3, 1.4), backG = new THREE.BoxGeometry(1.5, 1.4, 0.2);
+    const cm = stdMat('#1d2027', 0.55);
+    const seats = new THREE.InstancedMesh(seatG, cm, cf.length), backs = new THREE.InstancedMesh(backG, cm, cf.length);
+    const d = new THREE.Object3D();
+    cf.forEach((c, i) => {
+      d.position.set(c.x, c.y + 0.6, c.z); d.rotation.set(0, 0, 0); d.updateMatrix(); seats.setMatrixAt(i, d.matrix);
+      d.position.set(c.x, c.y + 1.35, c.z + 0.65); d.updateMatrix(); backs.setMatrixAt(i, d.matrix);
+    });
+    R.scene.add(seats); R.scene.add(backs); }
+  const nearRib = new THREE.Mesh(new THREE.PlaneGeometry(96, 1.6), hdrBasic('#ffffff', 1.8, { map: R.ribbonT }));
+  nearRib.position.set(0, 0.8, 27.6); nearRib.rotation.y = PI; R.scene.add(nearRib);
   R.courtside = buildCrowdMesh(cs); R.scene.add(R.courtside);
   { const a = R.courtside.geometry.attributes.aAnim; cs.forEach((c, i) => { a.array[i * 4 + 3] = c.stand ? 1 : 0; a.array[i * 4 + 1] = c.kind === 'photo' ? 0.2 : 0.9; }); a.needsUpdate = true;
     const d = new THREE.Object3D(); cs.forEach((c, i) => { const sc = c.kind === 'bench' ? 1.22 : 1.05; d.position.set(c.x, c.y, c.z); d.rotation.set(0, -c.face, 0); d.scale.set(sc, sc, sc); d.updateMatrix(); R.courtside.setMatrixAt(i, d.matrix); });
@@ -3558,10 +3607,12 @@ function paintArena(home, away) {
   if (R.floorRough) R.floorRough.dispose();
   R.floorTex = canvasTex(drawCourt(home, R.courtW));
   R.floorRough = canvasTex(drawCourtRough(R.courtW >> 1), false);
-  R.floorMat.map = R.floorTex; R.floorMat.roughnessMap = R.floorRough; R.floorMat.needsUpdate = true;
+  if (!R.floorBump) { R.floorBump = canvasTex(drawCourtBump(R.courtW >> 1), false); }
+  R.floorMat.map = R.floorTex; R.floorMat.roughnessMap = R.floorRough; R.floorMat.bumpMap = R.floorBump; R.floorMat.bumpScale = 0.012;
+  R.floorMat.needsUpdate = true;
   R.benchMats[0].color.set(shade(home.c1, -0.55)); R.benchMats[1].color.set(shade(away.c1, -0.55));
   R.bowlMat.color.set(shade(home.c2, -0.1)).lerp(new THREE.Color('#3a3f4a'), 0.6);
-  colorCrowd(R.crowdLower, home, away); colorCrowd(R.crowdUpper, home, away);
+  colorCrowd(R.crowdLower, home, away); colorCrowd(R.crowdUpper, home, away); colorCrowd(R.courtFans, home, away);
   { const a = R.courtside.geometry.attributes.aShirt, col = new THREE.Color();
     R.courtsideSeats.forEach((c, i) => {
       col.set(c.kind === 'bench' ? (c.side < 0 ? home.c1 : away.c1) : c.kind === 'coach' ? '#1c1f26' : '#2a2c31');
@@ -4109,9 +4160,9 @@ const HAIRC = ['#14100c', '#221710', '#35261a', '#6a4a2a', '#c9a35e'];
 
 /* ---------- atlas layout: 1024 x 1024 canvas, uv v = 1 - y / 1024 ---------- */
 const AT = 1024;
-const REG = { jersey: [0, 0, 1024, 512], shorts: [0, 512, 512, 256], pelvis: [512, 512, 512, 256], face: [0, 768, 256, 256], hair: [256, 768, 256, 256] };
+const REG = { jersey: [0, 0, 1024, 512], shortsR: [0, 512, 512, 256], shortsL: [512, 512, 512, 256], pelvis: [512, 896, 512, 128], face: [0, 768, 256, 256], hair: [256, 768, 256, 256] };
 const PATCH = { skin: 0, sock: 1, shoe: 2, sole: 3, accent: 4, trim: 5, dark: 6, white: 7, band: 8, sleeve: 9, lip: 10, kit: 11, hairSolid: 12, shoe2: 13, pants: 14, shirt: 15 };
-const ROUGH = { jersey: 0.74, shorts: 0.6, pelvis: 0.6, face: 0.5, hair: 0.85,
+const ROUGH = { jersey: 0.74, shortsR: 0.6, shortsL: 0.6, pelvis: 0.6, face: 0.5, hair: 0.85,
   patch: [0.47, 0.85, 0.32, 0.55, 0.38, 0.6, 0.35, 0.6, 0.8, 0.5, 0.4, 0.6, 0.82, 0.3, 0.7, 0.72] };
 function patchXY(i) { return [512 + (i % 8) * 64, 768 + Math.floor(i / 8) * 64]; }
 function patchUV(name) { const [x, y] = patchXY(PATCH[name]); return [(x + 32) / AT, 1 - (y + 32) / AT]; }
@@ -4260,20 +4311,28 @@ function paintAtlas(T, home, d, C) {
   }
   // shorts legs (u 0/1 = +z side, 0.5 = -z side; v 0 = hem at the bottom of the region)
   const kitB = C.ref ? C.pants : kit;
-  g.fillStyle = kitB; g.fillRect(0, 512, 512, 256);
-  folds(g, 0, 512, 512, 256, 26, 0.09);
-  const sh = g.createLinearGradient(0, 640, 0, 768); sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(0,0,0,0.2)');
-  g.fillStyle = sh; g.fillRect(0, 640, 512, 128);
-  g.fillStyle = trim;
-  for (const x of [0, 498, 242]) g.fillRect(x, 512, x === 242 ? 28 : 14, 256);
-  g.fillRect(0, 740, 512, 14);
-  g.save(); g.beginPath(); g.arc(128, 580, 30, 0, TAU); g.fillStyle = home ? T.c2 : T.c1; g.fill();
-  g.font = `900 italic 30px ${FONT_D}`; g.fillStyle = '#fff'; g.fillText(T.id, 128, 582); g.restore();
+  for (const x0 of [0, 512]) {
+    g.fillStyle = kitB; g.fillRect(x0, 512, 512, 256);
+    folds(g, x0, 512, 512, 256, 26, 0.09);
+    const sh = g.createLinearGradient(0, 640, 0, 768); sh.addColorStop(0, 'rgba(0,0,0,0)'); sh.addColorStop(1, 'rgba(0,0,0,0.2)');
+    g.fillStyle = sh; g.fillRect(x0, 640, 512, 128);
+    if (!C.ref) {
+      g.fillStyle = trim;
+      for (const x of [0, 498, 242]) g.fillRect(x0 + x, 512, x === 242 ? 28 : 14, 256);
+      g.fillRect(x0, 740, 512, 14);
+    }
+  }
+  // one team badge on the outside front of the left leg (u 0.375 on that leg)
+  if (!C.ref) {
+    g.save(); g.beginPath(); g.arc(512 + 192, 636, 30, 0, TAU); g.fillStyle = home ? T.c2 : T.c1; g.fill();
+    g.lineWidth = 4; g.strokeStyle = trim; g.stroke();
+    g.font = `900 italic 28px ${FONT_D}`; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#fff'; g.fillText(T.id, 512 + 192, 638); g.restore();
+  }
   // shorts pelvis with waistband
-  g.fillStyle = kitB; g.fillRect(512, 512, 512, 256);
-  folds(g, 512, 512, 512, 256, 20, 0.07);
-  g.fillStyle = trim; g.fillRect(512, 512, 512, 46);
-  g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(512, 558, 512, 6);
+  g.fillStyle = kitB; g.fillRect(512, 896, 512, 128);
+  folds(g, 512, 896, 512, 128, 14, 0.07);
+  g.fillStyle = C.ref ? '#0c0c0c' : trim; g.fillRect(512, 896, 512, 26);
+  g.fillStyle = 'rgba(0,0,0,0.18)'; g.fillRect(512, 922, 512, 4);
   // face: u 0.5 = front, v 1 = crown
   const fx = 0, fy = 768;
   g.fillStyle = C.skin; g.fillRect(fx, fy, 256, 256);
@@ -4324,6 +4383,20 @@ function roughAtlas() {
   for (const p in PATCH) { const i = PATCH[p], [x, y] = patchXY(i); g.fillStyle = v(ROUGH.patch[i]); g.fillRect(x * k, y * k, 64 * k, 64 * k); }
   ROUGH_TEX = new THREE.CanvasTexture(c);
   return ROUGH_TEX;
+}
+
+/* fabric detail as a height map in the same layout: mesh holes on the jersey, a fine twill on the shorts, strands in the hair */
+let DETAIL_TEX = null;
+function detailAtlas() {
+  if (DETAIL_TEX) return DETAIL_TEX;
+  const c = mkCanvas(1024, 1024), g = c.getContext('2d');
+  g.fillStyle = 'rgb(128,128,128)'; g.fillRect(0, 0, 1024, 1024);
+  g.fillStyle = 'rgb(108,108,108)';
+  for (let y = 1; y < 512; y += 3) for (let x = (y / 3 % 2) * 1.5; x < 1024; x += 3) g.fillRect(x, y, 1, 1);
+  for (let x = 0; x < 1024; x += 2) { g.fillStyle = x % 4 ? 'rgb(134,134,134)' : 'rgb(122,122,122)'; g.fillRect(x, 512, 1, 256); }
+  for (let i = 0; i < 3000; i++) { const x = 256 + Math.random() * 256, y = 768 + Math.random() * 256; g.fillStyle = Math.random() < 0.5 ? 'rgb(90,90,90)' : 'rgb(170,170,170)'; g.fillRect(x, y, 1, 4 + Math.random() * 6); }
+  DETAIL_TEX = new THREE.CanvasTexture(c);
+  return DETAIL_TEX;
 }
 
 /* ---------- the model ---------- */
@@ -4389,8 +4462,13 @@ function buildHumanoid(pl, home) {
       (x, y) => blend(sh, el, sstep(ys - 0.98, ys - 1.32, y) === 0 ? 0 : sstep(ys - 0.98, ys - 1.32, y)), armAO));
     P.push(piece(constUV(sphereG(0.215, 16, 12, 1.0, 1.08, 0.8, 0, -0.07, -s * 0.03), 'skin'), j,
       () => [sh, 1], armAO));
-    P.push(piece(constUV(sphereG(0.155, 12, 9, 0.62, 1.3, 1.0, 0.01, -2.35, 0), 'skin'), j, () => [el, 1], () => 0.92));
-    P.push(piece(constUV(sphereG(0.06, 8, 6, 1, 1.6, 1, 0.08, -2.26, s * 0.1), 'skin'), j, () => [el, 1]));
+    P.push(piece(constUV(sphereG(0.13, 12, 9, 0.6, 1.05, 1.0, 0.01, -2.31, 0), 'skin'), j, () => [el, 1], () => 0.92));
+    for (let f = 0; f < 4; f++) {
+      const fz = (f - 1.5) * 0.058, fl = [0.17, 0.2, 0.19, 0.15][f];
+      const fg = boxG(0.052, fl, 0.05, 0, -fl / 2, 0); fg.rotateZ(0.15); fg.translate(0.03, -2.41, fz);
+      P.push(piece(constUV(fg, 'skin'), j, () => [el, 1], () => 0.88));
+    }
+    { const th = boxG(0.055, 0.15, 0.055, 0, -0.075, 0); th.rotateX(-s * 0.5); th.rotateZ(0.35); th.translate(0.08, -2.27, s * 0.1); P.push(piece(constUV(th, 'skin'), j, () => [el, 1])); }
     if (d.acc === 2 && s > 0) P.push(piece(constUV(lathe([[0.108, -2.05], [0.14, -1.85], [0.165, -1.55], [0.148, -1.3], [0.14, -1.18], [0.158, -1.02], [0.2, -0.75], [0.222, -0.48], [0.21, -0.25]], 16, b, b), 'sleeve'), j,
       (x, y) => blend(sh, el, sstep(ys - 0.98, ys - 1.32, y))));
     if (d.acc === 2 && s < 0) P.push(piece(constUV(cylG(0.108, 0.1, 0.16, 14, 0, -2.08, 0), 'band'), j, () => [el, 1]));
@@ -4405,7 +4483,7 @@ function buildHumanoid(pl, home) {
     const lp = ref ? 'pants' : 'skin', lw = ref ? 1.18 : 1;
     P.push(piece(constUV(lathe([[0.115 * lw, -3.14], [0.12 * lw, -3.05], [0.14 * lw, -2.9], [0.176 * lw, -2.6], [0.212 * lw, -2.22], [0.2 * lw, -1.95], [0.19 * lw, -1.75], [0.2 * lw, -1.6], [0.23 * lw, -1.4], [0.28 * lw, -1.0], [0.31 * lw, -0.55], [0.31 * lw, -0.2], [0.29 * lw, 0.02]], 16, b, b), lp), j, legW, legAO));
     P.push(piece(constUV(sphereG(0.19 * lw, 12, 9, 1.05, 1, 1, 0.02, -1.6, 0), lp), j, legW, legAO));
-    if (!ref) P.push(piece(regionUV(lathe([[0.43, -1.42], [0.452, -1.2], [0.46, -0.6], [0.45, -0.12], [0.4, 0.06]], 20, b, b), 'shorts'), j,
+    if (!ref) P.push(piece(regionUV(lathe([[0.43, -1.42], [0.452, -1.2], [0.46, -0.6], [0.45, -0.12], [0.4, 0.06]], 20, b, b), s > 0 ? 'shortsR' : 'shortsL'), j,
       (x, y) => blend(BI.hips, hp, sstep(yh + 0.05, yh - 0.35, y)),
       (x, y, z, nx, ny, nz) => 1 - 0.2 * clamp(-nz * s, 0, 1) - 0.12 * (1 - sstep(yh - 1.42, yh - 1.1, y))));
     P.push(piece(constUV(lathe([[0.127, -3.14], [0.133, -2.98], [0.158, -2.75], [0.183, -2.54], [0.179, -2.5]], 16, b, b), 'sock'), j, legW, legAO));
@@ -4425,7 +4503,12 @@ function buildHumanoid(pl, home) {
   const bHipL = bone(bHips, 0, -0.08, -0.32 * b), bKnL = bone(bHipL, 0, -1.6, 0), bAnkL = bone(bKnL, 0, -1.52, 0);
   const skel = new THREE.Skeleton(bones);
   const atlas = canvasTex(paintAtlas(T, home, d, C));
-  const mat = new THREE.MeshStandardMaterial({ map: atlas, roughnessMap: roughAtlas(), roughness: 1, metalness: 0, vertexColors: true, skinning: true, envMapIntensity: 0.65 });
+  const mat = new THREE.MeshStandardMaterial({ map: atlas, roughnessMap: roughAtlas(), bumpMap: detailAtlas(), bumpScale: 0.05, roughness: 1, metalness: 0, vertexColors: true, skinning: true, envMapIntensity: 0.65 });
+  mat.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader.replace('#include <tonemapping_fragment>',
+      'gl_FragColor.rgb += vec3(0.5, 0.58, 0.72) * pow(1.0 - clamp(dot(normalize(geometryNormal), normalize(vViewPosition)), 0.0, 1.0), 3.0) * 0.32;\n#include <tonemapping_fragment>');
+  };
+  mat.customProgramCacheKey = () => 'player-rim';
   const mesh = new THREE.SkinnedMesh(geo, mat);
   mesh.add(bBody);
   mesh.bind(skel);
