@@ -145,7 +145,7 @@ class App {
     const boot = document.getElementById('boot');
     if (boot) { boot.style.transition = 'opacity .4s'; boot.style.opacity = '0'; setTimeout(() => boot.remove(), 450); }
     this.watch = { frames: 0, white: 0 };
-    this.goodFrames = 0;
+    this.goodFrames = 0; this.goodSince = performance.now(); this._markCleared = false;
     if (this.crashRecovered) setTimeout(() => this.ui.toast(`The game closed unexpectedly last time, so graphics were set to ${QUALITY[this.crashTier]?.name || 'a lower setting'}.`), 1200);
   }
 
@@ -382,7 +382,7 @@ class App {
     this.race = race;
     this.raceOpts = { opts, after };
     this.mode = 'race';
-    this.goodFrames = 0;
+    this.goodFrames = 0; this.goodSince = performance.now(); this._markCleared = false;
     this.watch = { frames: 0, white: 0 };
     this.input.capture = true;
     if (this.isTouch && !this.input.touchEl) this.input.buildTouchControls(this.overlay);
@@ -578,8 +578,9 @@ class App {
       }
       if (this.mode === 'race' || this.mode === 'menu') {
         this.checkWhite(); this.perfCheck(dt);
-        // a couple of seconds of normal frames: whatever was loading did not crash the page
-        if (++this.goodFrames === 120) setMark(null);
+        // a few seconds of normal frames: whatever was loading did not crash the page
+        this.goodFrames++;
+        if (!this._markCleared && (this.goodFrames >= 120 || (this.goodFrames >= 30 && performance.now() - this.goodSince >= 4000))) { setMark(null); this._markCleared = true; }
       }
       this.badFrames = 0;
     } catch (e) {
