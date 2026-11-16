@@ -21,6 +21,7 @@ const TIER_DOWN = { ultra: 'medium', high: 'medium', medium: 'low', low: 'lite' 
 const STEP_DOWN = { ultra: 'high', high: 'medium', medium: 'low', low: 'lite' }; // crash while loading: one step
 const ORDER = ['lite', 'low', 'medium', 'high', 'ultra'];
 const LOST_KEY = 'apexVelocity.lostAt'; // when the graphics chip last reset (for the start-up message)
+const LOST_TIER = 'apexVelocity.lostTier'; // lowest setting that made this device's graphics chip reset (kept even if the save is reset)
 
 class App {
   constructor() {
@@ -36,7 +37,14 @@ class App {
     this.isTouch = isTouchFirst();
     const st = this.profile.settings;
     // Graphics start on the highest setting (Ultra) on every device, once for old saves too
-    if (st.gfxVersion !== GFX_VERSION) { st.quality = null; st.liteLocked = false; st.lostAt = null; st.gfxVersion = GFX_VERSION; } // null = auto = Ultra
+    if (st.gfxVersion !== GFX_VERSION) { st.quality = null; st.liteLocked = false; st.gfxVersion = GFX_VERSION; } // null = auto = Ultra
+    // settings that crashed this device's graphics chip are never used again here
+    try {
+      const ls = localStorage.getItem(LOST_TIER);
+      if (ls && ORDER.includes(ls) && (!st.lostAt || ORDER.indexOf(ls) < ORDER.indexOf(st.lostAt))) st.lostAt = ls;
+      if (st.lostAt) localStorage.setItem(LOST_TIER, st.lostAt);
+    } catch (e) { /* ignore */ }
+    if (st.quality && ORDER.indexOf(st.quality) > ORDER.indexOf(this.allowedTop())) st.quality = this.allowedTop();
     // Did the page die while loading last time (out of memory, graphics crash)? Then go one step lower.
     try {
       const m = localStorage.getItem(MARK);
@@ -52,7 +60,9 @@ class App {
     document.addEventListener('gesturestart', (e) => e.preventDefault());
     document.addEventListener('dblclick', (e) => e.preventDefault(), { passive: false });
     try {
-      this.gfx = new Graphics(this.view);
+      // drawing straight to the screen (Lite/Low): let the screen smooth the edges
+      const startQ = st.quality || this.allowedTop();
+      this.gfx = new Graphics(this.view, { antialias: !!QUALITY[startQ]?.direct });
     } catch (e) {
       setMark(null);
       window.__bootError?.(glHelp() + '\n(' + (e && e.message ? e.message : e) + ')', 'E-GL');
@@ -72,6 +82,7 @@ class App {
       const st2 = this.profile.settings;
       st2.quality = next;
       if (!st2.lostAt || ORDER.indexOf(was) < ORDER.indexOf(st2.lostAt)) st2.lostAt = was;
+      try { localStorage.setItem(LOST_TIER, st2.lostAt); } catch (e) { /* ignore */ }
       this.save();
       setMark(null);
       try { localStorage.setItem(LOST_KEY, String(Date.now())); } catch (e) { /* ignore */ }
@@ -148,12 +159,20 @@ class App {
     }
   }
 
-  // Always the highest graphics, except where there is no real graphics chip at all
+  // The highest setting this device can use: Ultra, unless a setting made its
+  // graphics chip reset - then the best one below that.
+  allowedTop() {
+    const lost = this.profile.settings.lostAt;
+    if (!lost || !ORDER.includes(lost)) return 'ultra';
+    return ORDER[Math.max(0, ORDER.indexOf(lost) - 1)];
+  }
+
+  // Always the highest graphics allowed, except where there is no real graphics chip at all
   autoQuality() {
     const gpu = this.gfx.gpu || '';
     if (/SwiftShader|llvmpipe|Software/i.test(gpu)) return 'lite'; // software drawing (no graphics chip)
     if ((navigator.deviceMemory || 4) < 1) return 'lite'; // tiny-memory devices
-    return 'ultra';
+    return this.allowedTop();
   }
 
   // Full-screen notice that works even while the menus are hidden (during races)
@@ -213,6 +232,7 @@ class App {
 
   // Switch quality while a race (or the menu) is on screen
   applyQualityLive(q) {
+    if (ORDER.indexOf(q) > ORDER.indexOf(this.allowedTop())) q = this.allowedTop();
     if (this.perf) this.perf.cool = 8; // give a manual change a moment before judging speed
     this.profile.settings.quality = q;
     this.save();
@@ -477,7 +497,7 @@ class App {
       restart: () => this.restartRace(),
       camera: () => { this.race.hudCam(this.race.rcam.next()); },
       quality: () => {
-        const order = ['lite', 'low', 'medium', 'high', 'ultra'];
+        const order = ORDER.slice(0, ORDER.indexOf(this.allowedTop()) + 1); // only settings this device can run
         const q = order[(order.indexOf(this.gfx.qualityName) + 1) % order.length];
         D.log('quality', q + ' (pause menu)');
         this.applyQualityLive(q); // leaving Lite restarts the race with the new graphics

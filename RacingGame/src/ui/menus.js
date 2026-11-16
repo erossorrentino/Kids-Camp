@@ -587,9 +587,15 @@ export class UI {
   settings() {
     const s = this.profile.settings;
     this.app.showroom.setFrame(0.3);
+    // settings that made this device's graphics chip crash are switched off
+    const ORD = ['lite', 'low', 'medium', 'high', 'ultra'], top = this.app.allowedTop();
+    const tierOk = (k) => ORD.indexOf(k) <= ORD.indexOf(top);
+    const gfxNote = top === 'ultra'
+      ? 'Ultra is the best looking and is used on every device. If a device can\'t draw it, the game steps down by itself. Lite is the simplest.'
+      : `${QUALITY[top].name} is the best this device can run: ${QUALITY[ORD[ORD.indexOf(top) + 1]].name} and higher made its graphics chip crash, so they are switched off here.`;
     const tog = (k, label, desc) => `<label class="toggle"><input type="checkbox" data-assist="${k}"${s.assists[k] ? ' checked' : ''}><span class="sw-ui"></span><div><b>${label}</b><small>${desc}</small></div></label>`;
     this.screenEl.innerHTML = `<div class="panel settings"><h1>Settings</h1>
-      <div class="f-h">Graphics quality</div><p class="sub" style="margin-bottom:8px">Ultra is the best looking and is used on every device. If a device can't draw it, the game steps down by itself. Lite is the simplest.</p><div class="chips">${Object.entries(QUALITY).map(([k, q]) => `<button class="chip${this.app.gfx.qualityName === k ? ' on' : ''}" data-q="${k}">${q.name}</button>`).join('')}</div>
+      <div class="f-h">Graphics quality</div><p class="sub" style="margin-bottom:8px">${gfxNote}</p><div class="chips">${Object.entries(QUALITY).map(([k, q]) => `<button class="chip${this.app.gfx.qualityName === k ? ' on' : ''}" data-q="${k}"${tierOk(k) ? '' : ' disabled'}>${q.name}</button>`).join('')}</div>
       <div class="f-h">Difficulty</div><div class="chips">${['easy', 'normal', 'hard'].map((d) => `<button class="chip${s.difficulty === d ? ' on' : ''}" data-diff="${d}">${d[0].toUpperCase() + d.slice(1)}</button>`).join('')}</div>
       <div class="f-h">Driving assists</div>
       <div class="toggles">

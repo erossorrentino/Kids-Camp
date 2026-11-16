@@ -113,8 +113,8 @@ export class Showroom {
     if (on) {
       this.scene.environment = null;
       this.thumbScene.environment = null;
-      liteSwap(this.scene, this.liteCache);
-      liteSwap(this.thumbScene, this.liteCache);
+      liteSwap(this.scene, this.liteCache, 'studio');
+      liteSwap(this.thumbScene, this.liteCache, 'studio');
       if (this.car) this.car.useLite(this.liteCache);
     } else {
       this.ensureEnv();
@@ -168,7 +168,7 @@ export class Showroom {
     this.car = buildCar(vis, { detail: this.lite ? 1 : 2 });
     this.car.root.traverse((o) => { if (o.isMesh) { o.castShadow = true; } });
     this.pivot.add(this.car.root);
-    if (this.lite) { liteSwap(this.car.root, this.liteCache); this.car.useLite(this.liteCache); }
+    if (this.lite) { liteSwap(this.car.root, this.liteCache, 'studio'); this.car.useLite(this.liteCache); }
     const L = this.car.dims.front - this.car.dims.rear;
     this.camTarget.dist = 6.5 + L * 1.05;
     this.camTarget.height = 1.2 + this.car.dims.H * 0.5;
@@ -220,7 +220,7 @@ export class Showroom {
     model.root.rotation.y = 0.75;
     model.root.position.z = -(model.dims.front + model.dims.rear) / 2 * Math.cos(0.75);
     this.thumbScene.add(model.root);
-    if (this.lite) liteSwap(model.root, this.liteCache);
+    if (this.lite) liteSwap(model.root, this.liteCache, 'studio');
     const L = model.dims.front - model.dims.rear;
     const cam = this.thumbCam;
     cam.position.set(0.7, 0.9 + model.dims.H * 0.45, 2.4 + L * 1.05);

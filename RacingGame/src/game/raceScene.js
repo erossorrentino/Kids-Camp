@@ -153,7 +153,7 @@ export class RaceScene {
     this.env.goLite();
     this.effects.goLite();
     this.guide.goLite();
-    this.liteCache = liteSwap(this.scene, this.liteCache || new Map());
+    this.liteCache = liteSwap(this.scene, this.liteCache || new Map(), this.night ? 'night' : 'day');
     for (const e of this.entrants) e.model.useLite(this.liteCache);
     this.venue.useLite(this.liteCache);
   }

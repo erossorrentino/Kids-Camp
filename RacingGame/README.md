@@ -67,11 +67,16 @@ tablet, or host it anywhere. Progress saves in the browser.
   resolution adapts). On phones and tablets Ultra keeps every effect but
   sizes its picture buffers for a phone (about 80 MB of graphics memory
   instead of about 280 MB on a sharp phone screen). If the graphics chip
-  still runs out of memory, the game switches to Low and never offers the
-  setting that crashed again on that device. A white or blank picture
-  steps down a level; a crash while loading starts one level lower next
-  time. **Lite** (no shadows, reflections or special effects) is there for
-  devices that need it. Change it any time in Settings or the pause menu.
+  still crashes, the game switches to Low (and to Lite if Low crashes
+  too). Settings that crashed a device's graphics chip are remembered and
+  switched off on that device, in Settings and the pause menu, so it can't
+  crash again. A white or blank picture steps down a level; a crash while
+  loading starts one level lower next time.
+- **Lite** works on any graphics chip: it uses no shadow maps, no
+  reflection buffers and no special-effect buffers, only plain textures.
+  It is still sharp (up to 1.5x pixels on phones), has smooth edges, shiny
+  car paint with simple painted-on reflections, and soft shadows under
+  the cars.
 
 ### Sound
 
@@ -155,7 +160,7 @@ at. Reports contain no names or personal details.
 | E-SLOW | The game took too long to start | Asks you to reload |
 | E-BOOT | The game crashed while starting | Asks you to reload |
 | E-GL | 3D graphics could not start | Waits and retries for about 15 seconds first; then asks you to close and reopen the app |
-| E-LOST | The graphics chip ran out of memory | Switches to Low graphics and goes back to the menu (or asks you to reopen the app) |
+| E-LOST | The graphics chip crashed | Switches to Low (or Lite), switches off the setting that crashed on this device, goes back to the menu (or asks you to reopen the app) |
 | E-WHITE | The picture stayed white or blank | Switches down a graphics step; shows this only if Lite fails too |
 | E-RACE | A race failed to load | Retries once on Lite before showing this |
 | E-LOOP | The game kept hitting an error | Stops the race (or suggests a reload) |

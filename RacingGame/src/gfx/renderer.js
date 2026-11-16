@@ -12,7 +12,8 @@ import { setMaxAnisotropy } from './textures.js';
 
 export const QUALITY = {
   // Lite: plain Lambert shading, no shadows / reflections / custom shaders. Runs on anything with WebGL.
-  lite: { name: 'Lite', pixelRatio: 0.85, shadows: 0, shadowMapSize: 512, shadowExtent: 40, msaa: 0, bloom: false, post: false, direct: true, lite: true, scenery: 0.2, carDetail: 0, maxDpr: 1 },
+  // (sharp on phones: up to 1.5x pixels, smoothed edges when the context was made with antialias)
+  lite: { name: 'Lite', pixelRatio: 1, shadows: 0, shadowMapSize: 512, shadowExtent: 40, msaa: 0, bloom: false, post: false, direct: true, lite: true, scenery: 0.2, carDetail: 0, maxDpr: 2 },
   // Low draws straight to the screen (no HDR buffers / post effects): the most compatible path
   low: { name: 'Low', pixelRatio: 0.9, shadows: 1, shadowMapSize: 1024, shadowExtent: 45, msaa: 0, bloom: false, post: false, direct: true, scenery: 0.35, carDetail: 0, maxDpr: 1 },
   medium: { name: 'Medium', pixelRatio: 1, shadows: 1, shadowMapSize: 2048, shadowExtent: 60, msaa: 2, bloom: true, post: true, scenery: 0.65, carDetail: 1, maxDpr: 1.25 },
@@ -107,15 +108,18 @@ function mobileCaps(q) {
 }
 
 export class Graphics {
-  constructor(container) {
+  // antialias: smooth edges on the screen itself (used when the game will draw
+  // straight to the screen, i.e. Lite/Low; the effect tiers smooth their own buffers)
+  constructor(container, { antialias = false } = {}) {
     this.container = container;
     this.mobile = isMobileGPU();
+    this.antialias = antialias;
     let renderer;
     try {
-      renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'high-performance', stencil: false, preserveDrawingBuffer: false });
+      renderer = new THREE.WebGLRenderer({ antialias, powerPreference: 'high-performance', stencil: false, preserveDrawingBuffer: false });
     } catch (e) {
       // some phones refuse a "high-performance" context: ask for a default one
-      renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: 'default', stencil: false, preserveDrawingBuffer: false });
+      renderer = new THREE.WebGLRenderer({ antialias, powerPreference: 'default', stencil: false, preserveDrawingBuffer: false });
     }
     renderer.setClearColor(0x000000);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
