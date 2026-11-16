@@ -431,10 +431,241 @@ function colorCrowd(mesh, home, away) {
   const col = new THREE.Color(), rnd = mulberry32(31 + n);
   for (let i = 0; i < n; i++) {
     col.set(pal[Math.floor(rnd() * pal.length)]);
-    col.multiplyScalar(0.5 + 0.3 * rnd());
+    { const l = col.r * 0.3 + col.g * 0.55 + col.b * 0.15; col.lerp(new THREE.Color(l, l, l), 0.28); }
+    col.multiplyScalar(0.42 + 0.28 * rnd());
     a.array[i * 3] = col.r; a.array[i * 3 + 1] = col.g; a.array[i * 3 + 2] = col.b;
   }
   a.needsUpdate = true;
+}
+
+/* ---------------- painted crowd ----------------
+   Every fan in the bowl is a camera-facing card painted from an atlas of
+   16 people in 8 poses (sitting, clapping, arms crossed, on the phone,
+   standing, arms up, fist pump). Clothes, skin and hair are painted as
+   shading only, with a mask, so each fan gets their own colours. */
+const CROWD_COLS = 16, CROWD_ROWS = 8;
+function crowdVariant(c) {
+  const r = mulberry32(1000 + c * 7), pick = (a) => a[Math.floor(r() * a.length)];
+  const hair = pick(['short', 'short', 'long', 'bald', 'cap', 'curly', 'buzz', 'pony', 'short', 'long']);
+  const fem = hair === 'long' || hair === 'pony' ? 1 : 0;
+  const bw = (fem ? 0.86 : 0.92) + r() * 0.32;
+  return {
+    hair, fem, bw, sh: (fem ? 1.2 : 1.34 + r() * 0.16) * bw, top: pick(['tee', 'tee', 'hoodie', 'jacket', 'jersey', 'longsleeve', 'tee', 'hoodie']),
+    hw: 0.54 + r() * 0.08, hh: 0.72 + r() * 0.06, shoe: pick(['#e6e6e6', '#141414', '#6e1f1f', '#26354f', '#d8d0c0']), inner: pick(['#ededed', '#141414', '#bdb5a5']),
+    glasses: r() < 0.15,
+  };
+}
+function paintFan(a, m, x0, y0, CW, CH, K, V, row) {
+  const X = (x) => x0 + CW / 2 + x * K, Y = (y) => y0 + CH - y * K;
+  const MK = { shirt: '#ff0000', pants: '#00ff00', skin: '#0000ff', hair: '#ffff00', none: '#000000' };
+  const gr = (l) => { const v = Math.round(clamp(l, 0, 1) * 255); return `rgb(${v},${v},${v})`; };
+  const both = (fn) => { fn(a, false); fn(m, true); };
+  const poly = (pts, fillA, mk) => both((g, isM) => { g.beginPath(); pts.forEach((p, i) => (i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1])))); g.closePath(); g.fillStyle = isM ? MK[mk] : fillA; g.fill(); });
+  const ell = (x, y, rx, ry, fillA, mk) => both((g, isM) => { g.beginPath(); g.ellipse(X(x), Y(y), Math.max(0.5, rx * K), Math.max(0.5, ry * K), 0, 0, TAU); g.fillStyle = isM ? MK[mk] : fillA; g.fill(); });
+  const line = (pts, w, strokeA, mk) => both((g, isM) => { g.lineCap = 'round'; g.lineJoin = 'round'; g.lineWidth = w * K; g.strokeStyle = isM ? MK[mk] : strokeA; g.beginPath(); pts.forEach((p, i) => (i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1])))); g.stroke(); });
+  const shadeA = (fn) => { a.save(); fn(a); a.restore(); };   // albedo-only shading on top of a region
+  for (const g of [a, m]) { g.save(); g.beginPath(); g.rect(x0, y0, CW, CH); g.clip(); }
+  const seated = !(row === 3 || row === 4 || row === 5);
+  const hip = seated ? 1.25 : 2.85, shY = hip + 1.52, hcY = shY + 0.5, bw = V.bw, sh = V.sh;
+  const sleeveSkin = V.top === 'jersey', shortSleeve = V.top === 'tee' || V.top === 'jersey';
+  // seat back behind the fan
+  poly([[-0.8, 1.15], [0.8, 1.15], [0.78, 2.5], [-0.78, 2.5]], '#1b1e24', 'none');
+  // legs
+  if (seated) {
+    for (const s of [-1, 1]) { poly([[s * 0.1, 0.18], [s * 0.44, 0.18], [s * 0.47, 1.3], [s * 0.07, 1.3]], gr(0.62), 'pants'); ell(s * 0.28, 0.1, 0.24, 0.11, V.shoe, 'none'); }
+    poly([[-0.6 * bw, hip + 0.12], [0.6 * bw, hip + 0.12], [0.5, 1.12], [-0.5, 1.12]], gr(0.8), 'pants');
+    for (const s of [-1, 1]) ell(s * 0.27, 1.22, 0.22, 0.12, gr(0.86), 'pants');
+  } else {
+    for (const s of [-1, 1]) { poly([[s * 0.06, 0.18], [s * 0.42, 0.18], [s * 0.52 * bw, hip + 0.1], [s * 0.02, hip + 0.1]], gr(0.66), 'pants'); ell(s * 0.27, 0.1, 0.24, 0.11, V.shoe, 'none'); }
+    shadeA((g) => { const gg = g.createLinearGradient(0, Y(hip), 0, Y(0.2)); gg.addColorStop(0, 'rgba(255,255,255,0.12)'); gg.addColorStop(1, 'rgba(0,0,0,0.22)'); g.globalCompositeOperation = 'source-atop'; g.fillStyle = gg; g.fillRect(X(-0.6), Y(hip + 0.1), 1.2 * K, (hip - 0.1) * K); });
+  }
+  // arms: shoulder, elbow, hand per pose
+  const S = [sh / 2 - 0.12, shY - 0.1];
+  const arms = {
+    0: [[0.6 * bw + 0.06, hip + 0.62], [0.34, hip + 0.18]],
+    1: [[0.62 * bw + 0.04, hip + 0.7], [0.2, shY - 0.42]],
+    2: [[0.6 * bw, hip + 0.7], [0.03, shY - 0.4]],
+    3: [[0.6 * bw + 0.1, hip + 0.68], [0.6 * bw + 0.04, hip - 0.08]],
+    4: [[sh / 2 + 0.32, shY + 0.68], [sh / 2 + 0.52, shY + 1.36]],
+    5: [[sh / 2 + 0.3, shY + 0.6], [sh / 2 + 0.12, shY + 1.28]],
+    6: [[0.56 * bw, hip + 0.82], [-0.3, hip + 0.98]],
+    7: [[0.56 * bw, hip + 0.75], [0.12, shY - 0.05]],
+  };
+  const armPts = (s) => {
+    let [e, h] = arms[row];
+    if (row === 5 && s < 0) { e = [0.6 * bw + 0.1, shY - 0.72]; h = [-0.22, shY - 0.4]; }
+    if (row === 7 && s < 0) { e = arms[0][0]; h = arms[0][1]; }
+    return [[s * S[0], S[1]], [s * e[0], e[1]], [s * h[0], h[1]]];
+  };
+  const drawArm = (s) => {
+    const p = armPts(s), mid = [lerp(p[0][0], p[1][0], 0.5), lerp(p[0][1], p[1][1], 0.5)];
+    const upMk = sleeveSkin ? 'skin' : 'shirt', loMk = sleeveSkin || shortSleeve ? 'skin' : 'shirt';
+    line([p[0], p[1]], 0.33, gr(0.58), upMk); line([p[0], p[1]], 0.27, gr(sleeveSkin ? 0.8 : 0.78), upMk);
+    if (shortSleeve && !sleeveSkin) { line([mid, p[1]], 0.25, gr(0.8), 'skin'); }
+    line([p[1], p[2]], 0.27, gr(0.58), loMk); line([p[1], p[2]], 0.22, gr(0.82), loMk);
+    ell(p[2][0], p[2][1], 0.12, 0.13, gr(0.88), 'skin');
+  };
+  const raised = row === 4 || row === 5;
+  if (raised) { drawArm(1); if (row === 4) drawArm(-1); }
+  // torso
+  const tw = 0.56 * bw, cw = 0.64 * bw;
+  const torso = [[-tw, hip + 0.08], [tw, hip + 0.08], [cw, shY - 0.42], [sh / 2, shY - 0.08], [sh / 2 - 0.16, shY + 0.04], [0.16, shY + 0.1], [-0.16, shY + 0.1], [-(sh / 2 - 0.16), shY + 0.04], [-sh / 2, shY - 0.08], [-cw, shY - 0.42]];
+  if (V.top === 'hoodie') ell(0, shY + 0.02, 0.36, 0.16, gr(0.6), 'shirt');
+  poly(torso, gr(0.84), 'shirt');
+  shadeA((g) => {
+    g.globalCompositeOperation = 'source-atop';
+    const hg = g.createLinearGradient(X(-sh / 2), 0, X(sh / 2), 0);
+    hg.addColorStop(0, 'rgba(0,0,0,0.42)'); hg.addColorStop(0.35, 'rgba(255,255,255,0.08)'); hg.addColorStop(0.6, 'rgba(0,0,0,0.02)'); hg.addColorStop(1, 'rgba(0,0,0,0.5)');
+    g.fillStyle = hg; g.fillRect(X(-sh / 2), Y(shY + 0.2), sh * K, (shY - hip) * K);
+    const vg = g.createLinearGradient(0, Y(shY), 0, Y(hip));
+    vg.addColorStop(0, 'rgba(255,255,255,0.06)'); vg.addColorStop(1, 'rgba(0,0,0,0.3)');
+    g.fillStyle = vg; g.fillRect(X(-sh / 2), Y(shY + 0.2), sh * K, (shY - hip) * K);
+  });
+  if (V.top === 'jersey') {
+    for (const s of [-1, 1]) poly([[s * (sh / 2 + 0.02), shY - 0.06], [s * (sh / 2 - 0.2), shY + 0.06], [s * (cw - 0.08), shY - 0.55]], gr(0.8), 'skin');
+    a.fillStyle = 'rgba(255,255,255,0.85)'; a.font = `900 ${0.5 * K}px ${FONT_D}`; a.textAlign = 'center'; a.textBaseline = 'middle';
+    a.fillText(String((row * 7 + Math.round(bw * 31)) % 50), X(0), Y(hip + 0.85));
+  }
+  if (V.top === 'jacket') {
+    poly([[-0.16, hip + 0.1], [0.16, hip + 0.1], [0.14, shY + 0.08], [-0.14, shY + 0.08]], V.inner, 'none');
+    line([[-0.17, hip + 0.1], [-0.15, shY + 0.08]], 0.03, gr(0.3), 'shirt'); line([[0.17, hip + 0.1], [0.15, shY + 0.08]], 0.03, gr(0.3), 'shirt');
+  }
+  if (V.top === 'hoodie') line([[-0.32, hip + 0.42], [0.32, hip + 0.42]], 0.03, gr(0.45), 'shirt');
+  if (!raised) { drawArm(1); drawArm(-1); } else if (row === 5) drawArm(-1);
+  if (row === 7) { const h = armPts(1)[2]; poly([[h[0] - 0.13, h[1] - 0.05], [h[0] + 0.13, h[1] - 0.05], [h[0] + 0.13, h[1] + 0.38], [h[0] - 0.13, h[1] + 0.38]], '#cfe0ff', 'none'); }
+  // neck and head
+  poly([[-0.12, shY - 0.02], [0.12, shY - 0.02], [0.11, shY + 0.24], [-0.11, shY + 0.24]], gr(0.66), 'skin');
+  const hw = V.hw / 2, hh = V.hh / 2;
+  if (V.hair === 'long') poly([[-hw - 0.05, hcY + 0.1], [hw + 0.05, hcY + 0.1], [hw + 0.1, shY - 0.15], [-hw - 0.1, shY - 0.15]], gr(0.7), 'hair');
+  if (V.hair === 'curly') ell(0, hcY + 0.1, hw + 0.13, hh + 0.08, gr(0.68), 'hair');
+  for (const s of [-1, 1]) ell(s * hw * 0.98, hcY - 0.02, 0.06, 0.1, gr(0.72), 'skin');
+  ell(0, hcY, hw, hh, gr(0.86), 'skin');
+  shadeA((g) => {
+    g.globalCompositeOperation = 'source-atop';
+    const rg = g.createRadialGradient(X(-0.06), Y(hcY + 0.08), 0, X(0), Y(hcY), hh * K * 1.2);
+    rg.addColorStop(0, 'rgba(255,255,255,0.12)'); rg.addColorStop(0.7, 'rgba(0,0,0,0.06)'); rg.addColorStop(1, 'rgba(0,0,0,0.4)');
+    g.fillStyle = rg; g.fillRect(X(-hw - 0.1), Y(hcY + hh + 0.1), (hw * 2 + 0.2) * K, (hh * 2 + 0.2) * K);
+  });
+  // face: brows, eyes, nose shadow, mouth
+  for (const s of [-1, 1]) {
+    ell(s * 0.1, hcY + 0.04, 0.05, 0.03, '#1a1310', 'none');
+    line([[s * 0.04, hcY + 0.11], [s * 0.16, hcY + 0.12]], 0.035, gr(0.3), 'hair');
+  }
+  if (V.glasses) for (const s of [-1, 1]) both((g, isM) => { g.lineWidth = 0.025 * K; g.strokeStyle = isM ? MK.none : '#111'; g.beginPath(); g.ellipse(X(s * 0.1), Y(hcY + 0.04), 0.075 * K, 0.055 * K, 0, 0, TAU); g.stroke(); });
+  shadeA((g) => { g.fillStyle = 'rgba(0,0,0,0.18)'; g.beginPath(); g.ellipse(X(0.01), Y(hcY - 0.08), 0.04 * K, 0.025 * K, 0, 0, TAU); g.fill(); });
+  line([[-0.07, hcY - 0.18], [0.07, hcY - 0.18]], 0.03, 'rgba(70,30,25,0.9)', 'none');
+  // hair on top
+  const capTop = (y0, ext, mk, l) => both((g, isM) => { g.beginPath(); g.ellipse(X(0), Y(hcY + 0.02), (hw + ext) * K, (hh + ext) * K, 0, PI, TAU); g.lineTo(X(hw + ext), Y(y0)); g.lineTo(X(-hw - ext), Y(y0)); g.closePath(); g.fillStyle = isM ? MK[mk] : gr(l); g.fill(); });
+  if (V.hair === 'short' || V.hair === 'pony') capTop(hcY + 0.16, 0.025, 'hair', 0.72);
+  else if (V.hair === 'buzz') capTop(hcY + 0.2, 0.0, 'hair', 0.6);
+  else if (V.hair === 'long') capTop(hcY + 0.12, 0.04, 'hair', 0.74);
+  else if (V.hair === 'curly') capTop(hcY + 0.17, 0.09, 'hair', 0.7);
+  else if (V.hair === 'cap') { capTop(hcY + 0.18, 0.04, 'shirt', 0.66); poly([[-hw - 0.02, hcY + 0.2], [hw + 0.02, hcY + 0.2], [hw * 0.9, hcY + 0.12], [-hw * 0.9, hcY + 0.12]], gr(0.38), 'shirt'); }
+  for (const g of [a, m]) g.restore();
+}
+function paintCrowdAtlas(S) {
+  const CW = Math.round(128 * S), CH = Math.round(256 * S), K = 42.67 * S;
+  const A = mkCanvas(CROWD_COLS * CW, CROWD_ROWS * CH), M = mkCanvas(CROWD_COLS * CW, CROWD_ROWS * CH);
+  const a = A.getContext('2d'), m = M.getContext('2d');
+  m.fillStyle = '#000'; m.fillRect(0, 0, M.width, M.height);
+  for (let c = 0; c < CROWD_COLS; c++) { const V = crowdVariant(c); for (let r = 0; r < CROWD_ROWS; r++) paintFan(a, m, c * CW, r * CH, CW, CH, K, V, r); }
+  return { A, M };
+}
+function crowdBoardMat() {
+  if (!R.crowdAtlas) {
+    const { A, M } = paintCrowdAtlas(R.mobile ? 0.5 : 1);
+    R.crowdAtlas = { a: new THREE.CanvasTexture(A), m: new THREE.CanvasTexture(M) };
+    R.crowdAtlas.a.anisotropy = 4;
+  }
+  return new THREE.ShaderMaterial({
+    uniforms: Object.assign({}, R.crowdU, { tA: { value: R.crowdAtlas.a }, tM: { value: R.crowdAtlas.m } }),
+    side: THREE.DoubleSide,
+    vertexShader: `
+      attribute vec3 aShirt; attribute vec3 aSkin; attribute vec4 aAnim; attribute float aVar;
+      uniform float uTime; uniform float uExcite; uniform float uWave; uniform float uFar; uniform float uLight;
+      varying vec2 vUv; varying vec3 vShirt; varying vec3 vSkin; varying vec3 vPants; varying vec3 vHair; varying float vDim;
+      void main(){
+        vec3 c = (modelMatrix * instanceMatrix * vec4(0.0, 0.0, 0.0, 1.0)).xyz;
+        float sc = length(instanceMatrix[0].xyz);
+        float ph = aAnim.x, amp = aAnim.y;
+        float wd = abs(mod(aAnim.z - uWave + 3.14159265, 6.2831853) - 3.14159265);
+        float wave = exp(-wd * wd * 16.0);
+        float ex = clamp(uExcite * amp, 0.0, 1.6);
+        // each fan has their own threshold: big plays bring part of the crowd up, never the whole bowl at once
+        float thr = 0.3 + 0.95 * fract(ph * 4.7);
+        float hype = ex - thr;
+        float stand = max(max(step(0.0, hype), step(0.35, wave)), aAnim.w);
+        float jump = max(0.0, sin(uTime * (6.5 + amp * 3.0) + ph)) * clamp(hype * 2.0, 0.0, 1.0) * 0.6;
+        float calm = fract(ph * 1.913);
+        float row = calm < 0.62 ? 0.0 : calm < 0.8 ? 6.0 : calm < 0.9 ? 7.0 : 0.0;
+        float clap = step(0.35, fract(ph * 3.17)) * step(0.08, uExcite * amp - 0.06);
+        if (clap > 0.5) row = fract(uTime * (3.2 + amp) + ph) < 0.5 ? 1.0 : 2.0;
+        float yOff = 0.0;
+        if (stand > 0.5) {
+          float up = max(hype * 2.5, wave * 2.0);
+          row = up > 0.45 ? (wave > 0.3 ? 4.0 : fract(uTime * 1.7 + ph * 3.0) < 0.5 ? 4.0 : 5.0) : 3.0;
+          yOff = jump;
+        }
+        vUv = vec2((aVar + uv.x) / ${CROWD_COLS}.0, (${CROWD_ROWS - 1}.0 - row + uv.y) / ${CROWD_ROWS}.0);
+        vec3 toCam = cameraPosition - c; toCam.y = 0.0;
+        vec3 right = normalize(vec3(toCam.z, 0.0, -toCam.x) + vec3(1e-5, 0.0, 0.0));
+        vec3 wp = c + right * position.x * sc + vec3(0.0, position.y * sc + yOff, 0.0);
+        gl_Position = projectionMatrix * viewMatrix * vec4(wp, 1.0);
+        vShirt = aShirt; vSkin = aSkin;
+        float pt = fract(ph * 3.71);
+        vPants = pt < 0.45 ? vec3(0.1, 0.13, 0.22) : pt < 0.7 ? vec3(0.03) : pt < 0.85 ? vec3(0.3, 0.26, 0.18) : vec3(0.15, 0.15, 0.16);
+        float ht = fract(ph * 7.31);
+        vHair = ht > 0.9 ? vec3(0.5, 0.4, 0.26) : ht > 0.8 ? vec3(0.4, 0.4, 0.42) : ht > 0.6 ? vec3(0.16, 0.09, 0.05) : vec3(0.025, 0.02, 0.018);
+        float ddx = max(abs(c.x) - 47.0, 0.0), ddz = max(abs(c.z) - 25.0, 0.0);
+        float dd = length(vec2(ddx, ddz)) + max(c.y - 2.0, 0.0) * 0.55;
+        vDim = mix(0.86, uFar, pow(smoothstep(3.0, 52.0, dd), 0.65)) * (0.78 + 0.36 * fract(ph * 2.39)) * uLight;
+      }`,
+    fragmentShader: `
+      uniform sampler2D tA; uniform sampler2D tM;
+      varying vec2 vUv; varying vec3 vShirt; varying vec3 vSkin; varying vec3 vPants; varying vec3 vHair; varying float vDim;
+      void main(){
+        vec4 a = texture2D(tA, vUv);
+        if (a.a < 0.42) discard;
+        vec3 m = texture2D(tM, vUv).rgb;
+        float hair = m.r * m.g, shirt = m.r * (1.0 - m.g), pants = m.g * (1.0 - m.r), skin = m.b;
+        float rec = clamp(shirt + pants + skin + hair, 0.0, 1.0);
+        vec3 lin = pow(a.rgb, vec3(2.2));
+        vec3 tint = (vShirt * shirt + vPants * pants + vSkin * skin + vHair * hair) / max(rec, 0.001);
+        vec3 col = mix(lin * 0.5, lin.r * tint * 1.2, rec) * vDim;
+        col += (1.0 - rec) * step(0.15, lin.b - lin.r) * lin * 1.8;   // phone screens glow
+        gl_FragColor = vec4(col, 1.0);
+        #include <tonemapping_fragment>
+        #include <encodings_fragment>
+      }`,
+  });
+}
+function buildCrowdBoards(seats) {
+  const geo = new THREE.PlaneGeometry(3, 6); geo.translate(0, 3, 0);
+  const n = seats.length;
+  const shirt = new Float32Array(n * 3), skin = new Float32Array(n * 3), anim = new Float32Array(n * 4), vari = new Float32Array(n);
+  const SK = ['#f0c8a2', '#dcaa7c', '#c48a5c', '#9c6640', '#76482a', '#4c2e1b'].map((h) => new THREE.Color(h));
+  const rnd = mulberry32(77 + n);
+  seats.forEach((s, i) => {
+    const c = SK[Math.floor(rnd() * SK.length)];
+    skin[i * 3] = c.r * 0.85; skin[i * 3 + 1] = c.g * 0.85; skin[i * 3 + 2] = c.b * 0.85;
+    anim[i * 4] = rnd() * TAU; anim[i * 4 + 1] = 0.6 + rnd() * 0.75; anim[i * 4 + 2] = s.ang; anim[i * 4 + 3] = rnd() < 0.03 ? 1 : 0;
+    vari[i] = Math.floor(rnd() * CROWD_COLS);
+  });
+  geo.setAttribute('aShirt', new THREE.InstancedBufferAttribute(shirt, 3));
+  geo.setAttribute('aSkin', new THREE.InstancedBufferAttribute(skin, 3));
+  geo.setAttribute('aAnim', new THREE.InstancedBufferAttribute(anim, 4));
+  geo.setAttribute('aVar', new THREE.InstancedBufferAttribute(vari, 1));
+  const mesh = new THREE.InstancedMesh(geo, R.crowdBoardMaterial, n);
+  const d = new THREE.Object3D();
+  seats.forEach((s, i) => {
+    const sc = 0.92 + rnd() * 0.14;
+    d.position.set(s.x + (rnd() - 0.5) * 0.3, s.y, s.z + (rnd() - 0.5) * 0.3); d.rotation.set(0, 0, 0); d.scale.set(sc, sc, sc); d.updateMatrix();
+    mesh.setMatrixAt(i, d.matrix);
+  });
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.frustumCulled = false;
+  mesh.userData.seats = seats;
+  return mesh;
 }
 
 /* ---------------- arena build ---------------- */
@@ -448,8 +679,9 @@ function buildArena() {
   ground.rotation.x = -PI / 2; ground.position.y = -0.03; ground.receiveShadow = true;
   R.scene.add(ground); R.reflHide.push(ground);
   // bowl
-  R.crowdU = { uTime: { value: 0 }, uExcite: { value: 0 }, uWave: { value: -9 }, uFar: { value: 0.2 } };
+  R.crowdU = { uTime: { value: 0 }, uExcite: { value: 0 }, uWave: { value: -9 }, uFar: { value: 0.2 }, uLight: { value: 1 } };
   R.crowdMaterial = crowdMat();
+  R.crowdBoardMaterial = crowdBoardMat();
   const lower = { ax: 57.5, az: 35.5, rc: 12, rows: 17, depth: 2.7, rise: 1.3, base: 1.8, off0: 0, wall: 4 };
   const upper = { ax: 57.5, az: 35.5, rc: 12, rows: 13, depth: 2.6, rise: 1.85, base: 37, off0: 52, wall: 14 };
   R.bowlMat = new THREE.MeshStandardMaterial({ color: '#30343f', roughness: 0.85, vertexColors: true, side: THREE.DoubleSide });
@@ -462,8 +694,8 @@ function buildArena() {
   const ls = [], us = [];
   bowlSeats(lower, ls, 0.95);
   bowlSeats(upper, us, R.mobile ? 0.45 : 0.9);
-  R.crowdLower = buildCrowdMesh(ls); R.scene.add(R.crowdLower); R.reflHide.push(R.crowdLower);
-  R.crowdUpper = buildCrowdMesh(us, true); R.scene.add(R.crowdUpper); R.reflHide.push(R.crowdUpper);
+  R.crowdLower = buildCrowdBoards(ls); R.scene.add(R.crowdLower); R.reflHide.push(R.crowdLower);
+  R.crowdUpper = buildCrowdBoards(us); R.scene.add(R.crowdUpper); R.reflHide.push(R.crowdUpper);
   R.seatsAll = ls.concat(us);
   buildSigns(ls);
   // 360-degree ribbon board on the lower bowl fascia, and the suite level above it
@@ -503,13 +735,13 @@ function buildArena() {
   // courtside people: bench players, coaches and baseline photographers share the crowd shader
   const cs = [];
   for (const s of [-1, 1]) {
-    for (let i = 0; i < 8; i++) if (i !== 4) cs.push({ x: s * (20 + i * 2.15), y: 1.0, z: -30.45, face: -PI / 2, ang: 9, row: 0, kind: i === 0 ? 'coach' : 'bench', side: s });
+    for (const i of [0, 7]) cs.push({ x: s * (20 + i * 2.15), y: 1.0, z: -30.45, face: -PI / 2, ang: 9, row: 0, kind: 'coach', side: s });
     for (let i = 0; i < 4; i++) cs.push({ x: s * (49.2 + (i % 2) * 0.9), y: -0.45, z: (i < 2 ? 1 : -1) * (9 + i * 2.6), face: s > 0 ? PI : 0, ang: 9, row: 0, kind: 'photo' });
   }
   // two rows of courtside seats along the near sideline
   const cf = [];
   for (const [z, y] of [[29.4, 0.8], [31.5, 1.35]]) for (let x = -43; x <= 43; x += 2.25) cf.push({ x: x + vrr(-0.15, 0.15), y, z, face: -PI / 2, ang: Math.atan2(z, x), row: 0 });
-  R.courtFans = buildCrowdMesh(cf); R.scene.add(R.courtFans); R.courtFansSeats = cf;
+  R.courtFans = buildCrowdBoards(cf.map((c) => Object.assign({}, c, { y: c.y - 0.55, z: c.z + 0.15 }))); R.scene.add(R.courtFans); R.courtFansSeats = cf;
   { const seatG = new THREE.BoxGeometry(1.5, 0.3, 1.4), backG = new THREE.BoxGeometry(1.5, 1.4, 0.2);
     const cm = stdMat('#1d2027', 0.55);
     const seats = new THREE.InstancedMesh(seatG, cm, cf.length), backs = new THREE.InstancedMesh(backG, cm, cf.length);
@@ -1157,6 +1389,7 @@ function updateWorld(dt, rdt) {
     poseHumanoid(R.players[i], p, Math.max(dt, 1e-4), px, py, pz, pf);
   });
   stepRefs(dt);
+  stepBench(rdt);
   const b = G.ball, bm = R.ball;
   bm.visible = b.visible;
   const bx = lerp(R.prevBall.x, b.x, a), by = lerp(R.prevBall.y, b.y, a), bz = lerp(R.prevBall.z, b.z, a);
@@ -1205,6 +1438,7 @@ function updateWorld(dt, rdt) {
   R.excite = Math.max(0, R.excite - rdt * 0.32);
   R.crowdU.uTime.value = R.t;
   R.crowdU.uExcite.value = R.excite;
+  R.crowdU.uLight.value = R.baseLights ? clamp(0.25 + 0.75 * R.key.intensity / R.baseLights.key, 0.2, 1.2) : 1;
   if (G.attract && G.state === 'dead' && R.wave < -5 && Math.random() < rdt * 0.08) R.wave = -PI;
   if (R.wave > -5) { R.wave += rdt * 1.1; if (R.wave > PI * 3) R.wave = -9; }
   R.crowdU.uWave.value = R.wave > -5 ? ((R.wave % TAU) + TAU) % TAU - PI : -9;

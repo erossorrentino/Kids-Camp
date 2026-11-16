@@ -36,9 +36,9 @@ fonts from their CDNs. There is nothing to install.
 The default camera is **third person**: it rides high behind the player you control,
 so your player sits low in the frame with the half court and the rim ahead, looking
 at the basket on offense and at the ball handler on defense. Chevrons mark your
-teammates (the bright one is your pass target). Near a baseline the camera pulls in
-rather than dropping behind the glass, and if it does swing behind a backboard, the
-glass and stanchion drop out of the shot. In this mode you stay locked to your own
+teammates (the bright one is your pass target). Near a baseline the camera swings
+around your player instead of dropping behind the glass, and if it ever ends up
+behind a backboard, the glass and stanchion drop out of the shot. In this mode you stay locked to your own
 player on defense. Settings also offer Broadcast (full court), Close and Skycam.
 
 ## Controls
@@ -86,9 +86,13 @@ Phones and tablets get an on-screen joystick and buttons.
   city and team lettering along both baselines.
 - House lights down: the court sits in a pool of light while the stands fade into
   the dark the further they are from the floor. Rounded two-tier bowl with
-  suites, about 7,500 GPU-animated fans in everyday clothes (caps, jeans, team
-  shirts) who stand, cheer and do the wave, a 360° ribbon board, a center-hung
-  scoreboard, ceiling light rig with haze, camera flashes and confetti.
+  suites and about 7,500 painted fans: 16 people in 8 poses (sitting, clapping,
+  arms crossed, on their phone, standing, arms up, fist pump), each recoloured with
+  their own shirt, trousers, skin and hair. Big plays bring part of the crowd to
+  its feet, never the whole bowl at once, and they do the wave. Also a 360° ribbon
+  board, a center-hung scoreboard, ceiling light rig with haze, camera flashes and
+  confetti.
+- Five substitutes per team sit on each bench in full uniform and follow the ball.
 - Players are single skinned meshes on a 15-bone skeleton, painted from a
   per-player texture atlas: jerseys with names, numbers and side panels, long
   shorts with stripes and a team badge, fabric detail and a broadcast rim light.
@@ -103,7 +107,8 @@ Phones and tablets get an on-screen joystick and buttons.
   wristbands, headbands, arm tattoos and four sneaker colourways.
 - Depth of field on replays, the pregame show, free throws and other cinematic
   shots: the arena melts into a soft blur behind sharp players.
-- Three referees, bench players, coaches, photographers and courtside fans.
+- Three referees, coaches, photographers and courtside fans.
+- Defenders guard in a wide, low stance with their arms out over the passing lanes.
 - Broadcast presentation: a starting-lineups intro with 3D player cards,
   instant replays of big dunks and threes (logo wipe, slow motion, cinematic
   camera, skippable), pop-up stat graphics for hot players, and a

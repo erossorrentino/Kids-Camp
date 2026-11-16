@@ -310,9 +310,9 @@ function paintFace(g, L, C) {
   const hairStroke = (x, y, a) => { g.strokeStyle = rgba(C.hair, a); g.lineWidth = 1.2; g.beginPath(); g.moveTo(x, y); g.lineTo(x + (Math.random() - 0.5) * 1.5, y + 2 + Math.random() * 2); g.stroke(); };
   const fillArea = (inside, n, a) => { for (let i = 0; i < n; i++) { const x = fx + Math.random() * 256, y = fy + 120 + Math.random() * 136; if (inside(x - cx, y - fy)) hairStroke(x, y, a * (0.6 + Math.random() * 0.4)); } };
   const lipsOut = (dx, dy) => !(Math.abs(dx) < 14 && dy > 165 && dy < 180);
-  const beardZone = (dx, dy) => { const ax = Math.abs(dx); return ax < 66 && dy > 128 + ax * 0.15 && (ax > 40 ? dy > 128 : dy > 156 - ax * 0.4) && lipsOut(dx, dy); };
+  const beardZone = (dx, dy) => { const ax = Math.abs(dx); return ax < 66 && dy > 140 + ax * 0.12 && (ax > 40 ? dy > 146 : dy > 157 - ax * 0.25) && lipsOut(dx, dy); };
   if (L.beard === 'stubble') fillArea(beardZone, 2600, 0.28);
-  if (L.beard === 'full') { fillArea(beardZone, 9000, 0.85); fillArea((dx, dy) => Math.abs(dx) > 58 && Math.abs(dx) < 70 && dy > 100 && dy < 140, 600, 0.8); }
+  if (L.beard === 'full') { fillArea(beardZone, 11000, 0.82); fillArea((dx, dy) => Math.abs(dx) > 58 && Math.abs(dx) < 70 && dy > 100 && dy < 146, 600, 0.75); }
   if (L.beard === 'goatee') { fillArea((dx, dy) => Math.abs(dx) < 17 && dy > 160 && dy < 167, 900, 0.85); fillArea((dx, dy) => Math.abs(dx) < 20 - (dy - 182) * 0.1 && dy > 182 && dy < 236, 1800, 0.85); fillArea(beardZone, 900, 0.18); }
   if (L.beard === 'chin') fillArea((dx, dy) => { const ax = Math.abs(dx), jaw = 214 - ax * 0.62 + (ax > 52 ? (ax - 52) * -6 : 0); return ax < 70 && Math.abs(dy - jaw) < 8 && lipsOut(dx, dy); }, 2600, 0.85);
   if (L.hair !== 'bald') for (const s of [-1, 1]) fillArea((dx, dy) => dx * s > 60 && dx * s < 70 && dy > 92 && dy < 128, 260, 0.8);
@@ -574,17 +574,6 @@ function buildHumanoid(pl, home) {
     }
   } else if (H === 'bun') { P.push(piece(cap(0.352, 0.47, 1.0, 1.12, 0.91, 0.01, 0.36), J.head, headW)); P.push(piece(hairUV(sphereG(0.13, 14, 10, 1, 1, 1, -0.3, 0.62, 0)), J.head, headW)); }
   else if (H === 'braids') { P.push(piece(cap(0.35, 0.48, 1.0, 1.12, 0.91, 0.01, 0.355), J.head, headW)); for (let i = 0; i < 6; i++) { const z = (i - 2.5) * 0.08, lc = hairUV(cylG(0.03, 0.022, 0.42, 6, 0, -0.21, 0)); lc.rotateZ(-0.35); lc.translate(-0.32, 0.36, z); P.push(piece(lc, J.head, headW)); } }
-  if (L.beard === 'full') {
-    // a thin shell over the jaw so the beard has volume in profile
-    // jaw sides from the sideburns down, and the chin below the lower lip (the mouth stays open)
-    for (const [p0, pl, t0, tl] of [[0.62, 0.27, 0.5, 0.4], [1.11, 0.27, 0.5, 0.4], [0.88, 0.24, 0.76, 0.16]]) {
-      const bd = new THREE.SphereGeometry(0.352, 12, 10, PI * p0, PI * pl, PI * t0, PI * tl);
-      const p = bd.attributes.position;
-      for (let i = 0; i < p.count; i++) { let x = p.getX(i), y = p.getY(i), z = p.getZ(i); const dy = y / 0.35, dx = x / 0.35; x *= 0.98; y *= 1.13; z *= 0.88; if (dy < 0) { z *= 1 - 0.24 * -dy; if (dx > -0.2) x += 0.07 * -dy * Math.max(0, dx + 0.2); y *= 1 + 0.08 * -dy; } p.setXYZ(i, x + 0.028, y + 0.32, z); }
-      bd.computeVertexNormals();
-      P.push(piece(constUV(bd, 'hairSolid'), J.head, headW, () => 0.85));
-    }
-  }
   if (d.acc === 1) P.push(piece(constUV(cylG(0.37, 0.37, 0.1, 28, 0.015, 0.47, 0), 'band'), J.head, headW));
   // arms: one continuous tube per arm that bends smoothly at the elbow; athletic deltoids, biceps and forearms
   const ARM = [[0.104, -2.22], [0.114, -2.12], [0.156, -1.85], [0.19, -1.55], [0.17, -1.3], [0.155, -1.18], [0.182, -1.02], [0.24, -0.75], [0.272, -0.48], [0.26, -0.2], [0.22, 0.05]];
@@ -636,7 +625,7 @@ function buildHumanoid(pl, home) {
     }
     P.push(piece(constUV(lathe(bandProf(LEG, -3.14, sockTop, 0.016, 8).concat([[profR(LEG, sockTop) + 0.006, sockTop + 0.02]]), 18, b, b), 'sock'), j, legW, legAO));
     for (const g of shoePieces()) {
-      g.scale(1.14, 1.1, 1.22); g.translate(0.07, -2.98, 0);
+      g.scale(1.03, 1.0, 1.08); g.translate(0.07, -2.99, 0);
       P.push(piece(g, j, () => [an, 1], (x, y) => 0.8 + 0.2 * sstep(0.0, 0.25, y)));
     }
   }
@@ -696,6 +685,54 @@ function buildRefs() {
     R.refs.push({ p, h: buildHumanoid(p, false) });
   }
 }
+/* the second unit: five substitutes per team in full uniform, seated on each bench, following the ball */
+const BENCH_FIRST = ['Marcus', 'Theo', 'Jalen', 'Owen', 'Darius', 'Luca', 'Isaiah', 'Kofi', 'Mateus', 'Rory', 'Andre', 'Nate', 'Elijah', 'Tariq', 'Henrik', 'Cam'];
+const BENCH_LAST = ['Reid', 'Okafor', 'Lindgren', 'Barros', 'Cole', 'Hayes', 'Mensah', 'Duarte', 'Price', 'Vance', 'Sato', 'Ellis', 'Navarro', 'Booker', 'Strand', 'Achebe'];
+function buildBench() {
+  if (R.bench) for (const b of R.bench) disposeHumanoid(b.h);
+  R.bench = [];
+  if (G.mode === 'threept') return;
+  G.teams.forEach((T, ti) => {
+    const s = T.idx === 0 ? -1 : 1;
+    const used = new Set(T.players.map((p) => p.d.num));
+    const r = mulberry32(nameHash(T.def.id + ti) + 5);
+    [1, 2, 3, 5, 6].forEach((slot, k) => {
+      let num = 0; do { num = Math.floor(r() * 55); } while (used.has(num)); used.add(num);
+      const d = { n: BENCH_FIRST[Math.floor(r() * 16)] + ' ' + BENCH_LAST[Math.floor(r() * 16)], pos: ['SG', 'SF', 'PF', 'C', 'PG'][k], h: 74 + Math.floor(r() * 10), num,
+        skin: Math.floor(r() * 6), hair: Math.floor(r() * 5), acc: r() < 0.2 ? 1 : 0 };
+      const p = { ref: false, bench: true, id: 300 + ti * 10 + k, team: T, d, hgt: d.h / 12, sc: d.h / 12 / 6.5, x: s * (20 + slot * 2.15) + (r() - 0.5) * 0.2, y: 0, z: -30.5, face: PI / 2 + (r() - 0.5) * 0.25 };
+      const h = buildHumanoid(p, T.idx === 0);
+      h.mesh.castShadow = false; h.blob.visible = false;
+      poseSeated(h, p, r);
+      R.bench.push({ p, h });
+    });
+  });
+}
+function poseSeated(h, p, r) {
+  const sc = p.sc, hipY = 1.78 + 0.3 * sc;
+  const th = Math.acos(clamp((hipY - 1.77 * sc) / (1.6 * sc), 0.05, 0.95));
+  h.root.position.set(p.x, hipY - 3.35 * sc, p.z); h.root.rotation.y = -p.face;
+  const spread = 0.1 + r() * 0.12;
+  h.legR.hp.rotation.set(0, -spread, th); h.legL.hp.rotation.set(0, spread, th);
+  for (const leg of [h.legR, h.legL]) { leg.kn.rotation.set(0, 0, -th); leg.ank.rotation.set(0, 0, 0); }
+  h.hips.position.y = 3.35; h.torso.rotation.z = 0.04 - r() * 0.12;
+  const kx = 1.6 * Math.sin(th), ky = 3.27 - 1.6 * Math.cos(th);
+  if (r() < 0.3) {   // elbows on the knees, leaning in
+    h.torso.rotation.z = -0.3;
+    armIK(h, h.armR, 1, kx * 0.9, ky + 0.7, 0.3, 1); armIK(h, h.armL, -1, kx * 0.9, ky + 0.7, -0.3, 1);
+  } else { armIK(h, h.armR, 1, kx * 0.62, ky + 0.42, 0.46, 1); armIK(h, h.armL, -1, kx * 0.62, ky + 0.42, -0.46, 1); }
+  h.benchLook = r() * 10;
+}
+function stepBench(dt) {
+  if (!R.bench || !R.bench.length) return;
+  const b = G.ball, k = 1 - Math.exp(-4 * dt);
+  for (const q of R.bench) {
+    const lb = toLocal(q.p, b.x, b.y, b.z);
+    const yaw = clamp(Math.atan2(lb.z, Math.max(0.3, lb.x)), -1.15, 1.15) + Math.sin(R.t * 0.3 + q.h.benchLook) * 0.08;
+    q.h.headG.rotation.y += (-yaw - q.h.headG.rotation.y) * k;
+    q.h.headG.rotation.z += (clamp(Math.atan2(lb.y - 4.6, Math.max(1, hyp(lb.x, lb.z))), -0.4, 0.4) * 0.6 - q.h.headG.rotation.z) * k;
+  }
+}
 function refSignal(kind, x, z) {
   if (!R.refs || !R.refs.length) return;
   let best = R.refs[0], bd = 1e9;
@@ -740,6 +777,7 @@ function buildPlayers() {
   for (const h of R.players) disposeHumanoid(h);
   R.players = G.players.map((p) => buildHumanoid(p, p.team.idx === 0));
   buildRefs();
+  buildBench();
   R.prev = G.players.map((p) => ({ x: p.x, y: p.y, z: p.z, f: p.face }));
   R.prevBall = { x: G.ball.x, y: G.ball.y, z: G.ball.z };
   paintArena(G.teams[0].def, G.teams[1].def);
@@ -1043,9 +1081,9 @@ function poseHumanoid(h, p, dt, px, py, pz, pf) {
       const pump = Math.sin(p.celebT * 9) > 0 ? 3.0 : 2.35;
       setArm(h.armR, pump, -0.2, 0.65, k); setArm(h.armL, 0.25, 0.3, 0.7, k);
     } else if (def && spS < 9) {
-      // active hands in the stance: one up to contest the pass, one low for the ball
+      // active hands in a wide, low stance: arms out to the sides covering the passing lanes, palms working
       const w = Math.sin(R.t * 3 + p.id);
-      setArm(h.armR, 1.0 + 0.18 * w, -0.62, 1.05, k); setArm(h.armL, 0.85 - 0.18 * w, 0.62, 1.1, k);
+      setArm(h.armR, 0.62 + 0.14 * w, -1.08, 0.5 + 0.1 * w, k); setArm(h.armL, 0.55 - 0.14 * w, 1.08, 0.55 - 0.1 * w, k);
     } else if (h.armSwing && spS > 0.7) {
       // arms counter-swing to the legs; elbows bend more as the pace picks up
       const ar = h.armSwing[0], al = h.armSwing[1], amp = 0.8 + 0.6 * run;

@@ -358,7 +358,7 @@ function renderDof() {
     D.skip = [];
     sc.traverse((o) => { const m = o.material; if (o.isSprite || o.isPoints || o.isLine || (m && !Array.isArray(m) && (m.transparent || m.blending === THREE.AdditiveBlending))) D.skip.push(o); });
   }
-  hide(R.crowdLower); hide(R.crowdUpper); hide(R.signs);
+  hide(R.crowdLower); hide(R.crowdUpper); hide(R.courtFans); hide(R.signs);
   for (const o of D.skip) hide(o);
   for (const h of R.players) hide(h.blob);
   if (R.refs) for (const q of R.refs) hide(q.h.blob);
@@ -557,17 +557,28 @@ function thirdPerson(dt) {
   if (R.tpYaw == null || R.snapCam) R.tpYaw = want;
   else R.tpYaw += angDiff(R.tpYaw, want) * (1 - Math.exp(-2.4 * dt));
   const fx = Math.cos(R.tpYaw), fz = Math.sin(R.tpYaw);
-  // high behind the player: the controlled player sits low in frame with the half court and rim ahead
-  let dist = 20.5, height = 14.2;
+  // high behind the player: the controlled player sits low in frame with the half court and rim ahead.
+  // If that spot is behind a baseline, swing around the player (keeping the distance) instead of pulling in.
+  let dist = 20.5, height = 14.2, yawC = R.tpYaw;
   const side = 0.6, lim = 41.5;
-  // never drop behind a backboard: pull in (and up) so the glass and stanchion don't block the view
-  const bx = p.x - fx * dist;
-  if (Math.abs(bx) > lim && Math.abs(fx) > 0.12) {
-    const dmax = (p.x - Math.sign(bx) * lim) / fx;
-    if (dmax > 7) { const dd = Math.min(dist, dmax); height += (dist - dd) * 0.18; dist = dd; }
-    else height += 4;
+  const fits = (y) => Math.abs(p.x - Math.cos(y) * dist) <= lim;
+  if (!fits(yawC)) {
+    let best = null, bestScore = 1e9;
+    for (let k = 1; k <= 16; k++) for (const sg of [1, -1]) {
+      const y = R.tpYaw + sg * k * 0.09;
+      if (!fits(y)) continue;
+      const cz = Math.abs(p.z - Math.sin(y) * dist);
+      const score = k * 3 + (cz > 33 ? 40 : 0) + (sg === R.tpSwing ? 0 : 2.5);
+      if (score < bestScore) { bestScore = score; best = [y, sg]; }
+    }
+    if (best) { yawC = best[0]; R.tpSwing = best[1]; }
+    else {
+      const bx = p.x - fx * dist, dmax = (p.x - Math.sign(bx) * lim) / fx;
+      if (dmax > 7) { const dd = Math.min(dist, dmax); height += (dist - dd) * 0.18; dist = dd; }
+    }
   }
-  let cx = p.x - fx * dist - fz * side, cz = p.z - fz * dist + fx * side;
+  const cfx = Math.cos(yawC), cfz = Math.sin(yawC);
+  let cx = p.x - cfx * dist - cfz * side, cz = p.z - cfz * dist + cfx * side;
   cx = clamp(cx, -60, 60); cz = clamp(cz, -36, 36);
   const lift = b.state === 'shot' ? clamp(b.y - 8, 0, 8) * 0.4 : 0;
   const ahead = 3 + 7 * clamp(dist / 20.5, 0, 1);
