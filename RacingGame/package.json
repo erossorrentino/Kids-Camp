@@ -1,0 +1,17 @@
+{
+  "name": "apex-velocity",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A browser racing game: F1 / GT-style circuit racing with 10,000 procedurally generated cars, upgrade parts and a career mode.",
+  "type": "module",
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch"
+  },
+  "dependencies": {
+    "three": "0.180.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.25.10"
+  }
+}

@@ -1,5 +1,10 @@
 # Crime City (working title)
 
+> **New: Apex Velocity racing game.** An F1 / Gran Turismo-style racer with
+> 10,000 cars, upgrade parts, real-world prices and a career mode, playable in
+> any browser (computer, tablet or phone). See [`RacingGame/`](RacingGame/README.md);
+> to play, open `RacingGame/dist/index.html`.
+
 An open-world crime game in the GTA tradition: steal cars, plan and run
 heists, build wanted stars, buy guns and vehicles. Built as a real Unity
 project with working, data-driven systems rather than hand-placed content,
