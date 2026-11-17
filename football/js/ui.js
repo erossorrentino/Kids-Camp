@@ -106,7 +106,7 @@
     el.innerHTML = { home: renderHome, squad: renderSquad, packs: renderPacks, market: renderMarket, club: renderClub }[UI.tab]();
     el.scrollTop = 0;
     const s = sv();
-    $('#nav-packs .dot').hidden = Object.values(s.packs).reduce((a, b) => a + b, 0) === 0;
+    $('#nav-packs .dot').hidden = Object.values(s.packs).reduce((a, b) => a + b, 0) === 0 && !UI.dailyReady();
     $('#nav-club .dot').hidden = s.newIds.length === 0 || UI.tab === 'club';
     if (UI.tab === 'club' && s.newIds.length) { UI._newShown = s.newIds.slice(); s.newIds = []; SV.commit(); }
     UI.refreshTop();
@@ -146,7 +146,7 @@
       <section class="stars">
         <p class="eyebrow">Your best players</p>
         <div class="fan">${order.map((p, i) => C.card(p, { cls: 'fan-' + i, kit: [me.c1, me.c2] })).join('')}</div>
-        ${packN ? `<button class="packnote" data-act="tab" data-v="packs"><b>${packN} ${packN === 1 ? 'pack' : 'packs'} waiting</b><span>Open ${packN === 1 ? 'it' : 'them'} in Packs</span></button>` : `<button class="packnote quiet" data-act="tab" data-v="packs"><b>Build your Ultimate Team</b><span>Spend coins on packs and players</span></button>`}
+        ${UI.dailyReady() ? `<button class="packnote" data-act="tab" data-v="packs"><b>Free daily pack ready</b><span>${packN ? packN + ' more ' + (packN === 1 ? 'pack' : 'packs') + ' waiting too' : 'Claim it in Packs'}</span></button>` : packN ? `<button class="packnote" data-act="tab" data-v="packs"><b>${packN} ${packN === 1 ? 'pack' : 'packs'} waiting</b><span>Open ${packN === 1 ? 'it' : 'them'} in Packs</span></button>` : `<button class="packnote quiet" data-act="tab" data-v="packs"><b>Build your Ultimate Team</b><span>Spend coins on packs and players</span></button>`}
       </section>
     </div>`;
   }
@@ -192,30 +192,49 @@
   }
 
   /* ---------- packs ---------- */
+  const today = () => { const d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); };
+  const dayNumber = () => { const d = new Date(); return Math.floor((d.getTime() - d.getTimezoneOffset() * 60000) / 864e5); };
+  UI.dailyReady = () => sv().dailyClaim !== today();
   function packArt(pack, extra) {
-    return `<div class="pack pk-${pack.id} ${extra || ''}"><div class="pack-crimp"></div><div class="pack-face"><span class="pack-n">${pack.cards}</span><b>${pack.name.split(' ')[0]}</b><i>pack</i></div><div class="pack-crimp b"></div></div>`;
+    const t = pack.theme || ['#888', '#333', '#fff'];
+    const label = pack.short || pack.name.split(' ')[0];
+    return `<div class="pack ${pack.holo ? 'holo' : ''} ${extra || ''}" style="--pb:linear-gradient(170deg, ${t[0]}, ${t[1]});--pi:${t[2]}"><div class="pack-crimp"></div><div class="pack-face"><span class="pack-n">${pack.mystery ? '?' : pack.cards}</span><b class="${label.length > 5 ? 'long' : ''}">${esc(label)}</b><i>pack</i></div><div class="pack-crimp b"></div></div>`;
   }
   function oddsList(pack) {
     const row = (o) => Object.keys(o).map((k) => `<li class="t-${k}"><span>${D.TIER_BY_ID[k].name}</span><b>${o[k]}%</b></li>`).join('');
-    return `<ul class="odds">${row(pack.odds)}</ul>` + (pack.guarantee ? `<p class="odds-note">Guaranteed card</p><ul class="odds">${row(pack.guarantee)}</ul>` : '');
+    const only = pack.club ? 'Only players from the ' + D.club(pack.club).name : pack.pos ? 'Only ' + pack.pos.map((p) => D.POS_NAME[p].toLowerCase() + 's').join(', ') : '';
+    const top = pack.top ? 'The top third of each tier for ' + { spd: 'speed', str: 'strength', cth: 'catching' }[pack.top] : '';
+    return (only || top ? `<p class="odds-note">${esc([only, top].filter(Boolean).join('. '))}</p>` : '') + `<ul class="odds">${row(pack.odds)}</ul>` +
+      (pack.guarantee ? `<p class="odds-note">${pack.guaranteeN > 1 ? pack.guaranteeN + ' guaranteed cards' : 'Guaranteed card'}</p><ul class="odds">${row(pack.guarantee)}</ul>` : '');
   }
+  function packCard(p) {
+    const s = sv();
+    let btn;
+    if (p.daily) btn = UI.dailyReady() ? `<button class="btn btn-play sm wide" data-act="claim-daily">Claim free pack</button>` : `<button class="btn btn-buy" disabled>Next one tomorrow</button>`;
+    else btn = `<button class="btn btn-buy${s.coins < p.price ? ' poor' : ''}" data-act="buy-pack" data-v="${p.id}">${coinHtml(p.price)}</button>`;
+    return `<article class="packcard${p.holo ? ' holo-card' : ''}">
+      ${p.badge ? `<em class="pack-badge">${esc(p.badge)}</em>` : ''}
+      ${packArt(p)}
+      <h3>${esc(p.name)}</h3>
+      <p>${esc(p.blurb)}</p>
+      ${btn}
+      <details><summary>Pack odds</summary>${oddsList(p)}</details>
+    </article>`;
+  }
+  const PACK_SECTIONS = [['free', 'Free and cheap', ''], ['classic', 'Classic packs', 'From Bronze all the way up to Mythic'], ['position', 'Position packs', 'Fill one spot in your lineup'], ['special', 'Special packs', 'Big bundles, superstars and players with one standout skill'], ['team', 'Team packs', 'Four different teams every day']];
   function renderPacks() {
     const s = sv();
     const mine = D.PACKS.filter((p) => s.packs[p.id] > 0);
+    const teams = new Set(D.featuredTeams(dayNumber()).map((id) => 'team-' + id));
+    const sections = PACK_SECTIONS.map(([cat, title, sub]) => {
+      const list = D.PACKS.filter((p) => p.cat === cat && (cat !== 'team' || teams.has(p.id)));
+      return `<section class="packsec"><div class="packsec-head"><p class="label">${title}</p>${sub ? `<span class="hint">${sub}</span>` : ''}</div><div class="packgrid">${list.map(packCard).join('')}</div></section>`;
+    }).join('');
     return `
     <div class="store">
-      <header class="pagehead"><div><p class="eyebrow">Ultimate Team</p><h1>Packs</h1></div><p class="hint">Coins come from playing games. Nothing here costs real money.</p></header>
-      ${mine.length ? `<section class="mine"><p class="label">Your unopened packs</p><div class="mine-row">${mine.map((p) => `<button class="minepack" data-act="open-pack" data-v="${p.id}">${packArt(p, 'small')}<span><b>${p.name}</b><i>${s.packs[p.id]} to open</i></span><em class="btn btn-play sm">Open</em></button>`).join('')}</div></section>` : ''}
-      <section class="packgrid">
-        ${D.PACKS.map((p) => `
-          <article class="packcard">
-            ${packArt(p)}
-            <h3>${p.name}</h3>
-            <p>${p.blurb}</p>
-            <button class="btn btn-buy${s.coins < p.price ? ' poor' : ''}" data-act="buy-pack" data-v="${p.id}">${coinHtml(p.price)}</button>
-            <details><summary>Pack odds</summary>${oddsList(p)}</details>
-          </article>`).join('')}
-      </section>
+      <header class="pagehead"><div><p class="eyebrow">Ultimate Team</p><h1>Packs</h1></div><p class="hint">${D.PACKS.filter((p) => p.cat !== 'team').length + 4} packs on sale today. Coins come from playing games. Nothing here costs real money.</p></header>
+      ${mine.length ? `<section class="mine"><p class="label">Your unopened packs</p><div class="mine-row">${mine.map((p) => `<button class="minepack" data-act="open-pack" data-v="${p.id}">${packArt(p, 'small')}<span><b>${esc(p.name)}</b><i>${s.packs[p.id]} to open</i></span><em class="btn btn-play sm">Open</em></button>`).join('')}</div></section>` : ''}
+      ${sections}
     </div>`;
   }
   function buyPack(id) {
@@ -622,6 +641,11 @@
     'squad-side': (el) => { UI.squadSide = el.dataset.v; A.click(); UI.show('squad'); },
     'best-xi': () => { const s = sv(); s.lineup = D.bestLineup(s.owned); SV.commit(); A.click(); UI.show('squad'); toast('Best lineup picked'); },
     'buy-pack': (el) => buyPack(el.dataset.v),
+    'claim-daily': () => {
+      if (!UI.dailyReady()) return;
+      const s = sv(); s.dailyClaim = today(); s.packs.daily = (s.packs.daily || 0) + 1; SV.commit();
+      A.coin(); openPack('daily');
+    },
     'open-pack': (el) => { A.click(); openPack(el.dataset.v); },
     'po-open': poOpen,
     'po-flip': (el) => poFlip(+el.dataset.i),

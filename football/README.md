@@ -17,7 +17,9 @@ Everything is invented: every team, player and sponsor in the game is fictional.
   field goals with a timing meter, punts, sacks, interceptions and pick sixes, safeties,
   turnovers on downs, four quarters.
 - **Ultimate Team.** About 455 fictional players across 10 positions and six card tiers
-  (Bronze to Mythic). Earn coins by winning games, spend them on five kinds of packs or on
+  (Bronze to Mythic). New teams start with three Rookie Packs. Earn coins by winning games, spend them on 27 kinds of packs (a free daily
+  pack, Rookie, Lucky, Mystery, Bronze to Mythic, a pack for every position, Jumbo, Mega,
+  Superstar, Speed, Power, Sure Hands, Offense, Defense, and team packs that rotate daily) or on
   single players in the market, sell spare players, and set a 23-player lineup
   (11 offense, 11 defense, a kicker). Climb from Division 10 to Division 1 for pack rewards.
   No real money anywhere.

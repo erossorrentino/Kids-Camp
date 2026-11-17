@@ -14,7 +14,7 @@
       v: 1, stamp: 0, seed: Math.floor(Math.random() * 1e6) + 1,
       coins: 2000, owned, newIds: [],
       lineup: D.bestLineup(owned),
-      packs: { rookie: 3 }, rookieGift: true,
+      packs: { rookie: 3 }, rookieGift: true, dailyClaim: '',
       division: 10, divPts: 0,
       stats: { played: 0, w: 0, d: 0, l: 0, pf: 0, pa: 0, tds: 0 },
       market: { seed: 1 },

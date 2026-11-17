@@ -203,32 +203,85 @@
   /* ---------- economy ---------- */
   const sellPrice = (ovr) => Math.max(10, Math.round((12 * Math.pow(1.155, ovr - 50)) / 5) * 5);
   const buyPrice = (ovr) => Math.round((sellPrice(ovr) * 4.5) / 10) * 10;
+  /* Packs. theme = [gradient top, gradient bottom, ink]. Optional filters: pos (positions), club,
+     top (only the best third of each tier at that stat). cat groups them in the store. */
+  const SG = { silver: 45, gold: 45, elite: 9, legend: 1 };
   const PACKS = [
-    { id: 'rookie', name: 'Rookie Pack', price: 300, cards: 5, blurb: '5 young players. One is guaranteed Silver or better.', odds: { bronze: 62, silver: 30, gold: 7.4, elite: 0.6 }, guarantee: { silver: 75, gold: 23, elite: 2 } },
-    { id: 'bronze', name: 'Bronze Pack', price: 500, cards: 4, blurb: '4 players. Mostly Bronze, with a shot at Silver.', odds: { bronze: 80, silver: 18, gold: 1.9, elite: 0.1 } },
-    { id: 'silver', name: 'Silver Pack', price: 1200, cards: 4, blurb: '4 players. Mostly Silver, Gold is possible.', odds: { bronze: 25, silver: 60, gold: 13.5, elite: 1.4, legend: 0.1 } },
-    { id: 'gold', name: 'Gold Pack', price: 4500, cards: 5, blurb: '5 players. Mostly Gold, Elite is possible.', odds: { silver: 30, gold: 60, elite: 8.8, legend: 1.1, mythic: 0.1 } },
-    { id: 'elite', name: 'Elite Pack', price: 11000, cards: 5, blurb: '5 players. One is guaranteed Elite or better.', odds: { gold: 55, elite: 36, legend: 8, mythic: 1 }, guarantee: { elite: 82, legend: 15, mythic: 3 } },
-    { id: 'legend', name: 'Legend Pack', price: 32000, cards: 6, blurb: '6 players. One is guaranteed Legend or Mythic.', odds: { gold: 30, elite: 50, legend: 17, mythic: 3 }, guarantee: { legend: 85, mythic: 15 } },
+    { id: 'daily', cat: 'free', name: 'Daily Pack', short: 'Daily', price: 0, cards: 3, daily: true, badge: 'Free', blurb: 'Free once a day. Come back tomorrow for another.', odds: { bronze: 68, silver: 27, gold: 4.7, elite: 0.3 }, theme: ['#56f0d6', '#0a5c61', '#03221f'] },
+    { id: 'rookie', cat: 'free', name: 'Rookie Pack', short: 'Rookie', price: 300, cards: 5, blurb: '5 young players. One is guaranteed Silver or better.', odds: { bronze: 62, silver: 30, gold: 7.4, elite: 0.6 }, guarantee: { silver: 75, gold: 23, elite: 2 }, theme: ['#4fe39a', '#0b6b3c', '#022b16'] },
+    { id: 'lucky', cat: 'free', name: 'Lucky Pack', short: 'Lucky', price: 750, cards: 3, badge: 'Long shot', blurb: 'Cheap, with a tiny chance at a Legend or a Mythic.', odds: { bronze: 70, silver: 20, gold: 5, elite: 3, legend: 1.5, mythic: 0.5 }, theme: ['#9dff6a', '#1d7a1a', '#05230a'] },
+    { id: 'mystery', cat: 'free', name: 'Mystery Pack', short: '???', price: 2000, cards: 5, mystery: true, badge: 'Surprise', blurb: 'Somewhere between 3 and 7 players, of any tier.', odds: { bronze: 35, silver: 30, gold: 22, elite: 9, legend: 3, mythic: 1 }, theme: ['#3a3f4b', '#07090d', '#ffd23f'] },
+
+    { id: 'bronze', cat: 'classic', name: 'Bronze Pack', short: 'Bronze', price: 500, cards: 4, blurb: '4 players. Mostly Bronze, with a shot at Silver.', odds: { bronze: 80, silver: 18, gold: 1.9, elite: 0.1 }, theme: ['#e0a878', '#7d4c2c', '#2a1508'] },
+    { id: 'silver', cat: 'classic', name: 'Silver Pack', short: 'Silver', price: 1200, cards: 4, blurb: '4 players. Mostly Silver, Gold is possible.', odds: { bronze: 25, silver: 60, gold: 13.5, elite: 1.4, legend: 0.1 }, theme: ['#f4f7fa', '#8996a5', '#161d28'] },
+    { id: 'gold', cat: 'classic', name: 'Gold Pack', short: 'Gold', price: 4500, cards: 5, blurb: '5 players. Mostly Gold, Elite is possible.', odds: { silver: 30, gold: 60, elite: 8.8, legend: 1.1, mythic: 0.1 }, theme: ['#ffe680', '#b27d10', '#2b1e00'] },
+    { id: 'elite', cat: 'classic', name: 'Elite Pack', short: 'Elite', price: 11000, cards: 5, blurb: '5 players. One is guaranteed Elite or better.', odds: { gold: 55, elite: 36, legend: 8, mythic: 1 }, guarantee: { elite: 82, legend: 15, mythic: 3 }, theme: ['#7b4bff', '#1b0d5c', '#f6efff'] },
+    { id: 'legend', cat: 'classic', name: 'Legend Pack', short: 'Legend', price: 32000, cards: 6, blurb: '6 players. One is guaranteed Legend or Mythic.', odds: { gold: 30, elite: 50, legend: 17, mythic: 3 }, guarantee: { legend: 85, mythic: 15 }, theme: ['#c41a22', '#120305', '#ffe2a0'] },
+    { id: 'mythic', cat: 'classic', name: 'Mythic Pack', short: 'Mythic', price: 90000, cards: 3, badge: 'Rarest', blurb: '3 players. One is guaranteed Mythic, the best cards in the game.', odds: { elite: 50, legend: 40, mythic: 10 }, guarantee: { mythic: 100 }, theme: ['#8df3ff', '#c86bff', '#14082e'], holo: true },
+
+    { id: 'qb', cat: 'position', name: 'Quarterback Pack', short: 'QB', price: 3000, cards: 4, pos: ['QB'], blurb: '4 quarterbacks. Find your franchise passer.', odds: SG, theme: ['#2b4bd6', '#0a1240', '#ffd23f'] },
+    { id: 'rb', cat: 'position', name: 'Running Back Pack', short: 'RB', price: 3000, cards: 4, pos: ['RB'], blurb: '4 running backs who love contact.', odds: SG, theme: ['#ff8a2a', '#7a2e05', '#1f0b00'] },
+    { id: 'wr', cat: 'position', name: 'Receiver Pack', short: 'WR', price: 3000, cards: 4, pos: ['WR'], blurb: '4 wide receivers to stretch the field.', odds: SG, theme: ['#6ec6ff', '#13507a', '#04182a'] },
+    { id: 'te', cat: 'position', name: 'Tight End Pack', short: 'TE', price: 2500, cards: 3, pos: ['TE'], blurb: '3 tight ends who block and catch.', odds: SG, theme: ['#c99a64', '#5b3a1a', '#1d0f02'] },
+    { id: 'ol', cat: 'position', name: 'Lineman Pack', short: 'OL', price: 3000, cards: 5, pos: ['OL'], blurb: '5 offensive linemen to protect your quarterback.', odds: SG, theme: ['#9aa5b5', '#333c4a', '#0b0f15'] },
+    { id: 'dl', cat: 'position', name: 'Pass Rusher Pack', short: 'DL', price: 3000, cards: 4, pos: ['DL'], blurb: '4 defensive linemen who chase quarterbacks.', odds: SG, theme: ['#ff4a4a', '#5c0a0a', '#1f0202'] },
+    { id: 'lb', cat: 'position', name: 'Linebacker Pack', short: 'LB', price: 3000, cards: 4, pos: ['LB'], blurb: '4 linebackers who tackle everything.', odds: SG, theme: ['#2fbf71', '#0b4a29', '#021a0d'] },
+    { id: 'db', cat: 'position', name: 'Secondary Pack', short: 'DB', price: 3000, cards: 4, pos: ['CB', 'S'], blurb: '4 cornerbacks and safeties to stop the pass.', odds: SG, theme: ['#b07bff', '#3b1a7a', '#12052b'] },
+    { id: 'k', cat: 'position', name: 'Kicker Pack', short: 'K', price: 800, cards: 3, pos: ['K'], blurb: '3 kickers with big legs.', odds: { bronze: 30, silver: 40, gold: 25, elite: 4.5, legend: 0.5 }, theme: ['#f2ff7a', '#7a8a10', '#1d2202'] },
+
+    { id: 'jumbo', cat: 'special', name: 'Jumbo Pack', short: 'Jumbo', price: 2600, cards: 10, badge: '10 players', blurb: '10 players! Mostly Bronze and Silver.', odds: { bronze: 55, silver: 38, gold: 6.5, elite: 0.5 }, theme: ['#ff7ac8', '#7a1450', '#26031a'] },
+    { id: 'mega', cat: 'special', name: 'Mega Pack', short: 'Mega', price: 20000, cards: 8, guaranteeN: 2, badge: 'Best value', blurb: '8 players. Two are guaranteed Elite or better.', odds: { silver: 15, gold: 62, elite: 19, legend: 3.5, mythic: 0.5 }, guarantee: { elite: 80, legend: 17, mythic: 3 }, theme: ['#ffcf4a', '#4a1a8a', '#fff3c4'] },
+    { id: 'superstar', cat: 'special', name: 'Superstar Pack', short: 'Star', price: 15000, cards: 1, badge: '1 big player', blurb: 'Just one player, and he is Elite or better.', odds: { elite: 70, legend: 25, mythic: 5 }, theme: ['#ffffff', '#c9a227', '#2b1e00'] },
+    { id: 'speed', cat: 'special', name: 'Speed Pack', short: 'Speed', price: 5000, cards: 4, top: 'spd', blurb: '4 of the fastest players in the league.', odds: SG, theme: ['#fff04a', '#1a1a1a', '#1a1a1a'] },
+    { id: 'power', cat: 'special', name: 'Power Pack', short: 'Power', price: 5000, cards: 4, top: 'str', blurb: '4 of the strongest players. Big hits guaranteed.', odds: SG, theme: ['#ff5a36', '#240404', '#fff1e8'] },
+    { id: 'hands', cat: 'special', name: 'Sure Hands Pack', short: 'Hands', price: 5000, cards: 4, top: 'cth', pos: ['WR', 'TE', 'RB'], blurb: '4 pass catchers with the safest hands.', odds: SG, theme: ['#35e0c2', '#0d3b52', '#ecfffb'] },
+    { id: 'offense', cat: 'special', name: 'Offense Pack', short: 'Offense', price: 6000, cards: 5, pos: ['QB', 'RB', 'WR', 'TE', 'OL'], blurb: '5 offensive players. Mostly Gold.', odds: { silver: 30, gold: 58, elite: 10.5, legend: 1.4, mythic: 0.1 }, theme: ['#ff6a3d', '#7a1a05', '#fff0e6'] },
+    { id: 'defense', cat: 'special', name: 'Defense Pack', short: 'Defense', price: 6000, cards: 5, pos: ['DL', 'LB', 'CB', 'S'], blurb: '5 defensive players. Mostly Gold.', odds: { silver: 30, gold: 58, elite: 10.5, legend: 1.4, mythic: 0.1 }, theme: ['#3d7bff', '#060c24', '#e6eeff'] },
   ];
+  CLUBS.forEach((c) => {
+    const dark = U.shade(c.c1, -0.55);
+    PACKS.push({ id: 'team-' + c.id, cat: 'team', club: c.id, name: c.name + ' Pack', short: c.id, price: 3500, cards: 4, blurb: '4 players from the ' + c.name + '.', odds: { silver: 40, gold: 50, elite: 9, legend: 1 }, theme: [c.c1, dark, U.lum(c.c1) > 0.6 ? '#10131a' : c.c2 === c.c1 ? '#ffffff' : c.c2] });
+  });
   const PACK_BY_ID = {};
   PACKS.forEach((p) => (PACK_BY_ID[p.id] = p));
+  const TIER_ORDER = TIERS.map((t) => t.id);
   function rollTier(odds, r) {
     const tot = Object.values(odds).reduce((a, b) => a + b, 0);
     let x = r() * tot;
     for (const k of Object.keys(odds)) { x -= odds[k]; if (x <= 0) return k; }
     return Object.keys(odds)[0];
   }
+  function packPool(pack, tierId) {
+    let pool = byTier[tierId];
+    if (pack.pos) pool = pool.filter((p) => pack.pos.includes(p.pos));
+    if (pack.club) pool = pool.filter((p) => p.club === pack.club);
+    if (pack.top) pool = pool.slice().sort((a, b) => b.st[pack.top] - a.st[pack.top]).slice(0, Math.max(3, Math.ceil(pool.length / 3)));
+    return pool;
+  }
+  /* pick a player of the rolled tier that fits the pack; if none exist, the nearest tier below, then above */
+  function drawFor(pack, tierId, r, taken) {
+    const k = TIER_ORDER.indexOf(tierId), order = [k];
+    for (let d = 1; d < TIER_ORDER.length; d++) { if (k - d >= 0) order.push(k - d); if (k + d < TIER_ORDER.length) order.push(k + d); }
+    for (const i of order) {
+      const pool = packPool(pack, TIER_ORDER[i]).filter((p) => !taken.includes(p));
+      if (pool.length) return pool[Math.floor(r() * pool.length)];
+    }
+    const any = byTier[tierId].filter((p) => !taken.includes(p));
+    return any[Math.floor(r() * any.length)];
+  }
   function openPack(packId, r) {
     r = r || Math.random;
     const pack = PACK_BY_ID[packId], out = [];
-    for (let i = 0; i < pack.cards; i++) {
-      const pool = byTier[rollTier(i === pack.cards - 1 && pack.guarantee ? pack.guarantee : pack.odds, r)];
-      let p, guard = 0;
-      do { p = pool[Math.floor(r() * pool.length)]; } while (out.includes(p) && guard++ < 20);
-      out.push(p);
-    }
+    const n = pack.mystery ? 3 + Math.floor(r() * 5) : pack.cards;
+    const gN = pack.guarantee ? pack.guaranteeN || 1 : 0;
+    for (let i = 0; i < n; i++) out.push(drawFor(pack, rollTier(i >= n - gN ? pack.guarantee : pack.odds, r), r, out));
     return out.sort((a, b) => a.ovr - b.ovr);
+  }
+  /* four team packs are on sale each day */
+  function featuredTeams(day) {
+    const r = U.rng(day * 7919 + 101), ids = CLUBS.map((c) => c.id), out = [];
+    while (out.length < 4) { const i = Math.floor(r() * ids.length); out.push(ids.splice(i, 1)[0]); }
+    return out;
   }
 
   function starterSquad(r) {
@@ -318,7 +371,7 @@
 
   FG.data = {
     CLUBS, KITS, TIERS, TIER_BY_ID, POS_NAME, POS_GROUP, STAT_KEYS, CARD_STATS, LINEUP, ROLE_NAME, PACKS, PACK_BY_ID, DIVISIONS,
-    players, byId, byTier, club: (id) => CLUBS.find((c) => c.id === id),
+    players, byId, byTier, club: (id) => CLUBS.find((c) => c.id === id), featuredTeams,
     posFit, effStats, sellPrice, buyPrice, openPack, starterSquad, bestLineup, unitRating, teamRating, buildAITeam, marketStock,
   };
 })();
