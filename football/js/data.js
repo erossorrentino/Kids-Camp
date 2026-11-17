@@ -204,6 +204,7 @@
   const sellPrice = (ovr) => Math.max(10, Math.round((12 * Math.pow(1.155, ovr - 50)) / 5) * 5);
   const buyPrice = (ovr) => Math.round((sellPrice(ovr) * 4.5) / 10) * 10;
   const PACKS = [
+    { id: 'rookie', name: 'Rookie Pack', price: 300, cards: 5, blurb: '5 young players. One is guaranteed Silver or better.', odds: { bronze: 62, silver: 30, gold: 7.4, elite: 0.6 }, guarantee: { silver: 75, gold: 23, elite: 2 } },
     { id: 'bronze', name: 'Bronze Pack', price: 500, cards: 4, blurb: '4 players. Mostly Bronze, with a shot at Silver.', odds: { bronze: 80, silver: 18, gold: 1.9, elite: 0.1 } },
     { id: 'silver', name: 'Silver Pack', price: 1200, cards: 4, blurb: '4 players. Mostly Silver, Gold is possible.', odds: { bronze: 25, silver: 60, gold: 13.5, elite: 1.4, legend: 0.1 } },
     { id: 'gold', name: 'Gold Pack', price: 4500, cards: 5, blurb: '5 players. Mostly Gold, Elite is possible.', odds: { silver: 30, gold: 60, elite: 8.8, legend: 1.1, mythic: 0.1 } },

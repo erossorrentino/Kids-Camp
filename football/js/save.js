@@ -14,7 +14,7 @@
       v: 1, stamp: 0, seed: Math.floor(Math.random() * 1e6) + 1,
       coins: 2000, owned, newIds: [],
       lineup: D.bestLineup(owned),
-      packs: { gold: 1, silver: 1 },
+      packs: { rookie: 3 }, rookieGift: true,
       division: 10, divPts: 0,
       stats: { played: 0, w: 0, d: 0, l: 0, pf: 0, pa: 0, tds: 0 },
       market: { seed: 1 },
@@ -27,6 +27,7 @@
   function repair(d) {
     const f = fresh();
     if (!d || typeof d !== 'object' || d.v !== 1) return f;
+    const needGift = !d.rookieGift;
     Object.keys(f).forEach((k) => { if (d[k] == null) d[k] = f[k]; });
     ['stats', 'market', 'club', 'settings'].forEach((k) => { d[k] = Object.assign({}, f[k], d[k]); });
     d.owned = (Array.isArray(d.owned) ? d.owned : []).filter((id, i, a) => D.byId[id] && a.indexOf(id) === i);
@@ -37,6 +38,8 @@
     d.coins = Math.max(0, Math.floor(+d.coins || 0));
     d.division = Math.min(10, Math.max(1, Math.floor(+d.division || 10)));
     d.newIds = Array.isArray(d.newIds) ? d.newIds : [];
+    d.packs = Object.assign({}, d.packs);
+    if (needGift) { d.packs.rookie = (d.packs.rookie || 0) + 3; d.rookieGift = true; }
     return d;
   }
 

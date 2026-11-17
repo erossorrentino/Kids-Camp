@@ -404,7 +404,7 @@
       <label class="field" for="clubName">Team name<input id="clubName" maxlength="20" value="${esc(s.club.name)}" autocomplete="off"></label>
       <p class="label">Pick your uniform</p>
       <div class="kits">${D.KITS.map((k, i) => `<button class="kit${i === s.club.kit ? ' on' : ''}" data-act="set-kit" data-v="${i}" aria-label="${k.name} uniform" style="--k1:${k.c1};--k2:${k.c2};--k3:${k.helm}"><i></i></button>`).join('')}</div>
-      <p class="hint">You start with a full roster of Bronze players, ${fmt(s.coins)} coins and two free packs. Win games, earn coins, open packs and build your Ultimate Team.</p>
+      <p class="hint">You start with a full roster of Bronze players, ${fmt(s.coins)} coins and three free Rookie Packs. Win games, earn coins, open packs and build your Ultimate Team.</p>
       <button class="btn btn-play wide" data-act="onboard-go">Open my first pack</button></div></div>`;
   };
 
@@ -657,7 +657,7 @@
       A.unlock(); A.click();
       $('#overlay').className = 'overlay';
       UI._afterPack = () => { UI.show('home'); toast('Roster ready. Play your first game!'); };
-      openPack('gold');
+      openPack('rookie');
     },
     'result-continue': () => { A.click(); FG.game.leave(); },
     pause: () => FG.game.pause(),

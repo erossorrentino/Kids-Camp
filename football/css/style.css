@@ -267,6 +267,7 @@ button.card, .card[data-act] { cursor: pointer; border: 0; background: none; pad
 .pack-n { position: absolute; top: 0.7em; left: 0.7em; width: 2em; height: 2em; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 0.95em; background: rgba(0, 0, 0, 0.3); color: #fff; }
 .pack-crimp { position: absolute; left: 3%; right: 3%; top: 0; height: 7%; border-radius: 0.2em 0.2em 0 0; background: repeating-linear-gradient(90deg, rgba(0, 0, 0, 0.3) 0 0.22em, rgba(255, 255, 255, 0.22) 0.22em 0.44em), var(--pb); }
 .pack-crimp.b { top: auto; bottom: 0; border-radius: 0 0 0.2em 0.2em; }
+.pk-rookie { --pb: linear-gradient(170deg, #4fe39a, #0b6b3c); --pi: #022b16; }
 .pk-bronze { --pb: linear-gradient(170deg, #e0a878, #7d4c2c); --pi: #2a1508; }
 .pk-silver { --pb: linear-gradient(170deg, #f4f7fa, #8996a5); --pi: #161d28; }
 .pk-gold { --pb: linear-gradient(170deg, #ffe680, #b27d10); --pi: #2b1e00; }

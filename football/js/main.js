@@ -24,13 +24,16 @@
     const kits = [{ c1: me.c1, c2: me.c2, helm: me.helm, pants: me.pants }, opp.kit];
     const m = new FG.Match({ home, away, user: 0, quarterSec: s.settings.qtr * 60, level, autoSwitch: s.settings.autoSwitch });
     GAME.match = m; GAME.info = { mode: opts.mode, opp, mult, kits }; GAME.paused = false; GAME.done = false; GAME.acc = 0;
-    GX.setupMatch(m, kits, [me.name, opp.name]);
+    const wr = Math.random();
+    const weather = opts.weather || (wr < 0.6 ? 'clear' : wr < 0.82 ? 'snow' : 'rain');
+    GAME.info.weather = weather;
+    GX.setupMatch(m, kits, [me.name, opp.name], weather);
     $('#app').hidden = true; $('#veil').classList.add('off');
     $('#overlay').hidden = true; $('#overlay').innerHTML = ''; $('#overlay').className = 'overlay';
     UI.hudStart(m, kits);
     IN.reset(); IN.active = true;
     A.unlock(); A.crowdStart();
-    UI.banner(me.name + ' vs ' + opp.name, opts.mode === 'division' ? 'Division ' + s.division : 'Exhibition', 2600);
+    UI.banner(me.name + ' vs ' + opp.name, (opts.mode === 'division' ? 'Division ' + s.division : 'Exhibition') + (weather === 'snow' ? ' · Snow game' : weather === 'rain' ? ' · Rain game' : ' · Clear night'), 2600);
   };
 
   GAME.callPlay = function (id) {
