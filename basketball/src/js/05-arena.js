@@ -668,6 +668,70 @@ function buildCrowdBoards(seats) {
   return mesh;
 }
 
+/* ---------------- sponsor boards ----------------
+   Courtside LED boards and the fascia ribbon rotate through ads for made-up sponsors
+   and home-team promos, switching every few seconds with an LED wipe. */
+const ADS = ['volta', 'skyline', 'northpeak', 'pixel', 'riverton', 'fresh', 'app', 'home'];
+function drawAd(g, x, y, w, h, kind, T) {
+  g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip();
+  const cx = x + w / 2, cy = y + h / 2, f = (sz, wt, it) => `${wt || 900} ${it ? 'italic ' : ''}${Math.round(h * sz)}px ${FONT_D}`;
+  const txt = (t, xx, yy, sz, col, wt, it, al) => { g.font = f(sz, wt, it); g.fillStyle = col; g.textAlign = al || 'center'; g.textBaseline = 'middle'; g.fillText(t, xx, yy); };
+  if (kind === 'volta') {
+    g.fillStyle = '#050705'; g.fillRect(x, y, w, h);
+    g.fillStyle = '#7dff3a'; g.beginPath(); g.moveTo(x + w * 0.2, y + h * 0.12); g.lineTo(x + w * 0.13, y + h * 0.55); g.lineTo(x + w * 0.18, y + h * 0.55); g.lineTo(x + w * 0.12, y + h * 0.9); g.lineTo(x + w * 0.26, y + h * 0.42); g.lineTo(x + w * 0.21, y + h * 0.42); g.lineTo(x + w * 0.27, y + h * 0.12); g.fill();
+    txt('VOLTA', x + w * 0.58, cy - h * 0.06, 0.62, '#ffffff', 900, true); txt('CHARGE UP', x + w * 0.58, cy + h * 0.33, 0.2, '#7dff3a', 800);
+  } else if (kind === 'skyline') {
+    const gr = g.createLinearGradient(x, 0, x + w, 0); gr.addColorStop(0, '#0b3d91'); gr.addColorStop(1, '#2aa8ff'); g.fillStyle = gr; g.fillRect(x, y, w, h);
+    g.strokeStyle = '#ffffff'; g.lineWidth = h * 0.08; g.beginPath(); g.arc(x + w * 0.16, cy + h * 0.55, h * 0.6, -2.3, -0.9); g.stroke();
+    txt('SKYLINE', x + w * 0.56, cy - h * 0.08, 0.5, '#ffffff', 900); txt('A I R', x + w * 0.56, cy + h * 0.3, 0.22, '#cfe9ff', 700);
+  } else if (kind === 'northpeak') {
+    g.fillStyle = '#0d1b3a'; g.fillRect(x, y, w, h);
+    g.fillStyle = '#e8b84a'; g.beginPath(); g.moveTo(x + w * 0.08, y + h * 0.82); g.lineTo(x + w * 0.17, y + h * 0.2); g.lineTo(x + w * 0.26, y + h * 0.82); g.fill();
+    g.fillStyle = '#ffffff'; g.beginPath(); g.moveTo(x + w * 0.145, y + h * 0.38); g.lineTo(x + w * 0.17, y + h * 0.2); g.lineTo(x + w * 0.195, y + h * 0.38); g.fill();
+    txt('NORTHPEAK', x + w * 0.6, cy - h * 0.08, 0.46, '#ffffff', 800); txt('BANK', x + w * 0.6, cy + h * 0.3, 0.22, '#e8b84a', 800);
+  } else if (kind === 'pixel') {
+    g.fillStyle = '#16051f'; g.fillRect(x, y, w, h);
+    for (let i = 0; i < 9; i++) { g.fillStyle = ['#ff2bd6', '#2bf2ff', '#ffe02b'][i % 3]; g.fillRect(x + w * 0.06 + (i % 3) * h * 0.22, y + h * 0.18 + Math.floor(i / 3) * h * 0.22, h * 0.18, h * 0.18); }
+    txt('PIXELBURST', x + w * 0.6, cy - h * 0.06, 0.44, '#ffffff', 900, true); txt('PLAY NOW', x + w * 0.6, cy + h * 0.31, 0.19, '#2bf2ff', 800);
+  } else if (kind === 'riverton') {
+    g.fillStyle = '#c4161c'; g.fillRect(x, y, w, h);
+    g.fillStyle = '#ffffff'; g.beginPath(); g.moveTo(x + w * 0.06, y + h * 0.66); g.quadraticCurveTo(x + w * 0.14, y + h * 0.28, x + w * 0.27, y + h * 0.5); g.lineTo(x + w * 0.29, y + h * 0.66); g.fill();
+    txt('RIVERTON', x + w * 0.6, cy - h * 0.06, 0.5, '#ffffff', 900, true); txt('MOTORS', x + w * 0.6, cy + h * 0.32, 0.2, '#ffd0d0', 800);
+  } else if (kind === 'fresh') {
+    g.fillStyle = '#ff7a1a'; g.fillRect(x, y, w, h);
+    g.fillStyle = '#2f9e44'; g.beginPath(); g.ellipse(x + w * 0.16, cy, h * 0.18, h * 0.32, 0.6, 0, TAU); g.fill();
+    txt('freshbox', x + w * 0.58, cy, 0.56, '#ffffff', 800);
+  } else if (kind === 'app') {
+    const gr = g.createLinearGradient(x, 0, x + w, 0); gr.addColorStop(0, '#0a0e16'); gr.addColorStop(1, T.c2); g.fillStyle = gr; g.fillRect(x, y, w, h);
+    txt('WATCH. PLAY. WIN.', cx, cy - h * 0.08, 0.42, '#ffffff', 900, true); txt('HARDWOOD KINGS', cx, cy + h * 0.3, 0.18, T.c3, 800);
+  } else {
+    g.fillStyle = T.c1; g.fillRect(x, y, w, h);
+    drawEmblem(g, T, x + h * 0.6, cy, h * 0.42);
+    txt("LET'S GO", x + w * 0.6, cy - h * 0.2, 0.24, '#ffffff', 800); txt(T.name.toUpperCase(), x + w * 0.6, cy + h * 0.16, 0.42, T.c3, 900, true);
+  }
+  g.restore();
+}
+function drawAdBoards(phase, wipe) {
+  const c = R.adC, g = c.getContext('2d'), T = R.home || TEAMS[0], n = 4, w = c.width / n, h = c.height;
+  for (let i = 0; i < n; i++) {
+    const cur = ADS[(phase * n + i) % ADS.length], prev = ADS[((phase - 1) * n + i + ADS.length * 9) % ADS.length];
+    if (wipe < 1) { drawAd(g, i * w, 0, w, h, prev, T); g.save(); g.beginPath(); g.rect(i * w, 0, w, h * wipe); g.clip(); drawAd(g, i * w, 0, w, h, cur, T); g.restore(); }
+    else drawAd(g, i * w, 0, w, h, cur, T);
+    g.fillStyle = '#000'; g.fillRect(i * w, 0, 3, h);
+  }
+  for (let y = 0; y < h; y += 3) { g.fillStyle = 'rgba(0,0,0,0.22)'; g.fillRect(0, y, c.width, 1); }
+  R.adT.needsUpdate = true;
+}
+function stepAdBoards(rdt) {
+  if (!R.adC) return;
+  R.adClock = (R.adClock || 0) + rdt;
+  const phase = Math.floor(R.adClock / 8), w = Math.round(clamp((R.adClock % 8) / 0.45, 0, 1) * 8) / 8;
+  const key = phase * 10 + w;
+  if (key !== R.adKey || R.adPhase === -1) { R.adKey = key; R.adPhase = phase; drawAdBoards(phase, w); }
+}
+/* stretch a board's UVs so one ad panel always spans about the same length of board */
+function adUV(geo, len) { const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * len / 60); return geo; }
+
 /* ---------------- arena build ---------------- */
 function buildArena() {
   R.courtW = R.mobile ? 2048 : 4096;
@@ -709,10 +773,11 @@ function buildArena() {
   const roof = new THREE.Mesh(new THREE.PlaneGeometry(420, 340), new THREE.MeshBasicMaterial({ color: '#05070b' }));
   roof.rotation.x = PI / 2; roof.position.y = 96; R.scene.add(roof);
   // courtside: ribbon boards on the floor along the far side and baselines, scorer's table, benches
-  const lowRib = hdrBasic('#ffffff', 1.8, { map: R.ribbonT });
-  const b1 = new THREE.Mesh(new THREE.PlaneGeometry(112, 2.2), lowRib); b1.position.set(0, 1.1, -34.8); R.scene.add(b1);
+  R.adC = mkCanvas(2048, 128); R.adT = canvasTex(R.adC); R.adT.wrapS = THREE.RepeatWrapping; R.adPhase = -1;
+  const lowRib = hdrBasic('#ffffff', 1.55, { map: R.adT });
+  const b1 = new THREE.Mesh(adUV(new THREE.PlaneGeometry(112, 2.2), 112), lowRib); b1.position.set(0, 1.1, -34.8); R.scene.add(b1);
   for (const s of [-1, 1]) {
-    const b = new THREE.Mesh(new THREE.PlaneGeometry(62, 2.2), lowRib); b.position.set(s * 57.3, 1.1, 0); b.rotation.y = -s * PI / 2; R.scene.add(b);
+    const b = new THREE.Mesh(adUV(new THREE.PlaneGeometry(62, 2.2), 62), lowRib); b.position.set(s * 57.3, 1.1, 0); b.rotation.y = -s * PI / 2; R.scene.add(b);
   }
   const table = new THREE.Mesh(new THREE.BoxGeometry(34, 2.7, 2.6), stdMat('#0d0f14', 0.4, { metalness: 0.3 }));
   table.position.set(0, 1.35, -29.8); table.castShadow = true; R.scene.add(table);
@@ -751,7 +816,7 @@ function buildArena() {
       d.position.set(c.x, c.y + 1.35, c.z + 0.65); d.updateMatrix(); backs.setMatrixAt(i, d.matrix);
     });
     R.scene.add(seats); R.scene.add(backs); }
-  const nearRib = new THREE.Mesh(new THREE.PlaneGeometry(96, 1.6), hdrBasic('#ffffff', 1.8, { map: R.ribbonT }));
+  const nearRib = new THREE.Mesh(adUV(new THREE.PlaneGeometry(96, 1.6), 70), lowRib);
   nearRib.position.set(0, 0.8, 27.6); nearRib.rotation.y = PI; R.scene.add(nearRib);
   R.courtside = buildCrowdMesh(cs); R.scene.add(R.courtside);
   { const a = R.courtside.geometry.attributes.aAnim; cs.forEach((c, i) => { a.array[i * 4 + 3] = c.stand ? 1 : 0; a.array[i * 4 + 1] = c.kind === 'photo' ? 0.2 : 0.9; }); a.needsUpdate = true;
@@ -934,7 +999,7 @@ function paintArena(home, away) {
   if (R.signC) drawSigns(home);
   R.jumboRing.color.set(home.c1).multiplyScalar(2.2);
   for (const h of R.hoops) { drawPad(h, home); }
-  drawRibbon(); drawTable(); drawJumbo(true);
+  drawRibbon(); drawTable(); drawJumbo(true); R.adPhase = -1; stepAdBoards(0);
 }
 function drawReflCrowd(home, away) {
   const c = R.reflCrowdC, g = c.getContext('2d');
@@ -1443,6 +1508,7 @@ function updateWorld(dt, rdt) {
   if (R.wave > -5) { R.wave += rdt * 1.1; if (R.wave > PI * 3) R.wave = -9; }
   R.crowdU.uWave.value = R.wave > -5 ? ((R.wave % TAU) + TAU) % TAU - PI : -9;
   R.ribbonT.offset.x = (R.ribbonT.offset.x + rdt * 0.012) % 1;
+  stepAdBoards(rdt);
   R.tableT.offset.x = (R.tableT.offset.x - rdt * 0.02) % 1;
   R.coneMat.uniforms.uA.value = 0.016 + R.excite * 0.008;
   R.jumboTick = (R.jumboTick || 0) + rdt;

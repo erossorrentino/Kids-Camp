@@ -93,6 +93,7 @@ function initRender(canvas, quality) {
   buildFX();
   initPost();
   initDof();
+  if (R.dof.ok) initAO();
   setQuality(quality || 'high');
   R.ready = true;
 }
@@ -266,8 +267,8 @@ function initPost() {
   P.mComp = ppMat(`
     uniform sampler2D tScene; uniform sampler2D tBloom; uniform vec2 uRes;
     uniform float uBloom; uniform float uExposure; uniform float uTime; uniform float uVig; uniform float uGrain;
-    uniform float uFlash; uniform float uCine; uniform float uCA; uniform float uSat; uniform float uStreak;
-    uniform sampler2D tDof; uniform float uDof;
+    uniform float uFlash; uniform float uCine; uniform float uCA; uniform float uSat; uniform float uStreak; uniform float uSharp;
+    uniform sampler2D tDof; uniform float uDof; uniform sampler2D tAO; uniform float uAO;
     varying vec2 vUv;
     vec3 rrt(vec3 v){ vec3 a = v * (v + 0.0245786) - 0.000090537; vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081; return a / b; }
     vec3 aces(vec3 c){
@@ -281,12 +282,21 @@ function initPost() {
       vec2 uv = vUv, d = uv - 0.5;
       float ca = uCA * dot(d, d);
       vec3 col = vec3(texture2D(tScene, uv - d * ca).r, texture2D(tScene, uv).g, texture2D(tScene, uv + d * ca).b);
-      if (uDof > 0.001) { vec4 bk = texture2D(tDof, uv); col = mix(col, bk.rgb, smoothstep(0.07, 0.32, abs(bk.a)) * uDof); }
+      if (uAO > 0.001) col *= mix(1.0, texture2D(tAO, uv).r, uAO);
+      float dofK = 0.0;
+      if (uDof > 0.001) { vec4 bk = texture2D(tDof, uv); dofK = smoothstep(0.07, 0.32, abs(bk.a)) * uDof; col = mix(col, bk.rgb, dofK); }
       col += texture2D(tBloom, uv).rgb * uBloom;
       vec3 st = vec3(0.0);
       for (int i = 1; i <= 6; i++) { float o = float(i) * 0.02; st += (texture2D(tBloom, uv + vec2(o, 0.0)).rgb + texture2D(tBloom, uv - vec2(o, 0.0)).rgb) * (1.0 - float(i) / 7.0); }
       col += st * uStreak * vec3(0.55, 0.72, 1.0);
       col = aces(col * uExposure);
+      // light contrast-adaptive sharpening against the four neighbours, in display space
+      vec2 tx = 1.0 / uRes;
+      vec3 nb = aces(texture2D(tScene, uv + vec2(tx.x, 0.0)).rgb * uExposure) + aces(texture2D(tScene, uv - vec2(tx.x, 0.0)).rgb * uExposure)
+              + aces(texture2D(tScene, uv + vec2(0.0, tx.y)).rgb * uExposure) + aces(texture2D(tScene, uv - vec2(0.0, tx.y)).rgb * uExposure);
+      vec3 hp = col - nb * 0.25;
+      col = clamp(col + hp * uSharp * (1.0 - dofK) / (1.0 + 4.0 * abs(hp)), 0.0, 1.0);
+      col = mix(col, col * col * (3.0 - 2.0 * col), 0.22);
       float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
       col = max(mix(vec3(l), col, uSat - uCine * 0.3), 0.0);
       col *= mix(vec3(0.94, 0.98, 1.06), vec3(1.04, 1.0, 0.95), smoothstep(0.15, 0.85, l));
@@ -300,7 +310,7 @@ function initPost() {
       gl_FragColor = vec4(col, 1.0);
     }`, { tScene: { value: null }, tBloom: { value: null }, uRes: { value: new THREE.Vector2(1, 1) }, uBloom: { value: 0.45 },
     uExposure: { value: 1.12 }, uTime: { value: 0 }, uVig: { value: 0.32 }, uGrain: { value: 0.028 }, uFlash: { value: 0 },
-    uCine: { value: 0 }, uCA: { value: 0.006 }, uSat: { value: 1.1 }, uStreak: { value: 0.045 }, tDof: { value: null }, uDof: { value: 0 } });
+    uCine: { value: 0 }, uCA: { value: 0.006 }, uSat: { value: 1.04 }, uStreak: { value: 0.045 }, tDof: { value: null }, uDof: { value: 0 }, tAO: { value: null }, uAO: { value: 0 }, uSharp: { value: 0.45 } });
 }
 /* depth of field for close and cinematic cameras: a half-resolution depth prepass (the crowd is skipped:
    the seating bowl behind it is close enough), signed circle of confusion, then a golden-angle bokeh
@@ -351,29 +361,38 @@ function resizeDof(w, h) {
   D.rt.depthTexture.type = R.gl2 ? THREE.UnsignedIntType : THREE.UnsignedShortType;
   D.a.setSize(hw, hh); D.b.setSize(hw, hh);
 }
-function renderDof() {
+/* half-resolution depth of everything solid; the crowd cards keep their own shader so their cut-out
+   silhouettes land in the depth buffer too */
+const _ccTmp = new THREE.Color();
+function renderDepth() {
   const D = R.dof, r = R.r, sc = R.scene, hidden = [];
   const hide = (o) => { if (o && o.visible) { o.visible = false; hidden.push(o); } };
   if (!D.skip) {
     D.skip = [];
     sc.traverse((o) => { const m = o.material; if (o.isSprite || o.isPoints || o.isLine || (m && !Array.isArray(m) && (m.transparent || m.blending === THREE.AdditiveBlending))) D.skip.push(o); });
   }
-  hide(R.crowdLower); hide(R.crowdUpper); hide(R.courtFans); hide(R.signs);
+  hide(R.signs);
   for (const o of D.skip) hide(o);
   for (const h of R.players) hide(h.blob);
   if (R.refs) for (const q of R.refs) hide(q.h.blob);
   const fog = sc.fog, bg = sc.background, swapped = [];
   sc.traverseVisible((o) => {
-    if (!o.isMesh) return;
+    if (!o.isMesh || o.material === R.crowdBoardMaterial) return;
     swapped.push(o, o.material);
     o.material = o.isSkinnedMesh ? D.mats.skin : o.isInstancedMesh ? D.mats.inst : D.mats.plain;
   });
   sc.fog = null; sc.background = null;
+  // the colour buffer stays clear (alpha 0) except where crowd cards draw: ambient occlusion skips those pixels
+  const cc = r.getClearColor(_ccTmp), ca = r.getClearAlpha();
+  r.setClearColor(0x000000, 0);
   r.setRenderTarget(D.rt); r.clear(); r.render(sc, R.cam);
+  r.setClearColor(cc, ca);
   for (let i = 0; i < swapped.length; i += 2) swapped[i].material = swapped[i + 1];
   sc.fog = fog; sc.background = bg;
   for (const o of hidden) o.visible = true;
-  const P = R.pp, U = D.mPrep.uniforms;
+}
+function renderDof() {
+  const D = R.dof, P = R.pp, U = D.mPrep.uniforms;
   U.tScene.value = P.main.texture; U.tDepth.value = D.rt.depthTexture;
   U.texel.value.set(1 / P.main.width, 1 / P.main.height);
   U.uFocus.value = D.focus; U.uAp.value = D.ap; U.uNear.value = R.cam.near; U.uFar.value = R.cam.far;
@@ -383,6 +402,63 @@ function renderDof() {
   B.uStep.value = clamp(D.a.height / 300, 0.8, 2.2);
   B.tex.value = D.a.texture; B.dir.value.set(1, 0); ppPass(D.mBlur, D.b);
   B.tex.value = D.b.texture; B.dir.value.set(0, 1); ppPass(D.mBlur, D.a);
+}
+/* ambient occlusion from the same depth: contact shading under feet, in creases and where bodies meet */
+function initAO() {
+  const o = { format: THREE.RGBAFormat, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false, stencilBuffer: false };
+  const A = R.ao = { a: new THREE.WebGLRenderTarget(4, 4, o), b: new THREE.WebGLRenderTarget(4, 4, o), on: 0 };
+  const LZ = 'float linZ(vec2 uv){ float d = texture2D(tDepth, uv).x; return (uNear * uFar) / (uFar - (uFar - uNear) * d); }';
+  A.mAO = ppMat(`
+    uniform sampler2D tDepth; uniform sampler2D tMask; uniform vec2 texel; uniform float uNear; uniform float uFar; uniform float uTanH; uniform float uAspect;
+    uniform float uRadius; uniform float uProj; uniform float uInt; varying vec2 vUv;
+    ${LZ}
+    vec3 vpos(vec2 uv){ float z = linZ(uv); return vec3((uv.x * 2.0 - 1.0) * uTanH * uAspect * z, (uv.y * 2.0 - 1.0) * uTanH * z, z); }
+    void main(){
+      vec3 P = vpos(vUv);
+      if (P.z > 150.0 || texture2D(tMask, vUv).a > 0.5) { gl_FragColor = vec4(1.0); return; }
+      vec3 pr = vpos(vUv + vec2(texel.x, 0.0)), pl = vpos(vUv - vec2(texel.x, 0.0));
+      vec3 pu = vpos(vUv + vec2(0.0, texel.y)), pd = vpos(vUv - vec2(0.0, texel.y));
+      vec3 dx = abs(pr.z - P.z) < abs(P.z - pl.z) ? pr - P : P - pl;
+      vec3 dy = abs(pu.z - P.z) < abs(P.z - pd.z) ? pu - P : P - pd;
+      vec3 n = normalize(cross(dy, dx));
+      float rpx = clamp(uRadius * uProj / P.z, 1.5, 40.0);
+      float nz = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) * 6.2831853;
+      float sum = 0.0;
+      for (int i = 0; i < 12; i++) {
+        float fi = float(i) + 0.5, ang = fi * 2.39996 + nz, rr = sqrt(fi / 12.0);
+        vec3 Q = vpos(vUv + vec2(cos(ang), sin(ang)) * rr * rpx * texel);
+        vec3 v = Q - P; float vv = dot(v, v);
+        sum += max(0.0, dot(v, n) - 0.004 * P.z) / (vv + 0.06) * step(vv, uRadius * uRadius * 2.5);
+      }
+      float a = max(0.0, 1.0 - uInt * sum / 12.0);
+      a = mix(1.0, a * a, 1.0 - smoothstep(70.0, 130.0, P.z));
+      gl_FragColor = vec4(vec3(a), 1.0);
+    }`, { tDepth: { value: null }, tMask: { value: null }, texel: { value: new THREE.Vector2() }, uNear: { value: 0.8 }, uFar: { value: 900 }, uTanH: { value: 0.3 }, uAspect: { value: 1.7 },
+    uRadius: { value: 1.6 }, uProj: { value: 300 }, uInt: { value: 0.5 } });
+  A.mBlur = ppMat(`
+    uniform sampler2D tAO; uniform sampler2D tDepth; uniform vec2 texel; uniform vec2 dir; uniform float uNear; uniform float uFar; varying vec2 vUv;
+    ${LZ}
+    void main(){
+      float z0 = linZ(vUv), s = 0.0, ws = 0.0;
+      for (int i = -3; i <= 3; i++) {
+        vec2 uv = vUv + dir * texel * float(i) * 1.5;
+        float w = exp(-abs(linZ(uv) - z0) / (0.04 * z0 + 0.1)) * (1.0 - abs(float(i)) / 4.5);
+        s += texture2D(tAO, uv).r * w; ws += w;
+      }
+      gl_FragColor = vec4(vec3(s / max(ws, 1e-4)), 1.0);
+    }`, { tAO: { value: null }, tDepth: { value: null }, texel: { value: new THREE.Vector2() }, dir: { value: new THREE.Vector2(1, 0) }, uNear: { value: 0.8 }, uFar: { value: 900 } });
+}
+function renderAO() {
+  const A = R.ao, D = R.dof, c = R.cam, U = A.mAO.uniforms;
+  if (A.a.width !== D.rt.width || A.a.height !== D.rt.height) { A.a.setSize(D.rt.width, D.rt.height); A.b.setSize(D.rt.width, D.rt.height); }
+  const tanH = Math.tan(c.fov * PI / 360);
+  U.tDepth.value = D.rt.depthTexture; U.tMask.value = D.rt.texture; U.texel.value.set(1 / A.a.width, 1 / A.a.height);
+  U.uNear.value = c.near; U.uFar.value = c.far; U.uTanH.value = tanH; U.uAspect.value = c.aspect; U.uProj.value = A.a.height * 0.5 / tanH;
+  ppPass(A.mAO, A.a);
+  const B = A.mBlur.uniforms;
+  B.tDepth.value = D.rt.depthTexture; B.texel.value.set(1 / A.a.width, 1 / A.a.height); B.uNear.value = c.near; B.uFar.value = c.far;
+  B.tAO.value = A.a.texture; B.dir.value.set(1, 0); ppPass(A.mBlur, A.b);
+  B.tAO.value = A.b.texture; B.dir.value.set(0, 1); ppPass(A.mBlur, A.a);
 }
 function resizePost(w, h) {
   const P = R.pp;
@@ -419,6 +495,7 @@ function renderPost() {
   const D = R.dof;
   U.uDof.value = D && D.ok && D.on > 0.01 ? D.on : 0;
   U.tDof.value = D && D.ok ? D.a.texture : null;
+  U.uAO.value = R.ao && R.ao.on ? 0.95 : 0; U.tAO.value = R.ao ? R.ao.a.texture : null;
   ppPass(P.mComp, null);
 }
 
@@ -461,7 +538,15 @@ function renderFrame(dt, rdt) {
       D.focus = D.on < 0.05 || R.dofSnap ? fd : damp(D.focus, fd, 6, rdt);
       D.ap = w.ap || 1;
     }
+    const wantAO = !!R.ao && R.quality === 'high' && R.aoEnabled !== false;
+    if (D.on > 0.01 || wantAO) renderDepth();
     if (D.on > 0.01) renderDof();
+    if (wantAO) renderAO();
+    R.ao && (R.ao.on = wantAO ? 1 : 0);
+    if (R.debugView === 'ao' && wantAO) {
+      if (!R.pp.mCopyAO) R.pp.mCopyAO = ppMat('uniform sampler2D tex; varying vec2 vUv; void main(){ gl_FragColor = vec4(texture2D(tex, vUv).rrr, 1.0); }', { tex: { value: null } });
+      R.pp.mCopyAO.uniforms.tex.value = R.ao.a.texture; ppPass(R.pp.mCopyAO, null); return;
+    }
     if (R.debugView === 'coc' && D.on > 0.01) {
       if (!R.pp.mCoc) R.pp.mCoc = ppMat('uniform sampler2D tex; varying vec2 vUv; void main(){ float c = texture2D(tex, vUv).a; gl_FragColor = vec4(max(c, 0.0), max(-c, 0.0), 0.0, 1.0); }', { tex: { value: null } });
       if (!R.pp.mRgb) R.pp.mRgb = ppMat('uniform sampler2D tex; varying vec2 vUv; void main(){ vec3 c = texture2D(tex, vUv).rgb; gl_FragColor = vec4(pow(c / (1.0 + c), vec3(0.4545)), 1.0); }', { tex: { value: null } });

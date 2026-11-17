@@ -817,10 +817,10 @@ for (const T of TEAMS) { for (const p of T.roster) p.ovr = playerOvr(p); T.rt = 
 
 /* win = half width (seconds) of the perfect-release window for the human shooter */
 const DIFFS = {
-  rookie:  { name: 'Rookie',   win: 0.058, boost: 0.95, cpuShot: 0.84, react: 1.75, think: 0.55, cpuSteal: 0.45, jump: 0.30, noise: 1.6, userSteal: 1.1, cpuFoul: 1.2 },
-  pro:     { name: 'Pro',      win: 0.044, boost: 0.90, cpuShot: 0.95, react: 1.30, think: 0.42, cpuSteal: 0.75, jump: 0.46, noise: 1.0, userSteal: 0.8, cpuFoul: 1.0 },
-  allstar: { name: 'All-Star', win: 0.034, boost: 0.86, cpuShot: 1.03, react: 1.00, think: 0.34, cpuSteal: 1.00, jump: 0.60, noise: 0.7, userSteal: 0.65, cpuFoul: 0.9 },
-  legend:  { name: 'Legend',   win: 0.026, boost: 0.80, cpuShot: 1.10, react: 0.85, think: 0.28, cpuSteal: 1.20, jump: 0.72, noise: 0.5, userSteal: 0.52, cpuFoul: 0.8 },
+  rookie:  { name: 'Rookie',   win: 0.07, boost: 0.95, cpuShot: 0.84, react: 1.75, think: 0.55, cpuSteal: 0.45, jump: 0.30, noise: 1.6, userSteal: 1.1, cpuFoul: 1.2 },
+  pro:     { name: 'Pro',      win: 0.053, boost: 0.90, cpuShot: 0.95, react: 1.30, think: 0.42, cpuSteal: 0.75, jump: 0.46, noise: 1.0, userSteal: 0.8, cpuFoul: 1.0 },
+  allstar: { name: 'All-Star', win: 0.041, boost: 0.86, cpuShot: 1.03, react: 1.00, think: 0.34, cpuSteal: 1.00, jump: 0.60, noise: 0.7, userSteal: 0.65, cpuFoul: 0.9 },
+  legend:  { name: 'Legend',   win: 0.031, boost: 0.80, cpuShot: 1.10, react: 0.85, think: 0.28, cpuSteal: 1.20, jump: 0.72, noise: 0.5, userSteal: 0.52, cpuFoul: 0.8 },
 };
 
 /* Half-court spots in attack coordinates (the hoop being attacked sits at +41.75, 0) */
@@ -1204,7 +1204,7 @@ function contestOn(p, antic) {
    accuracy with every foot, threes are hardest and fall off quickly past the line. */
 function baseProb(r, d, three, type) {
   if (type === 'dunk') return 0.97;
-  if (type === 'layup') return lerp(0.64, 0.9, rt(r.ins)) - Math.max(0, d - 4) * 0.012;
+  if (type === 'layup') return lerp(0.72, 0.93, rt(r.ins)) - Math.max(0, d - 4) * 0.01;
   if (three) { let b = lerp(0.33, 0.51, rt(r.tpt)); const deep = d - 24.5; if (deep > 0) b -= deep * 0.04; return b; }
   const sk = rt(d > 12 ? r.mid : (r.mid + r.ins) / 2);
   return lerp(0.5, 0.7, sk) - Math.max(0, d - 6) * 0.0095;
@@ -1213,12 +1213,20 @@ function baseProb(r, d, three, type) {
 function windowScale(d) { return clamp(1.75 - d * 0.038, 0.5, 1.6); }
 /* how much a perfect release can lift the odds: certain up close, less so from deep */
 function perfectScale(d) { return clamp(1.2 - (d - 10) * 0.02, 0.62, 1); }
-function contestMult(type, c) { return type === 'dunk' ? 1 - 0.42 * c * c : type === 'layup' ? 1 - 0.36 * c : 1 - 0.34 * c; }
+function contestMult(type, c) { return type === 'dunk' ? 1 - 0.36 * c * c : type === 'layup' ? 1 - 0.3 * c : 1 - 0.34 * c; }
+/* a perfect (green) release is nearly automatic: about 97% open, still about 85% with a hand in the face,
+   less only from well beyond the arc; easier on Rookie, harder on Legend */
+function greenFloor(d, c) { return clamp(0.975 - 0.15 * c - Math.max(0, d - 25.5) * 0.04 + (G.diff.boost - 0.9) * 0.6, 0.35, 0.99); }
 function shotChance(p, S, c) {
   if (S.type === 'ft') return clamp(0.52 + 0.42 * rt(p.d.mid), 0.4, 0.95);
-  let base = baseProb(p.d, S.dist, S.three, S.type) * contestMult(S.type, c);
+  // the user's finishes at the rim shrug off contact better, and short jumpers get a lift
+  const user = userHas(p);
+  const ce = user && S.type !== 'jump' ? c * 0.45 : c;
+  let base = baseProb(p.d, user && S.type === 'layup' ? Math.min(S.dist, 5) : S.dist, S.three, S.type) * contestMult(S.type, ce);
+  if (user && S.type === 'layup') base += (1 - base) * 0.35;
+  if (user && S.type === 'jump' && S.dist < 12) base += 0.07 * (1 - S.dist / 12) + 0.03;
   if (S.type === 'jump' && S.moving) base *= 0.9;
-  if (S.type === 'layup' && S.runSp > 17.5) base *= 0.92;
+  if (S.type === 'layup' && S.runSp > 17.5 && !user) base *= 0.92;
   if (p.stam < 25) base *= 0.9;
   return clamp(base, 0.01, 0.97);
 }
@@ -1361,7 +1369,7 @@ function releaseBlockCheck(p, S) {
     if (o.y < 0.6) continue;
     const hx = o.x + Math.cos(o.face) * 0.7, hz = o.z + Math.sin(o.face) * 0.7, hy = o.y + o.reach;
     if (hyp(b.x - hx, b.z - hz) > 2.2 || hy < b.y - 1.2) continue;
-    const P = (0.12 + 0.3 * rt(o.d.blk)) * (S.type === 'dunk' ? 0.5 : 1);
+    const P = (0.12 + 0.3 * rt(o.d.blk)) * (S.type === 'dunk' ? 0.5 : 1) * (userHas(p) ? 0.5 : 1);
     if (rand() < P) return o;
   }
   return null;
@@ -1390,7 +1398,7 @@ function releaseShot(p) {
     const lvl = ae <= w ? 0 : ae <= w * 2.7 ? 1 : ae <= w * 5.5 ? 2 : 3;
     grade = lvl === 0 ? 'perfect' : (err < 0 ? 'early' : 'late') + lvl;
     if (S.type === 'ft') prob = lvl === 0 ? 0.995 : lvl === 1 ? Math.min(0.97, prob + 0.12) : lvl === 2 ? prob * 0.6 : 0.08;
-    else if (lvl === 0) prob = prob + (1 - prob) * G.diff.boost * (1 - 0.5 * c) * perfectScale(S.dist);
+    else if (lvl === 0) prob = Math.max(prob + (1 - prob) * G.diff.boost * (1 - 0.5 * c) * perfectScale(S.dist), greenFloor(S.dist, c));
     else if (lvl === 1) prob *= 1.1; else if (lvl === 2) prob *= 0.55; else prob *= 0.1;
   } else if (G.userTeam >= 0 && T.idx !== G.userTeam && S.type !== 'ft') prob *= G.diff.cpuShot;
   prob = clamp(prob, 0.005, 0.995);
@@ -1398,7 +1406,7 @@ function releaseShot(p) {
   let foul = null, blocker = null;
   if (S.type !== 'ft' && G.state === 'live') {
     foul = shootingFoulCheck(p, S);
-    if (foul && made && rand() < 0.45) made = false;
+    if (foul && made && rand() < (user ? 0.25 : 0.45)) made = false;   // the rest are and-ones
     if (!foul) blocker = releaseBlockCheck(p, S);
   }
   holdPos(p, b);
@@ -2952,6 +2960,7 @@ function initRender(canvas, quality) {
   buildFX();
   initPost();
   initDof();
+  if (R.dof.ok) initAO();
   setQuality(quality || 'high');
   R.ready = true;
 }
@@ -3125,8 +3134,8 @@ function initPost() {
   P.mComp = ppMat(`
     uniform sampler2D tScene; uniform sampler2D tBloom; uniform vec2 uRes;
     uniform float uBloom; uniform float uExposure; uniform float uTime; uniform float uVig; uniform float uGrain;
-    uniform float uFlash; uniform float uCine; uniform float uCA; uniform float uSat; uniform float uStreak;
-    uniform sampler2D tDof; uniform float uDof;
+    uniform float uFlash; uniform float uCine; uniform float uCA; uniform float uSat; uniform float uStreak; uniform float uSharp;
+    uniform sampler2D tDof; uniform float uDof; uniform sampler2D tAO; uniform float uAO;
     varying vec2 vUv;
     vec3 rrt(vec3 v){ vec3 a = v * (v + 0.0245786) - 0.000090537; vec3 b = v * (0.983729 * v + 0.4329510) + 0.238081; return a / b; }
     vec3 aces(vec3 c){
@@ -3140,12 +3149,21 @@ function initPost() {
       vec2 uv = vUv, d = uv - 0.5;
       float ca = uCA * dot(d, d);
       vec3 col = vec3(texture2D(tScene, uv - d * ca).r, texture2D(tScene, uv).g, texture2D(tScene, uv + d * ca).b);
-      if (uDof > 0.001) { vec4 bk = texture2D(tDof, uv); col = mix(col, bk.rgb, smoothstep(0.07, 0.32, abs(bk.a)) * uDof); }
+      if (uAO > 0.001) col *= mix(1.0, texture2D(tAO, uv).r, uAO);
+      float dofK = 0.0;
+      if (uDof > 0.001) { vec4 bk = texture2D(tDof, uv); dofK = smoothstep(0.07, 0.32, abs(bk.a)) * uDof; col = mix(col, bk.rgb, dofK); }
       col += texture2D(tBloom, uv).rgb * uBloom;
       vec3 st = vec3(0.0);
       for (int i = 1; i <= 6; i++) { float o = float(i) * 0.02; st += (texture2D(tBloom, uv + vec2(o, 0.0)).rgb + texture2D(tBloom, uv - vec2(o, 0.0)).rgb) * (1.0 - float(i) / 7.0); }
       col += st * uStreak * vec3(0.55, 0.72, 1.0);
       col = aces(col * uExposure);
+      // light contrast-adaptive sharpening against the four neighbours, in display space
+      vec2 tx = 1.0 / uRes;
+      vec3 nb = aces(texture2D(tScene, uv + vec2(tx.x, 0.0)).rgb * uExposure) + aces(texture2D(tScene, uv - vec2(tx.x, 0.0)).rgb * uExposure)
+              + aces(texture2D(tScene, uv + vec2(0.0, tx.y)).rgb * uExposure) + aces(texture2D(tScene, uv - vec2(0.0, tx.y)).rgb * uExposure);
+      vec3 hp = col - nb * 0.25;
+      col = clamp(col + hp * uSharp * (1.0 - dofK) / (1.0 + 4.0 * abs(hp)), 0.0, 1.0);
+      col = mix(col, col * col * (3.0 - 2.0 * col), 0.22);
       float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
       col = max(mix(vec3(l), col, uSat - uCine * 0.3), 0.0);
       col *= mix(vec3(0.94, 0.98, 1.06), vec3(1.04, 1.0, 0.95), smoothstep(0.15, 0.85, l));
@@ -3159,7 +3177,7 @@ function initPost() {
       gl_FragColor = vec4(col, 1.0);
     }`, { tScene: { value: null }, tBloom: { value: null }, uRes: { value: new THREE.Vector2(1, 1) }, uBloom: { value: 0.45 },
     uExposure: { value: 1.12 }, uTime: { value: 0 }, uVig: { value: 0.32 }, uGrain: { value: 0.028 }, uFlash: { value: 0 },
-    uCine: { value: 0 }, uCA: { value: 0.006 }, uSat: { value: 1.1 }, uStreak: { value: 0.045 }, tDof: { value: null }, uDof: { value: 0 } });
+    uCine: { value: 0 }, uCA: { value: 0.006 }, uSat: { value: 1.04 }, uStreak: { value: 0.045 }, tDof: { value: null }, uDof: { value: 0 }, tAO: { value: null }, uAO: { value: 0 }, uSharp: { value: 0.45 } });
 }
 /* depth of field for close and cinematic cameras: a half-resolution depth prepass (the crowd is skipped:
    the seating bowl behind it is close enough), signed circle of confusion, then a golden-angle bokeh
@@ -3210,29 +3228,38 @@ function resizeDof(w, h) {
   D.rt.depthTexture.type = R.gl2 ? THREE.UnsignedIntType : THREE.UnsignedShortType;
   D.a.setSize(hw, hh); D.b.setSize(hw, hh);
 }
-function renderDof() {
+/* half-resolution depth of everything solid; the crowd cards keep their own shader so their cut-out
+   silhouettes land in the depth buffer too */
+const _ccTmp = new THREE.Color();
+function renderDepth() {
   const D = R.dof, r = R.r, sc = R.scene, hidden = [];
   const hide = (o) => { if (o && o.visible) { o.visible = false; hidden.push(o); } };
   if (!D.skip) {
     D.skip = [];
     sc.traverse((o) => { const m = o.material; if (o.isSprite || o.isPoints || o.isLine || (m && !Array.isArray(m) && (m.transparent || m.blending === THREE.AdditiveBlending))) D.skip.push(o); });
   }
-  hide(R.crowdLower); hide(R.crowdUpper); hide(R.courtFans); hide(R.signs);
+  hide(R.signs);
   for (const o of D.skip) hide(o);
   for (const h of R.players) hide(h.blob);
   if (R.refs) for (const q of R.refs) hide(q.h.blob);
   const fog = sc.fog, bg = sc.background, swapped = [];
   sc.traverseVisible((o) => {
-    if (!o.isMesh) return;
+    if (!o.isMesh || o.material === R.crowdBoardMaterial) return;
     swapped.push(o, o.material);
     o.material = o.isSkinnedMesh ? D.mats.skin : o.isInstancedMesh ? D.mats.inst : D.mats.plain;
   });
   sc.fog = null; sc.background = null;
+  // the colour buffer stays clear (alpha 0) except where crowd cards draw: ambient occlusion skips those pixels
+  const cc = r.getClearColor(_ccTmp), ca = r.getClearAlpha();
+  r.setClearColor(0x000000, 0);
   r.setRenderTarget(D.rt); r.clear(); r.render(sc, R.cam);
+  r.setClearColor(cc, ca);
   for (let i = 0; i < swapped.length; i += 2) swapped[i].material = swapped[i + 1];
   sc.fog = fog; sc.background = bg;
   for (const o of hidden) o.visible = true;
-  const P = R.pp, U = D.mPrep.uniforms;
+}
+function renderDof() {
+  const D = R.dof, P = R.pp, U = D.mPrep.uniforms;
   U.tScene.value = P.main.texture; U.tDepth.value = D.rt.depthTexture;
   U.texel.value.set(1 / P.main.width, 1 / P.main.height);
   U.uFocus.value = D.focus; U.uAp.value = D.ap; U.uNear.value = R.cam.near; U.uFar.value = R.cam.far;
@@ -3242,6 +3269,63 @@ function renderDof() {
   B.uStep.value = clamp(D.a.height / 300, 0.8, 2.2);
   B.tex.value = D.a.texture; B.dir.value.set(1, 0); ppPass(D.mBlur, D.b);
   B.tex.value = D.b.texture; B.dir.value.set(0, 1); ppPass(D.mBlur, D.a);
+}
+/* ambient occlusion from the same depth: contact shading under feet, in creases and where bodies meet */
+function initAO() {
+  const o = { format: THREE.RGBAFormat, minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter, depthBuffer: false, stencilBuffer: false };
+  const A = R.ao = { a: new THREE.WebGLRenderTarget(4, 4, o), b: new THREE.WebGLRenderTarget(4, 4, o), on: 0 };
+  const LZ = 'float linZ(vec2 uv){ float d = texture2D(tDepth, uv).x; return (uNear * uFar) / (uFar - (uFar - uNear) * d); }';
+  A.mAO = ppMat(`
+    uniform sampler2D tDepth; uniform sampler2D tMask; uniform vec2 texel; uniform float uNear; uniform float uFar; uniform float uTanH; uniform float uAspect;
+    uniform float uRadius; uniform float uProj; uniform float uInt; varying vec2 vUv;
+    ${LZ}
+    vec3 vpos(vec2 uv){ float z = linZ(uv); return vec3((uv.x * 2.0 - 1.0) * uTanH * uAspect * z, (uv.y * 2.0 - 1.0) * uTanH * z, z); }
+    void main(){
+      vec3 P = vpos(vUv);
+      if (P.z > 150.0 || texture2D(tMask, vUv).a > 0.5) { gl_FragColor = vec4(1.0); return; }
+      vec3 pr = vpos(vUv + vec2(texel.x, 0.0)), pl = vpos(vUv - vec2(texel.x, 0.0));
+      vec3 pu = vpos(vUv + vec2(0.0, texel.y)), pd = vpos(vUv - vec2(0.0, texel.y));
+      vec3 dx = abs(pr.z - P.z) < abs(P.z - pl.z) ? pr - P : P - pl;
+      vec3 dy = abs(pu.z - P.z) < abs(P.z - pd.z) ? pu - P : P - pd;
+      vec3 n = normalize(cross(dy, dx));
+      float rpx = clamp(uRadius * uProj / P.z, 1.5, 40.0);
+      float nz = fract(52.9829189 * fract(dot(gl_FragCoord.xy, vec2(0.06711056, 0.00583715)))) * 6.2831853;
+      float sum = 0.0;
+      for (int i = 0; i < 12; i++) {
+        float fi = float(i) + 0.5, ang = fi * 2.39996 + nz, rr = sqrt(fi / 12.0);
+        vec3 Q = vpos(vUv + vec2(cos(ang), sin(ang)) * rr * rpx * texel);
+        vec3 v = Q - P; float vv = dot(v, v);
+        sum += max(0.0, dot(v, n) - 0.004 * P.z) / (vv + 0.06) * step(vv, uRadius * uRadius * 2.5);
+      }
+      float a = max(0.0, 1.0 - uInt * sum / 12.0);
+      a = mix(1.0, a * a, 1.0 - smoothstep(70.0, 130.0, P.z));
+      gl_FragColor = vec4(vec3(a), 1.0);
+    }`, { tDepth: { value: null }, tMask: { value: null }, texel: { value: new THREE.Vector2() }, uNear: { value: 0.8 }, uFar: { value: 900 }, uTanH: { value: 0.3 }, uAspect: { value: 1.7 },
+    uRadius: { value: 1.6 }, uProj: { value: 300 }, uInt: { value: 0.5 } });
+  A.mBlur = ppMat(`
+    uniform sampler2D tAO; uniform sampler2D tDepth; uniform vec2 texel; uniform vec2 dir; uniform float uNear; uniform float uFar; varying vec2 vUv;
+    ${LZ}
+    void main(){
+      float z0 = linZ(vUv), s = 0.0, ws = 0.0;
+      for (int i = -3; i <= 3; i++) {
+        vec2 uv = vUv + dir * texel * float(i) * 1.5;
+        float w = exp(-abs(linZ(uv) - z0) / (0.04 * z0 + 0.1)) * (1.0 - abs(float(i)) / 4.5);
+        s += texture2D(tAO, uv).r * w; ws += w;
+      }
+      gl_FragColor = vec4(vec3(s / max(ws, 1e-4)), 1.0);
+    }`, { tAO: { value: null }, tDepth: { value: null }, texel: { value: new THREE.Vector2() }, dir: { value: new THREE.Vector2(1, 0) }, uNear: { value: 0.8 }, uFar: { value: 900 } });
+}
+function renderAO() {
+  const A = R.ao, D = R.dof, c = R.cam, U = A.mAO.uniforms;
+  if (A.a.width !== D.rt.width || A.a.height !== D.rt.height) { A.a.setSize(D.rt.width, D.rt.height); A.b.setSize(D.rt.width, D.rt.height); }
+  const tanH = Math.tan(c.fov * PI / 360);
+  U.tDepth.value = D.rt.depthTexture; U.tMask.value = D.rt.texture; U.texel.value.set(1 / A.a.width, 1 / A.a.height);
+  U.uNear.value = c.near; U.uFar.value = c.far; U.uTanH.value = tanH; U.uAspect.value = c.aspect; U.uProj.value = A.a.height * 0.5 / tanH;
+  ppPass(A.mAO, A.a);
+  const B = A.mBlur.uniforms;
+  B.tDepth.value = D.rt.depthTexture; B.texel.value.set(1 / A.a.width, 1 / A.a.height); B.uNear.value = c.near; B.uFar.value = c.far;
+  B.tAO.value = A.a.texture; B.dir.value.set(1, 0); ppPass(A.mBlur, A.b);
+  B.tAO.value = A.b.texture; B.dir.value.set(0, 1); ppPass(A.mBlur, A.a);
 }
 function resizePost(w, h) {
   const P = R.pp;
@@ -3278,6 +3362,7 @@ function renderPost() {
   const D = R.dof;
   U.uDof.value = D && D.ok && D.on > 0.01 ? D.on : 0;
   U.tDof.value = D && D.ok ? D.a.texture : null;
+  U.uAO.value = R.ao && R.ao.on ? 0.95 : 0; U.tAO.value = R.ao ? R.ao.a.texture : null;
   ppPass(P.mComp, null);
 }
 
@@ -3320,7 +3405,15 @@ function renderFrame(dt, rdt) {
       D.focus = D.on < 0.05 || R.dofSnap ? fd : damp(D.focus, fd, 6, rdt);
       D.ap = w.ap || 1;
     }
+    const wantAO = !!R.ao && R.quality === 'high' && R.aoEnabled !== false;
+    if (D.on > 0.01 || wantAO) renderDepth();
     if (D.on > 0.01) renderDof();
+    if (wantAO) renderAO();
+    R.ao && (R.ao.on = wantAO ? 1 : 0);
+    if (R.debugView === 'ao' && wantAO) {
+      if (!R.pp.mCopyAO) R.pp.mCopyAO = ppMat('uniform sampler2D tex; varying vec2 vUv; void main(){ gl_FragColor = vec4(texture2D(tex, vUv).rrr, 1.0); }', { tex: { value: null } });
+      R.pp.mCopyAO.uniforms.tex.value = R.ao.a.texture; ppPass(R.pp.mCopyAO, null); return;
+    }
     if (R.debugView === 'coc' && D.on > 0.01) {
       if (!R.pp.mCoc) R.pp.mCoc = ppMat('uniform sampler2D tex; varying vec2 vUv; void main(){ float c = texture2D(tex, vUv).a; gl_FragColor = vec4(max(c, 0.0), max(-c, 0.0), 0.0, 1.0); }', { tex: { value: null } });
       if (!R.pp.mRgb) R.pp.mRgb = ppMat('uniform sampler2D tex; varying vec2 vUv; void main(){ vec3 c = texture2D(tex, vUv).rgb; gl_FragColor = vec4(pow(c / (1.0 + c), vec3(0.4545)), 1.0); }', { tex: { value: null } });
@@ -4152,6 +4245,70 @@ function buildCrowdBoards(seats) {
   return mesh;
 }
 
+/* ---------------- sponsor boards ----------------
+   Courtside LED boards and the fascia ribbon rotate through ads for made-up sponsors
+   and home-team promos, switching every few seconds with an LED wipe. */
+const ADS = ['volta', 'skyline', 'northpeak', 'pixel', 'riverton', 'fresh', 'app', 'home'];
+function drawAd(g, x, y, w, h, kind, T) {
+  g.save(); g.beginPath(); g.rect(x, y, w, h); g.clip();
+  const cx = x + w / 2, cy = y + h / 2, f = (sz, wt, it) => `${wt || 900} ${it ? 'italic ' : ''}${Math.round(h * sz)}px ${FONT_D}`;
+  const txt = (t, xx, yy, sz, col, wt, it, al) => { g.font = f(sz, wt, it); g.fillStyle = col; g.textAlign = al || 'center'; g.textBaseline = 'middle'; g.fillText(t, xx, yy); };
+  if (kind === 'volta') {
+    g.fillStyle = '#050705'; g.fillRect(x, y, w, h);
+    g.fillStyle = '#7dff3a'; g.beginPath(); g.moveTo(x + w * 0.2, y + h * 0.12); g.lineTo(x + w * 0.13, y + h * 0.55); g.lineTo(x + w * 0.18, y + h * 0.55); g.lineTo(x + w * 0.12, y + h * 0.9); g.lineTo(x + w * 0.26, y + h * 0.42); g.lineTo(x + w * 0.21, y + h * 0.42); g.lineTo(x + w * 0.27, y + h * 0.12); g.fill();
+    txt('VOLTA', x + w * 0.58, cy - h * 0.06, 0.62, '#ffffff', 900, true); txt('CHARGE UP', x + w * 0.58, cy + h * 0.33, 0.2, '#7dff3a', 800);
+  } else if (kind === 'skyline') {
+    const gr = g.createLinearGradient(x, 0, x + w, 0); gr.addColorStop(0, '#0b3d91'); gr.addColorStop(1, '#2aa8ff'); g.fillStyle = gr; g.fillRect(x, y, w, h);
+    g.strokeStyle = '#ffffff'; g.lineWidth = h * 0.08; g.beginPath(); g.arc(x + w * 0.16, cy + h * 0.55, h * 0.6, -2.3, -0.9); g.stroke();
+    txt('SKYLINE', x + w * 0.56, cy - h * 0.08, 0.5, '#ffffff', 900); txt('A I R', x + w * 0.56, cy + h * 0.3, 0.22, '#cfe9ff', 700);
+  } else if (kind === 'northpeak') {
+    g.fillStyle = '#0d1b3a'; g.fillRect(x, y, w, h);
+    g.fillStyle = '#e8b84a'; g.beginPath(); g.moveTo(x + w * 0.08, y + h * 0.82); g.lineTo(x + w * 0.17, y + h * 0.2); g.lineTo(x + w * 0.26, y + h * 0.82); g.fill();
+    g.fillStyle = '#ffffff'; g.beginPath(); g.moveTo(x + w * 0.145, y + h * 0.38); g.lineTo(x + w * 0.17, y + h * 0.2); g.lineTo(x + w * 0.195, y + h * 0.38); g.fill();
+    txt('NORTHPEAK', x + w * 0.6, cy - h * 0.08, 0.46, '#ffffff', 800); txt('BANK', x + w * 0.6, cy + h * 0.3, 0.22, '#e8b84a', 800);
+  } else if (kind === 'pixel') {
+    g.fillStyle = '#16051f'; g.fillRect(x, y, w, h);
+    for (let i = 0; i < 9; i++) { g.fillStyle = ['#ff2bd6', '#2bf2ff', '#ffe02b'][i % 3]; g.fillRect(x + w * 0.06 + (i % 3) * h * 0.22, y + h * 0.18 + Math.floor(i / 3) * h * 0.22, h * 0.18, h * 0.18); }
+    txt('PIXELBURST', x + w * 0.6, cy - h * 0.06, 0.44, '#ffffff', 900, true); txt('PLAY NOW', x + w * 0.6, cy + h * 0.31, 0.19, '#2bf2ff', 800);
+  } else if (kind === 'riverton') {
+    g.fillStyle = '#c4161c'; g.fillRect(x, y, w, h);
+    g.fillStyle = '#ffffff'; g.beginPath(); g.moveTo(x + w * 0.06, y + h * 0.66); g.quadraticCurveTo(x + w * 0.14, y + h * 0.28, x + w * 0.27, y + h * 0.5); g.lineTo(x + w * 0.29, y + h * 0.66); g.fill();
+    txt('RIVERTON', x + w * 0.6, cy - h * 0.06, 0.5, '#ffffff', 900, true); txt('MOTORS', x + w * 0.6, cy + h * 0.32, 0.2, '#ffd0d0', 800);
+  } else if (kind === 'fresh') {
+    g.fillStyle = '#ff7a1a'; g.fillRect(x, y, w, h);
+    g.fillStyle = '#2f9e44'; g.beginPath(); g.ellipse(x + w * 0.16, cy, h * 0.18, h * 0.32, 0.6, 0, TAU); g.fill();
+    txt('freshbox', x + w * 0.58, cy, 0.56, '#ffffff', 800);
+  } else if (kind === 'app') {
+    const gr = g.createLinearGradient(x, 0, x + w, 0); gr.addColorStop(0, '#0a0e16'); gr.addColorStop(1, T.c2); g.fillStyle = gr; g.fillRect(x, y, w, h);
+    txt('WATCH. PLAY. WIN.', cx, cy - h * 0.08, 0.42, '#ffffff', 900, true); txt('HARDWOOD KINGS', cx, cy + h * 0.3, 0.18, T.c3, 800);
+  } else {
+    g.fillStyle = T.c1; g.fillRect(x, y, w, h);
+    drawEmblem(g, T, x + h * 0.6, cy, h * 0.42);
+    txt("LET'S GO", x + w * 0.6, cy - h * 0.2, 0.24, '#ffffff', 800); txt(T.name.toUpperCase(), x + w * 0.6, cy + h * 0.16, 0.42, T.c3, 900, true);
+  }
+  g.restore();
+}
+function drawAdBoards(phase, wipe) {
+  const c = R.adC, g = c.getContext('2d'), T = R.home || TEAMS[0], n = 4, w = c.width / n, h = c.height;
+  for (let i = 0; i < n; i++) {
+    const cur = ADS[(phase * n + i) % ADS.length], prev = ADS[((phase - 1) * n + i + ADS.length * 9) % ADS.length];
+    if (wipe < 1) { drawAd(g, i * w, 0, w, h, prev, T); g.save(); g.beginPath(); g.rect(i * w, 0, w, h * wipe); g.clip(); drawAd(g, i * w, 0, w, h, cur, T); g.restore(); }
+    else drawAd(g, i * w, 0, w, h, cur, T);
+    g.fillStyle = '#000'; g.fillRect(i * w, 0, 3, h);
+  }
+  for (let y = 0; y < h; y += 3) { g.fillStyle = 'rgba(0,0,0,0.22)'; g.fillRect(0, y, c.width, 1); }
+  R.adT.needsUpdate = true;
+}
+function stepAdBoards(rdt) {
+  if (!R.adC) return;
+  R.adClock = (R.adClock || 0) + rdt;
+  const phase = Math.floor(R.adClock / 8), w = Math.round(clamp((R.adClock % 8) / 0.45, 0, 1) * 8) / 8;
+  const key = phase * 10 + w;
+  if (key !== R.adKey || R.adPhase === -1) { R.adKey = key; R.adPhase = phase; drawAdBoards(phase, w); }
+}
+/* stretch a board's UVs so one ad panel always spans about the same length of board */
+function adUV(geo, len) { const uv = geo.attributes.uv; for (let i = 0; i < uv.count; i++) uv.setX(i, uv.getX(i) * len / 60); return geo; }
+
 /* ---------------- arena build ---------------- */
 function buildArena() {
   R.courtW = R.mobile ? 2048 : 4096;
@@ -4193,10 +4350,11 @@ function buildArena() {
   const roof = new THREE.Mesh(new THREE.PlaneGeometry(420, 340), new THREE.MeshBasicMaterial({ color: '#05070b' }));
   roof.rotation.x = PI / 2; roof.position.y = 96; R.scene.add(roof);
   // courtside: ribbon boards on the floor along the far side and baselines, scorer's table, benches
-  const lowRib = hdrBasic('#ffffff', 1.8, { map: R.ribbonT });
-  const b1 = new THREE.Mesh(new THREE.PlaneGeometry(112, 2.2), lowRib); b1.position.set(0, 1.1, -34.8); R.scene.add(b1);
+  R.adC = mkCanvas(2048, 128); R.adT = canvasTex(R.adC); R.adT.wrapS = THREE.RepeatWrapping; R.adPhase = -1;
+  const lowRib = hdrBasic('#ffffff', 1.55, { map: R.adT });
+  const b1 = new THREE.Mesh(adUV(new THREE.PlaneGeometry(112, 2.2), 112), lowRib); b1.position.set(0, 1.1, -34.8); R.scene.add(b1);
   for (const s of [-1, 1]) {
-    const b = new THREE.Mesh(new THREE.PlaneGeometry(62, 2.2), lowRib); b.position.set(s * 57.3, 1.1, 0); b.rotation.y = -s * PI / 2; R.scene.add(b);
+    const b = new THREE.Mesh(adUV(new THREE.PlaneGeometry(62, 2.2), 62), lowRib); b.position.set(s * 57.3, 1.1, 0); b.rotation.y = -s * PI / 2; R.scene.add(b);
   }
   const table = new THREE.Mesh(new THREE.BoxGeometry(34, 2.7, 2.6), stdMat('#0d0f14', 0.4, { metalness: 0.3 }));
   table.position.set(0, 1.35, -29.8); table.castShadow = true; R.scene.add(table);
@@ -4235,7 +4393,7 @@ function buildArena() {
       d.position.set(c.x, c.y + 1.35, c.z + 0.65); d.updateMatrix(); backs.setMatrixAt(i, d.matrix);
     });
     R.scene.add(seats); R.scene.add(backs); }
-  const nearRib = new THREE.Mesh(new THREE.PlaneGeometry(96, 1.6), hdrBasic('#ffffff', 1.8, { map: R.ribbonT }));
+  const nearRib = new THREE.Mesh(adUV(new THREE.PlaneGeometry(96, 1.6), 70), lowRib);
   nearRib.position.set(0, 0.8, 27.6); nearRib.rotation.y = PI; R.scene.add(nearRib);
   R.courtside = buildCrowdMesh(cs); R.scene.add(R.courtside);
   { const a = R.courtside.geometry.attributes.aAnim; cs.forEach((c, i) => { a.array[i * 4 + 3] = c.stand ? 1 : 0; a.array[i * 4 + 1] = c.kind === 'photo' ? 0.2 : 0.9; }); a.needsUpdate = true;
@@ -4418,7 +4576,7 @@ function paintArena(home, away) {
   if (R.signC) drawSigns(home);
   R.jumboRing.color.set(home.c1).multiplyScalar(2.2);
   for (const h of R.hoops) { drawPad(h, home); }
-  drawRibbon(); drawTable(); drawJumbo(true);
+  drawRibbon(); drawTable(); drawJumbo(true); R.adPhase = -1; stepAdBoards(0);
 }
 function drawReflCrowd(home, away) {
   const c = R.reflCrowdC, g = c.getContext('2d');
@@ -4927,6 +5085,7 @@ function updateWorld(dt, rdt) {
   if (R.wave > -5) { R.wave += rdt * 1.1; if (R.wave > PI * 3) R.wave = -9; }
   R.crowdU.uWave.value = R.wave > -5 ? ((R.wave % TAU) + TAU) % TAU - PI : -9;
   R.ribbonT.offset.x = (R.ribbonT.offset.x + rdt * 0.012) % 1;
+  stepAdBoards(rdt);
   R.tableT.offset.x = (R.tableT.offset.x - rdt * 0.02) % 1;
   R.coneMat.uniforms.uA.value = 0.016 + R.excite * 0.008;
   R.jumboTick = (R.jumboTick || 0) + rdt;
@@ -4954,7 +5113,7 @@ function spinBall(m, b, dt) {
    solver below drives the bones from simulation state.
    ============================================================ */
 
-const SKIN = ['#f0c8a2', '#dcaa7c', '#c48a5c', '#9c6640', '#76482a', '#4c2e1b'];
+const SKIN = ['#e6b996', '#d29f78', '#b98058', '#935f3d', '#704429', '#4a2c1b'];
 const HAIRC = ['#14100c', '#221710', '#35261a', '#6a4a2a', '#c9a35e'];
 
 /* ---------- atlas layout: 1024 x 1024 canvas, uv v = 1 - y / 1024 ---------- */
@@ -5432,7 +5591,7 @@ function buildHumanoid(pl, home) {
   const J = { hips: [0, 3.35, 0], head: [0, 5.77, 0], shR: [0, 5.25, 0.76 * b], shL: [0, 5.25, -0.76 * b], hipR: [0, 3.27, 0.32 * b], hipL: [0, 3.27, -0.32 * b] };
   const P = [];
   // torso / jersey: lower third follows the hips, upper body follows the spine; broad through the chest and lats
-  P.push(piece(regionUV(lathe([[0.57, 0.08], [0.56, 0.45], [0.6, 0.85], [0.69, 1.3], [0.76, 1.6], [0.79, 1.82], [0.71, 1.99], [0.46, 2.11], [0.26, 2.2]], 32, 0.62, b), 'jersey'), J.hips,
+  P.push(piece(regionUV(lathe([[0.6, 0.02], [0.57, 0.2], [0.56, 0.45], [0.6, 0.85], [0.69, 1.3], [0.76, 1.6], [0.79, 1.82], [0.71, 1.99], [0.46, 2.11], [0.26, 2.2]], 32, 0.62, b), 'jersey'), J.hips,
     (x, y) => { const t = sstep(3.6, 4.3, y), hw = 0.8 * (1 - sstep(3.45, 4.15, y)); return [BI.hips, (1 - t) * (1 - hw), BI.torso, t * (1 - hw), BI.hem, hw]; },
     (x, y, z, nx, ny, nz) => 1 - 0.14 * (1 - sstep(3.45, 4.1, y)) - 0.18 * sstep(0.45, 0.7, Math.abs(z)) * sstep(4.6, 5.0, y) * (1 - sstep(5.15, 5.35, y))));
   // shorts top
@@ -5566,7 +5725,7 @@ function buildHumanoid(pl, home) {
       const knee = L.legs === 'kneeBoth' || (L.legs === 'kneeL' && s < 0);
       if (full) P.push(piece(constUV(lathe(bandProf(LEG, sockTop - 0.06, -0.9, 0.012, 16), 18, b, b), 'pants'), j, legW, legAO));
       if (knee) P.push(piece(constUV(lathe(bandProf(LEG, -1.98, -1.22, (y) => 0.024 + 0.02 * Math.cos((y + 1.6) / 0.38 * PI / 2), 10), 18, b, b), 'pants'), j, legW, legAO));
-      P.push(piece(regionUV(lathe([[0.43, -1.52], [0.45, -1.3], [0.465, -0.6], [0.46, -0.12], [0.41, 0.06]], 22, b, b), s > 0 ? 'shortsR' : 'shortsL'), j,
+      P.push(piece(regionUV(lathe([[0.5, -1.54], [0.5, -1.44], [0.48, -1.2], [0.47, -0.6], [0.46, -0.12], [0.41, 0.06]], 22, b, b), s > 0 ? 'shortsR' : 'shortsL'), j,
         (x, y) => blend(BI.hips, hp, sstep(yh + 0.05, yh - 0.35, y)),
         (x, y, z, nx, ny, nz) => 1 - 0.09 * clamp(-nz * s, 0, 1) - 0.12 * (1 - sstep(yh - 1.52, yh - 1.2, y))));
     }
@@ -5607,7 +5766,7 @@ function buildHumanoid(pl, home) {
   const mesh = new THREE.SkinnedMesh(geo, mat);
   mesh.add(bBody);
   mesh.bind(skel);
-  mesh.castShadow = true; mesh.frustumCulled = false;
+  mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = false;
   bBody.scale.set(pl.sc, pl.sc, pl.sc);
   const root = new THREE.Group(); root.add(mesh);
   const blob = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 4.4), R.blobMat);

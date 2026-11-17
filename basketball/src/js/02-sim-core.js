@@ -320,7 +320,7 @@ function contestOn(p, antic) {
    accuracy with every foot, threes are hardest and fall off quickly past the line. */
 function baseProb(r, d, three, type) {
   if (type === 'dunk') return 0.97;
-  if (type === 'layup') return lerp(0.64, 0.9, rt(r.ins)) - Math.max(0, d - 4) * 0.012;
+  if (type === 'layup') return lerp(0.72, 0.93, rt(r.ins)) - Math.max(0, d - 4) * 0.01;
   if (three) { let b = lerp(0.33, 0.51, rt(r.tpt)); const deep = d - 24.5; if (deep > 0) b -= deep * 0.04; return b; }
   const sk = rt(d > 12 ? r.mid : (r.mid + r.ins) / 2);
   return lerp(0.5, 0.7, sk) - Math.max(0, d - 6) * 0.0095;
@@ -329,12 +329,20 @@ function baseProb(r, d, three, type) {
 function windowScale(d) { return clamp(1.75 - d * 0.038, 0.5, 1.6); }
 /* how much a perfect release can lift the odds: certain up close, less so from deep */
 function perfectScale(d) { return clamp(1.2 - (d - 10) * 0.02, 0.62, 1); }
-function contestMult(type, c) { return type === 'dunk' ? 1 - 0.42 * c * c : type === 'layup' ? 1 - 0.36 * c : 1 - 0.34 * c; }
+function contestMult(type, c) { return type === 'dunk' ? 1 - 0.36 * c * c : type === 'layup' ? 1 - 0.3 * c : 1 - 0.34 * c; }
+/* a perfect (green) release is nearly automatic: about 97% open, still about 85% with a hand in the face,
+   less only from well beyond the arc; easier on Rookie, harder on Legend */
+function greenFloor(d, c) { return clamp(0.975 - 0.15 * c - Math.max(0, d - 25.5) * 0.04 + (G.diff.boost - 0.9) * 0.6, 0.35, 0.99); }
 function shotChance(p, S, c) {
   if (S.type === 'ft') return clamp(0.52 + 0.42 * rt(p.d.mid), 0.4, 0.95);
-  let base = baseProb(p.d, S.dist, S.three, S.type) * contestMult(S.type, c);
+  // the user's finishes at the rim shrug off contact better, and short jumpers get a lift
+  const user = userHas(p);
+  const ce = user && S.type !== 'jump' ? c * 0.45 : c;
+  let base = baseProb(p.d, user && S.type === 'layup' ? Math.min(S.dist, 5) : S.dist, S.three, S.type) * contestMult(S.type, ce);
+  if (user && S.type === 'layup') base += (1 - base) * 0.35;
+  if (user && S.type === 'jump' && S.dist < 12) base += 0.07 * (1 - S.dist / 12) + 0.03;
   if (S.type === 'jump' && S.moving) base *= 0.9;
-  if (S.type === 'layup' && S.runSp > 17.5) base *= 0.92;
+  if (S.type === 'layup' && S.runSp > 17.5 && !user) base *= 0.92;
   if (p.stam < 25) base *= 0.9;
   return clamp(base, 0.01, 0.97);
 }
@@ -477,7 +485,7 @@ function releaseBlockCheck(p, S) {
     if (o.y < 0.6) continue;
     const hx = o.x + Math.cos(o.face) * 0.7, hz = o.z + Math.sin(o.face) * 0.7, hy = o.y + o.reach;
     if (hyp(b.x - hx, b.z - hz) > 2.2 || hy < b.y - 1.2) continue;
-    const P = (0.12 + 0.3 * rt(o.d.blk)) * (S.type === 'dunk' ? 0.5 : 1);
+    const P = (0.12 + 0.3 * rt(o.d.blk)) * (S.type === 'dunk' ? 0.5 : 1) * (userHas(p) ? 0.5 : 1);
     if (rand() < P) return o;
   }
   return null;
@@ -506,7 +514,7 @@ function releaseShot(p) {
     const lvl = ae <= w ? 0 : ae <= w * 2.7 ? 1 : ae <= w * 5.5 ? 2 : 3;
     grade = lvl === 0 ? 'perfect' : (err < 0 ? 'early' : 'late') + lvl;
     if (S.type === 'ft') prob = lvl === 0 ? 0.995 : lvl === 1 ? Math.min(0.97, prob + 0.12) : lvl === 2 ? prob * 0.6 : 0.08;
-    else if (lvl === 0) prob = prob + (1 - prob) * G.diff.boost * (1 - 0.5 * c) * perfectScale(S.dist);
+    else if (lvl === 0) prob = Math.max(prob + (1 - prob) * G.diff.boost * (1 - 0.5 * c) * perfectScale(S.dist), greenFloor(S.dist, c));
     else if (lvl === 1) prob *= 1.1; else if (lvl === 2) prob *= 0.55; else prob *= 0.1;
   } else if (G.userTeam >= 0 && T.idx !== G.userTeam && S.type !== 'ft') prob *= G.diff.cpuShot;
   prob = clamp(prob, 0.005, 0.995);
@@ -514,7 +522,7 @@ function releaseShot(p) {
   let foul = null, blocker = null;
   if (S.type !== 'ft' && G.state === 'live') {
     foul = shootingFoulCheck(p, S);
-    if (foul && made && rand() < 0.45) made = false;
+    if (foul && made && rand() < (user ? 0.25 : 0.45)) made = false;   // the rest are and-ones
     if (!foul) blocker = releaseBlockCheck(p, S);
   }
   holdPos(p, b);

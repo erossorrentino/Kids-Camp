@@ -7,7 +7,7 @@
    solver below drives the bones from simulation state.
    ============================================================ */
 
-const SKIN = ['#f0c8a2', '#dcaa7c', '#c48a5c', '#9c6640', '#76482a', '#4c2e1b'];
+const SKIN = ['#e6b996', '#d29f78', '#b98058', '#935f3d', '#704429', '#4a2c1b'];
 const HAIRC = ['#14100c', '#221710', '#35261a', '#6a4a2a', '#c9a35e'];
 
 /* ---------- atlas layout: 1024 x 1024 canvas, uv v = 1 - y / 1024 ---------- */
@@ -485,7 +485,7 @@ function buildHumanoid(pl, home) {
   const J = { hips: [0, 3.35, 0], head: [0, 5.77, 0], shR: [0, 5.25, 0.76 * b], shL: [0, 5.25, -0.76 * b], hipR: [0, 3.27, 0.32 * b], hipL: [0, 3.27, -0.32 * b] };
   const P = [];
   // torso / jersey: lower third follows the hips, upper body follows the spine; broad through the chest and lats
-  P.push(piece(regionUV(lathe([[0.57, 0.08], [0.56, 0.45], [0.6, 0.85], [0.69, 1.3], [0.76, 1.6], [0.79, 1.82], [0.71, 1.99], [0.46, 2.11], [0.26, 2.2]], 32, 0.62, b), 'jersey'), J.hips,
+  P.push(piece(regionUV(lathe([[0.6, 0.02], [0.57, 0.2], [0.56, 0.45], [0.6, 0.85], [0.69, 1.3], [0.76, 1.6], [0.79, 1.82], [0.71, 1.99], [0.46, 2.11], [0.26, 2.2]], 32, 0.62, b), 'jersey'), J.hips,
     (x, y) => { const t = sstep(3.6, 4.3, y), hw = 0.8 * (1 - sstep(3.45, 4.15, y)); return [BI.hips, (1 - t) * (1 - hw), BI.torso, t * (1 - hw), BI.hem, hw]; },
     (x, y, z, nx, ny, nz) => 1 - 0.14 * (1 - sstep(3.45, 4.1, y)) - 0.18 * sstep(0.45, 0.7, Math.abs(z)) * sstep(4.6, 5.0, y) * (1 - sstep(5.15, 5.35, y))));
   // shorts top
@@ -619,7 +619,7 @@ function buildHumanoid(pl, home) {
       const knee = L.legs === 'kneeBoth' || (L.legs === 'kneeL' && s < 0);
       if (full) P.push(piece(constUV(lathe(bandProf(LEG, sockTop - 0.06, -0.9, 0.012, 16), 18, b, b), 'pants'), j, legW, legAO));
       if (knee) P.push(piece(constUV(lathe(bandProf(LEG, -1.98, -1.22, (y) => 0.024 + 0.02 * Math.cos((y + 1.6) / 0.38 * PI / 2), 10), 18, b, b), 'pants'), j, legW, legAO));
-      P.push(piece(regionUV(lathe([[0.43, -1.52], [0.45, -1.3], [0.465, -0.6], [0.46, -0.12], [0.41, 0.06]], 22, b, b), s > 0 ? 'shortsR' : 'shortsL'), j,
+      P.push(piece(regionUV(lathe([[0.5, -1.54], [0.5, -1.44], [0.48, -1.2], [0.47, -0.6], [0.46, -0.12], [0.41, 0.06]], 22, b, b), s > 0 ? 'shortsR' : 'shortsL'), j,
         (x, y) => blend(BI.hips, hp, sstep(yh + 0.05, yh - 0.35, y)),
         (x, y, z, nx, ny, nz) => 1 - 0.09 * clamp(-nz * s, 0, 1) - 0.12 * (1 - sstep(yh - 1.52, yh - 1.2, y))));
     }
@@ -660,7 +660,7 @@ function buildHumanoid(pl, home) {
   const mesh = new THREE.SkinnedMesh(geo, mat);
   mesh.add(bBody);
   mesh.bind(skel);
-  mesh.castShadow = true; mesh.frustumCulled = false;
+  mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = false;
   bBody.scale.set(pl.sc, pl.sc, pl.sc);
   const root = new THREE.Group(); root.add(mesh);
   const blob = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 4.4), R.blobMat);

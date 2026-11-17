@@ -8,7 +8,7 @@ const ctx = vm.createContext({ console, Math, Date, Object, Array, Number, JSON 
 vm.runInContext(code, ctx);
 const { G, EV, TEAMS, newGame, stepGame, DT, CT, resumeHalftime, hoopX, distRim } = ctx.__api;
 const N = +(process.argv[2] || 4), diff = process.argv[3] || 'pro';
-let tot = { us: 0, them: 0, grades: {}, ev: {} };
+let tot = { us: 0, them: 0, grades: {}, ev: {}, mk: {} };
 for (let g = 0; g < N; g++) {
   newGame({ home: TEAMS[g % 8], away: TEAMS[(g + 3) % 8], userTeam: 0, difficulty: diff, qLen: 120, seed: 500 + g });
   let t = 0, holdShot = 0, lastKey = '', stall = 0, maxStall = 0, stallKey = '';
@@ -41,7 +41,8 @@ for (let g = 0; g < N; g++) {
       else if (p.shot && p.shot.timed) I.shoot = p.actT < p.shot.ideal + (Math.random() - 0.5) * 0.05;
     }
     stepGame(DT); t++;
-    for (const e of EV) { tot.ev[e.type] = (tot.ev[e.type] || 0) + 1; if (e.type === 'release' && e.user) tot.grades[e.grade] = (tot.grades[e.grade] || 0) + 1; }
+    for (const e of EV) { tot.ev[e.type] = (tot.ev[e.type] || 0) + 1; if (e.type === 'release' && e.user) { tot.grades[e.grade] = (tot.grades[e.grade] || 0) + 1;
+      if (e.shotType !== 'ft') { const k = e.shotType !== 'jump' ? e.shotType : (e.grade === 'perfect' ? 'green' : 'off-green') + (e.three ? ' 3pt' : e.p.shot.dist < 12 ? ' close' : ' mid'); const o = tot.mk[k] || (tot.mk[k] = { n: 0, m: 0, c: 0 }); o.n++; o.c += e.contest; if (e.made) o.m++; } } }
     EV.length = 0;
     const key = G.state + '|' + G.ball.state + '|' + (G.dead ? G.dead.phase : '') + '|' + (G.ball.holder ? G.ball.holder.id : '');
     if (key === lastKey) { stall += DT; if (stall > maxStall) { maxStall = stall; stallKey = key; } } else { lastKey = key; stall = 0; }
@@ -53,4 +54,5 @@ for (let g = 0; g < N; g++) {
 }
 console.log('avg score user', (tot.us / N).toFixed(1), 'cpu', (tot.them / N).toFixed(1));
 console.log('user release grades', JSON.stringify(tot.grades));
+console.log('user makes:', Object.entries(tot.mk).map(([k, o]) => `${k} ${o.m}/${o.n} (${(100 * o.m / o.n).toFixed(0)}%, contest ${(o.c / o.n).toFixed(2)})`).join(' | '));
 console.log('events', Object.entries(tot.ev).filter(([k]) => !['dribble', 'jump', 'catch', 'pass', 'bounce', 'rim', 'backboard'].includes(k)).map(([k, v]) => k + ':' + (v / N).toFixed(1)).join(' '));

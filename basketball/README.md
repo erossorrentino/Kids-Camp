@@ -67,7 +67,12 @@ Phones and tablets get an on-screen joystick and buttons.
 - Shot quality from distance, ratings, defender distance, angle, height and
   hands up. Release timing grades from "Excellent" to "Very late". Range
   matters: the green window is wider and makes are likelier up close, and
-  deep threes stay hard even with a perfect release.
+  deep threes stay harder.
+- A green (perfect) release is close to automatic: about 97% when open and
+  still around 85% with a hand in your face; only well beyond the arc does it
+  drop lower (a little easier on Rookie, a little harder on Legend). Your own
+  layups and dunks shrug off contact, get blocked less, and fouled finishes
+  often turn into and-ones; short jumpers get a lift too.
 - A solid backboard and stanchion: the ball banks and bounces off every side
   of the glass, its pads, the shot clock and the support arm (`tools/boardtest.js`
   fires 4,000 balls at it and checks none get through).
@@ -107,6 +112,11 @@ Phones and tablets get an on-screen joystick and buttons.
   wristbands, headbands, arm tattoos and four sneaker colourways.
 - Depth of field on replays, the pregame show, free throws and other cinematic
   shots: the arena melts into a soft blur behind sharp players.
+- Ambient occlusion on High: soft contact shading under feet, between bodies
+  and in creases, plus self-shadowing on the players and a light sharpening
+  pass for a crisp broadcast picture.
+- Courtside LED boards rotate through ads for made-up sponsors and home-team
+  promos with an LED wipe every few seconds.
 - Three referees, coaches, photographers and courtside fans.
 - Defenders guard in a wide, low stance with their arms out over the passing lanes.
 - Broadcast presentation: a starting-lineups intro with 3D player cards,
@@ -136,7 +146,7 @@ the browser's speech engine.
 ```
 node tools/build.js       # concatenates src/ into dist/
 node tools/simtest.js 8   # 8 CPU-vs-CPU games headless, prints league-style stats
-node tools/usertest.js 4  # 4 games through the human-input path with a scripted player
+node tools/usertest.js 4  # 4 games through the human-input path with a scripted player (make rates by shot type)
 node tools/boardtest.js   # 4,000 balls at the backboard; fails if any pass through
 ```
 
