@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#060a14">
+</head>
+<body>
+<!-- page:start -->
+<title>Gridiron Kings</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&family=Big+Shoulders+Display:wght@700;800;900&display=swap">
+<link rel="stylesheet" href="css/style.css">
+
+<canvas id="gl" aria-label="Football stadium"></canvas>
+<div id="vig"></div>
+<div id="veil"></div>
+
+<div id="app">
+  <header id="top">
+    <div class="brand"><i class="brand-mark"></i><span>Gridiron <b>Kings</b></span></div>
+    <div class="top-right">
+      <div class="chip" id="divChip">DIV 10</div>
+      <div class="chip coinchip" id="coinChip" title="Coins"><i class="coin"></i><span id="coins">0</span></div>
+      <button class="iconbtn" id="btnSettings" data-act="settings" aria-label="Settings"></button>
+    </div>
+  </header>
+  <main id="screen" class="screen"></main>
+  <nav id="nav" aria-label="Sections"></nav>
+</div>
+
+<div id="hud" hidden>
+  <div class="sb" id="sb">
+    <span class="sb-team" id="sbHome"></span>
+    <span class="sb-team" id="sbAway"></span>
+    <em id="sbClock">Q1 2:00</em>
+    <span class="sb-down"><b id="sbDown">1st &amp; 10</b><i id="sbSpot">Own 25</i></span>
+  </div>
+  <button class="iconbtn hud-pause" id="btnPause" data-act="pause" aria-label="Timeout"><svg viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1" fill="currentColor"/><rect x="14" y="5" width="4" height="14" rx="1" fill="currentColor"/></svg></button>
+  <div id="recv" class="recv"></div>
+  <div id="banner" class="banner" hidden></div>
+  <div id="resultLine" class="resultline" hidden></div>
+  <div id="bigFx" class="goalfx" hidden></div>
+  <div id="snapPrompt" class="snapprompt" hidden>Ready. Snap the ball when you are.</div>
+  <div id="kick" class="kickmeter" hidden><p>Tap KICK when the needle is in the green</p><div class="kick-bar"><i class="kick-zone"></i><b id="kickNeedle"></b></div></div>
+  <div id="keysHelp" class="keys"></div>
+  <div id="touch" class="touch" hidden>
+    <div id="stickZone"><div id="stick"><div id="knob"></div></div></div>
+    <button class="tb tb-c" id="tbC" type="button" hidden>AWAY</button>
+    <button class="tb tb-a" id="tbA" type="button" hidden>JUKE</button>
+    <button class="tb tb-b" id="tbB" type="button" hidden>SNAP</button>
+  </div>
+  <div id="playcall" class="playcall" hidden></div>
+</div>
+
+<div id="fade"></div>
+<div id="overlay" class="overlay" hidden></div>
+<div id="toasts" aria-live="polite"></div>
+<noscript><p style="padding:24px">Gridiron Kings needs JavaScript to run.</p></noscript>
+
+<script src="vendor/three.min.js"></script>
+<script src="js/data.js"></script>
+<script src="js/plays.js"></script>
+<script src="js/match.js"></script>
+<script src="js/cards.js"></script>
+<script src="js/audio.js"></script>
+<script src="js/save.js"></script>
+<script src="js/input.js"></script>
+<script src="js/gfx.js"></script>
+<script src="js/ui.js"></script>
+<script src="js/main.js"></script>
+<!-- page:end -->
+</body>
+</html>
