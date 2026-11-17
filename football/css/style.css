@@ -558,3 +558,7 @@ html { background: var(--night); }
 @keyframes holo { 0% { background-position: 120% 0; } 100% { background-position: -60% 0; } }
 .btn-buy[disabled] { opacity: 0.5; cursor: default; }
 @media (max-width: 520px) { .packsec-head .hint { display: none; } }
+
+.gfxinfo { font-size: 13px; overflow-wrap: anywhere; }
+.gfxinfo-big { margin: 12px 0; padding: 10px 12px; border-radius: 10px; background: var(--night); border: 1px solid var(--line); font-weight: 600; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
+#gl { background: var(--night); }

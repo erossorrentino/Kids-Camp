@@ -404,8 +404,27 @@
       <p class="label">Sound</p>${seg('set-sound', st.sound ? 1 : 0, [[1, 'On'], [0, 'Off']])}
       <p class="label">Graphics</p>${seg('set-quality', st.quality, [[1, 'High'], [0, 'Fast']])}
       <p class="label">Auto-switch defender</p>${seg('set-auto', st.autoSwitch ? 1 : 0, [[1, 'On'], [0, 'Off']])}
+      ${graphicsInfoHtml()}
       <div class="row-btns"><button class="btn btn-ghost" data-act="howto">How to play</button><button class="btn btn-ghost" data-act="reset">Start a new team</button></div>`);
   }
+  function graphicsInfoHtml() {
+    const G = FG.gfx;
+    if (!G || !G.renderer) return '<p class="hint gfxinfo">3D graphics are not running on this device.</p>';
+    const i = G.info();
+    const lvl = ['All effects on', 'Glow effect off', 'Glow, reflections and shadows off', 'Simplest graphics'][i.safe] || '';
+    return `<p class="label">Graphics details</p><p class="hint gfxinfo">${esc(i.webgl)} · ${esc(String(i.gpu))} · ${esc(lvl)} · resolution ×${esc(i.pr)}${i.last ? ' · last check ' + esc(i.last) : ''}</p>${i.safe ? '<button class="btn btn-ghost sm" data-act="gfx-reset">Try all effects again</button>' : ''}`;
+  }
+  UI.graphicsTrouble = function () {
+    const i = FG.gfx.info();
+    UI.modal(`<p class="eyebrow">Graphics problem</p><h2>The 3D view is coming out blank</h2>
+      <p class="hint">The game already switched to its simplest graphics, and this device still draws a blank screen. Please tell Claude what this line says, so it can be fixed:</p>
+      <p class="gfxinfo-big">${esc(i.webgl)} · ${esc(String(i.gpu))} · ${esc(i.last || '')}</p>
+      <p class="hint">Trying a different browser (Chrome or Safari) can also help.</p>`);
+  };
+  UI.graphicsLost = function () {
+    UI.modal(`<p class="eyebrow">Graphics problem</p><h2>The graphics chip ran out of memory</h2>
+      <p class="hint">The game switched to Fast graphics so this does not happen again. Reload the page to keep playing.</p>`);
+  };
   UI.howTo = function (inMatch) {
     const touch = FG.input.usedTouch || matchMedia('(pointer: coarse)').matches;
     const rows = touch
@@ -669,6 +688,7 @@
     'set-qtr': (el) => { sv().settings.qtr = +el.dataset.v; SV.commit(); A.click(); saveClubName(); settingsModal(); },
     'set-sound': (el) => { sv().settings.sound = el.dataset.v === '1'; A.setOn(sv().settings.sound); SV.commit(); A.click(); saveClubName(); settingsModal(); },
     'set-quality': (el) => { sv().settings.quality = +el.dataset.v; FG.gfx.setQuality(sv().settings.quality); SV.commit(); A.click(); saveClubName(); settingsModal(); },
+    'gfx-reset': () => { const G = FG.gfx; sv().settings.gfxSafe = 0; SV.commit(); G.safe = 0; G.gaveUp = false; G.applyQuality(); G.setQuality(G.quality); G.resetCheck(); A.click(); saveClubName(); settingsModal(); },
     'set-auto': (el) => { sv().settings.autoSwitch = el.dataset.v === '1'; SV.commit(); A.click(); saveClubName(); settingsModal(); },
     howto: () => { A.click(); saveClubName(); UI.howTo(false); },
     reset: (el) => {

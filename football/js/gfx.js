@@ -353,7 +353,8 @@
     const rt = pm.fromScene(s, 0.02);
     pm.dispose();
     s.traverse((o) => { if (o.geometry) o.geometry.dispose(); if (o.material) { if (o.material.map) o.material.map.dispose(); o.material.dispose(); } });
-    G.scene.environment = rt.texture;
+    G.envTex = rt.texture;
+    G.scene.environment = G.safe >= 2 ? null : rt.texture;
   }
 
   /* ---------- post-processing: bloom + filmic tone curve + vignette ---------- */
@@ -364,18 +365,26 @@
     const ext = R.extensions;
     const float = ext.has('EXT_color_buffer_float') || ext.has('EXT_color_buffer_half_float');
     const type = float ? T.HalfFloatType : T.UnsignedByteType;
+    let maxS = 0;
+    try {
+      const gl = R.getContext();
+      const fmt = float ? gl.RGBA16F : gl.RGBA8;
+      const list = gl.getInternalformatParameter(gl.RENDERBUFFER, fmt, gl.SAMPLES);
+      if (list && list.length) maxS = list[0];
+    } catch (e) { maxS = 0; }
     const rt = (samples, depth) => {
+      samples = Math.min(samples || 0, maxS);
       const t = new T.WebGLRenderTarget(4, 4, { type, depthBuffer: !!depth, samples: samples || 0 });
       t.texture.generateMipmaps = false; t.texture.minFilter = T.LinearFilter; t.texture.magFilter = T.LinearFilter;
       return t;
     };
     const P = {
-      float, scene: rt((window.devicePixelRatio || 1) >= 1.5 ? 2 : 4, true),
+      float, scene: rt(2, true),
       lv: [0, 1, 2].map(() => ({ a: rt(), b: rt() })),
       bright: new T.ShaderMaterial({
         uniforms: { tex: { value: null }, th: { value: float ? 2.6 : 0.92 }, knee: { value: float ? 1.6 : 0.06 } },
         vertexShader: VS,
-        fragmentShader: 'uniform sampler2D tex; uniform float th; uniform float knee; varying vec2 vUv; void main(){ vec3 c = texture2D(tex, vUv).rgb; float b = max(c.r, max(c.g, c.b)); float w = smoothstep(th, th + knee, b); gl_FragColor = vec4(c * w, 1.0); }',
+        fragmentShader: 'uniform sampler2D tex; uniform float th; uniform float knee; varying vec2 vUv; void main(){ vec3 c = texture2D(tex, vUv).rgb; float b = max(c.r, max(c.g, c.b)); if (!(b < 60000.0) || !(b >= 0.0) || !(c.r >= 0.0) || !(c.g >= 0.0) || !(c.b >= 0.0)) { c = vec3(0.0); b = 0.0; } c = min(c, vec3(24.0)); float w = smoothstep(th, th + knee, min(b, 24.0)); gl_FragColor = vec4(c * w, 1.0); }',
         depthTest: false, depthWrite: false,
       }),
       blur: new T.ShaderMaterial({
@@ -394,7 +403,12 @@
           'float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }',
           'void main(){',
           '  vec3 c = texture2D(tScene, vUv).rgb;',
+          '  float m = max(c.r, max(c.g, c.b));',
+          '  if (!(m < 60000.0) || !(c.r >= 0.0) || !(c.g >= 0.0) || !(c.b >= 0.0)) c = vec3(0.0);',
+          '  c = min(c, vec3(32.0));',
           '  vec3 b = texture2D(t1, vUv).rgb * 0.6 + texture2D(t2, vUv).rgb * 0.5 + texture2D(t3, vUv).rgb * 0.45;',
+          '  float mb = max(b.r, max(b.g, b.b));',
+          '  if (!(mb < 60000.0) || !(mb >= 0.0)) b = vec3(0.0);',
           '  c += b * strength + flash;',
           '  c = aces(c * exposure);',
           '  float l = dot(c, vec3(0.2126, 0.7152, 0.0722)); c = mix(vec3(l), c, 1.1);',
@@ -613,7 +627,7 @@
   /* ---------- a living crowd: thousands of fans in one draw call ---------- */
   function buildCrowd(home, away) {
     if (G.crowd) { G.scene.remove(G.crowd); G.crowd.geometry.dispose(); G.crowd = null; }
-    if (!hi()) { G.tiers.forEach((t) => (t.material = G.crowdMat)); return; }
+    if (!hi() || G.safe >= 3) { G.tiers.forEach((t) => (t.material = G.crowdMat)); return; }
     G.tiers.forEach((t) => (t.material = G.seatMat));
     const person = merge([
       [new T.BoxGeometry(0.46, 0.5, 0.3), M(0, 0.25, 0)],
@@ -756,7 +770,7 @@
     SKIN.forEach((c) => MATS.skin.push(new T.MeshStandardMaterial({ color: c, roughness: 0.6, metalness: 0, envMapIntensity: 0.4 })));
     MATS.mask = new T.MeshStandardMaterial({ color: 0xc9ced6, roughness: 0.32, metalness: 0.75 });
     MATS.maskDark = new T.MeshStandardMaterial({ color: 0x23262d, roughness: 0.35, metalness: 0.6 });
-    MATS.visor = new T.MeshStandardMaterial({ color: 0x0b0d12, roughness: 0.05, metalness: 0.9, envMapIntensity: 1.6, transparent: true, opacity: 0.88 });
+    MATS.visor = new T.MeshStandardMaterial({ color: 0x0b0d12, roughness: 0.18, metalness: 0.85, envMapIntensity: 1.4, transparent: true, opacity: 0.88 });
     MATS.cleat = new T.MeshStandardMaterial({ color: 0x15171c, roughness: 0.4, metalness: 0.1 });
     MATS.cleatW = new T.MeshStandardMaterial({ color: 0xf4f4f4, roughness: 0.45 });
     MATS.white = new T.MeshStandardMaterial({ color: 0xf5f5f5, roughness: 0.8, side: T.DoubleSide });
@@ -781,7 +795,7 @@
     const pantsM = std({ map: stripeTexture(kit.pants, U.colorDist(kit.pants, trim) < 90 ? kit.c1 : trim, 'pants'), roughness: 0.5, envMapIntensity: 0.7 });
     const sockBase = kit.c1 === '#f3f5f8' ? kit.c2 : kit.c1;
     const sockM = std({ map: stripeTexture(U.shade(sockBase, -0.1), '#ffffff', 'sock'), roughness: 0.8 });
-    const helmM = new T.MeshPhysicalMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.28, metalness: 0.15, clearcoat: 1, clearcoatRoughness: 0.08, envMapIntensity: 1.25 });
+    const helmM = new T.MeshPhysicalMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.28, metalness: 0.15, clearcoat: 1, clearcoatRoughness: 0.16, envMapIntensity: 1.2 });
     const helmGeo = helmetGeo(kit);
     const decalM = new T.MeshStandardMaterial({ map: decalTexture(kit, letter), transparent: true, roughness: 0.25, metalness: 0.1, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 });
     const skin = MATS.skin[look.skin % SKIN.length];
@@ -1249,10 +1263,12 @@
   }
 
   /* ---------- public ---------- */
-  G.init = function (canvas, quality) {
+  G.init = function (canvas, quality, safe) {
     T = window.THREE;
     if (!T) { G.failed = true; return false; }
     G.canvas = canvas; G.quality = quality == null ? 1 : quality;
+    G.safe = Math.max(0, Math.min(3, safe || 0));
+    canvas.addEventListener('webglcontextlost', (e) => { e.preventDefault(); G.lost = true; if (G.onLost) G.onLost(); }, false);
     try { G.renderer = new T.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' }); }
     catch (e) { G.failed = true; return false; }
     const R = G.renderer;
@@ -1284,11 +1300,14 @@
 
   G.applyQuality = function () {
     const R = G.renderer, q = hi();
-    R.shadowMap.enabled = G.quality > 0;
-    G.sun.castShadow = G.quality > 0;
-    G.beams.forEach((b) => (b.visible = q));
-    if (q && !G.post) { try { G.post = buildPost(); } catch (e) { console.warn('post-processing unavailable', e); G.post = null; } }
-    if (!q && G.post) G.post = null;
+    const shadows = G.quality > 0 && G.safe < 2;
+    R.shadowMap.enabled = shadows;
+    G.sun.castShadow = shadows;
+    G.beams.forEach((b) => (b.visible = q && G.safe < 3));
+    G.scene.environment = G.safe >= 2 ? null : G.envTex || null;
+    const usePost = q && G.safe < 1;
+    if (usePost && !G.post) { try { G.post = buildPost(); } catch (e) { console.warn('post-processing unavailable', e); G.post = null; } }
+    if (!usePost && G.post) G.post = null;
     if (G.post) { R.toneMapping = T.NoToneMapping; } else { R.toneMapping = T.ACESFilmicToneMapping; R.outputEncoding = T.sRGBEncoding; }
     G.scene.traverse((o) => { if (o.material && !o.material.length) o.material.needsUpdate = true; });
   };
@@ -1312,7 +1331,7 @@
     if (!G.renderer) return;
     const w = G.canvas.clientWidth || window.innerWidth, h = G.canvas.clientHeight || window.innerHeight;
     G.w = w; G.h = h;
-    G.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, hi() ? 2 : 1.25) * G.prScale);
+    G.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, G.safe >= 3 ? 1 : hi() ? 1.5 : 1) * G.prScale);
     G.renderer.setSize(w, h, false);
     sizePost();
     layoutCamera();
@@ -1377,8 +1396,66 @@
     else if (avg < 1 / 50 && G.prScale < 1) { G.prScale = Math.min(1, G.prScale + 0.1); G.resize(); }
   }
 
+  /* ---------- self-check: if the picture comes out blank white, turn effects down until it shows ---------- */
+  G.safe = 0; G.lost = false;
+  const health = { next: 0.6, bad: 0, checks: 0, since: 0 };
+  function sampleFrame() {
+    const gl = G.renderer.getContext();
+    const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight, px = new Uint8Array(4);
+    let white = 0, sum = 0, sum2 = 0;
+    for (let i = 1; i <= 4; i++) for (let j = 1; j <= 4; j++) {
+      gl.readPixels(Math.floor((w * i) / 5), Math.floor((h * j) / 5), 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px);
+      const l = (px[0] + px[1] + px[2]) / 3;
+      sum += l; sum2 += l * l; if (l > 232) white++;
+    }
+    const mean = sum / 16, sd = Math.sqrt(Math.max(0, sum2 / 16 - mean * mean));
+    return { white, mean, sd };
+  }
+  function selfCheck(dt, m) {
+    if (G.lost) return;
+    const now = performance.now() / 1000;
+    const rdt = health.last ? Math.min(1, now - health.last) : 0;
+    health.last = now;
+    health.since += rdt;
+    health.next -= rdt;
+    if (health.next > 0) return;
+    health.next = health.since < 8 || health.bad > 0 ? 0.4 : 3;
+    if (m && m.fade > 0.05) return;
+    let r;
+    try { r = sampleFrame(); } catch (e) { return; }
+    health.checks++;
+    const blank = r.white >= 13 || (r.mean > 215 && r.sd < 6);
+    health.bad = blank ? health.bad + 1 : 0;
+    if (blank) health.next = 0.3;
+    G.lastCheck = r;
+    if (health.bad >= 2) {
+      health.bad = 0;
+      if (G.safe < 3) {
+        G.safe++;
+        G.applyQuality();
+        buildCrowd(G.kits ? G.kits[0].c1 : '#ffc72c', G.kits ? G.kits[1].c1 : '#1f4fd6');
+        G.resize();
+        health.next = 0.5;
+        if (G.onSafe) G.onSafe(G.safe, false);
+      } else if (G.onSafe && !G.gaveUp) { G.gaveUp = true; G.onSafe(G.safe, true); }
+    }
+  }
+  G.resetCheck = function () { health.next = 0.6; health.bad = 0; health.since = 0; };
+  G._health = health;
+  G.info = function () {
+    const out = { webgl: '?', gpu: 'unknown', effects: !!G.post, safe: G.safe, pr: G.renderer ? G.renderer.getPixelRatio().toFixed(2) : '?' };
+    try {
+      const gl = G.renderer.getContext();
+      out.webgl = G.renderer.capabilities.isWebGL2 ? 'WebGL 2' : 'WebGL 1';
+      const ext = gl.getExtension('WEBGL_debug_renderer_info');
+      out.gpu = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER);
+    } catch (e) { /* not available */ }
+    if (G.lastCheck) out.last = G.lastCheck.white + '/16 white, mean ' + Math.round(G.lastCheck.mean);
+    return out;
+  };
+
   G.render = function (dt, m) {
-    if (!G.ready) return;
+    if (!G.ready || G.lost) return;
     G.time += dt; G.lastDt = dt;
     adapt(dt);
     if (m) {
@@ -1404,8 +1481,9 @@
     updateCamera(dt, m);
     if (G.post) {
       try { renderPost(); }
-      catch (e) { console.warn('post-processing failed, falling back', e); G.post = null; G.applyQuality(); G.renderer.setRenderTarget(null); G.renderer.render(G.scene, G.camera); }
+      catch (e) { console.warn('post-processing failed, falling back', e); G.safe = Math.max(G.safe, 1); G.post = null; G.applyQuality(); G.renderer.setRenderTarget(null); G.renderer.render(G.scene, G.camera); }
     } else G.renderer.render(G.scene, G.camera);
+    selfCheck(dt, m);
   };
 
   G.snapCamera = function () { G.cam.init = false; };

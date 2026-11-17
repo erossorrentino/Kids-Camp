@@ -24,6 +24,7 @@
     const kits = [{ c1: me.c1, c2: me.c2, helm: me.helm, pants: me.pants }, opp.kit];
     const m = new FG.Match({ home, away, user: 0, quarterSec: s.settings.qtr * 60, level, autoSwitch: s.settings.autoSwitch });
     GAME.match = m; GAME.info = { mode: opts.mode, opp, mult, kits }; GAME.paused = false; GAME.done = false; GAME.acc = 0;
+    if (GX.resetCheck) GX.resetCheck();
     const wr = Math.random();
     const weather = opts.weather || (wr < 0.6 ? 'clear' : wr < 0.82 ? 'snow' : 'rain');
     GAME.info.weather = weather;
@@ -145,8 +146,8 @@
         }
         if (n === 4) GAME.acc = 0;
       }
-      GX.render(GAME.paused ? 0 : dt, m);
-      UI.hudUpdate();
+      try { GX.render(GAME.paused ? 0 : dt, m); } catch (e) { console.error(e); reportOnce(e); }
+      try { UI.hudUpdate(); } catch (e) { console.error(e); reportOnce(e); }
       $('#fade').style.opacity = m.fade.toFixed(2);
     } else if (GX.ready && !document.hidden && GAME.frame % 2 === 0 && !$('#overlay').classList.contains('po')) {
       GX.render(dt * 2, null);
@@ -168,6 +169,15 @@
       if (id) { A.click(); GAME.callPlay(id); }
       return true;
     };
+    GX.onSafe = (level, gaveUp) => {
+      SV.data.settings.gfxSafe = level; SV.commit();
+      if (!gaveUp) { UI.toast(['', 'Turned off the glow effect so the game shows up on this device', 'Turned off reflections and shadows so the game shows up', 'Switched to the simplest graphics so the game shows up'][level]); return; }
+      UI.graphicsTrouble();
+    };
+    GX.onLost = () => {
+      SV.data.settings.gfxSafe = 3; SV.data.settings.quality = 0; SV.commit();
+      UI.graphicsLost();
+    };
     const no3d = () => {
       document.body.classList.add('no3d');
       UI.toast('3D graphics could not start on this device. The menus still work.', 'warn');
@@ -185,7 +195,7 @@
         return;
       }
       let ok = false;
-      try { ok = GX.init($('#gl'), SV.data.settings.quality); } catch (e) { console.error(e); GX.failed = true; ok = false; }
+      try { ok = GX.init($('#gl'), SV.data.settings.quality, SV.data.settings.gfxSafe || 0); } catch (e) { console.error(e); GX.failed = true; ok = false; }
       if (ok) $('#gl').classList.add('on'); else no3d();
     };
     let started = false;
