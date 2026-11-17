@@ -22,6 +22,9 @@
 
   const SKIN = ['#f6d3b3', '#eebf98', '#dba57c', '#b97f55', '#8a5a3a', '#5e3b26'];
 
+  if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function (x, y, w, h) { this.rect(x, y, w, h); };
+  }
   function canvasTex(w, h, draw, opts) {
     const c = document.createElement('canvas');
     c.width = w; c.height = h;

@@ -534,3 +534,10 @@ button.card, .card[data-act] { cursor: pointer; border: 0; background: none; pad
   .pcard span { display: none; }
   .playcall { padding-block: 56px 10px; }
 }
+
+/* ---------- boot note ---------- */
+html { background: var(--night); }
+.boot { position: fixed; inset: 0; z-index: 60; display: grid; place-content: center; justify-items: center; gap: 12px; padding: 24px; text-align: center; background: radial-gradient(120% 80% at 50% 0%, #16264d, var(--night) 70%); color: var(--chalk); transition: opacity 0.5s ease; }
+.boot b { font-family: var(--display); font-weight: 900; font-size: 44px; text-transform: uppercase; letter-spacing: 0.03em; }
+.boot span { color: var(--mute); font-size: 16px; max-width: 36ch; }
+.boot.done { opacity: 0; pointer-events: none; }

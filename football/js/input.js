@@ -30,7 +30,8 @@
     let a = !!k.a, b = !!k.b, c = !!k.c, sprint = !!k.s;
     if (t.id != null) { mx = t.mx; my = t.my; if (Math.hypot(t.mx, t.my) > 0.9) sprint = true; }
     a = a || t.a; b = b || t.b; c = c || t.c;
-    const pads = navigator.getGamepads ? navigator.getGamepads() : [];
+    let pads = [];
+    if (!I.noPads) { try { pads = navigator.getGamepads ? navigator.getGamepads() || [] : []; } catch (e) { I.noPads = true; } }
     for (const gp of pads) {
       if (!gp || !gp.connected) continue;
       const ax = gp.axes[0] || 0, ay = gp.axes[1] || 0;

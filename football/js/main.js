@@ -121,22 +121,24 @@
   GAME.modalClosed = function () { if (GAME.match && GAME.paused && !GAME.done) UI.pauseMenu(); };
   GAME.quit = function () { GAME.done = true; GAME.leave(); UI.toast('Game forfeited. No coins this time.', 'warn'); };
 
+  let reported = false;
+  function reportOnce(e) { if (reported) return; reported = true; UI.toast('Something went wrong: ' + (e && e.message || e), 'warn'); }
   function frame(t) {
     requestAnimationFrame(frame);
     const dt = Math.min(0.05, Math.max(0, (t - GAME.last) / 1000 || 0));
     GAME.last = t; GAME.frame++;
     const m = GAME.match;
     if (m) {
-      IN.poll();
+      try { IN.poll(); } catch (e) { console.error(e); }
       if (!GAME.paused) {
         GAME.acc += dt;
         let n = 0;
         while (GAME.acc >= STEP && n < 4) {
           m.basis = GX.basis;
-          m.step(STEP, IN.state);
+          try { m.step(STEP, IN.state); } catch (e) { console.error(e); reportOnce(e); }
           IN.consume();
           GAME.acc -= STEP; n++;
-          drain(m);
+          try { drain(m); } catch (e) { console.error(e); reportOnce(e); }
         }
         if (n === 4) GAME.acc = 0;
       }
@@ -163,15 +165,31 @@
       if (id) { A.click(); GAME.callPlay(id); }
       return true;
     };
+    const no3d = () => {
+      document.body.classList.add('no3d');
+      UI.toast('3D graphics could not start on this device. The menus still work.', 'warn');
+    };
+    let triedCdn = false;
     const start3d = () => {
       if (GX.ready || GX.failed) return;
-      const ok = GX.init($('#gl'), SV.data.settings.quality);
-      if (ok) $('#gl').classList.add('on'); else document.body.classList.add('no3d');
+      if (!window.THREE) {
+        if (triedCdn) { GX.failed = true; no3d(); return; }
+        triedCdn = true;
+        const sc = document.createElement('script');
+        sc.src = 'https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js';
+        sc.onload = start3d; sc.onerror = () => { GX.failed = true; no3d(); };
+        document.head.appendChild(sc);
+        return;
+      }
+      let ok = false;
+      try { ok = GX.init($('#gl'), SV.data.settings.quality); } catch (e) { console.error(e); GX.failed = true; ok = false; }
+      if (ok) $('#gl').classList.add('on'); else no3d();
     };
     let started = false;
     const go = () => { if (!started) { started = true; start3d(); } };
-    if (document.fonts && document.fonts.load) document.fonts.load('900 40px "Big Shoulders Display"').then(go, go);
-    setTimeout(go, 1200);
+    const waitFonts = () => { if (document.fonts && document.fonts.load) document.fonts.load('900 40px "Big Shoulders Display"').then(go, go); else go(); };
+    if (document.readyState === 'complete') setTimeout(waitFonts, 50); else window.addEventListener('load', () => setTimeout(waitFonts, 50));
+    setTimeout(go, 1500);
     window.addEventListener('resize', () => GX.resize());
     if (window.ResizeObserver) new ResizeObserver(() => GX.resize()).observe(document.body);
     document.addEventListener('visibilitychange', () => { if (document.hidden) GAME.pause(); });
@@ -184,6 +202,15 @@
     };
     SV.initCloud();
     requestAnimationFrame(frame);
+    window.FG_BOOTED = true;
+    const bt = $('#boot');
+    if (bt) { bt.classList.add('done'); setTimeout(() => bt.remove(), 600); }
+    let lastErr = 0;
+    window.addEventListener('error', (e) => {
+      if (performance.now() - lastErr < 4000) return;
+      lastErr = performance.now();
+      UI.toast('Something went wrong: ' + (e.message || 'unknown error'), 'warn');
+    });
   }
 
   FG.game = GAME;

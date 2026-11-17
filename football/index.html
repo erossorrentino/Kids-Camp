@@ -9,7 +9,7 @@
 <!-- page:start -->
 <title>Gridiron Kings</title>
 <meta name="claude:viewport-fit-sides" content="cover">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&family=Big+Shoulders+Display:wght@700;800;900&display=swap">
+<style>html, body { background: #060a14; color: #f2f5ff; }</style>
 <link rel="stylesheet" href="css/style.css">
 
 <canvas id="gl" aria-label="Football stadium"></canvas>
@@ -56,6 +56,24 @@
 <div id="fade"></div>
 <div id="overlay" class="overlay" hidden></div>
 <div id="toasts" aria-live="polite"></div>
+<div id="boot" class="boot"><i class="brand-mark"></i><b>Gridiron Kings</b><span id="bootMsg">Loading the stadium…</span></div>
+<script>
+  // fonts load in the background so a slow font server can never leave the page blank
+  (function () {
+    function fonts() {
+      var f = document.createElement('link');
+      f.rel = 'stylesheet';
+      f.href = 'https://fonts.googleapis.com/css2?family=Barlow+Semi+Condensed:wght@400;500;600;700&family=Big+Shoulders+Display:wght@700;800;900&display=swap';
+      document.head.appendChild(f);
+    }
+    if (document.readyState === 'complete') fonts(); else window.addEventListener('load', fonts);
+    window.addEventListener('error', function (e) {
+      if (window.FG_BOOTED) return;
+      var m = document.getElementById('bootMsg');
+      if (m) m.textContent = 'Something went wrong while loading: ' + (e.message || 'unknown error') + '. Try reloading the page.';
+    });
+  })();
+</script>
 <noscript><p style="padding:24px">Gridiron Kings needs JavaScript to run.</p></noscript>
 
 <script src="vendor/three.min.js"></script>
