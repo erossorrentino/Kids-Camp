@@ -562,3 +562,27 @@ html { background: var(--night); }
 .gfxinfo { font-size: 13px; overflow-wrap: anywhere; }
 .gfxinfo-big { margin: 12px 0; padding: 10px 12px; border-radius: 10px; background: var(--night); border: 1px solid var(--line); font-weight: 600; overflow-wrap: anywhere; user-select: text; -webkit-user-select: text; }
 #gl { background: var(--night); }
+
+/* ---------- numbered throw buttons ---------- */
+.throwbar { position: absolute; left: 50%; bottom: 86px; transform: translateX(-50%); z-index: 3; display: flex; gap: 8px; width: max-content; max-width: calc(100vw - 16px); pointer-events: auto; }
+.throwbar .tbtn { flex: none; }
+.tbtn { position: relative; width: 70px; height: 70px; padding: 4px 2px; border-radius: 16px; border: 3px solid var(--c); background: rgba(6, 10, 20, 0.88); color: var(--chalk); display: grid; justify-items: center; align-content: center; gap: 1px; touch-action: none; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45); transition: transform 0.1s ease, opacity 0.2s ease; }
+.tbtn b { font-family: var(--display); font-weight: 900; font-size: 30px; line-height: 0.85; color: var(--c); }
+.tbtn .tpos { font-size: 11px; font-weight: 700; letter-spacing: 0.08em; line-height: 1.1; }
+.tbtn .tname { font-style: normal; font-size: 10px; color: var(--mute); max-width: 62px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 1.1; }
+.tbtn::after { content: ""; position: absolute; top: 5px; right: 5px; width: 10px; height: 10px; border-radius: 50%; background: transparent; }
+.tbtn[data-open="open"] { box-shadow: 0 0 0 3px var(--turf), 0 0 18px rgba(37, 199, 111, 0.75); }
+.tbtn[data-open="open"]::after { background: var(--turf); }
+.tbtn[data-open="tight"]::after { background: var(--flood); }
+.tbtn[data-open="covered"]::after { background: var(--alert); }
+.tbtn:disabled { opacity: 0.3; border-style: dashed; cursor: default; }
+.tbtn.down { transform: scale(0.92); background: color-mix(in srgb, var(--c) 35%, rgba(6, 10, 20, 0.9)); }
+.throwbar.preview .tbtn { opacity: 0.72; }
+.throwbar.preview .tbtn:disabled { opacity: 0.25; }
+.rcv.dim { opacity: 0.6; }
+.rcv[data-open="open"] { box-shadow: 0 0 0 3px var(--turf), 0 0 16px rgba(37, 199, 111, 0.8); }
+.rcv[data-open="covered"] { opacity: 0.8; }
+.throwbar.bar-touch { bottom: 188px; }
+@media (orientation: landscape) and (pointer: coarse) { .throwbar.bar-touch { bottom: 12px; } .throwbar.bar-touch .tbtn { width: 62px; height: 62px; } }
+@media (max-width: 400px) { .tbtn { width: 60px; height: 64px; } .tbtn b { font-size: 26px; } .throwbar { gap: 6px; } }
+@media (max-height: 470px) { .keys { display: none; } .throwbar { bottom: 14px; } }

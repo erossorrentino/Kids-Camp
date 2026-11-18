@@ -428,7 +428,7 @@
   UI.howTo = function (inMatch) {
     const touch = FG.input.usedTouch || matchMedia('(pointer: coarse)').matches;
     const rows = touch
-      ? [['Play call', 'Tap a play card. Each card shows where everyone runs'], ['Snap', 'Tap SNAP to start the play'], ['Throw', 'Tap a receiver\'s bubble on the field, or THROW for the most open man'], ['Run', 'Steer with your left thumb. Push to the edge to sprint. JUKE and SPIN dodge tacklers'], ['Defense', 'TACKLE dives at the ball carrier. SWITCH jumps to the defender nearest the ball']]
+      ? [['Play call', 'Tap a play card. Each card shows where everyone runs'], ['Snap', 'Tap SNAP to start the play'], ['Throw', 'Tap a number button (1 to 5) to throw to that receiver. Green means open. BEST throws to the most open man'], ['Run', 'Steer with your left thumb. Push to the edge to sprint. JUKE and SPIN dodge tacklers'], ['Defense', 'TACKLE dives at the ball carrier. SWITCH jumps to the defender nearest the ball']]
       : [['1 – 8', 'Pick a play on the play-call screen'], ['Space', 'Snap the ball. Throw to the most open receiver. Spin when running. Tackle on defense'], ['1 – 5', 'Throw to that receiver (the colored bubbles)'], ['WASD or arrows', 'Move. Hold Shift to sprint'], ['X', 'Juke when running. Switch defender on defense'], ['C', 'Throw the ball away'], ['Esc', 'Pause']];
     UI.modal(`<p class="eyebrow">How to play</p><h2>Controls</h2><dl class="howto">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
       <p class="hint">You always attack up the field. Four downs to gain 10 yards. A touchdown is 6 points plus an automatic extra point; a field goal is 3. If you leave the stick alone, your player runs on his own.</p>
@@ -542,6 +542,9 @@
     $('#touch').hidden = !touch;
     $('#keysHelp').hidden = touch;
     $('#recv').innerHTML = P.RECV_ORDER.map((r, i) => `<button class="rcv" data-act="throw" data-i="${i}" style="--c:${RECV_COLORS[i]}" hidden><b>${i + 1}</b></button>`).join('');
+    $('#throwBar').innerHTML = P.RECV_ORDER.map((r, i) => `<button class="tbtn" type="button" data-act="throw" data-i="${i}" style="--c:${RECV_COLORS[i]}" aria-label="Throw to receiver ${i + 1}"><b>${i + 1}</b><span class="tpos"></span><i class="tname"></i></button>`).join('');
+    $('#throwBar').classList.toggle('bar-touch', touch);
+    H.openT = 0; H.open = [];
   };
   UI.hudStop = function () { $('#hud').hidden = true; H.m = null; };
   UI.banner = function (text, sub, ms) {
@@ -601,10 +604,10 @@
     const qbLive = m.state === 'live' && c && car === c && c.job === 'qb';
     if (m.state === 'presnap') {
       if (m.play && m.play.id === 'fg' && uo) { b = 'KICK'; help = '<span><b>Space</b> kick when the needle is in the middle</span>'; }
-      else if (uo && !m.play.special) { b = 'SNAP'; help = '<span><b>Space</b> snap</span><span><b>1–5</b> throw to a receiver after the snap</span>'; }
+      else if (uo && !m.play.special) { b = 'SNAP'; help = '<span><b>Space</b> snap</span><span>After the snap, press <b>1–5</b> or tap a number to throw to that receiver</span>'; }
       else if (!uo) { a = 'SWITCH'; help = '<span><b>X</b> change player</span><span><b>WASD</b> move before the snap</span>'; }
     } else if (m.state === 'live') {
-      if (qbLive) { b = 'THROW'; cc = 'AWAY'; help = '<span><b>1–5</b> throw to that receiver</span><span><b>Space</b> most open</span><span><b>C</b> throw away</span><span><b>WASD</b> scramble</span>'; }
+      if (qbLive) { b = 'BEST'; cc = 'AWAY'; help = '<span><b>1–5</b> or click a number to throw to him</span><span><b>Space</b> most open</span><span><b>C</b> throw away</span><span><b>WASD</b> scramble</span>'; }
       else if (car && car.team.idx === m.user && car.job === 'carry') { a = 'JUKE'; b = 'SPIN'; help = '<span><b>WASD</b> run</span><span><b>Shift</b> sprint</span><span><b>X</b> juke</span><span><b>Space</b> spin</span>'; }
       else if (!uo || m.turn) { a = 'SWITCH'; b = m.ball.state === 'air' ? 'SWAT' : 'TACKLE'; help = '<span><b>WASD</b> move</span><span><b>Space</b> ' + (m.ball.state === 'air' ? 'jump for the ball' : 'dive tackle') + '</span><span><b>X</b> switch player</span>'; }
     }
@@ -618,18 +621,47 @@
     const showKick = m.state === 'presnap' && uo && m.play && m.play.id === 'fg';
     if (km.hidden === showKick) km.hidden = !showKick;
     if (showKick) $('#kickNeedle').style.left = (m.meterV * 100).toFixed(1) + '%';
-    // receiver bubbles
+    // receiver bubbles over the players, and the numbered throw buttons
     const R = m.offT().role, G = FG.gfx;
-    const showR = qbLive && !m.passed;
+    const passPlay = m.play && m.play.type === 'pass' && !m.play.special;
+    const preview = m.state === 'presnap' && uo && passPlay;
+    const showR = (qbLive && !m.passed) || preview;
+    // how open each receiver is, refreshed a few times a second
+    H.openT -= 1 / 60;
+    if (qbLive && !m.passed && H.openT <= 0) {
+      H.openT = 0.15;
+      P.RECV_ORDER.forEach((role, i) => { const p = R[role]; H.open[i] = p && (p.job === 'route' || p.job === 'attack') ? m.openness(c, p) : null; });
+    } else if (!qbLive) H.open = [];
+    const eligible = (p, role) => p && p.onField && (preview ? m.play.routes[role] && m.play.routes[role] !== 'block' : p.job === 'route' || p.job === 'attack');
+    const openState = (o) => (o == null ? '' : o > 0 ? 'open' : o > -0.3 ? 'tight' : 'covered');
     $$('#recv .rcv').forEach((el, i) => {
-      const p = R[P.RECV_ORDER[i]];
-      const ok = showR && p && p.onField && (p.job === 'route' || p.job === 'attack');
-      if (!ok) { if (!el.hidden) el.hidden = true; return; }
+      const role = P.RECV_ORDER[i], p = R[role];
+      if (!showR || !eligible(p, role)) { if (!el.hidden) el.hidden = true; return; }
       const pr = G.project(p.x, 2.9, p.z);
       if (!pr.vis) { el.hidden = true; return; }
       el.hidden = false;
+      el.classList.toggle('dim', preview);
+      el.dataset.open = openState(H.open[i]);
       el.style.transform = `translate(${pr.x.toFixed(0)}px, ${pr.y.toFixed(0)}px)`;
     });
+    const bar = $('#throwBar');
+    if (bar.hidden === showR) bar.hidden = !showR;
+    if (showR) {
+      bar.classList.toggle('preview', preview);
+      $$('.tbtn', bar).forEach((el, i) => {
+        const role = P.RECV_ORDER[i], p = R[role];
+        const ok = !!eligible(p, role);
+        if (el.disabled === ok) el.disabled = !ok;
+        const key = p ? p.card.id + (ok ? '1' : '0') : '-';
+        if (el.dataset.k !== key) {
+          el.dataset.k = key;
+          $('.tpos', el).textContent = !p ? '' : ok ? (role === 'SL' ? 'SLOT' : p.pos) : 'BLOCK';
+          $('.tname', el).textContent = p ? p.card.last : '';
+        }
+        const st = ok ? openState(H.open[i]) : '';
+        if (el.dataset.open !== st) el.dataset.open = st;
+      });
+    }
   };
 
   /* ---------- actions ---------- */
@@ -723,9 +755,10 @@
   });
   // receiver bubbles respond on touch-down, not click, so a throw never waits for finger-up
   document.addEventListener('pointerdown', (e) => {
-    const el = e.target.closest('.rcv');
-    if (!el) return;
+    const el = e.target.closest('.rcv, .tbtn');
+    if (!el || el.disabled) return;
     FG.input.state.throwTo = +el.dataset.i;
+    el.classList.add('down'); setTimeout(() => el.classList.remove('down'), 160);
     e.preventDefault();
   });
 

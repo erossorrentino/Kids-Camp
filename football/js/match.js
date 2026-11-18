@@ -568,13 +568,13 @@
         if (r < p) this.completeCatch(rec); else this.deflect(rec, 'drop');
       } else if (rec && def) {
         const ds = (def.e.cov / 99) * def.team.ai.cover + swat + (dd < rd ? 0.12 : 0);
-        const pInt = (0.05 + 0.1 * ds) * (def.pos === 'DL' ? 0.3 : 1);
+        const pInt = (0.03 + 0.065 * ds) * (def.pos === 'DL' ? 0.3 : 1);
         const pBreak = clamp(0.18 + 0.34 * ds - 0.22 * (rec.e.cth / 99), 0.05, 0.6);
         if (r < pInt) this.intercept(def);
         else if (r < pInt + pBreak) this.deflect(def, 'breakup');
         else this.completeCatch(rec, true);
       } else {
-        const pInt = 0.2 + (def.e.cov / 99) * 0.3 + swat + (def.e.cth / 99) * 0.15;
+        const pInt = 0.1 + (def.e.cov / 99) * 0.16 + swat + (def.e.cth / 99) * 0.06;
         if (r < pInt * (def.pos === 'DL' ? 0.4 : 1)) this.intercept(def); else this.deflect(def, 'breakup');
       }
     }
