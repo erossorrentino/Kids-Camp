@@ -224,7 +224,7 @@ function makeFloorMat() {
       .replace('#include <tonemapping_fragment>', `
         if (reflStr > 0.0) {
           vec2 ruv = vReflUv.xy / vReflUv.w + (normal.xy - geometryNormal.xy) * 0.035;
-          float blur = 0.8 + roughnessFactor * 4.0;
+          float blur = 0.45 + roughnessFactor * 2.4;
           vec3 rc = vec3(0.0); float tot = 0.0;
           for (int i = -4; i <= 4; i++) {
             float fi = float(i); float w = exp(-fi * fi / 10.0);
@@ -232,7 +232,7 @@ function makeFloorMat() {
           }
           rc /= tot;
           float fres = pow(1.0 - clamp(dot(normalize(normal), normalize(vViewPosition)), 0.0, 1.0), 3.0);
-          float k = clamp(reflStr * (0.1 + 0.55 * fres) * clamp(1.35 - roughnessFactor * 1.2, 0.0, 1.0), 0.0, 0.62);
+          float k = clamp(reflStr * (0.12 + 0.6 * fres) * clamp(1.4 - roughnessFactor * 1.2, 0.0, 1.0), 0.0, 0.68);
           gl_FragColor.rgb = mix(gl_FragColor.rgb, rc, k);
         }
         #include <tonemapping_fragment>`);
@@ -1063,7 +1063,18 @@ function buildHoops() {
     const mats = s > 0 ? [padM, front, padM, padM, padM, padM] : [front, padM, padM, padM, padM, padM];
     const base = new THREE.Mesh(new THREE.BoxGeometry(5, 4.4, 6.4), mats);
     base.position.set(s * 53.6, 2.2, 0); base.castShadow = true; grp.add(base);
-    const post = new THREE.Mesh(new THREE.BoxGeometry(1.1, 9.5, 1.1), padM);
+    if (!R.postT) {
+      // the stanchion post carries a stacked promo, the base a sponsor wordmark
+      const pc = mkCanvas(128, 640), pg = pc.getContext('2d');
+      pg.fillStyle = '#121419'; pg.fillRect(0, 0, 128, 640);
+      pg.fillStyle = '#ffffff'; pg.textAlign = 'center'; pg.textBaseline = 'middle';
+      [['GET', 120], ['THE', 225], ['APP', 330]].forEach(([t, y]) => { pg.font = `900 italic 74px ${FONT_D}`; pg.fillText(t, 64, y); });
+      pg.fillStyle = '#ff7a1a'; pg.fillRect(24, 400, 80, 6);
+      pg.font = `800 22px ${FONT_D}`; pg.fillStyle = '#c9ced8'; pg.fillText('HARDWOOD', 64, 440); pg.fillText('KINGS', 64, 466);
+      R.postT = canvasTex(pc);
+    }
+    const postFront = stdMat('#ffffff', 0.7, { map: R.postT });
+    const post = new THREE.Mesh(new THREE.BoxGeometry(1.1, 9.5, 1.1), s > 0 ? [padM, postFront, padM, padM, padM, padM] : [postFront, padM, padM, padM, padM, padM]);
     post.position.set(s * 52.6, 8.9, 0); post.castShadow = true; grp.add(post);
     const arm = new THREE.Mesh(new THREE.BoxGeometry(10, 0.9, 0.9), padM);
     arm.position.set(s * 48.3, 12.9, 0); arm.rotation.z = s * -0.24; arm.castShadow = true; grp.add(arm);
@@ -1123,9 +1134,16 @@ function buildHoops() {
 }
 function drawPad(h, T) {
   const c = h.padC, g = c.getContext('2d');
-  const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, shade(T.c1, -0.1)); gr.addColorStop(1, shade(T.c1, -0.45));
+  const gr = g.createLinearGradient(0, 0, 0, 256); gr.addColorStop(0, '#1c2028'); gr.addColorStop(1, '#0b0d11');
   g.fillStyle = gr; g.fillRect(0, 0, 512, 256);
-  drawEmblem(g, T, 256, 128, 100);
+  g.fillStyle = T.c1; g.fillRect(0, 0, 512, 14);
+  // padded seams
+  g.strokeStyle = 'rgba(255,255,255,0.05)'; g.lineWidth = 3; for (const x of [128, 256, 384]) { g.beginPath(); g.moveTo(x, 14); g.lineTo(x, 256); g.stroke(); }
+  // fictional sponsor wordmark, a different one at each end
+  g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#ffffff';
+  if (h.s > 0) { g.font = `900 italic 112px ${FONT_D}`; g.fillText('RIVERTON', 256, 132); g.fillStyle = '#c4161c'; g.fillRect(150, 196, 212, 8); }
+  else { g.font = `900 italic 120px ${FONT_D}`; g.fillText('VOLTA', 256, 126); g.fillStyle = '#7dff3a'; g.font = `800 34px ${FONT_D}`; g.fillText('CHARGE UP', 256, 200); }
+  drawEmblem(g, T, 470, 214, 30);
   h.padT.needsUpdate = true;
 }
 function drawShotClock(h, v) {

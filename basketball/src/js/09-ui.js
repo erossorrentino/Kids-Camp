@@ -306,17 +306,23 @@ function updateHUD(rdt) {
   else {
     const T0 = G.teams[0], T1 = G.teams[1];
     [[$('#bugA'), T1], [$('#bugB'), T0]].forEach(([el, T]) => {
-      if (el.dataset.t !== T.def.id + T.def.c1) {
-        el.dataset.t = T.def.id + T.def.c1;
-        el.style.setProperty('--tc', T.def.c1);
+      // each block wears the team's uniform colour for this game: the home side in its primary, the away side in white
+      const home = T.idx === 0, key = T.def.id + T.def.c1 + home;
+      if (el.dataset.t !== key) {
+        el.dataset.t = key;
+        const c = home ? T.def.c1 : '#e7e8ec', col = new THREE.Color(c), lum = col.r * 0.3 + col.g * 0.55 + col.b * 0.15;
+        el.style.setProperty('--tc', c);
+        el.classList.toggle('light', lum > 0.55);
         $('.em', el).src = emblemURL(T.def);
-        $('.ab', el).textContent = T.def.city;
+        $('.ab', el).textContent = T.def.id;
       }
       const fl = Math.min(5, T.fouls), dots = $$('.fl i', el);
       dots.forEach((d, i) => d.classList.toggle('on', i < fl));
+      $('.fl', el).classList.toggle('bonus', T.fouls >= 5);
       const sc = $('.sc', el), v = String(T.score);
       if (sc.textContent !== v) { sc.textContent = v; sc.classList.remove('flash'); void sc.offsetWidth; sc.classList.add('flash'); }
-      setTxt($('.bonus', el), G.teams[1 - T.idx].fouls >= 5 ? 'BONUS' : '');
+      const bonus = G.teams[1 - T.idx].fouls >= 5, fe = $('.fls', el);
+      setTxt(fe, bonus ? 'FLS ' + T.fouls + ' • BONUS' : 'FLS ' + T.fouls); fe.classList.toggle('bonus', bonus);
       el.classList.toggle('has', G.offense === T.idx && (G.state === 'live' || G.state === 'dead'));
     });
     setTxt($('#bugQ'), qLabel());
@@ -410,9 +416,9 @@ function updateMeter(rdt) {
   if (active) {
     APP.meterHold = 0.7; APP.meterP = c;
     const full = S.ideal * 1.25;
-    $('.fill', m).style.height = clamp(c.actT / full, 0, 1) * 100 + '%';
+    $('.fill', m).style.strokeDasharray = (clamp(c.actT / full, 0, 1) * 100).toFixed(2) + ' 100';
     const w = S.win / full * 100, ctr = S.ideal / full * 100;
-    const win = $('.win', m); win.style.bottom = (ctr - w) + '%'; win.style.height = (2 * w) + '%';
+    const win = $('.win', m); win.style.strokeDasharray = (2 * w).toFixed(2) + ' 100'; win.style.strokeDashoffset = (-(ctr - w)).toFixed(2);
     m.className = '';
   } else if (APP.meterHold > 0) APP.meterHold -= rdt;
   const vis = active || APP.meterHold > 0;
@@ -420,7 +426,7 @@ function updateMeter(rdt) {
   if (vis && APP.meterP) {
     const p = APP.meterP;
     const s = projectToScreen(p.x, p.y + p.hgt * 0.75, p.z);
-    m.style.left = (s.x + 34) + 'px'; m.style.top = (s.y - 60) + 'px';
+    m.style.left = (s.x - 78) + 'px'; m.style.top = (s.y - 70) + 'px';
   }
 }
 function updateTPHud() {

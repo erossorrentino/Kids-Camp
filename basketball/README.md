@@ -116,18 +116,21 @@ Phones and tablets get an on-screen joystick and buttons.
   and in creases, plus self-shadowing on the players and a light sharpening
   pass for a crisp broadcast picture.
 - Courtside LED boards rotate through ads for made-up sponsors and home-team
-  promos with an LED wipe every few seconds.
+  promos with an LED wipe every few seconds; the stanchions carry sponsor pads and
+  a stacked promo, and the glossy floor mirrors all of it.
 - Three referees, coaches, photographers and courtside fans.
 - Defenders guard in a wide, low stance with their arms out over the passing lanes.
 - Broadcast presentation: a starting-lineups intro with 3D player cards,
   instant replays of big dunks and threes (logo wipe, slow motion, cinematic
   camera, skippable), pop-up stat graphics for hot players, and a
   player-of-the-game portrait.
-- In-game HUD: a stacked scorebug at the bottom right (team logos, city names,
-  scores, foul dots, bonus, possession, quarter, clock, shot clock), your player's
-  name and stamina bar at the bottom centre, and a live panel at the top right with
-  their points, rebounds, assists and FG% plus a running letter grade (A+ to F) for
-  your team's play.
+- In-game HUD: a broadcast scorebug across the top, with each team's block in the
+  colour of the uniform it is wearing (vertical abbreviation, logo, big score, team
+  fouls with foul dashes, bonus and possession) either side of a centre block with
+  the game clock, quarter and shot clock; your player's name and stamina bar at the
+  bottom centre; a curved shot meter beside the shooter; and a live panel at the top
+  right with their points, rebounds, assists and FG% plus a running letter grade
+  (A+ to F) for your team's play.
 - Skin with a warm subsurface-style scatter, muscle definition on the limbs,
   sculpted faces, and jerseys whose hem swings with momentum.
 - Fans hold up signs on big moments, courtside rows clap, and bright lights

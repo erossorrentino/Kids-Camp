@@ -132,7 +132,7 @@ function resizeRender() {
   const bw = Math.max(2, Math.floor(w * R.dpr)), bh = Math.max(2, Math.floor(h * R.dpr));
   resizePost(bw, bh);
   resizeDof(bw, bh);
-  const rs = R.quality === 'high' ? 0.5 : 0.33;
+  const rs = R.quality === 'high' ? 0.7 : 0.4;
   R.reflRT.setSize(Math.max(2, Math.floor(bw * rs)), Math.max(2, Math.floor(bh * rs)));
   if (R.floorU) R.floorU.reflTexel.value.set(1 / R.reflRT.width, 1 / R.reflRT.height);
 }
