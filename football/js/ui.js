@@ -402,6 +402,7 @@
       <div class="kits">${D.KITS.map((k, i) => `<button class="kit${i === s.club.kit ? ' on' : ''}" data-act="set-kit" data-v="${i}" aria-label="${k.name} uniform" style="--k1:${k.c1};--k2:${k.c2};--k3:${k.helm}"><i></i></button>`).join('')}</div>
       <p class="label">Quarter length</p>${seg('set-qtr', st.qtr, [[2, '2 min'], [3, '3 min'], [4, '4 min']])}
       <p class="label">Sound</p>${seg('set-sound', st.sound ? 1 : 0, [[1, 'On'], [0, 'Off']])}
+      <p class="label">Announcer voice</p>${seg('set-voice', st.voice === false ? 0 : 1, [[1, 'On'], [0, 'Off']])}
       <p class="label">Graphics</p>${seg('set-quality', st.quality, [[1, 'High'], [0, 'Fast']])}
       <p class="label">Auto-switch defender</p>${seg('set-auto', st.autoSwitch ? 1 : 0, [[1, 'On'], [0, 'Off']])}
       ${graphicsInfoHtml()}
@@ -428,10 +429,10 @@
   UI.howTo = function (inMatch) {
     const touch = FG.input.usedTouch || matchMedia('(pointer: coarse)').matches;
     const rows = touch
-      ? [['Play call', 'Tap a play card. Each card shows where everyone runs'], ['Snap', 'Tap SNAP to start the play'], ['Throw', 'Tap a number button (1 to 5) to throw to that receiver. Green means open. BEST throws to the most open man'], ['Run', 'Steer with your left thumb. Push to the edge to sprint. JUKE and SPIN dodge tacklers'], ['Defense', 'TACKLE dives at the ball carrier. SWITCH jumps to the defender nearest the ball']]
-      : [['1 – 8', 'Pick a play on the play-call screen'], ['Space', 'Snap the ball. Throw to the most open receiver. Spin when running. Tackle on defense'], ['1 – 5', 'Throw to that receiver (the colored bubbles)'], ['WASD or arrows', 'Move. Hold Shift to sprint'], ['X', 'Juke when running. Switch defender on defense'], ['C', 'Throw the ball away'], ['Esc', 'Pause']];
+      ? [['Play call', 'Pick a formation tab, then tap a play. Coach Picks are the best plays for this down'], ['Hot route', 'Before the snap, tap a number button to change that receiver\'s route'], ['Snap', 'Tap SNAP to start the play. Watch the play clock'], ['Throw', 'Tap a number button for a soft touch pass. Hold it for a fast bullet pass. Green means open. BEST throws to the most open man'], ['Run', 'Steer with your left thumb. JUKE and SPIN dodge tacklers. TRUCK runs them over'], ['Defense', 'TACKLE dives at the ball carrier. HIT is a big hit stick. SWITCH jumps to the defender nearest the ball']]
+      : [['1 – 8', 'Pick a play on the play-call screen. Left and right arrows change the formation tab'], ['1 – 5 before the snap', 'Hot route: change that receiver\'s route, then pick the new route with 1 – 9'], ['Space', 'Snap the ball. Throw to the most open receiver. Spin when running. Tackle on defense'], ['1 – 5 after the snap', 'Tap the key for a touch pass, hold it for a bullet pass'], ['WASD or arrows', 'Move. Hold Shift to sprint'], ['X', 'Juke when running. Switch defender on defense'], ['C', 'Throw it away as the QB. Truck when running. Big hit on defense'], ['Esc', 'Pause']];
     UI.modal(`<p class="eyebrow">How to play</p><h2>Controls</h2><dl class="howto">${rows.map(([k, v]) => `<dt>${k}</dt><dd>${v}</dd>`).join('')}</dl>
-      <p class="hint">You always attack up the field. Four downs to gain 10 yards. A touchdown is 6 points plus an automatic extra point; a field goal is 3. If you leave the stick alone, your player runs on his own.</p>
+      <p class="hint">You always attack up the field. Four downs to gain 10 yards. Snap before the play clock hits zero or it is a 5-yard penalty. A touchdown is 6 points plus an automatic extra point; a field goal is 3. If you leave the stick alone, your player runs on his own.</p>
       ${inMatch ? '<button class="btn btn-play" data-act="resume">Back to the game</button>' : ''}`);
   };
   UI.onboard = function () {
@@ -485,12 +486,12 @@
     P.RECV_ORDER.forEach((role, i) => {
       const rt = pl.routes && pl.routes[role];
       if (!rt || rt === 'block' || pl.type === 'run') return;
-      const [f0, s0] = F[role], side = role === 'RB' ? 1 : Math.sign(s0) || 1;
+      const [f0, s0] = F[role], side = role === 'RB' && Math.abs(s0) < 3 ? 1 : Math.sign(s0) || 1;
       const pts = [[f0, s0]].concat(P.ROUTES[rt].pts.map(([f, o]) => [f0 + f, s0 + o * side]));
       routes.push(`<polyline points="${polyline(pts)}" stroke="${RECV_COLORS[i]}" marker-end="url(#ah${i})"/>`);
     });
     if (pl.type === 'run') {
-      const [f0, s0] = F.RB;
+      const [f0, s0] = pl.sneak ? F.QB : F.RB;
       routes.push(`<polyline points="${polyline([[f0, s0], [-1.5, pl.hole * 0.5], [6, pl.hole]])}" stroke="#ffd23f" stroke-width="2.4" marker-end="url(#ah0)"/>`);
     }
     if (pl.special) {
@@ -534,11 +535,16 @@
   UI.hudStart = function (m, kits) {
     H.m = m; H.kits = kits; H.cache = {};
     $('#hud').hidden = false;
-    $('#sbHome').innerHTML = `<i style="background:${kits[0].c1}"></i><span>${esc(m.teams[0].short)}</span><b id="sbS0">0</b>`;
-    $('#sbAway').innerHTML = `<i style="background:${kits[1].c1}"></i><span>${esc(m.teams[1].short)}</span><b id="sbS1">0</b>`;
+    const ink = (c) => (U.lum(c) > 0.55 ? '#0b0f1a' : '#ffffff');
+    const crest = (i) => `<i class="sb-crest" style="--tc:${kits[i].c1};--ti:${ink(kits[i].c1)}">${esc(m.teams[i].name[0])}</i>`;
+    $('#sbHome').innerHTML = `${crest(0)}<span class="sb-abbr">${esc(m.teams[0].short)}</span><b id="sbS0">0</b>`;
+    $('#sbAway').innerHTML = `<b id="sbS1">0</b><span class="sb-abbr">${esc(m.teams[1].short)}</span>${crest(1)}`;
+    $('#sbHome').style.setProperty('--tc', kits[0].c1); $('#sbAway').style.setProperty('--tc', kits[1].c1);
+    H.ink = ink; UI.hideHot(); $('#caption').hidden = true; $('#replayBadge').hidden = true; $('#prePlate').hidden = true; $('#ctrlTag').hidden = true;
     $('#banner').hidden = true; $('#bigFx').hidden = true; $('#kick').hidden = true; $('#playcall').hidden = true; $('#snapPrompt').hidden = true; $('#resultLine').hidden = true;
     const touch = matchMedia('(pointer: coarse)').matches || FG.input.usedTouch;
     H.touch = touch;
+    $('#hud').classList.toggle('is-touch', touch);
     $('#touch').hidden = !touch;
     $('#keysHelp').hidden = touch;
     $('#recv').innerHTML = P.RECV_ORDER.map((r, i) => `<button class="rcv" data-act="throw" data-i="${i}" style="--c:${RECV_COLORS[i]}" hidden><b>${i + 1}</b></button>`).join('');
@@ -569,16 +575,43 @@
     clearTimeout(H.rT); H.rT = setTimeout(() => { el.hidden = true; }, 2100);
   };
   UI.clearResult = function () { clearTimeout(H.rT); $('#resultLine').hidden = true; };
-  UI.showPlaycall = function (m) {
+  const CAT_NAME = { run: 'Run', power: 'Short yardage', quick: 'Quick pass', mid: 'Pass', deep: 'Deep pass', pa: 'Play action', screen: 'Screen', zone: 'Zone', man: 'Man', blitz: 'Blitz', prevent: 'Prevent' };
+  const FORM_NAME = {};
+  P.FORM_TABS.forEach(([id, n]) => (FORM_NAME[id] = n));
+  function playTag(pl) {
+    if (pl.special) return 'Special teams';
+    if (pl.rush) return pl.cat === 'run' ? 'Run defense' : CAT_NAME[pl.cat];
+    return FORM_NAME[pl.form] + ' · ' + CAT_NAME[pl.cat];
+  }
+  UI.showPlaycall = function (m, keepTab) {
     const off = m.userOnOffense();
-    const list = off ? P.OFF.concat(m.down === 4 ? P.SPECIAL : []) : P.DEF;
-    const fgInfo = m.down === 4 ? ` · Field goal from ${m.fgDistance()} yards${m.fgDistance() > m.fgRange() ? ' (out of range)' : ''}` : '';
+    if (!keepTab) { H.pcTab = 'coach'; H.picks = m.coachPicks(); }
+    const tabs = [['coach', 'Coach Picks']].concat(off ? P.FORM_TABS : P.DEF_TABS);
+    if (off && m.down === 4) tabs.push(['special', 'Special Teams']);
+    let list;
+    if (H.pcTab === 'coach') { list = H.picks.slice(); if (off && m.down === 4) P.SPECIAL.forEach((sp) => { if (!list.includes(sp)) list.push(sp); }); }
+    else if (H.pcTab === 'special') list = P.SPECIAL;
+    else if (off) list = P.OFF.filter((p) => p.form === H.pcTab);
+    else list = P.DEF.filter((p) => p.cat === H.pcTab || (H.pcTab === 'run' && p.cat === 'prevent'));
+    const fgInfo = m.down === 4 && off ? ` · Field goal from ${m.fgDistance()} yards${m.fgDistance() > m.fgRange() ? ' (out of range)' : ''}` : '';
     const el = $('#playcall');
     el.innerHTML = `<div class="pc-head"><p class="eyebrow">${esc(m.downText())} · Ball on ${esc(m.spotText())}${esc(fgInfo)}</p><h2>${off ? 'Call your play' : 'Call your defense'}</h2></div>
-      <div class="pc-grid${list.length > 8 ? ' ten' : ''}">${list.map((pl, i) => `<button class="pcard${pl.special ? ' special' : ''}" data-act="call" data-v="${pl.id}">${off ? offArt(pl) : defArt(pl)}<b>${esc(pl.name)}</b><span>${esc(pl.tip)}</span>${i < 9 ? `<kbd>${i + 1}</kbd>` : ''}</button>`).join('')}</div>`;
+      <div class="pc-tabs" role="tablist">${tabs.map(([id, name]) => `<button class="pc-tab${id === H.pcTab ? ' on' : ''}${id === 'coach' ? ' coach' : ''}" type="button" role="tab" aria-selected="${id === H.pcTab}" data-act="pc-tab" data-v="${id}">${esc(name)}</button>`).join('')}</div>
+      <div class="pc-grid${list.length > 8 ? ' ten' : ''}">${list.map((pl, i) => `<button class="pcard${pl.special ? ' special' : ''}" data-act="call" data-v="${pl.id}">${off ? offArt(pl) : defArt(pl)}<em class="pc-tag">${esc(playTag(pl))}</em><b>${esc(pl.name)}</b><span>${esc(pl.tip)}</span>${i < 9 ? `<kbd>${i + 1}</kbd>` : ''}</button>`).join('')}</div>`;
     el.hidden = false;
-    H.callList = list.map((p) => p.id);
+    H.callList = list.map((p) => p.id); H.tabs = tabs.map((t) => t[0]);
   };
+  UI.playcallTab = function (dir) {
+    if (!H.m || !H.tabs || $('#playcall').hidden) return false;
+    const i = H.tabs.indexOf(H.pcTab);
+    H.pcTab = H.tabs[(i + dir + H.tabs.length) % H.tabs.length];
+    A.click(); UI.showPlaycall(H.m, true);
+    return true;
+  };
+  window.addEventListener('keydown', (e) => {
+    if (e.code === 'ArrowLeft' || e.code === 'KeyQ') UI.playcallTab(-1);
+    else if (e.code === 'ArrowRight' || e.code === 'KeyE') UI.playcallTab(1);
+  });
   UI.hidePlaycall = function () { $('#playcall').hidden = true; H.callList = null; };
   UI.callByIndex = function (i) { if (H.callList && H.callList[i]) return H.callList[i]; return null; };
 
@@ -595,21 +628,38 @@
     $('#sbHome').classList.toggle('poss', m.poss === 0 && m.state !== 'final');
     $('#sbAway').classList.toggle('poss', m.poss === 1 && m.state !== 'final');
     const mm = Math.floor(m.clock / 60), ss = Math.floor(m.clock % 60);
-    setText('#sbClock', 'Q' + m.quarter + ' ' + mm + ':' + String(ss).padStart(2, '0'));
-    setText('#sbDown', m.state === 'score' ? 'Touchdown' : m.downText());
-    setText('#sbSpot', m.spotText());
+    setText('#sbPoss', m.state === 'final' ? '' : m.poss === 0 ? '\u25C0' : '\u25B6');
+    setText('#sbQ', m.state === 'final' ? 'FINAL' : ['', '1ST', '2ND', '3RD', '4TH'][m.quarter] || 'OT');
+    setText('#sbClock', mm + ':' + String(ss).padStart(2, '0'));
+    const pcOn = (m.state === 'call' || m.state === 'presnap') && m.playClock != null;
+    const pc = pcOn ? Math.ceil(m.playClock) : null, pcTxt = pc == null ? '' : ':' + String(pc).padStart(2, '0');
+    setText('#sbPC', pcTxt);
+    if (H.cache.pcLow !== (pc != null && pc <= 10)) { H.cache.pcLow = pc != null && pc <= 10; $('#sbPC').classList.toggle('low', H.cache.pcLow); $('#ppClock').classList.toggle('low', H.cache.pcLow); }
+    const downTxt = m.state === 'score' ? 'Touchdown' : m.downText();
+    setText('#sbDown', downTxt.toUpperCase());
+    setText('#sbSpot', m.spotText().toUpperCase());
+    // pre-play plate: down and distance with the play clock
+    const pp = $('#prePlate'), showPP = pcOn && !H.replay && $('#playcall').hidden;
+    if (pp.hidden === showPP) pp.hidden = !showPP;
+    if (showPP) {
+      setText('#ppDown', m.downText());
+      setText('#ppClock', pcTxt);
+      setText('#ppState', m.state === 'call' ? 'Play call' : 'Pre-play');
+      const ck = 'c' + m.poss;
+      if (H.cache.ppCrest !== ck) { H.cache.ppCrest = ck; const cr = $('#ppCrest'), k = H.kits[m.poss]; cr.textContent = m.offT().name[0]; cr.style.background = k.c1; cr.style.color = H.ink(k.c1); }
+    }
     // context controls
     const uo = m.userOnOffense(), car = m.carrier(), c = m.ctrl;
     let a = '', b = '', cc = '', help = '';
     const qbLive = m.state === 'live' && c && car === c && c.job === 'qb';
     if (m.state === 'presnap') {
       if (m.play && m.play.id === 'fg' && uo) { b = 'KICK'; help = '<span><b>Space</b> kick when the needle is in the middle</span>'; }
-      else if (uo && !m.play.special) { b = 'SNAP'; help = '<span><b>Space</b> snap</span><span>After the snap, press <b>1–5</b> or tap a number to throw to that receiver</span>'; }
+      else if (uo && !m.play.special) { b = 'SNAP'; help = m.play.type === 'pass' ? '<span><b>Space</b> snap</span><span><b>1–5</b> hot route a receiver</span><span>After the snap: tap a number to throw, hold it for a bullet</span>' : '<span><b>Space</b> snap</span><span>Follow your blockers</span>'; }
       else if (!uo) { a = 'SWITCH'; help = '<span><b>X</b> change player</span><span><b>WASD</b> move before the snap</span>'; }
     } else if (m.state === 'live') {
-      if (qbLive) { b = 'BEST'; cc = 'AWAY'; help = '<span><b>1–5</b> or click a number to throw to him</span><span><b>Space</b> most open</span><span><b>C</b> throw away</span><span><b>WASD</b> scramble</span>'; }
-      else if (car && car.team.idx === m.user && car.job === 'carry') { a = 'JUKE'; b = 'SPIN'; help = '<span><b>WASD</b> run</span><span><b>Shift</b> sprint</span><span><b>X</b> juke</span><span><b>Space</b> spin</span>'; }
-      else if (!uo || m.turn) { a = 'SWITCH'; b = m.ball.state === 'air' ? 'SWAT' : 'TACKLE'; help = '<span><b>WASD</b> move</span><span><b>Space</b> ' + (m.ball.state === 'air' ? 'jump for the ball' : 'dive tackle') + '</span><span><b>X</b> switch player</span>'; }
+      if (qbLive) { b = 'BEST'; cc = 'AWAY'; help = '<span><b>1–5</b> tap for touch, hold for bullet</span><span><b>Space</b> most open</span><span><b>C</b> throw away</span><span><b>WASD</b> scramble</span>'; }
+      else if (car && car.team.idx === m.user && car.job === 'carry') { a = 'JUKE'; b = 'SPIN'; cc = 'TRUCK'; help = '<span><b>WASD</b> run</span><span><b>Shift</b> sprint</span><span><b>X</b> juke</span><span><b>Space</b> spin</span><span><b>C</b> truck</span>'; }
+      else if (!uo || m.turn) { a = 'SWITCH'; b = m.ball.state === 'air' ? 'SWAT' : 'TACKLE'; cc = m.ball.state === 'air' ? '' : 'HIT'; help = '<span><b>WASD</b> move</span><span><b>Space</b> ' + (m.ball.state === 'air' ? 'jump for the ball' : 'dive tackle') + '</span><span><b>C</b> big hit</span><span><b>X</b> switch player</span>'; }
     }
     setBtn('#tbA', a); setBtn('#tbB', b); setBtn('#tbC', cc);
     if (H.cache.help !== help) { H.cache.help = help; $('#keysHelp').innerHTML = help; $('#keysHelp').classList.toggle('empty', !help); }
@@ -633,6 +683,7 @@
       P.RECV_ORDER.forEach((role, i) => { const p = R[role]; H.open[i] = p && (p.job === 'route' || p.job === 'attack') ? m.openness(c, p) : null; });
     } else if (!qbLive) H.open = [];
     const eligible = (p, role) => p && p.onField && (preview ? m.play.routes[role] && m.play.routes[role] !== 'block' : p.job === 'route' || p.job === 'attack');
+    const tappable = (p, role) => (preview ? !!(p && p.onField) : eligible(p, role));
     const openState = (o) => (o == null ? '' : o > 0 ? 'open' : o > -0.3 ? 'tight' : 'covered');
     $$('#recv .rcv').forEach((el, i) => {
       const role = P.RECV_ORDER[i], p = R[role];
@@ -650,18 +701,101 @@
       bar.classList.toggle('preview', preview);
       $$('.tbtn', bar).forEach((el, i) => {
         const role = P.RECV_ORDER[i], p = R[role];
-        const ok = !!eligible(p, role);
+        const ok = tappable(p, role);
         if (el.disabled === ok) el.disabled = !ok;
-        const key = p ? p.card.id + (ok ? '1' : '0') : '-';
+        const rt = preview ? m.play.routes[role] || 'block' : '';
+        const key = p ? p.card.id + (ok ? '1' : '0') + rt : '-';
         if (el.dataset.k !== key) {
           el.dataset.k = key;
-          $('.tpos', el).textContent = !p ? '' : ok ? (role === 'SL' ? 'SLOT' : p.pos) : 'BLOCK';
-          $('.tname', el).textContent = p ? p.card.last : '';
+          el.classList.toggle('blk', rt === 'block');
+          $('.tpos', el).textContent = !p ? '' : preview || eligible(p, role) ? (role === 'SL' ? 'SLOT' : p.pos) : 'BLOCK';
+          $('.tname', el).textContent = !p ? '' : preview ? P.ROUTE_NAME[rt] : p.card.last;
         }
-        const st = ok ? openState(H.open[i]) : '';
+        const st = ok && !preview ? openState(H.open[i]) : '';
         if (el.dataset.open !== st) el.dataset.open = st;
       });
+    } else if (H.hot) UI.hideHot();
+    // name tag under the player you control
+    const tag = $('#ctrlTag');
+    let showTag = !!(c && c.onField && m.user >= 0 && (m.state === 'presnap' || m.state === 'live') && !H.replay);
+    if (showTag) {
+      const pr = G.project(c.x, 0, c.z);
+      if (!pr.vis) showTag = false;
+      else {
+        tag.style.transform = `translate(${pr.x.toFixed(0)}px, ${(pr.y + 16).toFixed(0)}px)`;
+        if (H.cache.tag !== c) { H.cache.tag = c; $('span', tag).textContent = c.card.last.toUpperCase(); }
+      }
     }
+    if (tag.hidden === showTag) tag.hidden = !showTag;
+  };
+
+  /* ---------- hot routes ---------- */
+  function routeIcon(rt) {
+    if (rt === 'block') return '<svg class="ri" viewBox="0 0 34 34" aria-hidden="true"><path d="M17 30V16M10 16H24" stroke="currentColor" stroke-width="3" stroke-linecap="round" fill="none"/></svg>';
+    const def = P.ROUTES[rt];
+    const pts = [[17, 30]].concat(def.pts.map(([f, o]) => [U.clamp(17 + o * 1.05, 3, 31), U.clamp(30 - Math.min(f, 26) * 1.0, 3, 32)]));
+    const d = pts.map(([x, y], k) => (k ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1)).join('');
+    const [ex, ey] = pts[pts.length - 1], [px, py] = pts[pts.length - 2];
+    const a = Math.atan2(ey - py, ex - px), h = 5;
+    const head = `M${(ex - h * Math.cos(a - 0.5)).toFixed(1)} ${(ey - h * Math.sin(a - 0.5)).toFixed(1)}L${ex.toFixed(1)} ${ey.toFixed(1)}L${(ex - h * Math.cos(a + 0.5)).toFixed(1)} ${(ey - h * Math.sin(a + 0.5)).toFixed(1)}`;
+    return `<svg class="ri" viewBox="0 0 34 34" aria-hidden="true"><path d="${d}" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/><path d="${head}" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" fill="none"/></svg>`;
+  }
+  UI.openHot = function (i) {
+    const m = H.m;
+    if (!m || m.state !== 'presnap' || !m.userOnOffense() || !m.play || m.play.type !== 'pass' || m.play.special) return false;
+    const role = P.RECV_ORDER[i], p = m.offT().role[role];
+    if (!p || !p.onField) return false;
+    const opts = role === 'RB' ? P.HOT_RB : P.HOT, cur = m.play.routes[role] || 'block';
+    H.hot = { i, role, opts };
+    const el = $('#hotMenu');
+    el.style.setProperty('--c', RECV_COLORS[i]);
+    el.innerHTML = `<div class="hm-head"><b>${i + 1}</b><span>Hot route · ${esc(role === 'SL' ? 'SLOT' : p.pos)} ${esc(p.card.last)}</span><button class="hm-x" type="button" data-act="hot-close" aria-label="Close">\u00D7</button></div>
+      <div class="hm-grid">${opts.map((rt, k) => `<button class="hm-opt${rt === cur ? ' on' : ''}" type="button" data-act="hot-pick" data-v="${rt}">${routeIcon(rt)}<span>${P.ROUTE_NAME[rt]}</span><kbd>${k + 1}</kbd></button>`).join('')}</div>`;
+    el.hidden = false;
+    return true;
+  };
+  UI.hideHot = function () { const el = $('#hotMenu'); if (el) el.hidden = true; H.hot = null; };
+  UI.hotDigit = function (n) {
+    if (H.hot) { const rt = H.hot.opts[n - 1]; if (rt) pickHot(rt); return; }
+    if (UI.openHot(n - 1)) A.click();
+  };
+  function pickHot(rt) {
+    const m = H.m, h = H.hot;
+    UI.hideHot();
+    if (m && h && m.hotRoute(h.role, rt)) { A.click(); UI.caption('Hot route: ' + (h.role === 'SL' ? 'slot' : m.offT().role[h.role].card.last) + ' runs a ' + P.ROUTE_NAME[rt].toLowerCase()); }
+  }
+
+  /* ---------- instant replay ---------- */
+  UI.replayStart = function () { H.replay = true; $('#hud').classList.add('replaying'); $('#replayBadge').hidden = false; UI.hideHot(); UI.clearResult(); };
+  UI.replayEnd = function () { H.replay = false; $('#hud').classList.remove('replaying'); $('#replayBadge').hidden = true; };
+
+  /* ---------- announcer caption ---------- */
+  UI.caption = function (text) {
+    const el = $('#caption');
+    if (!el || !H.m) return;
+    el.textContent = text; el.hidden = false; el.classList.remove('in'); void el.offsetWidth; el.classList.add('in');
+    clearTimeout(H.capT); H.capT = setTimeout(() => { el.hidden = true; }, 3200);
+  };
+  UI.throwFx = function (i, bullet) {
+    if (!bullet) return;
+    const btn = $$('#throwBar .tbtn')[i];
+    const fx = document.createElement('div');
+    fx.className = 'tfx'; fx.textContent = 'Bullet!';
+    if (btn) { const r = btn.getBoundingClientRect(); fx.style.left = (r.left + r.width / 2) + 'px'; fx.style.top = r.top + 'px'; }
+    else { fx.style.left = '50%'; fx.style.top = '60%'; }
+    $('#hud').appendChild(fx);
+    setTimeout(() => fx.remove(), 900);
+  };
+
+  /* ---------- coin toss ---------- */
+  UI.coinToss = function (m, done) {
+    const o = $('#overlay');
+    o.className = 'overlay locked'; o.hidden = false;
+    o.innerHTML = `<div class="modal-wrap"><div class="modal toss"><p class="eyebrow">Coin toss · ${esc(m.teams[0].short)} vs ${esc(m.teams[1].short)}</p><h2>Call it in the air</h2>
+      <div class="coinstage"><div class="coin" id="coin"><i class="cf heads">H</i><i class="cf tails">T</i></div></div>
+      <div class="row-btns toss-btns"><button class="btn btn-play" data-act="toss" data-v="h">Heads</button><button class="btn btn-play" data-act="toss" data-v="t">Tails</button></div>
+      <p class="hint" id="tossMsg">The winner gets the ball first.</p></div></div>`;
+    H.tossDone = done; H.tossBusy = false;
   };
 
   /* ---------- actions ---------- */
@@ -719,6 +853,7 @@
     'set-kit': (el) => { sv().club.kit = +el.dataset.v; SV.commit(); A.click(); $$('.kit').forEach((k) => k.classList.toggle('on', k === el)); },
     'set-qtr': (el) => { sv().settings.qtr = +el.dataset.v; SV.commit(); A.click(); saveClubName(); settingsModal(); },
     'set-sound': (el) => { sv().settings.sound = el.dataset.v === '1'; A.setOn(sv().settings.sound); SV.commit(); A.click(); saveClubName(); settingsModal(); },
+    'set-voice': (el) => { sv().settings.voice = el.dataset.v === '1'; FG.caster.setOn(sv().settings.voice); SV.commit(); A.click(); saveClubName(); settingsModal(); if (sv().settings.voice) FG.caster.say('Announcer on.', 2); },
     'set-quality': (el) => { sv().settings.quality = +el.dataset.v; FG.gfx.setQuality(sv().settings.quality); SV.commit(); A.click(); saveClubName(); settingsModal(); },
     'gfx-reset': () => { const G = FG.gfx; sv().settings.gfxSafe = 0; SV.commit(); G.safe = 0; G.gaveUp = false; G.applyQuality(); G.setQuality(G.quality); G.resetCheck(); A.click(); saveClubName(); settingsModal(); },
     'set-auto': (el) => { sv().settings.autoSwitch = el.dataset.v === '1'; SV.commit(); A.click(); saveClubName(); settingsModal(); },
@@ -744,7 +879,26 @@
       FG.game.quit();
     },
     call: (el) => { A.click(); FG.game.callPlay(el.dataset.v); },
-    throw: (el) => { FG.input.state.throwTo = +el.dataset.i; },
+    throw: () => { /* throws are handled on pointer down/up so a long press can make a bullet */ },
+    'pc-tab': (el) => { if (!H.m) return; H.pcTab = el.dataset.v; A.click(); UI.showPlaycall(H.m, true); },
+    'hot-pick': (el) => pickHot(el.dataset.v),
+    'hot-close': () => { A.back(); UI.hideHot(); },
+    toss: (el) => {
+      if (H.tossBusy) return;
+      H.tossBusy = true; A.click();
+      const call = el.dataset.v, res = Math.random() < 0.5 ? 'h' : 't', won = call === res;
+      $$('.toss-btns .btn').forEach((b) => { b.disabled = true; });
+      $('#tossMsg').textContent = 'You called ' + (call === 'h' ? 'heads' : 'tails') + '…';
+      $('#coin').classList.add('flip-' + res);
+      setTimeout(() => {
+        $('#tossMsg').innerHTML = `<b>${res === 'h' ? 'Heads' : 'Tails'}!</b> ${won ? 'You won the toss. Your ball first!' : 'They won the toss and get the ball first.'}`;
+        if (won) A.cheer(); else A.ooh();
+        setTimeout(() => {
+          const o = $('#overlay'); o.hidden = true; o.innerHTML = ''; o.className = 'overlay';
+          H.tossBusy = false; const f = H.tossDone; H.tossDone = null; if (f) f(won);
+        }, 1500);
+      }, 1800);
+    },
   };
   document.addEventListener('click', (e) => {
     const el = e.target.closest('[data-act]');
@@ -757,10 +911,23 @@
   document.addEventListener('pointerdown', (e) => {
     const el = e.target.closest('.rcv, .tbtn');
     if (!el || el.disabled) return;
-    FG.input.state.throwTo = +el.dataset.i;
-    el.classList.add('down'); setTimeout(() => el.classList.remove('down'), 160);
     e.preventDefault();
+    const i = +el.dataset.i, m = H.m;
+    if (m && m.state === 'presnap') {
+      A.click();
+      if (H.hot && H.hot.i === i) UI.hideHot(); else UI.openHot(i);
+      return;
+    }
+    el.classList.add('down', 'hold');
+    H.holdEl = el;
+    FG.input.holdThrow(i, 'ptr' + e.pointerId);
   });
+  const endHold = (e) => {
+    if (H.holdEl) { H.holdEl.classList.remove('down', 'hold'); H.holdEl = null; }
+    FG.input.releaseThrow('ptr' + e.pointerId);
+  };
+  document.addEventListener('pointerup', endHold);
+  document.addEventListener('pointercancel', endHold);
 
   FG.ui = UI;
 })();

@@ -1,12 +1,14 @@
 /* Gridiron Kings — input: keyboard, touch (virtual stick + buttons) and gamepad, merged into one state.
    Stick is in screen space (x right, y up). Buttons: a = juke / switch, b = snap / throw / spin / tackle,
-   c = throw away. Number keys pick a play on the call screen or throw to that receiver. */
+   c = throw away / truck / big hit. Number keys pick a play on the call screen or throw to that receiver:
+   tap the key for a touch pass, hold it for a bullet. */
 (function () {
   'use strict';
   const FG = (window.FG = window.FG || {});
   const mkBtn = () => ({ down: false, pressed: false, released: false, heldT: 0, t0: 0 });
   const I = {
-    state: { mx: 0, my: 0, sprint: false, a: mkBtn(), b: mkBtn(), c: mkBtn(), throwTo: -1 },
+    state: { mx: 0, my: 0, sprint: false, a: mkBtn(), b: mkBtn(), c: mkBtn(), throwTo: -1, bullet: false },
+    pendThrow: null, BULLET_MS: 230,
     onDigit: null,
     keys: {}, touch: { mx: 0, my: 0, a: false, b: false, c: false, id: null, ox: 0, oy: 0 },
     usedTouch: false, usedPad: false, pausePressed: false, active: false, onPause: null,
@@ -47,25 +49,31 @@
     if (l > 1) { mx /= l; my /= l; }
     S.mx = mx; S.my = my; S.sprint = sprint;
     setBtn(S.a, a, now); setBtn(S.b, b, now); setBtn(S.c, c, now);
+    const pt = I.pendThrow;
+    if (pt && now - pt.t >= I.BULLET_MS) { I.pendThrow = null; I.fireThrow(pt.i, true); }
     if (I.pausePressed) { I.pausePressed = false; if (I.onPause) I.onPause(); }
   };
   /* edges are latched until a simulation step has seen them */
-  I.consume = function () { for (const k of ['a', 'b', 'c']) { S[k].pressed = false; S[k].released = false; } S.throwTo = -1; };
+  I.consume = function () { for (const k of ['a', 'b', 'c']) { S[k].pressed = false; S[k].released = false; } S.throwTo = -1; S.bullet = false; };
+  I.fireThrow = function (i, bullet) { S.throwTo = i; S.bullet = !!bullet; if (I.onThrow) I.onThrow(i, !!bullet); };
+  /* start a throw that becomes a bullet if held; release() turns it into a touch pass */
+  I.holdThrow = function (i, src) { I.pendThrow = { i, t: performance.now(), src }; };
+  I.releaseThrow = function (src) { const pt = I.pendThrow; if (pt && (src == null || pt.src === src)) { I.pendThrow = null; I.fireThrow(pt.i, false); } };
   I.reset = function () {
     I.keys = {}; const t = I.touch; t.mx = t.my = 0; t.a = t.b = t.c = false; t.id = null;
     for (const k of ['a', 'b', 'c']) Object.assign(S[k], mkBtn());
-    S.mx = S.my = 0; S.sprint = false; S.throwTo = -1;
+    S.mx = S.my = 0; S.sprint = false; S.throwTo = -1; S.bullet = false; I.pendThrow = null;
   };
 
   window.addEventListener('keydown', (e) => {
     if (!I.active) return;
     if (e.code === 'Escape' || e.code === 'KeyP') { I.pausePressed = true; e.preventDefault(); return; }
     const dm = /^(?:Digit|Numpad)([1-9])$/.exec(e.code);
-    if (dm && !e.repeat) { const n = +dm[1]; if (!(I.onDigit && I.onDigit(n))) S.throwTo = n - 1; e.preventDefault(); return; }
+    if (dm) { e.preventDefault(); if (e.repeat) return; const n = +dm[1]; if (!(I.onDigit && I.onDigit(n))) I.holdThrow(n - 1, e.code); return; }
     const m = KEYMAP[e.code];
     if (m) { I.keys[m] = true; e.preventDefault(); }
   });
-  window.addEventListener('keyup', (e) => { const m = KEYMAP[e.code]; if (m) I.keys[m] = false; });
+  window.addEventListener('keyup', (e) => { I.releaseThrow(e.code); const m = KEYMAP[e.code]; if (m) I.keys[m] = false; });
   window.addEventListener('blur', () => { I.keys = {}; });
 
   /* ---------- touch ---------- */

@@ -277,6 +277,14 @@
       for (let i = 0; i < 2500; i++) { c.fillStyle = Math.random() > 0.5 ? 'rgba(255,255,255,0.035)' : 'rgba(0,0,0,0.05)'; c.fillRect(Math.random() * 512, Math.random() * 256, 2, 2); }
     });
   }
+  function refTexture() {
+    return canvasTex(256, 128, (c) => {
+      c.fillStyle = '#f2f2f0'; c.fillRect(0, 0, 256, 128);
+      c.fillStyle = '#121317';
+      for (let x = 0; x < 256; x += 32) c.fillRect(x, 0, 16, 128);
+      c.fillRect(0, 0, 256, 7);
+    });
+  }
   function stripeTexture(base, stripe, kind) {
     return canvasTex(128, 64, (c) => {
       c.fillStyle = base; c.fillRect(0, 0, 128, 64);
@@ -766,6 +774,10 @@
     GEO.visor = new T.SphereGeometry(0.158, 16, 8, Math.PI / 2 - 0.62, 1.24, Math.PI * 0.4, Math.PI * 0.14); GEO.visor.scale(0.97, 1, 1.1);
     GEO.towel = new T.PlaneGeometry(0.11, 0.26); GEO.towel.translate(0, -0.15, 0);
     GEO.ring = new T.RingGeometry(0.75, 1.0, 48);
+    GEO.hex = new T.RingGeometry(0.98, 1.2, 6, 1);
+    GEO.hexIn = new T.RingGeometry(0.8, 0.87, 6, 1);
+    GEO.cap = new T.SphereGeometry(0.128, 14, 8, 0, Math.PI * 2, 0, Math.PI * 0.5);
+    GEO.brim = new T.BoxGeometry(0.17, 0.014, 0.11);
     GEO.arrow = new T.ConeGeometry(0.24, 0.42, 4);
     SKIN.forEach((c) => MATS.skin.push(new T.MeshStandardMaterial({ color: c, roughness: 0.6, metalness: 0, envMapIntensity: 0.4 })));
     MATS.mask = new T.MeshStandardMaterial({ color: 0xc9ced6, roughness: 0.32, metalness: 0.75 });
@@ -786,21 +798,22 @@
   }
   function makeActor(p, kit, letter) {
     const look = p.card.look || { skin: 2 };
+    const ref = p.pos === 'REF';
     const trim = kit.c2 === kit.c1 ? '#ffffff' : kit.c2;
     const std = (o) => new T.MeshStandardMaterial(Object.assign({ roughness: 0.72, metalness: 0, envMapIntensity: 0.5 }, o));
-    const jersey = std({ map: jerseyTexture(kit, p.num), roughness: 0.68 });
-    const sleeveC = std({ map: stripeTexture(kit.c1, trim, 'sleeve'), side: T.DoubleSide });
+    const jersey = std({ map: ref ? refTexture() : jerseyTexture(kit, p.num), roughness: 0.68 });
+    const sleeveC = ref ? std({ map: refTexture(), side: T.DoubleSide }) : std({ map: stripeTexture(kit.c1, trim, 'sleeve'), side: T.DoubleSide });
     const padM = std({ color: kit.c1, roughness: 0.66 });
     const trimM = std({ color: trim, roughness: 0.6 });
     const pantsM = std({ map: stripeTexture(kit.pants, U.colorDist(kit.pants, trim) < 90 ? kit.c1 : trim, 'pants'), roughness: 0.5, envMapIntensity: 0.7 });
     const sockBase = kit.c1 === '#f3f5f8' ? kit.c2 : kit.c1;
     const sockM = std({ map: stripeTexture(U.shade(sockBase, -0.1), '#ffffff', 'sock'), roughness: 0.8 });
     const helmM = new T.MeshPhysicalMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.28, metalness: 0.15, clearcoat: 1, clearcoatRoughness: 0.16, envMapIntensity: 1.2 });
-    const helmGeo = helmetGeo(kit);
-    const decalM = new T.MeshStandardMaterial({ map: decalTexture(kit, letter), transparent: true, roughness: 0.25, metalness: 0.1, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 });
+    const helmGeo = ref ? null : helmetGeo(kit);
+    const decalM = new T.MeshStandardMaterial({ map: ref ? null : decalTexture(kit, letter), transparent: true, roughness: 0.25, metalness: 0.1, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -1 });
     const skin = MATS.skin[look.skin % SKIN.length];
     const skinHex = SKIN[look.skin % SKIN.length];
-    const handGeo = merge([[tint(GEO.foreArm, skinHex)], [tint(GEO.band, '#f2f2f2')], [tint(GEO.glove, p.pos === 'OL' || p.pos === 'DL' ? '#1e2026' : trim)]]);
+    const handGeo = merge([[tint(GEO.foreArm, skinHex)], [tint(GEO.band, ref ? skinHex : '#f2f2f2')], [tint(GEO.glove, ref ? skinHex : p.pos === 'OL' || p.pos === 'DL' ? '#1e2026' : trim)]]);
     const handM = std({ color: 0xffffff, vertexColors: true, roughness: 0.6 });
     const big = p.pos === 'OL' || p.pos === 'DL';
     const mk = (geo, mat, parent, x, y, z, shadow) => { const m = new T.Mesh(geo, mat); m.position.set(x || 0, y || 0, z || 0); m.castShadow = shadow !== false; parent.add(m); return m; };
@@ -809,17 +822,23 @@
     const body = new T.Group(); pelvis.add(body);
     const torso = mk(GEO.torso, jersey, body);
     if (big) torso.scale.set(1.12, 1, 1.12);
-    mk(GEO.padsAll, padM, body);
+    if (!ref) mk(GEO.padsAll, padM, body);
     mk(GEO.neck, skin, body, 0, 0, 0, false);
     mk(GEO.collar, trimM, body, 0, 0, 0, false);
     mk(GEO.pants, pantsM, pelvis);
     if (p.pos === 'WR' || p.pos === 'RB' || p.pos === 'QB' || p.pos === 'CB') { const tw = mk(GEO.towel, MATS.white, pelvis, 0.1, -0.02, 0.17, false); tw.rotation.x = 0.15; }
     const head = new T.Group(); head.position.set(0, 0.8, 0.01); body.add(head);
     mk(GEO.face, skin, head, 0, -0.01, 0.02, false);
-    mk(helmGeo, helmM, head);
-    mk(GEO.decal, decalM, head, 0, 0, 0, false);
-    mk(GEO.mask, U.lum(kit.helm) < 0.25 ? MATS.mask : (p.i % 3 === 0 ? MATS.maskDark : MATS.mask), head, 0, 0, 0, false);
-    if (look.brow === 1 && !big) mk(GEO.visor, MATS.visor, head, 0, 0, 0, false);
+    if (ref) {
+      const capM = p.white ? MATS.white : trimM;
+      mk(GEO.cap, capM, head, 0, 0.015, 0, false);
+      mk(GEO.brim, capM, head, 0, 0.02, 0.1, false);
+    } else {
+      mk(helmGeo, helmM, head);
+      mk(GEO.decal, decalM, head, 0, 0, 0, false);
+      mk(GEO.mask, U.lum(kit.helm) < 0.25 ? MATS.mask : (p.i % 3 === 0 ? MATS.maskDark : MATS.mask), head, 0, 0, 0, false);
+      if (look.brow === 1 && !big) mk(GEO.visor, MATS.visor, head, 0, 0, 0, false);
+    }
     const limb = (side) => {
       const arm = new T.Group(); arm.position.set(side * 0.34, 0.47, 0); body.add(arm);
       mk(GEO.sleeve, sleeveC, arm, 0, 0, 0, false);
@@ -833,7 +852,7 @@
       return { arm, elbow, leg, knee };
     };
     const L = limb(1), R = limb(-1);
-    root.scale.setScalar(big ? 1.16 : 1.12);
+    root.scale.setScalar(big ? 1.16 : ref ? 1.06 : 1.12);
     root.visible = false;
     G.scene.add(root);
     return { p, root, pelvis, body, head, L, R, phase: Math.random() * 6, yaw: 0, mats: [jersey, sleeveC, padM, trimM, pantsM, sockM, helmM, decalM, handM], geos: [handGeo], scale: root.scale.x };
@@ -861,6 +880,11 @@
       thL = -1.05; thR = -0.75; knL = 1.55; knR = 1.25; py = 0.6; lean = 1.0; aR = -1.45; eR = 0; aL = -0.55; eL = -0.5; azL = 0.25; azR = -0.1; headX = -0.7;
     } else if (p.kneel) {
       thL = -1.45; knL = 1.5; thR = 0.35; knR = 1.95; py = 0.5; lean = 0.25; aL = -1.0; aR = -1.0; eL = eR = -0.3; azL = -0.15; azR = 0.15;
+    } else if (m.state === 'presnap' && !p.act && amp < 0.25 && p.pos !== 'REF' && p.pos !== 'K' && !hasBall) {
+      if (p.pos === 'QB') {
+        if (!FG.plays.SHOTGUN[m.play && m.play.form]) { thL = thR = -0.45; knL = knR = 0.8; py = 0.84; lean = 0.62; aL = aR = -1.05; eL = eR = -0.55; azL = 0.15; azR = -0.15; headX = -0.45; }
+        else { thL = thR = -0.15; knL = knR = 0.35; py = 0.93; lean = 0.2; aL = aR = -0.75; eL = eR = -1.25; azL = 0.2; azR = -0.2; }
+      } else { thL = thR = -0.6; knL = knR = 1.0; py = 0.8; lean = 0.64; aL = aR = -0.55; eL = eR = -0.2; azL = 0.06; azR = -0.06; headX = -0.55; }
     } else if (engaged) {
       thL = -0.55 + s * 0.25; thR = 0.15 - s * 0.25; knL = 0.75; knR = 0.55; py = 0.86; lean = 0.55; aL = aR = -1.45; eL = eR = -0.35; azL = -0.12; azR = 0.12; headX = -0.4;
     } else if (hasBall && p.job === 'qb' && !p.act) {
@@ -882,6 +906,8 @@
       const g = p.act === 'tackled' ? clamp(p.actT / 0.4, 0, 1) : k < 0.55 ? 1 : 1 - (k - 0.55) / 0.45;
       pitch = (p.act === 'tackled' ? 1.3 : -1.25) * g; py = lerp(0.97, 0.36, g); thL = -0.5 * g; thR = -0.15 * g; knL = 0.9 * g; knR = 0.6 * g; aL = aR = -1.6 * g; eL = eR = -0.6;
     } else if (p.act === 'juke') { roll = (p.dvz * Math.cos(p.dir) - p.dvx * Math.sin(p.dir) > 0 ? -1 : 1) * 0.35 * Math.sin(k * Math.PI); }
+    else if (p.act === 'truck') { lean = 0.8; py = 0.88; aL = -1.35; eL = -0.5; azL = 0.25; aR = -0.3; eR = -1.7; headX = -0.6; }
+    else if (p.act === 'hit') { lean = 0.62; py = 0.9; aL = aR = -1.55; eL = eR = -0.25; azL = -0.1; azR = 0.1; headX = -0.45; }
     if (p.mood === 'celebrate') { aL = -2.8 + Math.sin(G.time * 11 + p.i) * 0.25; aR = -2.8 + Math.cos(G.time * 11 + p.i) * 0.25; eL = eR = -0.2; azL = 0.35; azR = -0.35; ry = Math.abs(Math.sin(G.time * 7 + p.i)) * 0.34; }
     else if (p.mood === 'sad') { headX = 0.55; lean = 0.22; aL = aR = 0.05; eL = eR = -0.1; }
     J(a.L.leg, 'x', thL, f); J(a.R.leg, 'x', thR, f); J(a.L.knee, 'x', knL, f); J(a.R.knee, 'x', knR, f);
@@ -894,6 +920,44 @@
     const yaw = Math.atan2(Math.cos(p.dir), Math.sin(p.dir));
     a.yaw += U.angDiff(yaw, a.yaw) * (1 - Math.exp(-(p.act === 'spin' ? 40 : 14) * dt));
     a.root.rotation.y = a.yaw;
+  }
+
+  /* officials: referee behind the offense, umpire behind the defensive line, back judge deep,
+     and a judge on each sideline at the line of scrimmage */
+  const REF_KIT = { c1: '#f2f2f0', c2: '#121317', helm: '#121317', pants: '#17181c' };
+  function makeRefs() {
+    G.refs = [];
+    ['R', 'U', 'B', 'HL', 'LJ'].forEach((slot, k) => {
+      const p = { team: { idx: 2, dir: 1 }, i: 60 + k, pos: 'REF', role: slot, slot, white: k === 0, num: 0, card: { look: { skin: (k * 2 + 1) % SKIN.length, brow: 0 } },
+        x: 0, z: 0, vx: 0, vz: 0, dir: 0, act: null, actT: 0, actDur: 1, onField: true, stance: false, kneel: false, mood: null, engBy: [], eng: null, job: 'ref', dvx: 0, dvz: 0, placed: false };
+      G.actors.push(makeActor(p, REF_KIT, ''));
+      G.refs.push(p);
+    });
+  }
+  function moveRefs(dt, m) {
+    if (!G.refs || !dt) return;
+    const d = m.offT().dir, b = m.ball, los = m.los;
+    const inPlay = m.state === 'live' || m.state === 'dead' || m.state === 'score' || b.state === 'replay';
+    const bx = inPlay ? b.x : los, bz = inPlay ? b.z : m.ballZ;
+    const ahead = (bx - los) * d;
+    for (const p of G.refs) {
+      let tx, tz;
+      if (p.slot === 'R') { tx = los - d * 11; tz = m.ballZ + 6; if (inPlay && ahead > 2) tx = bx - d * 10; }
+      else if (p.slot === 'U') { tx = los + d * 6.5; tz = m.ballZ - 1.5; if (inPlay && ahead > 5) tx = bx - d * 5; }
+      else if (p.slot === 'B') { tx = los + d * 24; tz = m.ballZ * 0.3; if (inPlay && ahead > 14) tx = bx + d * 9; }
+      else { tx = inPlay ? bx : los; tz = (p.slot === 'HL' ? -1 : 1) * (FW + 1.7); }
+      tx = clamp(tx, -EL - 2, EL + 2);
+      // step aside if the ball comes right at an official on the field
+      if (inPlay && p.slot !== 'HL' && p.slot !== 'LJ' && Math.hypot(bx - tx, bz - tz) < 4) tz += bz > tz ? -4 : 4;
+      let dx = tx - p.x, dz = tz - p.z;
+      const dl = Math.hypot(dx, dz);
+      if (!p.placed || dl > 30) { p.x = tx; p.z = tz; p.vx = p.vz = 0; p.placed = true; dx = dz = 0; }
+      const want = Math.min(dl > 6 ? 7.5 : 4.5, dl * 2.2), kv = 1 - Math.exp(-5 * dt);
+      const tvx = dl > 0.08 ? (dx / dl) * want : 0, tvz = dl > 0.08 ? (dz / dl) * want : 0;
+      p.vx += (tvx - p.vx) * kv; p.vz += (tvz - p.vz) * kv;
+      p.x += p.vx * dt; p.z += p.vz * dt;
+      p.dir = Math.hypot(p.vx, p.vz) > 1.6 ? Math.atan2(p.vz, p.vx) : Math.atan2(bz - p.z, bx - p.x);
+    }
   }
 
   /* soft contact shadows under every player (one draw call) */
@@ -994,7 +1058,7 @@
       const pos = tr.mesh.geometry.attributes.position.array, col = tr.mesh.geometry.attributes.color.array;
       const cam = G.camera.position, n = tr.pts.length;
       for (let i = 0; i < tr.N; i++) {
-        const P = tr.pts[Math.min(i, n - 1)], Pn = tr.pts[Math.min(i + 1, n - 1)] || P, Pp = tr.pts[Math.max(0, i - 1)];
+        const P = tr.pts[Math.min(i, n - 1)], Pn = tr.pts[Math.min(i + 1, n - 1)] || P, Pp = tr.pts[Math.min(Math.max(0, i - 1), n - 1)];
         Q.v.subVectors(Pp, Pn); Q.v2.subVectors(cam, P); Q.v.cross(Q.v2).normalize();
         const w = 0.09 * (1 - i / tr.N), a = i < n ? Math.pow(1 - i / tr.N, 1.6) * 0.9 : 0;
         pos[i * 6] = P.x + Q.v.x * w; pos[i * 6 + 1] = P.y + Q.v.y * w; pos[i * 6 + 2] = P.z + Q.v.z * w;
@@ -1205,6 +1269,9 @@
     G.cam.portrait = aspect < 0.95;
     const hHalf = Math.tan(((G.cam.portrait ? 60 : 64) * Math.PI) / 360);
     cam.fov = clamp((2 * Math.atan(hHalf / aspect) * 180) / Math.PI, 30, G.cam.portrait ? 76 : 80);
+    // short, wide screens (phones held sideways): open the view up so the quarterback clears the buttons
+    G.cam.short = !G.cam.portrait && G.h < 520;
+    if (G.cam.short) cam.fov = Math.max(cam.fov, 40);
     cam.updateProjectionMatrix();
   }
   function updateCamera(dt, m) {
@@ -1216,11 +1283,11 @@
       px = Math.cos(C.orbit) * r; pz = Math.sin(C.orbit) * r * 0.55; py = 20 + Math.sin(C.orbit * 0.7) * 6;
       lx = Math.cos(C.orbit + 0.5) * 10; ly = 4; lz = 0; k = 1 - Math.exp(-2 * dt);
     } else {
-      const b = m.ball, back = por ? 12 : 12.5, height = por ? 14.5 : 7.2, ahead = por ? 6.5 : 9;
+      const b = m.ball, back = por ? 12.5 : 15, height = por ? 15 : 11, ahead = por ? 2.5 : C.short ? 2.8 : 5.5;
       let fx, fz;
       const userDef = m.user >= 0 && !m.userOnOffense();
       if (m.state === 'call' || m.state === 'presnap' || m.state === 'intro') {
-        fx = m.los + (userDef ? -7 : -3.5); fz = m.ballZ * 0.6;
+        fx = m.los + (userDef ? -7 : -5); fz = m.ballZ * 0.6;
         if (m.play && m.play.special && m.state === 'presnap') fx = m.los - 6;
       } else {
         const car = m.carrier();
@@ -1238,6 +1305,16 @@
         px = s.x + Math.cos(ang) * r; pz = s.z + Math.sin(ang) * r; py = 2.3;
         lx = s.x; ly = 1.5; lz = s.z;
         k = 1 - Math.exp(-2.6 * dt);
+      }
+      if (G.replayCam) {
+        // replay: low camera from the sideline that slowly swings around the ball
+        const R = G.replayCam;
+        R.t += dt;
+        R.fx += (R.x - R.fx) * (1 - Math.exp(-3 * dt)); R.fz += (R.z - R.fz) * (1 - Math.exp(-3 * dt));
+        const ang = R.ang + R.t * 0.22 * R.d, r = por ? 13 : 11;
+        px = R.fx + Math.cos(ang) * r; pz = R.fz + Math.sin(ang) * r; py = 3.4;
+        lx = R.fx; ly = 1.1; lz = R.fz;
+        k = 1 - Math.exp(-3 * dt);
       }
       if (C.intro > 0) {
         C.intro = Math.max(0, C.intro - dt / 3.2);
@@ -1286,8 +1363,10 @@
     buildBall();
     buildBlobs();
     buildConfetti();
-    G.marker = new T.Mesh(GEO.ring, new T.MeshBasicMaterial({ color: new T.Color(0xffe45c).multiplyScalar(1.4), transparent: true, opacity: 0.95, depthWrite: false, toneMapped: false, side: T.DoubleSide }));
-    G.marker.rotation.x = -Math.PI / 2; G.marker.visible = false; G.marker.renderOrder = 4; G.scene.add(G.marker);
+    G.marker = new T.Group();
+    const hexMat = (c, o) => new T.MeshBasicMaterial({ color: new T.Color(c).multiplyScalar(1.35), transparent: true, opacity: o, depthWrite: false, toneMapped: false, side: T.DoubleSide });
+    [[GEO.hex, 0x2ff2c4, 0.95], [GEO.hexIn, 0x7dfcff, 0.55]].forEach(([g, c, o]) => { const h = new T.Mesh(g, hexMat(c, o)); h.rotation.x = -Math.PI / 2; h.rotation.z = Math.PI / 6; h.renderOrder = 4; G.marker.add(h); });
+    G.marker.visible = false; G.scene.add(G.marker);
     G.arrow = new T.Mesh(GEO.arrow, new T.MeshBasicMaterial({ color: new T.Color(0xffe45c).multiplyScalar(1.4), toneMapped: false }));
     G.arrow.rotation.x = Math.PI; G.arrow.visible = false; G.scene.add(G.arrow);
     G.paintField({ name: 'Gridiron Kings', c1: '#ffc72c', c2: '#111827', letter: 'G' }, { name: 'Visitors', c1: '#1f4fd6', c2: '#ffffff' });
@@ -1341,6 +1420,7 @@
     G.clearMatch();
     G.kits = kits; G.names = names;
     m.everyone.forEach((p) => { G.actors.push(makeActor(p, kits[p.team.idx], names[p.team.idx][0].toUpperCase())); });
+    makeRefs();
     G.paintField({ name: names[0], c1: kits[0].c1, c2: kits[0].c2, letter: names[0][0].toUpperCase() }, { name: names[1], c1: kits[1].c1, c2: kits[1].c2 });
     const old = G.crowdTex;
     G.crowdTex = crowdTexture(kits[0].c1, kits[1].c1);
@@ -1359,7 +1439,7 @@
       a.mats.forEach((mt) => { if (mt.map) mt.map.dispose(); mt.dispose(); });
       (a.geos || []).forEach((g) => g.dispose());
     });
-    G.actors.length = 0;
+    G.actors.length = 0; G.refs = null; G.replayCam = null;
     helmCache.forEach((g) => g.dispose()); helmCache.clear();
     G.clearRoutes();
     if (G.ballG) {
@@ -1459,19 +1539,20 @@
     G.time += dt; G.lastDt = dt;
     adapt(dt);
     if (m) {
+      moveRefs(dt, m);
       for (const a of G.actors) poseActor(a, dt, m);
       syncBall(m, dt);
       syncBlobs();
       const c = m.ctrl;
       const showMk = c && c.onField && m.user >= 0 && (m.state === 'presnap' || m.state === 'live');
-      G.marker.visible = G.arrow.visible = !!showMk;
+      G.marker.visible = !!showMk && !G.replayCam; G.arrow.visible = false;
       if (showMk) {
-        const pulse = 1 + Math.sin(G.time * 7) * 0.06;
+        const pulse = 1 + Math.sin(G.time * 5) * 0.035;
         G.marker.position.set(c.x, 0.05, c.z); G.marker.scale.setScalar(pulse);
         G.arrow.position.set(c.x, 2.6 + Math.sin(G.time * 5) * 0.07, c.z); G.arrow.rotation.y = G.time * 2;
       }
       const lines = m.state === 'call' || m.state === 'presnap' || m.state === 'live' || m.state === 'dead';
-      G.losLine.visible = lines && !(m.state === 'dead' && m.result && m.result.change);
+      G.losLine.visible = lines && !G.replayCam && !(m.state === 'dead' && m.result && m.result.change);
       G.fdLine.visible = G.losLine.visible && !(m.play && m.play.special && m.state !== 'call') && !m.goalToGo;
       G.losLine.position.set(m.los, 0.025, 0);
       G.fdLine.position.set(m.firstX, 0.026, 0);
@@ -1487,6 +1568,9 @@
   };
 
   G.snapCamera = function () { G.cam.init = false; };
+  G.replayStart = function (d) { G.replayCam = { x: 0, z: 0, fx: 0, fz: 0, t: 0, d: d || 1, ang: -Math.PI / 2 - 0.65 * (d || 1), first: true }; G.cam.init = false; };
+  G.replayFocus = function (x, z) { const R = G.replayCam; if (!R) return; R.x = x; R.z = z; if (R.first) { R.first = false; R.fx = x; R.fz = z; } };
+  G.replayEnd = function () { G.replayCam = null; G.cam.init = false; };
   const V = { v: null };
   G.project = function (x, y, z) {
     if (!V.v) V.v = new T.Vector3();

@@ -19,7 +19,7 @@
       stats: { played: 0, w: 0, d: 0, l: 0, pf: 0, pa: 0, tds: 0 },
       market: { seed: 1 },
       club: { name: 'Capital Kings', kit: 0 },
-      settings: { sound: true, qtr: 2, quality: 1, autoSwitch: true, gfxSafe: 0 },
+      settings: { sound: true, voice: true, qtr: 2, quality: 1, autoSwitch: true, gfxSafe: 0 },
       onboarded: false, helpSeen: false,
     };
   }

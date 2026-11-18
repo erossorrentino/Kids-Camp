@@ -68,9 +68,13 @@
       this.offense = []; this.defense = []; this.field = [];
       this.result = null; this.after = null; this.kick = null;
       this.tmp = { x: 0, z: 0 };
+      this.weather = cfg.weather || 'clear';
+      if (this.weather === 'snow') for (const p of this.everyone) { p.maxSpeed *= 0.95; p.accel *= 0.88; }
       this.setPoss(0, 25);
       this.baseLineup();
     }
+    /* who gets the ball first (decided by the coin toss) */
+    setFirstPoss(t) { this.firstPoss = t; this.setPoss(t, 25); this.baseLineup(); }
 
     mkTeam(def, idx, dir, level) {
       const t = { idx, dir, name: def.name, short: def.short, ai: aiLevel(level), units: { O: [], D: [] }, all: [], role: {}, kicker: null };
@@ -152,6 +156,8 @@
         const base = P.DFORM[p.role], a = al[p.role];
         const f = a[0];
         let s = a.length > 1 ? a[1] : base[1];
+        const cv = dp && dp.cover && dp.cover[p.role];
+        if (cv && cv[0] === 'man' && form[cv[1]] && !(dp.align && dp.align[p.role] && dp.align[p.role].length > 1)) s = cv[1];
         if (typeof s === 'string') {
           const rs = (form[s] ? form[s][1] : 0) * flip;
           s = rs - (s === 'X' || s === 'Z' ? 0 : Math.sign(rs) * 0.6);
@@ -178,7 +184,7 @@
 
     /* ---------------- play calling ---------------- */
     toCall() {
-      this.state = 'call'; this.stateT = 0;
+      this.state = 'call'; this.stateT = 0; this.playClock = 40;
       this.call = { off: null, def: null };
       if (this.user !== this.poss) this.call.off = this.aiOffense();
       if (this.user !== 1 - this.poss) this.call.def = this.aiDefense();
@@ -198,34 +204,66 @@
     }
     fgDistance() { return Math.round((GL - this.los * this.offT().dir) + 17); }
     fgRange(t) { const k = (t || this.offT()).kicker.e; return 38 + (k.kpw / 99) * 22; }
-    aiOffense() {
-      const OT = this.offT(), tg = this.toGo, dn = this.down, y = this.yfo(this.los);
+    fourthCall() {
+      if (this.down !== 4) return null;
+      const OT = this.offT(), tg = this.toGo, y = this.yfo(this.los);
       const diff = this.score[this.poss] - this.score[1 - this.poss];
       const late = this.quarter === 4 && this.clock < 90;
-      if (dn === 4) {
-        const goFor = (late && diff < 0) || (tg <= 1.5 && y > 55) || (tg <= 3 && y > 62 && y < 70);
-        if (!goFor) {
-          if (this.fgDistance() <= this.fgRange(OT) - 2 && !(late && diff < -3)) return P.byId.fg;
-          return P.byId.punt;
-        }
-      }
-      let w;
-      if (tg <= 2) w = { dive: 5, toss: 3, slants: 3, mesh: 2, pa: 1, screen: 1, verts: 0.5, postcorner: 0.5 };
-      else if (tg >= 9) w = { dive: 1.5, toss: 1, slants: 2, mesh: 2.5, pa: 2, screen: 2, verts: 2.5, postcorner: 2 };
-      else w = { dive: 2.5, toss: 2, slants: 2.5, mesh: 2, pa: 1.5, screen: 1.2, verts: 1.2, postcorner: 1.2 };
-      if (y > 88) { w.verts = 0.3; w.postcorner = 0.5; w.dive += 2; }
-      if (late && diff < 0) { w.dive = 0.3; w.toss = 0.3; w.verts += 2; }
-      return this.weighted(w);
+      const goFor = (late && diff < 0) || (tg <= 1.5 && y > 55) || (tg <= 3 && y > 62 && y < 70);
+      if (goFor) return null;
+      if (this.fgDistance() <= this.fgRange(OT) - 2 && !(late && diff < -3)) return P.byId.fg;
+      return P.byId.punt;
     }
-    aiDefense() {
+    offWeights() {
+      const tg = this.toGo, y = this.yfo(this.los);
+      const diff = this.score[this.poss] - this.score[1 - this.poss];
+      const late = this.quarter === 4 && this.clock < 90;
+      let w;
+      if (tg <= 2) w = { power: 3, run: 4, quick: 3, mid: 1.5, pa: 1.5, screen: 0.4, deep: 0.6 };
+      else if (tg >= 9) w = { power: 0, run: 2.2, quick: 2, mid: 3, pa: 2, screen: 0.8, deep: 2.6 };
+      else w = { power: 0, run: 4, quick: 2.5, mid: 2, pa: 1.5, screen: 0.6, deep: 1.3 };
+      if (y > 88) { w.deep = 0.3; w.run += 1; if (tg <= 3) w.power += 2; }
+      if (late && diff < 0) { w.run = 0.4; w.power *= 0.3; w.deep += 2; }
+      return w;
+    }
+    defWeights() {
       const tg = this.toGo, late = this.quarter === 4 && this.clock < 90;
       const lead = this.score[1 - this.poss] - this.score[this.poss];
       let w;
-      if (tg <= 2) w = { runstop: 4, blitz: 2, man: 2, cov2: 1, cov3: 0.5, prevent: 0 };
-      else if (tg >= 9) w = { runstop: 0.5, blitz: 1.5, man: 1.5, cov2: 2.5, cov3: 2.5, prevent: 1 };
-      else w = { runstop: 1.5, blitz: 1.5, man: 2, cov2: 2, cov3: 2, prevent: 0.3 };
+      if (tg <= 2) w = { run: 4, blitz: 2.5, man: 2, zone: 1, prevent: 0 };
+      else if (tg >= 9) w = { run: 0.5, blitz: 1.5, man: 1.8, zone: 4, prevent: 1 };
+      else w = { run: 1.5, blitz: 1.6, man: 2.2, zone: 3.5, prevent: 0.3 };
       if (late && lead > 0) w.prevent += 3;
-      return this.weighted(w);
+      return w;
+    }
+    pickCat(list, w) {
+      const cat = this.weightedKey(w);
+      const pool = list.filter((p) => p.cat === cat);
+      return pool.length ? pool[Math.floor(this.rand() * pool.length)] : list[0];
+    }
+    aiOffense() { return this.fourthCall() || this.pickCat(P.OFF, this.offWeights()); }
+    aiDefense() { return this.pickCat(P.DEF, this.defWeights()); }
+    weightedKey(w) {
+      const keys = Object.keys(w), tot = keys.reduce((a, k) => a + w[k], 0);
+      let x = this.rand() * tot;
+      for (const k of keys) { x -= w[k]; if (x <= 0) return k; }
+      return keys[0];
+    }
+    /* the coach's suggested plays for the user's side in this situation */
+    coachPicks() {
+      const off = this.userOnOffense();
+      const w = off ? this.offWeights() : this.defWeights(), list = off ? P.OFF : P.DEF;
+      const out = [];
+      if (off) { const k = this.fourthCall(); if (k) out.push(k); }
+      const cats = Object.keys(w).filter((k) => w[k] > 0).sort((a, b) => w[b] - w[a]);
+      for (let pass = 0; pass < 2 && out.length < 6; pass++) {
+        for (const c of cats) {
+          const pool = list.filter((p) => p.cat === c && !out.includes(p));
+          if (pool.length) out.push(pool[Math.floor(Math.random() * pool.length)]);
+          if (out.length >= 6) break;
+        }
+      }
+      return out;
     }
     weighted(w) {
       const keys = Object.keys(w), tot = keys.reduce((a, k) => a + w[k], 0);
@@ -251,6 +289,7 @@
       this.stepFade(dt);
       if (this.slowmo > 0) { this.slowmo -= dt; dt *= 0.32; }
       this.stateT += dt;
+      if (this.state === 'call' || this.state === 'presnap') this.tickPlayClock(dt);
       switch (this.state) {
         case 'intro': this.idle(dt); if (this.stateT > 2.8) this.toCall(); break;
         case 'call': this.idle(dt); if (this.call.off && this.call.def && this.stateT > 0.35) this.lineUp(); break;
@@ -262,6 +301,28 @@
       }
     }
 
+    /* the play clock runs from the play call to the snap; the coach picks a play if it gets low,
+       and running out before the snap is a delay of game */
+    tickPlayClock(dt) {
+      if (this.playClock == null) return;
+      this.playClock = Math.max(0, this.playClock - dt);
+      if (this.state === 'call' && this.playClock <= 15) {
+        if (!this.call.off) { this.call.off = this.aiOffense(); this.emit('autocall', { side: 'O' }); }
+        if (!this.call.def) { this.call.def = this.aiDefense(); this.emit('autocall', { side: 'D' }); }
+      }
+      if (this.state === 'presnap' && this.playClock <= 0 && this.userOnOffense()) this.delayOfGame();
+    }
+    delayOfGame() {
+      const d = this.offT().dir, y = this.yfo(this.los), ny = y > 10 ? y - 5 : y / 2;
+      this.state = 'dead'; this.stateT = 0;
+      this.los = (ny - 50) * d;
+      if (!this.goalToGo) this.firstX = Math.max(this.firstX * d, this.los * d + 0.5) * d;
+      const n = ['', '1st', '2nd', '3rd', '4th'][this.down] || '4th';
+      const r = { kind: 'penalty', text: 'Delay of game', sub: '5-yard penalty · Replay ' + n + ' down', firstDown: false, change: false };
+      this.result = r; this.after = null;
+      this.emit('flag', { text: r.text, user: true });
+      this.emit('result', r);
+    }
     idle(dt) {
       for (const p of this.field) { p.wx = p.wz = 0; p.sprint = false; }
       this.movePlayers(dt);
@@ -312,7 +373,7 @@
 
     /* ---------------- snap ---------------- */
     snap() {
-      const op = this.play, dp = this.dplay, OT = this.offT(), DT = this.defT(), R = OT.role;
+      const op = this.play, dp = this.dplay, OT = this.offT(), DT = this.defT(), R = OT.role, d = OT.dir;
       this.state = 'live'; this.stateT = 0; this.t = 0;
       this.passed = false; this.handed = false; this.handT = 0; this.turn = false; this.caught = false; this.qbRun = false; this.released = false;
       this.playKind = op.special ? 'kick' : op.type;
@@ -322,8 +383,11 @@
       if (op.special) { this.snapSpecial(); return; }
       for (const p of this.offense) {
         if (p.pos === 'OL') { p.job = 'block'; continue; }
-        if (p.role === 'QB') { p.job = op.type === 'run' ? 'handoff' : 'qb'; continue; }
-        if (p.role === 'RB' && op.type === 'run') { p.job = 'runner'; continue; }
+        if (p.role === 'QB') {
+          if (op.sneak) { p.job = 'carry'; p.hole = { x: this.los + d * 0.5, z: this.ballZ + op.hole * d * this.flip }; continue; }
+          p.job = op.type === 'run' ? 'handoff' : 'qb'; continue;
+        }
+        if (p.role === 'RB' && op.type === 'run' && !op.sneak) { p.job = 'runner'; continue; }
         const rt = op.routes[p.role];
         if (op.type === 'run' || !rt || rt === 'block') { p.job = 'block'; continue; }
         p.job = 'route';
@@ -343,9 +407,10 @@
         p.job = 'zone'; p.zone = this.zonePoint(c ? c[1] : 'mid');
       }
       if (op.pa) for (const p of this.defense) if (p.job !== 'rush' && (p.pos === 'LB' || p.role === 'SS')) p.biteT = 0.75;
+      if (op.sneak) { this.handed = true; this.qbRun = true; this.runRead(); }
       this.assignBlocks();
       const qb = R.QB;
-      if (op.form === 'gun') this.ballSnap(qb, 0.3); else this.give(qb);
+      if (P.SHOTGUN[op.form]) this.ballSnap(qb, op.form === 'pistol' ? 0.22 : 0.3); else this.give(qb);
     }
 
     zonePoint(name) {
@@ -356,7 +421,7 @@
     buildRoute(p, rt) {
       const d = this.offT().dir;
       let side = Math.sign((p.z - this.ballZ) * d) || 1;
-      if (p.role === 'RB') side = this.flip;
+      if (p.role === 'RB' && Math.abs(p.z - this.ballZ) < 3.2) side = this.flip;
       p.route = [{ x: p.x, z: p.z }];
       for (const [f, o] of rt.pts) {
         p.route.push({ x: clamp(p.x + f * d, -EL + 1, EL - 1), z: clamp(p.z + o * side * d, -FW + 1.2, FW - 1.2) });
@@ -382,7 +447,8 @@
       const anchor = this.protectPoint();
       const targets = run ? this.defense.filter((p) => p.pos === 'DL' || p.pos === 'LB' || p.job === 'rush') : this.defense.filter((p) => p.job === 'rush');
       targets.sort((a, b) => hyp(a.x - anchor.x, a.z - anchor.z) - hyp(b.x - anchor.x, b.z - anchor.z));
-      const free = blockers.filter((b) => b.pos !== 'WR');
+      const wide = (b) => b.pos === 'WR' && Math.abs(b.z - this.ballZ) > 7;
+      const free = blockers.filter((b) => !wide(b));
       blockers.forEach((b) => (b.blk = null));
       for (const tg of targets) {
         let best = null, bd = 1e9;
@@ -394,7 +460,7 @@
         for (const tg of targets) { const dd = hyp(b.x - tg.x, b.z - tg.z); if (dd < bd) { bd = dd; best = tg; } }
         b.blk = best;
       }
-      for (const b of blockers.filter((x) => x.pos === 'WR')) {
+      for (const b of blockers.filter(wide)) {
         let best = null, bd = 1e9;
         for (const tg of this.defense) { if (tg.pos !== 'CB' && tg.pos !== 'S') continue; const dd = hyp(b.x - tg.x, b.z - tg.z); if (dd < bd) { bd = dd; best = tg; } }
         b.blk = best;
@@ -564,7 +630,7 @@
       const r = this.rand();
       const swat = def && def.swatT > 0 ? 0.22 : 0;
       if (rec && !def) {
-        const p = 0.62 + (rec.e.cth / 99) * 0.36 - (rd > 0.9 ? 0.08 : 0);
+        const p = 0.62 + (rec.e.cth / 99) * 0.36 - (rd > 0.9 ? 0.08 : 0) - (this.weather === 'rain' ? 0.06 : this.weather === 'snow' ? 0.03 : 0) - (f.bullet && rd > 0.7 ? 0.04 : 0);
         if (r < p) this.completeCatch(rec); else this.deflect(rec, 'drop');
       } else if (rec && def) {
         const ds = (def.e.cov / 99) * def.team.ai.cover + swat + (dd < rd ? 0.12 : 0);
@@ -612,10 +678,10 @@
       if (this.user >= 0 && c.team.idx !== this.user) this.switchCd = 0;
     }
 
-    throwTo(q, rec, away) {
+    throwTo(q, rec, away, bullet) {
       if (this.passed || this.ball.holder !== q) return;
       const d = this.offT().dir, ai = q.team.ai;
-      const v = 16 + (q.e.thp / 99) * 12;
+      const v = (16 + (q.e.thp / 99) * 12) * (bullet && !away ? 1.3 : 1);
       const P0 = this.tmp;
       let x1, z1, T, dist;
       if (away) {
@@ -628,7 +694,7 @@
         let pressure = 0;
         for (const r of this.defense) if (!r.engBy.length && hyp(r.x - q.x, r.z - q.z) < 2.4) pressure = 1;
         const moving = clamp(hyp(q.vx, q.vz) / 6, 0, 1);
-        const err = (0.25 + (1 - q.e.tac / 99) * 1.8 + pressure * 1.2 + moving * 0.6) * (1 + dist / 42) * (q.team.idx === this.user ? 0.9 : ai.qbErr);
+        const err = (0.25 + (1 - q.e.tac / 99) * 1.8 + pressure * 1.2 + moving * 0.6) * (1 + dist / 42) * (q.team.idx === this.user ? 0.9 : ai.qbErr) * (bullet ? 1.12 : 1);
         const ux = (x1 - q.x) / (dist || 1), uz = (z1 - q.z) / (dist || 1);
         const ea = this.gauss() * err * 0.55, el = this.gauss() * err * 0.5;
         x1 += ux * ea - uz * el; z1 += uz * ea + ux * el;
@@ -640,7 +706,8 @@
       q.act = 'throw'; q.actT = 0; q.actDur = 0.35;
       q.dir = Math.atan2(z1 - q.z, x1 - q.x);
       this.ball.x = q.x + Math.cos(q.dir) * 0.3; this.ball.z = q.z + Math.sin(q.dir) * 0.3; this.ball.y = 2.0;
-      this.launch(q, x1, 1.35, z1, T, away ? 2 : 0.45 + dist * 0.075, 'pass', rec);
+      this.launch(q, x1, 1.35, z1, T, away ? 2 : bullet ? 0.2 + dist * 0.028 : 0.45 + dist * 0.075, 'pass', rec);
+      this.ball.fl.bullet = !!bullet && !away;
       q.job = 'idle';
       for (const p of this.defense) {
         if (p.engBy.length) continue;
@@ -649,7 +716,7 @@
         if (!away && tReach < T + 0.35 && (p.job === 'man' || p.job === 'zone')) { p.job = 'ball'; p.react = rt; }
         else if (p.job !== 'rush') { p.job = 'pursue'; p.react = rt + 0.2; }
       }
-      this.emit('throw', { away: !!away });
+      this.emit('throw', { away: !!away, bullet: !!bullet && !away, user: q.team.idx === this.user });
     }
 
     predict(p, T, out) {
@@ -716,7 +783,7 @@
         const p = R[role], rt = op.routes[role];
         if (!p || !p.onField || !rt || rt === 'block') return;
         const def = P.ROUTES[rt];
-        const side = role === 'RB' ? this.flip : Math.sign((p.sz - this.ballZ) * d) || 1;
+        const side = role === 'RB' && Math.abs(p.sz - this.ballZ) < 3.2 ? this.flip : Math.sign((p.sz - this.ballZ) * d) || 1;
         const pts = [{ x: p.sx, z: p.sz }];
         def.pts.forEach(([f, o]) => pts.push({ x: clamp(p.sx + f * d, -EL + 1, EL - 1), z: clamp(p.sz + o * side * d, -FW + 1.2, FW - 1.2) }));
         if (!def.settle) {
@@ -727,6 +794,20 @@
         out.push({ kind: 'route', color: colors[i], idx: i, role, pts });
       });
       return out;
+    }
+    /* change one receiver's route before the snap */
+    hotRoute(role, rt) {
+      const op = this.play;
+      if (this.state !== 'presnap' || !this.userOnOffense() || !op || op.type !== 'pass' || op.special) return false;
+      if (!P.ROUTES[rt] && rt !== 'block') return false;
+      const p = this.offT().role[role];
+      if (!p || !p.onField || RECV_ORDER.indexOf(role) < 0) return false;
+      const routes = Object.assign({}, op.routes, { [role]: rt });
+      const read = (op.read || []).filter((r) => routes[r] && routes[r] !== 'block');
+      RECV_ORDER.forEach((r) => { if (routes[r] && routes[r] !== 'block' && read.indexOf(r) < 0) read.push(r); });
+      this.play = Object.assign({}, op, { routes, read, hot: true, screen: op.screen && routes.RB === 'screen' });
+      this.emit('hot', { role, rt });
+      return true;
     }
     mostOpen(q) {
       let best = null;
@@ -750,13 +831,14 @@
         c.manual = active;
         if (active) { c.wx = wx; c.wz = wz; c.sprint = !!inp.sprint || mag > 0.92; }
         if (c.job === 'qb') {
-          if (inp.throwTo != null && inp.throwTo >= 0) { const r = this.offT().role[RECV_ORDER[inp.throwTo]]; if (r && r.onField && (r.job === 'route' || r.job === 'attack')) this.throwTo(c, r); }
+          if (inp.throwTo != null && inp.throwTo >= 0) { const r = this.offT().role[RECV_ORDER[inp.throwTo]]; if (r && r.onField && (r.job === 'route' || r.job === 'attack')) this.throwTo(c, r, false, !!inp.bullet); }
           else if (inp.b.pressed && this.t > 0.2) { const r = this.mostOpen(c); if (r) this.throwTo(c, r.p); }
           else if (inp.c.pressed && this.t > 0.2) this.throwTo(c, null, true);
           return;
         }
         if (inp.a.pressed) this.doMove(c, 'juke', wx, wz, active);
         else if (inp.b.pressed) this.doMove(c, 'spin', wx, wz, active);
+        else if (inp.c.pressed) this.doMove(c, 'truck', wx, wz, active);
         return;
       }
       if (this.poss === this.user && !this.turn) return;
@@ -769,6 +851,7 @@
       if (!c || !c.onField) return;
       c.manual = active;
       if (active) { c.wx = wx; c.wz = wz; c.sprint = !!inp.sprint || mag > 0.92; }
+      if (inp.c.pressed && !c.engBy.length) { this.hitStick(c); return; }
       if (inp.b.pressed) {
         if (c.engBy.length) { c.mashT = 0.35; return; }
         if (b.state === 'air' && b.fl && b.fl.kind === 'pass' && hyp(c.x - b.fl.x1, c.z - b.fl.z1) < 4) { c.swatT = 0.6; c.act = 'jump'; c.actT = 0; c.actDur = 0.6; return; }
@@ -801,13 +884,31 @@
       const sp = Math.max(7, hyp(c.vx, c.vz) + 2);
       c.act = 'dive'; c.actT = 0; c.actDur = 0.42; c.dvx = Math.cos(ang) * sp; c.dvz = Math.sin(ang) * sp; c.dir = ang;
     }
+    /* big hit: an upright launch at the ball carrier, more likely to bring him down hard */
+    hitStick(c) {
+      if (c.act || c.tackleCd > 0) return;
+      const car = this.carrier();
+      if (!car || car.team === c.team) { this.dive(c); return; }
+      const dx = car.x + car.vx * 0.15 - c.x, dz = car.z + car.vz * 0.15 - c.z;
+      const ang = hyp(dx, dz) < 6 ? Math.atan2(dz, dx) : c.dir;
+      const sp = Math.max(8.5, hyp(c.vx, c.vz) + 3);
+      c.act = 'hit'; c.actT = 0; c.actDur = 0.34; c.dvx = Math.cos(ang) * sp; c.dvz = Math.sin(ang) * sp; c.dir = ang;
+      this.emit('move', { kind: 'hit' });
+    }
     doMove(c, kind, wx, wz, steer) {
       if (c.moveCd > 0 || c.act === 'down' || c.act === 'tackled') return;
       const sp = Math.max(4, hyp(c.vx, c.vz));
       const fx = c.vx / sp || Math.cos(c.dir), fz = c.vz / sp || Math.sin(c.dir);
       let side = this.rand() < 0.5 ? -1 : 1;
       if (steer) side = Math.sign(fx * wz - fz * wx) || side;
-      if (kind === 'juke') {
+      if (kind === 'truck') {
+        let tx = fx, tz = fz;
+        if (steer && hyp(wx, wz) > 0.2) { const l = hyp(wx, wz); tx = wx / l; tz = wz / l; }
+        const v = Math.max(5.5, sp);
+        c.act = 'truck'; c.actT = 0; c.actDur = 0.55;
+        c.dvx = tx * v; c.dvz = tz * v;
+        c.evadeT = 0.55; c.moveCd = 1.1;
+      } else if (kind === 'juke') {
         c.act = 'juke'; c.actT = 0; c.actDur = 0.3;
         c.dvx = fx * 3 - fz * side * 7.5; c.dvz = fz * 3 + fx * side * 7.5;
         c.evadeT = 0.42; c.moveCd = 1.0;
@@ -825,7 +926,7 @@
       const user = this.ctrl;
       for (const p of this.field) {
         if (p === user && p.manual) continue;
-        if (p.act === 'down' || p.act === 'tackled' || p.act === 'dive' || p.act === 'juke' || p.act === 'spin') continue;
+        if (p.act === 'down' || p.act === 'tackled' || p.act === 'dive' || p.act === 'juke' || p.act === 'spin' || p.act === 'truck' || p.act === 'hit') continue;
         if (p.engBy.length || p.eng) continue;
         p.face = null;
         switch (p.job) {
@@ -904,13 +1005,16 @@
         return;
       }
       if (op.toss) { q.wx = q.wz = 0; return; }
-      this.seek(q, this.los - 2.7 * d, this.ballZ + Math.sign(op.hole) * 0.7 * d * this.flip, false, 0.6);
+      if (op.delay) { this.seek(q, this.los - 6.2 * d, this.ballZ, false, 0.6); return; }
+      const gun = P.SHOTGUN[op.form];
+      this.seek(q, this.los - (gun ? 4.6 : 2.7) * d, this.ballZ + Math.sign(op.hole) * (gun ? 0.3 : 0.7) * d * this.flip, false, 0.6);
     }
     runnerAI(rb) {
       const op = this.play, d = this.offT().dir, R = this.offT().role;
       if (op.toss) { this.seek(rb, this.los - 4.2 * d + this.t * 2 * d, this.ballZ + op.hole * d * this.flip, true); return; }
-      const qb = R.QB;
-      if (this.t < 0.45) this.seek(rb, qb.x - d * 0.4, qb.z + Math.sign(op.hole) * 0.4 * d * this.flip, true, 0.5);
+      const qb = R.QB, t0 = op.delay || 0;
+      if (this.t < t0) { this.seek(rb, rb.sx - d * 0.6, rb.sz, false, 0.4); rb.face = d > 0 ? 0 : Math.PI; return; }
+      if (this.t < t0 + 0.45) this.seek(rb, qb.x - d * 0.4, qb.z + Math.sign(op.hole) * 0.4 * d * this.flip, true, 0.5);
       else this.seek(rb, this.los + d, this.ballZ + op.hole * d * this.flip, true);
     }
     routeAI(p) {
@@ -1039,7 +1143,7 @@
           if (o.engBy.length) continue;
           const od = hyp(o.x - p.x, o.z - p.z);
           if (od < 2.4 && od > 0.9 && (o.x - p.x) * d > -0.5) {
-            if (this.rand() < (p.e.agi / 99) * 0.22) this.doMove(p, this.rand() < 0.6 ? 'juke' : 'spin', 0, 0, false);
+            if (this.rand() < (p.e.agi / 99) * 0.22) this.doMove(p, p.e.str > 72 && this.rand() < 0.35 ? 'truck' : this.rand() < 0.6 ? 'juke' : 'spin', 0, 0, false);
             else p.moveCd = 0.5;
             break;
           }
@@ -1191,8 +1295,8 @@
         if (this.ball.holder === p && this.ball.state === 'held' && p.job === 'carry') mul *= 0.9;
         if (p.act === 'down' || p.act === 'celebrate') mul = 0;
         if (p.act === 'throw' || p.act === 'catch') mul *= 0.6;
-        if (p.act === 'dive' || p.act === 'juke' || p.act === 'spin') {
-          const k = 1 - (p.actT / p.actDur) * 0.5;
+        if (p.act === 'dive' || p.act === 'juke' || p.act === 'spin' || p.act === 'truck' || p.act === 'hit') {
+          const k = 1 - (p.actT / p.actDur) * (p.act === 'truck' ? 0.12 : 0.5);
           p.vx = p.dvx * k; p.vz = p.dvz * k;
         } else {
           let wx = p.wx, wz = p.wz;
@@ -1239,28 +1343,33 @@
       for (const o of this.field) {
         if (o.team === c.team || o.act === 'down' || o.tackleCd > 0 || o.act === 'tackled') continue;
         const dist = hyp(o.x - c.x, o.z - c.z);
-        const reach = o.act === 'dive' ? 1.6 : 1.05;
+        const reach = o.act === 'dive' ? 1.6 : o.act === 'hit' ? 1.4 : 1.05;
         if (dist > reach) continue;
         let p = 0.7 + ((o.e.tkl - (c.e.str * 0.5 + c.e.agi * 0.5)) / 100) * 0.9;
         if (o.engBy.length) p *= 0.45;
-        if (c.evadeT > 0) p *= c.moveKind === 'spin' ? 0.45 : 0.32;
+        if (c.evadeT > 0) {
+          if (c.moveKind === 'truck') p *= clamp(1.25 - (c.e.str / 99) * 0.8, 0.35, 1);
+          else p *= c.moveKind === 'spin' ? 0.45 : 0.32;
+        }
         if (o.act === 'dive') p += 0.15;
+        if (o.act === 'hit') p += 0.1;
         if (o.team.idx === this.user) p += 0.08; else p *= o.team.ai.tackle;
         if (c.pos === 'QB' && !this.passed && !this.qbRun) p += 0.2;
         p = clamp(p, 0.1, 0.97);
         if (this.rand() < p) { this.tackled(c, o); return; }
         o.tackleCd = 1.1;
-        if (!o.engBy.length) { o.act = 'down'; o.actT = 0; o.actDur = 0.65; }
-        c.vx *= 0.7; c.vz *= 0.7;
-        this.emit('broken', { name: c.card.name, user: c.team.idx === this.user });
+        const trucked = c.evadeT > 0 && c.moveKind === 'truck';
+        if (!o.engBy.length) { o.act = 'down'; o.actT = 0; o.actDur = trucked || o.act === 'hit' ? 1.0 : 0.65; }
+        c.vx *= trucked ? 0.85 : 0.7; c.vz *= trucked ? 0.85 : 0.7;
+        this.emit('broken', { name: c.card.name, by: o.card.name, truck: trucked, user: c.team.idx === this.user });
       }
     }
     tackled(c, o) {
-      const rel = hyp(o.vx - c.vx, o.vz - c.vz);
+      const rel = hyp(o.vx - c.vx, o.vz - c.vz), stick = o.act === 'hit';
       c.act = 'tackled'; c.actT = 0; c.actDur = 1.2;
       c.vx = c.vx * 0.4 + o.vx * 0.5; c.vz = c.vz * 0.4 + o.vz * 0.5;
       if (o.act !== 'dive') { o.act = 'dive'; o.actT = 0.2; o.actDur = 0.42; o.dvx = o.vx * 0.6; o.dvz = o.vz * 0.6; }
-      const big = rel > 9.5;
+      const big = rel > 9.5 || stick;
       if (big) this.slowmo = 0.45;
       this.emit('tackle', { big, name: o.card.name, user: o.team.idx === this.user });
       const d = c.team.dir;
@@ -1295,7 +1404,7 @@
         this.state = 'score'; this.stateT = 0; this.xpShown = false;
         this.pendingXP = xp;
         r.text = 'Touchdown!'; r.sub = c.card.name;
-        this.emit('td', { team: sc, name: c.card.name, user: sc === this.user, pick: this.turn });
+        this.emit('td', { team: sc, name: c.card.name, user: sc === this.user, pick: this.turn, pass: this.caught && !this.turn, yds: this.turn ? 0 : Math.round((GL * d - this.los) * d) });
         this.after = () => { this.setPoss(1 - sc, 25); };
         return;
       }
@@ -1325,6 +1434,7 @@
       if (kind !== 'incomplete') {
         const g = Math.round(gain);
         r.text = kind === 'sack' ? 'Sacked!' : g > 0 ? 'Gain of ' + g : g < 0 ? 'Loss of ' + -g : 'No gain';
+        r.gain = g; r.name = c.card.name; r.by = tackler ? tackler.card.name : ''; r.pass = this.playKind === 'pass' && this.caught;
         if (kind === 'out') r.sub = 'Out of bounds';
         this.ballZ = clamp(c.z, -HASH, HASH);
         if (kind === 'tackle' || kind === 'sack') this.clock = Math.max(0, this.clock - 14);
