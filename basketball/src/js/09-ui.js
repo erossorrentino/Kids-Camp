@@ -416,9 +416,9 @@ function updateMeter(rdt) {
   if (active) {
     APP.meterHold = 0.7; APP.meterP = c;
     const full = S.ideal * 1.25;
-    $('.fill', m).style.strokeDasharray = (clamp(c.actT / full, 0, 1) * 100).toFixed(2) + ' 100';
+    $('.fill', m).style.height = clamp(c.actT / full, 0, 1) * 100 + '%';
     const w = S.win / full * 100, ctr = S.ideal / full * 100;
-    const win = $('.win', m); win.style.strokeDasharray = (2 * w).toFixed(2) + ' 100'; win.style.strokeDashoffset = (-(ctr - w)).toFixed(2);
+    const win = $('.win', m); win.style.bottom = (ctr - w) + '%'; win.style.height = (2 * w) + '%';
     m.className = '';
   } else if (APP.meterHold > 0) APP.meterHold -= rdt;
   const vis = active || APP.meterHold > 0;
@@ -426,7 +426,7 @@ function updateMeter(rdt) {
   if (vis && APP.meterP) {
     const p = APP.meterP;
     const s = projectToScreen(p.x, p.y + p.hgt * 0.75, p.z);
-    m.style.left = (s.x - 78) + 'px'; m.style.top = (s.y - 70) + 'px';
+    m.style.left = (s.x + 34) + 'px'; m.style.top = (s.y - 60) + 'px';
   }
 }
 function updateTPHud() {

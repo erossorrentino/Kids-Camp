@@ -417,16 +417,12 @@ table.box tr.tot td { font-weight: 700; color: var(--chalk); }
 #hud.tch #perf { display: none; }
 @media (max-width: 760px) { #perf { display: none; } #bug, #hud.tch #bug { transform: translateX(-50%) scale(0.62); } }
 @media (min-width: 761px) and (max-width: 1100px) { #bug { transform: translateX(-50%) scale(0.85); } }
-/* curved shot meter beside the shooter */
-#meter { position: absolute; width: 44px; height: 130px; display: none; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6)); }
-#meter path { fill: none; stroke-linecap: round; }
-#meter .rim { stroke: rgba(255,255,255,0.92); stroke-width: 11; }
-#meter .bg { stroke: rgba(8,10,16,0.88); stroke-width: 7; }
-#meter .win { stroke: var(--good); stroke-width: 7; stroke-linecap: butt; opacity: 0.9; }
-#meter .fill { stroke: #ffffff; stroke-width: 5; stroke-dasharray: 0 100; }
-#meter.res-perfect .fill { stroke: var(--good); }
-#meter.res-ok .fill { stroke: var(--warn); }
-#meter.res-bad .fill { stroke: var(--bad); }
+#meter { position: absolute; width: 12px; height: 78px; background: rgba(0,0,0,0.6); border: 2px solid rgba(255,255,255,0.85); border-radius: 7px; overflow: hidden; display: none; }
+#meter .fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: linear-gradient(0deg, #f3efe6, #fff); }
+#meter .win { position: absolute; left: 0; right: 0; background: var(--good); opacity: 0.9; }
+#meter.res-perfect .fill { background: var(--good); }
+#meter.res-ok .fill { background: var(--warn); }
+#meter.res-bad .fill { background: var(--bad); }
 #fb { position: absolute; transform: translate(-50%, -100%); font: 900 italic 26px/1 var(--f-display); text-transform: uppercase; text-align: center; white-space: nowrap; text-shadow: 0 2px 12px rgba(0,0,0,0.7); opacity: 0; }
 #fb small { display: block; font: 700 13px var(--f-body); font-style: normal; letter-spacing: 0.08em; color: var(--chalk); margin-top: 4px; }
 #fb.go { animation: fb 1.5s ease-out forwards; }
@@ -681,7 +677,7 @@ table.box tr.tot td { font-weight: 700; color: var(--chalk); }
   <div id="hud">
     <div id="ticker" aria-live="polite"></div>
     <div id="banner"><b></b><span></span></div>
-    <div id="meter"><svg viewBox="0 0 44 130" width="44" height="130" aria-hidden="true"><path class="rim" d="M33 121 A 90 90 0 0 1 33 9" pathLength="100"/><path class="bg" d="M33 121 A 90 90 0 0 1 33 9" pathLength="100"/><path class="win" d="M33 121 A 90 90 0 0 1 33 9" pathLength="100"/><path class="fill" d="M33 121 A 90 90 0 0 1 33 9" pathLength="100"/></svg></div>
+    <div id="meter"><div class="win"></div><div class="fill"></div></div>
     <div id="fb"></div>
     <div id="intro"><div class="card"><span class="eyebrow" id="introEy">Tip-off</span><div class="teams" id="introTeams"></div></div></div>
     <div id="tphud"><div><span class="lb">TIME</span><span class="vl" id="tpTime">60.0</span></div><div><div class="racks" id="tpRacks"></div></div><div><span class="lb">SCORE</span><span class="vl" id="tpScore">0</span></div></div>

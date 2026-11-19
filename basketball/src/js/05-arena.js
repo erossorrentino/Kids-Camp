@@ -207,7 +207,7 @@ function drawCourtRough(W) {
     const v = 130 + rnd() * 50; g.fillStyle = `rgba(${v | 0},${v | 0},${v | 0},0.35)`;
     g.beginPath(); g.ellipse(X(-47 + rnd() * 94), Y(-25 + rnd() * 50), k * (1 + rnd() * 4), k * (0.4 + rnd()), rnd() * PI, 0, TAU); g.fill();
   }
-  g.fillStyle = 'rgba(128,128,128,0.85)';
+  g.fillStyle = 'rgba(86,86,86,0.9)';
   g.fillRect(X(28), Y(-8), 19 * k, 16 * k); g.fillRect(X(-47), Y(-8), 19 * k, 16 * k);
   return c;
 }
@@ -443,7 +443,7 @@ function colorCrowd(mesh, home, away) {
    16 people in 8 poses (sitting, clapping, arms crossed, on the phone,
    standing, arms up, fist pump). Clothes, skin and hair are painted as
    shading only, with a mask, so each fan gets their own colours. */
-const CROWD_COLS = 16, CROWD_ROWS = 8;
+const CROWD_COLS = 16, CROWD_ROWS = 9;   // row 8: baseline photographers
 function crowdVariant(c) {
   const r = mulberry32(1000 + c * 7), pick = (a) => a[Math.floor(r() * a.length)];
   const hair = pick(['short', 'short', 'long', 'bald', 'cap', 'curly', 'buzz', 'pony', 'short', 'long']);
@@ -455,6 +455,30 @@ function crowdVariant(c) {
     glasses: r() < 0.15,
   };
 }
+/* a photographer sitting on the baseline floor, big lens up at the face */
+function paintPhotog(a, m, X, Y, V, MK, gr, poly, ell, line) {
+  const bw = V.bw, sh = V.sh * 0.95;
+  // crossed legs and feet on the floor
+  poly([[-0.85, 0.05], [0.85, 0.05], [0.7, 0.55], [-0.7, 0.55]], gr(0.6), 'pants');
+  for (const sg of [-1, 1]) ell(sg * 0.55, 0.12, 0.22, 0.1, V.shoe, 'none');
+  // torso, leaning slightly into the camera
+  const hip = 0.5, shY = 2.0, hcY = 2.48;
+  poly([[-0.52 * bw, hip], [0.52 * bw, hip], [0.6 * bw, shY - 0.4], [sh / 2, shY - 0.06], [0.15, shY + 0.08], [-0.15, shY + 0.08], [-sh / 2, shY - 0.06], [-0.6 * bw, shY - 0.4]], gr(0.8), 'shirt');
+  a.save(); a.globalCompositeOperation = 'source-atop';
+  const hg = a.createLinearGradient(X(-sh / 2), 0, X(sh / 2), 0); hg.addColorStop(0, 'rgba(0,0,0,0.4)'); hg.addColorStop(0.4, 'rgba(255,255,255,0.06)'); hg.addColorStop(1, 'rgba(0,0,0,0.45)');
+  a.fillStyle = hg; a.fillRect(X(-sh / 2), Y(shY + 0.2), (sh) * 42.67 * (X(1) - X(0)) / 42.67, (shY - hip) * (X(1) - X(0))); a.restore();
+  poly([[-0.11, shY - 0.02], [0.11, shY - 0.02], [0.1, shY + 0.2], [-0.1, shY + 0.2]], gr(0.66), 'skin');
+  // head, mostly hidden behind the camera
+  ell(0, hcY, V.hw / 2, V.hh / 2, gr(0.84), 'skin');
+  if (V.hair !== 'bald') both2(a, m, (g) => { g.beginPath(); g.ellipse(X(0), Y(hcY + 0.04), (V.hw / 2 + 0.02) * (X(1) - X(0)), (V.hh / 2 + 0.02) * (X(1) - X(0)), 0, Math.PI, 2 * Math.PI); g.closePath(); }, gr(0.62), MK.hair);
+  // arms up holding the camera
+  for (const sg of [-1, 1]) { line([[sg * (sh / 2 - 0.1), shY - 0.1], [sg * 0.55, shY - 0.55], [sg * 0.2, hcY - 0.12]], 0.26, gr(0.72), 'shirt'); ell(sg * 0.2, hcY - 0.12, 0.1, 0.11, gr(0.86), 'skin'); }
+  // camera body, long lens (seen end-on) and the strap
+  poly([[-0.3, hcY - 0.2], [0.3, hcY - 0.2], [0.3, hcY + 0.14], [-0.3, hcY + 0.14]], '#111214', 'none');
+  ell(0.04, hcY - 0.04, 0.2, 0.2, '#1b1c1f', 'none'); ell(0.04, hcY - 0.04, 0.13, 0.13, '#05070a', 'none'); ell(0.0, hcY, 0.05, 0.05, '#4a6a9a', 'none');
+  line([[-0.3, hcY + 0.05], [-0.42, shY - 0.3], [0.38, hip + 0.6]], 0.05, '#0b0b0c', 'none');
+}
+function both2(a, m, build, fillA, fillM) { a.beginPath(); build(a); a.fillStyle = fillA; a.fill(); m.beginPath(); build(m); m.fillStyle = fillM; m.fill(); }
 function paintFan(a, m, x0, y0, CW, CH, K, V, row) {
   const X = (x) => x0 + CW / 2 + x * K, Y = (y) => y0 + CH - y * K;
   const MK = { shirt: '#ff0000', pants: '#00ff00', skin: '#0000ff', hair: '#ffff00', none: '#000000' };
@@ -465,6 +489,7 @@ function paintFan(a, m, x0, y0, CW, CH, K, V, row) {
   const line = (pts, w, strokeA, mk) => both((g, isM) => { g.lineCap = 'round'; g.lineJoin = 'round'; g.lineWidth = w * K; g.strokeStyle = isM ? MK[mk] : strokeA; g.beginPath(); pts.forEach((p, i) => (i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1])))); g.stroke(); });
   const shadeA = (fn) => { a.save(); fn(a); a.restore(); };   // albedo-only shading on top of a region
   for (const g of [a, m]) { g.save(); g.beginPath(); g.rect(x0, y0, CW, CH); g.clip(); }
+  if (row === 8) { paintPhotog(a, m, X, Y, V, MK, gr, poly, ell, line); for (const g of [a, m]) g.restore(); return; }
   const seated = !(row === 3 || row === 4 || row === 5);
   const hip = seated ? 1.25 : 2.85, shY = hip + 1.52, hcY = shY + 0.5, bw = V.bw, sh = V.sh;
   const sleeveSkin = V.top === 'jersey', shortSleeve = V.top === 'tee' || V.top === 'jersey';
@@ -606,7 +631,9 @@ function crowdBoardMat() {
           row = up > 0.45 ? (wave > 0.3 ? 4.0 : fract(uTime * 1.7 + ph * 3.0) < 0.5 ? 4.0 : 5.0) : 3.0;
           yOff = jump;
         }
-        vUv = vec2((aVar + uv.x) / ${CROWD_COLS}.0, (${CROWD_ROWS - 1}.0 - row + uv.y) / ${CROWD_ROWS}.0);
+        float col = aVar;
+        if (aVar > 99.0) { col = aVar - 100.0; row = 8.0; yOff = 0.0; }   // photographers keep their pose
+        vUv = vec2((col + uv.x) / ${CROWD_COLS}.0, (${CROWD_ROWS - 1}.0 - row + uv.y) / ${CROWD_ROWS}.0);
         vec3 toCam = cameraPosition - c; toCam.y = 0.0;
         vec3 right = normalize(vec3(toCam.z, 0.0, -toCam.x) + vec3(1e-5, 0.0, 0.0));
         vec3 wp = c + right * position.x * sc + vec3(0.0, position.y * sc + yOff, 0.0);
@@ -801,12 +828,22 @@ function buildArena() {
   const cs = [];
   for (const s of [-1, 1]) {
     for (const i of [0, 7]) cs.push({ x: s * (20 + i * 2.15), y: 1.0, z: -30.45, face: -PI / 2, ang: 9, row: 0, kind: 'coach', side: s });
-    for (let i = 0; i < 4; i++) cs.push({ x: s * (49.2 + (i % 2) * 0.9), y: -0.45, z: (i < 2 ? 1 : -1) * (9 + i * 2.6), face: s > 0 ? PI : 0, ang: 9, row: 0, kind: 'photo' });
   }
   // two rows of courtside seats along the near sideline
   const cf = [];
   for (const [z, y] of [[29.4, 0.8], [31.5, 1.35]]) for (let x = -43; x <= 43; x += 2.25) cf.push({ x: x + vrr(-0.15, 0.15), y, z, face: -PI / 2, ang: Math.atan2(z, x), row: 0 });
   R.courtFans = buildCrowdBoards(cf.map((c) => Object.assign({}, c, { y: c.y - 0.55, z: c.z + 0.15 }))); R.scene.add(R.courtFans); R.courtFansSeats = cf;
+  // baseline: a row of photographers on the floor and two rows of courtside seats behind them, clear of the stanchion
+  { const bf = [], ph = [], rr = mulberry32(9);
+    for (const s of [-1, 1]) {
+      for (let z = -23; z <= 23; z += 2.3) { if (Math.abs(z) < 4.6) continue; ph.push({ x: s * (49.4 + rr() * 0.8), y: 0, z: z + (rr() - 0.5) * 0.6, ang: 9 }); }
+      for (const [x, y] of [[51.9, 0.0], [54.3, 0.45]]) for (let z = -26; z <= 26; z += 2.1) { if (Math.abs(z) < 4.8) continue; bf.push({ x: s * x, y, z: z + (rr() - 0.5) * 0.3, ang: Math.atan2(z, s * x) }); }
+    }
+    R.baseFans = buildCrowdBoards(bf); R.scene.add(R.baseFans);
+    R.photogs = buildCrowdBoards(ph); R.scene.add(R.photogs);
+    const va = R.photogs.geometry.attributes.aVar; for (let i = 0; i < ph.length; i++) va.array[i] = 100 + (i * 5) % CROWD_COLS; va.needsUpdate = true;
+    const sa = R.photogs.geometry.attributes.aShirt; for (let i = 0; i < ph.length; i++) { const c = [0.03, 0.035, 0.05, 0.12][i % 4]; sa.array[i * 3] = c; sa.array[i * 3 + 1] = c; sa.array[i * 3 + 2] = c * 1.1; } sa.needsUpdate = true;
+    const aa = R.photogs.geometry.attributes.aAnim; for (let i = 0; i < ph.length; i++) aa.array[i * 4 + 1] = 0.05; aa.needsUpdate = true; }
   { const seatG = new THREE.BoxGeometry(1.5, 0.3, 1.4), backG = new THREE.BoxGeometry(1.5, 1.4, 0.2);
     const cm = stdMat('#1d2027', 0.55);
     const seats = new THREE.InstancedMesh(seatG, cm, cf.length), backs = new THREE.InstancedMesh(backG, cm, cf.length);
@@ -987,7 +1024,7 @@ function paintArena(home, away) {
   R.floorMat.needsUpdate = true;
   R.benchMats[0].color.set(shade(home.c1, -0.55)); R.benchMats[1].color.set(shade(away.c1, -0.55));
   R.bowlMat.color.set(shade(home.c2, -0.3)).lerp(new THREE.Color('#22252c'), 0.6);
-  colorCrowd(R.crowdLower, home, away); colorCrowd(R.crowdUpper, home, away); colorCrowd(R.courtFans, home, away);
+  colorCrowd(R.crowdLower, home, away); colorCrowd(R.crowdUpper, home, away); colorCrowd(R.courtFans, home, away); colorCrowd(R.baseFans, home, away);
   { const a = R.courtside.geometry.attributes.aShirt, col = new THREE.Color();
     R.courtsideSeats.forEach((c, i) => {
       col.set(c.kind === 'bench' ? (c.side < 0 ? home.c1 : away.c1) : c.kind === 'coach' ? '#1c1f26' : '#2a2c31');

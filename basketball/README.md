@@ -33,13 +33,14 @@ fonts from their CDNs. There is nothing to install.
 
 ## Camera
 
-The default camera is **third person**: it rides high behind the player you control,
-so your player sits low in the frame with the half court and the rim ahead, looking
-at the basket on offense and at the ball handler on defense. Chevrons mark your
-teammates (the bright one is your pass target). Near a baseline the camera swings
-around your player instead of dropping behind the glass, and if it ever ends up
-behind a backboard, the glass and stanchion drop out of the shot. In this mode you stay locked to your own
-player on defense. Settings also offer Broadcast (full court), Close and Skycam.
+The default camera is **third person**, in the style of a broadcast basketball game:
+high behind the play, looking straight down the floor at the basket in use (the one
+the offense attacks, so on defense it is the one you protect), with the lane in the
+middle of the screen and the rim at the top. It follows your player and the ball, closes
+in when the play is in the backcourt so it never shows the whole floor, and orbits round
+the near sideline to the other end when possession changes. Chevrons mark your
+teammates (the bright one is your pass target). In this mode you stay locked to your
+own player on defense. Settings also offer Broadcast (full court), Close and Skycam.
 
 ## Controls
 
@@ -98,6 +99,8 @@ Phones and tablets get an on-screen joystick and buttons.
   board, a center-hung scoreboard, ceiling light rig with haze, camera flashes and
   confetti.
 - Five substitutes per team sit on each bench in full uniform and follow the ball.
+- Photographers sit along both baselines with their lenses up, with two rows of
+  courtside fans behind them.
 - Players are single skinned meshes on a 15-bone skeleton, painted from a
   per-player texture atlas: jerseys with names, numbers and side panels, long
   shorts with stripes and a team badge, fabric detail and a broadcast rim light.
@@ -118,7 +121,7 @@ Phones and tablets get an on-screen joystick and buttons.
 - Courtside LED boards rotate through ads for made-up sponsors and home-team
   promos with an LED wipe every few seconds; the stanchions carry sponsor pads and
   a stacked promo, and the glossy floor mirrors all of it.
-- Three referees, coaches, photographers and courtside fans.
+- Three referees, coaches and courtside fans.
 - Defenders guard in a wide, low stance with their arms out over the passing lanes.
 - Broadcast presentation: a starting-lineups intro with 3D player cards,
   instant replays of big dunks and threes (logo wipe, slow motion, cinematic
@@ -128,7 +131,7 @@ Phones and tablets get an on-screen joystick and buttons.
   colour of the uniform it is wearing (vertical abbreviation, logo, big score, team
   fouls with foul dashes, bonus and possession) either side of a centre block with
   the game clock, quarter and shot clock; your player's name and stamina bar at the
-  bottom centre; a curved shot meter beside the shooter; and a live panel at the top
+  bottom centre; the vertical shot meter beside the shooter; and a live panel at the top
   right with their points, rebounds, assists and FG% plus a running letter grade
   (A+ to F) for your team's play.
 - Skin with a warm subsurface-style scatter, muscle definition on the limbs,

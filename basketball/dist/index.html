@@ -417,16 +417,12 @@ table.box tr.tot td { font-weight: 700; color: var(--chalk); }
 #hud.tch #perf { display: none; }
 @media (max-width: 760px) { #perf { display: none; } #bug, #hud.tch #bug { transform: translateX(-50%) scale(0.62); } }
 @media (min-width: 761px) and (max-width: 1100px) { #bug { transform: translateX(-50%) scale(0.85); } }
-/* curved shot meter beside the shooter */
-#meter { position: absolute; width: 44px; height: 130px; display: none; filter: drop-shadow(0 2px 6px rgba(0,0,0,0.6)); }
-#meter path { fill: none; stroke-linecap: round; }
-#meter .rim { stroke: rgba(255,255,255,0.92); stroke-width: 11; }
-#meter .bg { stroke: rgba(8,10,16,0.88); stroke-width: 7; }
-#meter .win { stroke: var(--good); stroke-width: 7; stroke-linecap: butt; opacity: 0.9; }
-#meter .fill { stroke: #ffffff; stroke-width: 5; stroke-dasharray: 0 100; }
-#meter.res-perfect .fill { stroke: var(--good); }
-#meter.res-ok .fill { stroke: var(--warn); }
-#meter.res-bad .fill { stroke: var(--bad); }
+#meter { position: absolute; width: 12px; height: 78px; background: rgba(0,0,0,0.6); border: 2px solid rgba(255,255,255,0.85); border-radius: 7px; overflow: hidden; display: none; }
+#meter .fill { position: absolute; left: 0; right: 0; bottom: 0; height: 0; background: linear-gradient(0deg, #f3efe6, #fff); }
+#meter .win { position: absolute; left: 0; right: 0; background: var(--good); opacity: 0.9; }
+#meter.res-perfect .fill { background: var(--good); }
+#meter.res-ok .fill { background: var(--warn); }
+#meter.res-bad .fill { background: var(--bad); }
 #fb { position: absolute; transform: translate(-50%, -100%); font: 900 italic 26px/1 var(--f-display); text-transform: uppercase; text-align: center; white-space: nowrap; text-shadow: 0 2px 12px rgba(0,0,0,0.7); opacity: 0; }
 #fb small { display: block; font: 700 13px var(--f-body); font-style: normal; letter-spacing: 0.08em; color: var(--chalk); margin-top: 4px; }
 #fb.go { animation: fb 1.5s ease-out forwards; }
@@ -681,7 +677,7 @@ table.box tr.tot td { font-weight: 700; color: var(--chalk); }
   <div id="hud">
     <div id="ticker" aria-live="polite"></div>
     <div id="banner"><b></b><span></span></div>
-    <div id="meter"><svg viewBox="0 0 44 130" width="44" height="130" aria-hidden="true"><path class="rim" d="M33 121 A 90 90 0 0 1 33 9" pathLength="100"/><path class="bg" d="M33 121 A 90 90 0 0 1 33 9" pathLength="100"/><path class="win" d="M33 121 A 90 90 0 0 1 33 9" pathLength="100"/><path class="fill" d="M33 121 A 90 90 0 0 1 33 9" pathLength="100"/></svg></div>
+    <div id="meter"><div class="win"></div><div class="fill"></div></div>
     <div id="fb"></div>
     <div id="intro"><div class="card"><span class="eyebrow" id="introEy">Tip-off</span><div class="teams" id="introTeams"></div></div></div>
     <div id="tphud"><div><span class="lb">TIME</span><span class="vl" id="tpTime">60.0</span></div><div><div class="racks" id="tpRacks"></div></div><div><span class="lb">SCORE</span><span class="vl" id="tpScore">0</span></div></div>
@@ -3510,51 +3506,33 @@ function camTargets(dt) {
   }
   return { pos, look, fov, dof };
 }
-/* Third person: over the controlled player's shoulder. Offense looks at the basket being attacked,
-   defense looks at the ball handler, loose balls and shots pull the view toward the ball. */
+/* Third person, broadcast-game style: high behind the play, looking straight down the floor at the basket
+   in use (the one the offense attacks, so on defense it is the one you protect). The view follows your player
+   and the ball; when possession changes it orbits round the near sideline to the other end. */
 function thirdPerson(dt) {
   const p = G.ctrl, b = G.ball;
   if (!p || p.z < -100) return null;
-  const off = p.team.idx === G.offense;
-  const hx = hoopX(p.team);
-  let tx, tz;
-  if (b.state === 'shot' && b.shooter) { tx = b.shooter.team.dir * CT.RIM_X; tz = 0; }
-  else if (b.state === 'loose') { tx = b.x; tz = b.z; }
-  else if (off) { const own = p.hasBall; tx = own ? hx : lerp(hx, b.x, 0.4); tz = own ? 0 : lerp(0, b.z, 0.4); }
-  else { const h = b.holder || (b.state === 'pass' ? b.passTo : null); tx = h ? h.x : b.x; tz = h ? h.z : b.z; }
-  if (G.state === 'dead' && G.dead) { tx = G.dead.inb.x; tz = G.dead.inb.z; if (G.dead.inb === p) { tx = 0; tz = 0; } }
-  const dx = tx - p.x, dz = tz - p.z;
-  let want = R.tpYaw == null ? Math.atan2(dz, dx) : R.tpYaw;
-  if (hyp(dx, dz) > 6) want = Math.atan2(dz, dx);
-  if (R.tpYaw == null || R.snapCam) R.tpYaw = want;
-  else R.tpYaw += angDiff(R.tpYaw, want) * (1 - Math.exp(-2.4 * dt));
-  const fx = Math.cos(R.tpYaw), fz = Math.sin(R.tpYaw);
-  // high behind the player: the controlled player sits low in frame with the half court and rim ahead.
-  // If that spot is behind a baseline, swing around the player (keeping the distance) instead of pulling in.
-  let dist = 20.5, height = 14.2, yawC = R.tpYaw;
-  const side = 0.6, lim = 41.5;
-  const fits = (y) => Math.abs(p.x - Math.cos(y) * dist) <= lim;
-  if (!fits(yawC)) {
-    let best = null, bestScore = 1e9;
-    for (let k = 1; k <= 16; k++) for (const sg of [1, -1]) {
-      const y = R.tpYaw + sg * k * 0.09;
-      if (!fits(y)) continue;
-      const cz = Math.abs(p.z - Math.sin(y) * dist);
-      const score = k * 3 + (cz > 33 ? 40 : 0) + (sg === R.tpSwing ? 0 : 2.5);
-      if (score < bestScore) { bestScore = score; best = [y, sg]; }
-    }
-    if (best) { yawC = best[0]; R.tpSwing = best[1]; }
-    else {
-      const bx = p.x - fx * dist, dmax = (p.x - Math.sign(bx) * lim) / fx;
-      if (dmax > 7) { const dd = Math.min(dist, dmax); height += (dist - dd) * 0.18; dist = dd; }
-    }
-  }
-  const cfx = Math.cos(yawC), cfz = Math.sin(yawC);
-  let cx = p.x - cfx * dist - cfz * side, cz = p.z - cfz * dist + cfx * side;
-  cx = clamp(cx, -60, 60); cz = clamp(cz, -36, 36);
-  const lift = b.state === 'shot' ? clamp(b.y - 8, 0, 8) * 0.4 : 0;
-  const ahead = 3 + 7 * clamp(dist / 20.5, 0, 1);
-  return { pos: V3(cx, height + p.y * 0.3, cz), look: V3(p.x + fx * ahead, 3.2 + lift, p.z + fz * ahead), fov: 47 + (20.5 - dist) * 0.5 };
+  const O = G.teams[G.offense];
+  let s = O ? O.dir : p.team.dir;
+  if (b.state === 'shot' && b.shooter) s = b.shooter.team.dir;
+  // yaw 0 looks toward +x, -PI toward -x; the swing between them passes the near (+z) sideline
+  const want = s > 0 ? 0 : -PI;
+  if (R.tpYaw == null || R.snapCam || R.tpYaw > 0.01 || R.tpYaw < -PI - 0.01) R.tpYaw = want;
+  else R.tpYaw += (want - R.tpYaw) * (1 - Math.exp(-2.2 * dt));
+  const rim = s * CT.RIM_X;
+  let bx = b.x, bz = b.z;
+  if (b.state === 'held' && b.holder) { bx = b.holder.x; bz = b.holder.z; }
+  if (G.state === 'dead' && G.dead && G.dead.inb) { bx = G.dead.inb.x; bz = G.dead.inb.z; }
+  // focus: between your player and the ball, drawn toward the rim, never far behind half court
+  const ax = lerp(p.x, bx, 0.5);
+  let fx = ax + s * Math.min(Math.max(0, (rim - ax) * s) * 0.25, 6), fz = lerp(p.z, bz, 0.5) * 0.55;
+  fx = s * clamp(fx * s, -38, 30);
+  // in the backcourt the camera closes in and tilts down, so it frames the play instead of the whole floor
+  const bc = clamp(-(fx * s) / 26, 0, 1);
+  const D = 38 - 15 * bc, H = 27 - 3 * bc, ahead = 5 - 3 * bc, cy = Math.cos(R.tpYaw), sy = Math.sin(R.tpYaw);
+  const cx = clamp(fx - cy * D, -56, 56), cz = clamp(fz * 0.5 - sy * D, -36, 36);
+  const lift = b.state === 'shot' ? clamp(b.y - 9, 0, 9) * 0.35 : 0;
+  return { pos: V3(cx, H, cz), look: V3(fx + cy * ahead, 3.5 + lift, fz * 0.75 + sy * ahead), fov: 42 };
 }
 function updateCamera(dt) {
   const t = camTargets(dt);
@@ -3804,7 +3782,7 @@ function drawCourtRough(W) {
     const v = 130 + rnd() * 50; g.fillStyle = `rgba(${v | 0},${v | 0},${v | 0},0.35)`;
     g.beginPath(); g.ellipse(X(-47 + rnd() * 94), Y(-25 + rnd() * 50), k * (1 + rnd() * 4), k * (0.4 + rnd()), rnd() * PI, 0, TAU); g.fill();
   }
-  g.fillStyle = 'rgba(128,128,128,0.85)';
+  g.fillStyle = 'rgba(86,86,86,0.9)';
   g.fillRect(X(28), Y(-8), 19 * k, 16 * k); g.fillRect(X(-47), Y(-8), 19 * k, 16 * k);
   return c;
 }
@@ -4040,7 +4018,7 @@ function colorCrowd(mesh, home, away) {
    16 people in 8 poses (sitting, clapping, arms crossed, on the phone,
    standing, arms up, fist pump). Clothes, skin and hair are painted as
    shading only, with a mask, so each fan gets their own colours. */
-const CROWD_COLS = 16, CROWD_ROWS = 8;
+const CROWD_COLS = 16, CROWD_ROWS = 9;   // row 8: baseline photographers
 function crowdVariant(c) {
   const r = mulberry32(1000 + c * 7), pick = (a) => a[Math.floor(r() * a.length)];
   const hair = pick(['short', 'short', 'long', 'bald', 'cap', 'curly', 'buzz', 'pony', 'short', 'long']);
@@ -4052,6 +4030,30 @@ function crowdVariant(c) {
     glasses: r() < 0.15,
   };
 }
+/* a photographer sitting on the baseline floor, big lens up at the face */
+function paintPhotog(a, m, X, Y, V, MK, gr, poly, ell, line) {
+  const bw = V.bw, sh = V.sh * 0.95;
+  // crossed legs and feet on the floor
+  poly([[-0.85, 0.05], [0.85, 0.05], [0.7, 0.55], [-0.7, 0.55]], gr(0.6), 'pants');
+  for (const sg of [-1, 1]) ell(sg * 0.55, 0.12, 0.22, 0.1, V.shoe, 'none');
+  // torso, leaning slightly into the camera
+  const hip = 0.5, shY = 2.0, hcY = 2.48;
+  poly([[-0.52 * bw, hip], [0.52 * bw, hip], [0.6 * bw, shY - 0.4], [sh / 2, shY - 0.06], [0.15, shY + 0.08], [-0.15, shY + 0.08], [-sh / 2, shY - 0.06], [-0.6 * bw, shY - 0.4]], gr(0.8), 'shirt');
+  a.save(); a.globalCompositeOperation = 'source-atop';
+  const hg = a.createLinearGradient(X(-sh / 2), 0, X(sh / 2), 0); hg.addColorStop(0, 'rgba(0,0,0,0.4)'); hg.addColorStop(0.4, 'rgba(255,255,255,0.06)'); hg.addColorStop(1, 'rgba(0,0,0,0.45)');
+  a.fillStyle = hg; a.fillRect(X(-sh / 2), Y(shY + 0.2), (sh) * 42.67 * (X(1) - X(0)) / 42.67, (shY - hip) * (X(1) - X(0))); a.restore();
+  poly([[-0.11, shY - 0.02], [0.11, shY - 0.02], [0.1, shY + 0.2], [-0.1, shY + 0.2]], gr(0.66), 'skin');
+  // head, mostly hidden behind the camera
+  ell(0, hcY, V.hw / 2, V.hh / 2, gr(0.84), 'skin');
+  if (V.hair !== 'bald') both2(a, m, (g) => { g.beginPath(); g.ellipse(X(0), Y(hcY + 0.04), (V.hw / 2 + 0.02) * (X(1) - X(0)), (V.hh / 2 + 0.02) * (X(1) - X(0)), 0, Math.PI, 2 * Math.PI); g.closePath(); }, gr(0.62), MK.hair);
+  // arms up holding the camera
+  for (const sg of [-1, 1]) { line([[sg * (sh / 2 - 0.1), shY - 0.1], [sg * 0.55, shY - 0.55], [sg * 0.2, hcY - 0.12]], 0.26, gr(0.72), 'shirt'); ell(sg * 0.2, hcY - 0.12, 0.1, 0.11, gr(0.86), 'skin'); }
+  // camera body, long lens (seen end-on) and the strap
+  poly([[-0.3, hcY - 0.2], [0.3, hcY - 0.2], [0.3, hcY + 0.14], [-0.3, hcY + 0.14]], '#111214', 'none');
+  ell(0.04, hcY - 0.04, 0.2, 0.2, '#1b1c1f', 'none'); ell(0.04, hcY - 0.04, 0.13, 0.13, '#05070a', 'none'); ell(0.0, hcY, 0.05, 0.05, '#4a6a9a', 'none');
+  line([[-0.3, hcY + 0.05], [-0.42, shY - 0.3], [0.38, hip + 0.6]], 0.05, '#0b0b0c', 'none');
+}
+function both2(a, m, build, fillA, fillM) { a.beginPath(); build(a); a.fillStyle = fillA; a.fill(); m.beginPath(); build(m); m.fillStyle = fillM; m.fill(); }
 function paintFan(a, m, x0, y0, CW, CH, K, V, row) {
   const X = (x) => x0 + CW / 2 + x * K, Y = (y) => y0 + CH - y * K;
   const MK = { shirt: '#ff0000', pants: '#00ff00', skin: '#0000ff', hair: '#ffff00', none: '#000000' };
@@ -4062,6 +4064,7 @@ function paintFan(a, m, x0, y0, CW, CH, K, V, row) {
   const line = (pts, w, strokeA, mk) => both((g, isM) => { g.lineCap = 'round'; g.lineJoin = 'round'; g.lineWidth = w * K; g.strokeStyle = isM ? MK[mk] : strokeA; g.beginPath(); pts.forEach((p, i) => (i ? g.lineTo(X(p[0]), Y(p[1])) : g.moveTo(X(p[0]), Y(p[1])))); g.stroke(); });
   const shadeA = (fn) => { a.save(); fn(a); a.restore(); };   // albedo-only shading on top of a region
   for (const g of [a, m]) { g.save(); g.beginPath(); g.rect(x0, y0, CW, CH); g.clip(); }
+  if (row === 8) { paintPhotog(a, m, X, Y, V, MK, gr, poly, ell, line); for (const g of [a, m]) g.restore(); return; }
   const seated = !(row === 3 || row === 4 || row === 5);
   const hip = seated ? 1.25 : 2.85, shY = hip + 1.52, hcY = shY + 0.5, bw = V.bw, sh = V.sh;
   const sleeveSkin = V.top === 'jersey', shortSleeve = V.top === 'tee' || V.top === 'jersey';
@@ -4203,7 +4206,9 @@ function crowdBoardMat() {
           row = up > 0.45 ? (wave > 0.3 ? 4.0 : fract(uTime * 1.7 + ph * 3.0) < 0.5 ? 4.0 : 5.0) : 3.0;
           yOff = jump;
         }
-        vUv = vec2((aVar + uv.x) / ${CROWD_COLS}.0, (${CROWD_ROWS - 1}.0 - row + uv.y) / ${CROWD_ROWS}.0);
+        float col = aVar;
+        if (aVar > 99.0) { col = aVar - 100.0; row = 8.0; yOff = 0.0; }   // photographers keep their pose
+        vUv = vec2((col + uv.x) / ${CROWD_COLS}.0, (${CROWD_ROWS - 1}.0 - row + uv.y) / ${CROWD_ROWS}.0);
         vec3 toCam = cameraPosition - c; toCam.y = 0.0;
         vec3 right = normalize(vec3(toCam.z, 0.0, -toCam.x) + vec3(1e-5, 0.0, 0.0));
         vec3 wp = c + right * position.x * sc + vec3(0.0, position.y * sc + yOff, 0.0);
@@ -4398,12 +4403,22 @@ function buildArena() {
   const cs = [];
   for (const s of [-1, 1]) {
     for (const i of [0, 7]) cs.push({ x: s * (20 + i * 2.15), y: 1.0, z: -30.45, face: -PI / 2, ang: 9, row: 0, kind: 'coach', side: s });
-    for (let i = 0; i < 4; i++) cs.push({ x: s * (49.2 + (i % 2) * 0.9), y: -0.45, z: (i < 2 ? 1 : -1) * (9 + i * 2.6), face: s > 0 ? PI : 0, ang: 9, row: 0, kind: 'photo' });
   }
   // two rows of courtside seats along the near sideline
   const cf = [];
   for (const [z, y] of [[29.4, 0.8], [31.5, 1.35]]) for (let x = -43; x <= 43; x += 2.25) cf.push({ x: x + vrr(-0.15, 0.15), y, z, face: -PI / 2, ang: Math.atan2(z, x), row: 0 });
   R.courtFans = buildCrowdBoards(cf.map((c) => Object.assign({}, c, { y: c.y - 0.55, z: c.z + 0.15 }))); R.scene.add(R.courtFans); R.courtFansSeats = cf;
+  // baseline: a row of photographers on the floor and two rows of courtside seats behind them, clear of the stanchion
+  { const bf = [], ph = [], rr = mulberry32(9);
+    for (const s of [-1, 1]) {
+      for (let z = -23; z <= 23; z += 2.3) { if (Math.abs(z) < 4.6) continue; ph.push({ x: s * (49.4 + rr() * 0.8), y: 0, z: z + (rr() - 0.5) * 0.6, ang: 9 }); }
+      for (const [x, y] of [[51.9, 0.0], [54.3, 0.45]]) for (let z = -26; z <= 26; z += 2.1) { if (Math.abs(z) < 4.8) continue; bf.push({ x: s * x, y, z: z + (rr() - 0.5) * 0.3, ang: Math.atan2(z, s * x) }); }
+    }
+    R.baseFans = buildCrowdBoards(bf); R.scene.add(R.baseFans);
+    R.photogs = buildCrowdBoards(ph); R.scene.add(R.photogs);
+    const va = R.photogs.geometry.attributes.aVar; for (let i = 0; i < ph.length; i++) va.array[i] = 100 + (i * 5) % CROWD_COLS; va.needsUpdate = true;
+    const sa = R.photogs.geometry.attributes.aShirt; for (let i = 0; i < ph.length; i++) { const c = [0.03, 0.035, 0.05, 0.12][i % 4]; sa.array[i * 3] = c; sa.array[i * 3 + 1] = c; sa.array[i * 3 + 2] = c * 1.1; } sa.needsUpdate = true;
+    const aa = R.photogs.geometry.attributes.aAnim; for (let i = 0; i < ph.length; i++) aa.array[i * 4 + 1] = 0.05; aa.needsUpdate = true; }
   { const seatG = new THREE.BoxGeometry(1.5, 0.3, 1.4), backG = new THREE.BoxGeometry(1.5, 1.4, 0.2);
     const cm = stdMat('#1d2027', 0.55);
     const seats = new THREE.InstancedMesh(seatG, cm, cf.length), backs = new THREE.InstancedMesh(backG, cm, cf.length);
@@ -4584,7 +4599,7 @@ function paintArena(home, away) {
   R.floorMat.needsUpdate = true;
   R.benchMats[0].color.set(shade(home.c1, -0.55)); R.benchMats[1].color.set(shade(away.c1, -0.55));
   R.bowlMat.color.set(shade(home.c2, -0.3)).lerp(new THREE.Color('#22252c'), 0.6);
-  colorCrowd(R.crowdLower, home, away); colorCrowd(R.crowdUpper, home, away); colorCrowd(R.courtFans, home, away);
+  colorCrowd(R.crowdLower, home, away); colorCrowd(R.crowdUpper, home, away); colorCrowd(R.courtFans, home, away); colorCrowd(R.baseFans, home, away);
   { const a = R.courtside.geometry.attributes.aShirt, col = new THREE.Color();
     R.courtsideSeats.forEach((c, i) => {
       col.set(c.kind === 'bench' ? (c.side < 0 ? home.c1 : away.c1) : c.kind === 'coach' ? '#1c1f26' : '#2a2c31');
@@ -7202,9 +7217,9 @@ function updateMeter(rdt) {
   if (active) {
     APP.meterHold = 0.7; APP.meterP = c;
     const full = S.ideal * 1.25;
-    $('.fill', m).style.strokeDasharray = (clamp(c.actT / full, 0, 1) * 100).toFixed(2) + ' 100';
+    $('.fill', m).style.height = clamp(c.actT / full, 0, 1) * 100 + '%';
     const w = S.win / full * 100, ctr = S.ideal / full * 100;
-    const win = $('.win', m); win.style.strokeDasharray = (2 * w).toFixed(2) + ' 100'; win.style.strokeDashoffset = (-(ctr - w)).toFixed(2);
+    const win = $('.win', m); win.style.bottom = (ctr - w) + '%'; win.style.height = (2 * w) + '%';
     m.className = '';
   } else if (APP.meterHold > 0) APP.meterHold -= rdt;
   const vis = active || APP.meterHold > 0;
@@ -7212,7 +7227,7 @@ function updateMeter(rdt) {
   if (vis && APP.meterP) {
     const p = APP.meterP;
     const s = projectToScreen(p.x, p.y + p.hgt * 0.75, p.z);
-    m.style.left = (s.x - 78) + 'px'; m.style.top = (s.y - 70) + 'px';
+    m.style.left = (s.x + 34) + 'px'; m.style.top = (s.y - 60) + 'px';
   }
 }
 function updateTPHud() {
