@@ -16,7 +16,7 @@ const REG = { jersey: [0, 0, 1024, 512], shortsR: [0, 512, 512, 256], shortsL: [
   armR: [768, 896, 128, 128], armL: [896, 896, 128, 128] };
 const PATCH = { skin: 0, sock: 1, shoe: 2, sole: 3, accent: 4, trim: 5, dark: 6, white: 7, band: 8, sleeve: 9, lip: 10, kit: 11, hairSolid: 12, shoe2: 13, pants: 14, shirt: 15 };
 const SKIN_REG = { face: 1, limb: 1, armR: 1, armL: 1 };
-const ROUGH = { jersey: 0.74, shortsR: 0.6, shortsL: 0.6, pelvis: 0.6, face: 0.48, hair: 0.86, limb: 0.44, armR: 0.44, armL: 0.44,
+const ROUGH = { jersey: 0.74, shortsR: 0.42, shortsL: 0.42, pelvis: 0.42, face: 0.48, hair: 0.86, limb: 0.44, armR: 0.44, armL: 0.44,
   patch: [0.46, 0.85, 0.32, 0.55, 0.38, 0.6, 0.35, 0.6, 0.8, 0.5, 0.4, 0.6, 0.86, 0.3, 0.7, 0.72] };
 function patchXY(i) { return [512 + (i % 8) * 64, 768 + Math.floor(i / 8) * 64]; }
 function patchUV(name) { const [x, y] = patchXY(PATCH[name]); return [(x + 32) / AT, 1 - (y + 32) / AT]; }
@@ -273,11 +273,16 @@ function paintFace(g, L, C) {
   radial(cx, fy + 92, 46, 26, 'rgba(255,240,225,0.12)');
   radial(cx, ey + 18, 7, 24, 'rgba(255,240,225,0.14)');
   for (const s of [-1, 1]) { radial(cx + s * 34, ey + 30, 20, 16, 'rgba(190,70,50,0.07)'); radial(cx + s * 15, ey + 1, 17, 11, 'rgba(40,20,10,0.2)'); radial(cx + s * 44, ey + 40, 16, 34, 'rgba(0,0,0,0.08)'); }
-  const jaw = g.createLinearGradient(0, fy + 196, 0, fy + 256); jaw.addColorStop(0, 'rgba(0,0,0,0)'); jaw.addColorStop(1, 'rgba(0,0,0,0.32)');
+  const jaw = g.createLinearGradient(0, fy + 206, 0, fy + 256); jaw.addColorStop(0, 'rgba(0,0,0,0)'); jaw.addColorStop(1, 'rgba(0,0,0,0.14)');
   g.fillStyle = jaw; g.fillRect(fx, fy + 196, 256, 60);
   // eyes
   for (const s of [-1, 1]) {
     const ex = cx + s * 15;
+    if (L.eyes3d) {
+      // the eyeball itself is geometry: paint the socket shadow it sits in, the lid crease and the lash line
+      radial(ex, ey, 10, 8, 'rgba(25,12,8,0.32)');
+      g.strokeStyle = 'rgba(35,16,8,0.32)'; g.lineWidth = 1.1; g.beginPath(); g.ellipse(ex, ey - 1.6, 8.4, 8.0, 0, PI * 1.12, TAU - 0.12); g.stroke();
+    } else {
     g.fillStyle = '#ece6dc'; g.beginPath(); g.ellipse(ex, ey, 6.6, 4.4, 0, 0, TAU); g.fill();
     g.fillStyle = 'rgba(0,0,0,0.18)'; g.beginPath(); g.ellipse(ex, ey - 1.5, 6.6, 2.4, 0, PI, TAU); g.fill();
     g.fillStyle = '#3b2617'; g.beginPath(); g.arc(ex + s * 0.4, ey + 0.3, 3.3, 0, TAU); g.fill();
@@ -286,6 +291,7 @@ function paintFace(g, L, C) {
     g.strokeStyle = 'rgba(14,8,4,0.9)'; g.lineWidth = 1.8; g.beginPath(); g.ellipse(ex, ey + 0.4, 7.2, 4.8, 0, PI * 1.02, TAU - 0.02); g.stroke();
     g.strokeStyle = 'rgba(30,15,8,0.35)'; g.lineWidth = 1.1; g.beginPath(); g.ellipse(ex, ey - 0.6, 7.6, 6.4, 0, PI * 1.1, TAU - 0.1); g.stroke();
     g.strokeStyle = 'rgba(30,15,8,0.3)'; g.lineWidth = 1; g.beginPath(); g.ellipse(ex, ey, 6.4, 4.6, 0, 0.15, PI - 0.15); g.stroke();
+    }
     // brows: hair strokes along an arch
     g.save(); g.translate(ex, ey - 12); g.rotate(-s * 0.06);
     for (let i = 0; i < 46; i++) {
@@ -457,6 +463,109 @@ function detailAtlas() {
   return DETAIL_TEX;
 }
 
+
+/* ---------- heads: each player gets a 512px face texture of their own (twice the atlas detail),
+   with the eyeball texture in a strip along the bottom ---------- */
+const HT = 512, HFACE = 448, HEYE = [0, 448, 128, 64];
+function headUV(g, x, y, w, h) {
+  const uv = g.attributes.uv;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, (x + uv.getX(i) * w) / HT, 1 - (y + (1 - uv.getY(i)) * h) / HT);
+  return g;
+}
+function paintHead(L, C, d) {
+  const c = mkCanvas(HT, HT), g = c.getContext('2d');
+  g.save(); g.setTransform(HT / 256, 0, 0, HFACE / 256, 0, -768 * HFACE / 256);
+  paintFace(g, L, C);
+  g.restore();
+  // fine skin texture: pores and tiny tone shifts
+  const r = mulberry32(nameHash(d.n) + 3);
+  for (let i = 0; i < 9000; i++) { g.fillStyle = r() < 0.5 ? 'rgba(60,25,15,0.05)' : 'rgba(255,230,215,0.04)'; g.fillRect(r() * HT, r() * HFACE, 1, 1); }
+  // eyeball strip: the front of the sphere sits at the strip's centre. Lids are painted onto the ball in skin
+  // tone so only an almond-shaped opening shows white, with the iris and pupil inside it.
+  const [ex, ey, ew, eh] = HEYE, icx = ex + ew / 2, icy = ey + eh / 2;
+  const almond = (gg) => { gg.beginPath(); gg.moveTo(icx - 20, icy + 1); gg.quadraticCurveTo(icx - 2, icy - 19, icx + 20, icy - 1); gg.quadraticCurveTo(icx + 2, icy + 13, icx - 20, icy + 1); gg.closePath(); };
+  g.fillStyle = shade(C.skin, -0.12); g.fillRect(ex, ey, ew, eh);
+  g.save(); almond(g); g.clip();
+  const sc = g.createLinearGradient(0, icy - 12, 0, icy + 8);
+  sc.addColorStop(0, '#8f7f76'); sc.addColorStop(0.35, '#e4dcd2'); sc.addColorStop(1, '#d9cfc4');
+  g.fillStyle = sc; g.fillRect(ex, ey, ew, eh);
+  const iris = d.skin <= 1 && r() < 0.45 ? ['#5b7a8c', '#2c4252'] : d.skin <= 2 && r() < 0.3 ? ['#6b5530', '#3a2a14'] : ['#4a2c18', '#1e110a'];
+  const ig = g.createRadialGradient(icx, icy - 2, 1, icx, icy - 2, 10);
+  ig.addColorStop(0, iris[0]); ig.addColorStop(0.75, iris[1]); ig.addColorStop(1, '#0b0705');
+  g.fillStyle = ig; g.beginPath(); g.ellipse(icx, icy - 2, 5.6, 10.2, 0, 0, TAU); g.fill();
+  for (let k = 0; k < 36; k++) { const a = r() * TAU; g.strokeStyle = 'rgba(255,240,210,0.12)'; g.lineWidth = 0.7; g.beginPath(); g.moveTo(icx + Math.cos(a) * 2, icy - 2 + Math.sin(a) * 3.8); g.lineTo(icx + Math.cos(a) * 5, icy - 2 + Math.sin(a) * 9.2); g.stroke(); }
+  g.fillStyle = '#050403'; g.beginPath(); g.ellipse(icx, icy - 2, 2.3, 4.2, 0, 0, TAU); g.fill();
+  // the upper lid shades the top of the eye
+  const ls = g.createLinearGradient(0, icy - 12, 0, icy - 2); ls.addColorStop(0, 'rgba(20,10,6,0.55)'); ls.addColorStop(1, 'rgba(20,10,6,0)');
+  g.fillStyle = ls; g.fillRect(ex, ey, ew, eh);
+  g.restore();
+  // lash line along the upper lid, a finer line along the lower one
+  g.strokeStyle = 'rgba(12,6,3,0.95)'; g.lineWidth = 2.6; g.beginPath(); g.moveTo(icx - 20, icy + 1); g.quadraticCurveTo(icx - 2, icy - 19, icx + 20, icy - 1); g.stroke();
+  g.strokeStyle = 'rgba(30,14,8,0.5)'; g.lineWidth = 1.1; g.beginPath(); g.moveTo(icx - 20, icy + 1); g.quadraticCurveTo(icx + 2, icy + 13, icx + 20, icy - 1); g.stroke();
+  return c;
+}
+let HEAD_ROUGH = null, HEAD_BUMP = null;
+function headRough() {
+  if (HEAD_ROUGH) return HEAD_ROUGH;
+  const c = mkCanvas(256, 256), g = c.getContext('2d'), k = 256 / HT, fy = HFACE / 256;
+  const v = (r, skin) => `rgb(${skin ? 255 : 0},${Math.round(r * 255)},${Math.round(r * 255)})`;
+  g.fillStyle = v(0.5, 1); g.fillRect(0, 0, 256, 256);
+  // oilier T-zone and lips, glassy eyes
+  g.fillStyle = v(0.38, 1); g.fillRect((128 - 22) * 2 * k, 70 * fy * k, 44 * 2 * k, 90 * fy * k);
+  g.fillStyle = v(0.32, 1); g.fillRect((128 - 14) * 2 * k, 164 * fy * k, 28 * 2 * k, 16 * fy * k);
+  g.fillStyle = v(0.5, 1); g.fillRect(HEYE[0] * k, HEYE[1] * k, HEYE[2] * k, HEYE[3] * k);
+  { const cx = (HEYE[0] + HEYE[2] / 2) * k, cy = (HEYE[1] + HEYE[3] / 2) * k;
+    g.fillStyle = v(0.06, 0); g.beginPath(); g.moveTo(cx - 20 * k, cy + k); g.quadraticCurveTo(cx - 2 * k, cy - 19 * k, cx + 20 * k, cy - k); g.quadraticCurveTo(cx + 2 * k, cy + 13 * k, cx - 20 * k, cy + k); g.fill(); }
+  HEAD_ROUGH = new THREE.CanvasTexture(c);
+  return HEAD_ROUGH;
+}
+function headBump() {
+  if (HEAD_BUMP) return HEAD_BUMP;
+  const c = mkCanvas(512, 512), g = c.getContext('2d'), r = mulberry32(55), fy = HFACE / 256;
+  g.fillStyle = 'rgb(128,128,128)'; g.fillRect(0, 0, 512, 512);
+  for (let i = 0; i < 26000; i++) { const t = r() < 0.5 ? 112 : 140; g.fillStyle = `rgba(${t},${t},${t},0.6)`; g.fillRect(r() * 512, r() * HFACE, 1, 1); }
+  // nasolabial folds, lips and brow furrow
+  g.strokeStyle = 'rgba(95,95,95,0.6)'; g.lineWidth = 4;
+  for (const sg of [-1, 1]) { g.beginPath(); g.moveTo(256 + sg * 16, 152 * fy); g.quadraticCurveTo(256 + sg * 40, 162 * fy, 256 + sg * 34, 178 * fy); g.stroke(); }
+  g.strokeStyle = 'rgba(165,165,165,0.7)'; g.lineWidth = 5; g.beginPath(); g.moveTo(232, 175 * fy); g.quadraticCurveTo(256, 180 * fy, 280, 175 * fy); g.stroke();
+  g.fillStyle = 'rgb(128,128,128)'; g.fillRect(HEYE[0], HEYE[1], HEYE[2], HEYE[3]);
+  HEAD_BUMP = new THREE.CanvasTexture(c);
+  return HEAD_BUMP;
+}
+/* skin lighting: light wraps past the terminator and picks up a warm, reddish scatter the way it does
+   through real skin (masked by the red channel of the roughness map); cloth keeps plain Lambert */
+const PLAYER_LIGHT = THREE.ShaderChunk.lights_physical_pars_fragment
+  .replace('float dotNL = saturate( dot( geometry.normal, directLight.direction ) );',
+    `float ndlRaw = dot( geometry.normal, directLight.direction );
+	float dotNL = saturate( ndlRaw );
+	float wrapNL = saturate( ( ndlRaw + 0.45 ) / 1.45 );
+	vec3 irrDiff = mix( vec3( dotNL ), vec3( wrapNL ) * vec3( 0.93, 0.82, 0.76 ) + vec3( 0.34, 0.1, 0.05 ) * ( wrapNL - dotNL ), gSkin ) * directLight.color;
+	#ifndef PHYSICALLY_CORRECT_LIGHTS
+		irrDiff *= PI;
+	#endif`)
+  .replace('reflectedLight.directDiffuse += ( 1.0 - clearcoatDHR ) * irradiance * BRDF_Diffuse_Lambert( material.diffuseColor );',
+    'reflectedLight.directDiffuse += ( 1.0 - clearcoatDHR ) * irrDiff * BRDF_Diffuse_Lambert( material.diffuseColor );');
+function makePlayerMat(map, rough, bump, bumpScale) {
+  const mat = new THREE.MeshStandardMaterial({ map, roughnessMap: rough, bumpMap: bump, bumpScale, roughness: 1, metalness: 0, vertexColors: true, skinning: true, envMapIntensity: 0.7 });
+  mat.onBeforeCompile = (sh) => {
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <lights_physical_pars_fragment>', 'float gSkin = 0.0;\n' + PLAYER_LIGHT)
+      .replace('#include <lights_fragment_begin>', 'gSkin = texture2D(roughnessMap, vUv).r;\n#include <lights_fragment_begin>')
+      // sweat: skin gets a stronger, tighter specular than cloth; satin shorts and glassy eyes keep theirs
+      .replace('#include <aomap_fragment>',
+        `#include <aomap_fragment>
+         reflectedLight.directSpecular *= 1.0 + 0.8 * gSkin;
+         reflectedLight.indirectSpecular *= 1.0 + 0.45 * gSkin;`)
+      .replace('#include <tonemapping_fragment>',
+        `float ndv = clamp(dot(normalize(geometryNormal), normalize(vViewPosition)), 0.0, 1.0);
+         gl_FragColor.rgb += diffuseColor.rgb * vec3(0.5, 0.16, 0.07) * gSkin * (0.04 + 0.22 * pow(1.0 - ndv, 2.0));
+         gl_FragColor.rgb += vec3(0.5, 0.58, 0.72) * pow(1.0 - ndv, 3.0) * 0.3 * (1.0 - 0.45 * gSkin);
+         #include <tonemapping_fragment>`);
+  };
+  mat.customProgramCacheKey = () => 'player-skin-wrap-1';
+  return mat;
+}
+
 /* ---------- the model ---------- */
 const BI = { body: 0, hips: 1, torso: 2, head: 3, shR: 4, elR: 5, shL: 6, elL: 7, hipR: 8, knR: 9, ankR: 10, hipL: 11, knL: 12, ankL: 13, hem: 14 };
 const SHOE_CW = [
@@ -469,6 +578,7 @@ function buildHumanoid(pl, home) {
   const d = pl.d, T = pl.team.def, ref = !!pl.ref;
   const bulk = { PG: 0.95, SG: 0.98, SF: 1.01, PF: 1.07, C: 1.12 }[d.pos];
   const L = playerLook(d, ref);
+  L.eyes3d = true;
   const hairC = HAIRC[d.skin <= 1 && d.hair === 2 ? 4 : d.hair % 3];
   const skinC = new THREE.Color(SKIN[d.skin]);
   const C = {
@@ -485,14 +595,22 @@ function buildHumanoid(pl, home) {
   const J = { hips: [0, 3.35, 0], head: [0, 5.77, 0], shR: [0, 5.25, 0.76 * b], shL: [0, 5.25, -0.76 * b], hipR: [0, 3.27, 0.32 * b], hipL: [0, 3.27, -0.32 * b] };
   const P = [];
   // torso / jersey: lower third follows the hips, upper body follows the spine; broad through the chest and lats
-  P.push(piece(regionUV(lathe([[0.6, 0.02], [0.57, 0.2], [0.56, 0.45], [0.6, 0.85], [0.69, 1.3], [0.76, 1.6], [0.79, 1.82], [0.71, 1.99], [0.46, 2.11], [0.26, 2.2]], 32, 0.62, b), 'jersey'), J.hips,
+  const torsoG = lathe([[0.6, 0.02], [0.57, 0.2], [0.56, 0.45], [0.6, 0.85], [0.69, 1.3], [0.77, 1.58], [0.77, 1.76], [0.68, 1.93], [0.5, 2.06], [0.3, 2.17], [0.24, 2.22]], 36, 0.62, b);
+  { const p = torsoG.attributes.position, bell = (y, c, w) => Math.exp(-((y - c) * (y - c)) / (w * w));
+    for (let i = 0; i < p.count; i++) {
+      const x = p.getX(i), y = p.getY(i), z = p.getZ(i), nx = x / 0.62, nz = z / b, r = Math.hypot(nx, nz) || 1e-6, cf = nx / r, cs = Math.abs(nz) / r;
+      const k = 1 + 0.1 * bell(y, 1.55, 0.3) * Math.max(0, cf) ** 2 + 0.05 * bell(y, 1.68, 0.28) * Math.max(0, -cf) ** 2 + 0.05 * bell(y, 1.3, 0.25) * cs * cs - 0.04 * bell(y, 0.62, 0.25) * cs * cs;
+      p.setXYZ(i, x * k, y, z * k);
+    }
+    torsoG.computeVertexNormals(); }
+  P.push(piece(regionUV(torsoG, 'jersey'), J.hips,
     (x, y) => { const t = sstep(3.6, 4.3, y), hw = 0.8 * (1 - sstep(3.45, 4.15, y)); return [BI.hips, (1 - t) * (1 - hw), BI.torso, t * (1 - hw), BI.hem, hw]; },
     (x, y, z, nx, ny, nz) => 1 - 0.14 * (1 - sstep(3.45, 4.1, y)) - 0.18 * sstep(0.45, 0.7, Math.abs(z)) * sstep(4.6, 5.0, y) * (1 - sstep(5.15, 5.35, y))));
   // shorts top
-  P.push(piece(regionUV(lathe([[0.44, -0.86], [0.58, -0.62], [0.67, -0.32], [0.71, -0.05], [0.68, 0.16], [0.6, 0.32]], 24, 0.74 * b, b), 'pelvis'), J.hips,
+  P.push(piece(regionUV(lathe([[0.28, -1.3], [0.36, -1.08], [0.47, -0.82], [0.59, -0.58], [0.67, -0.32], [0.71, -0.05], [0.68, 0.16], [0.6, 0.32]], 24, 0.6, b), 'pelvis'), J.hips,
     () => [BI.hips, 1], (x, y) => 0.84 + 0.16 * sstep(2.6, 3.3, y)));
   // neck with a hint of the sternocleidomastoid
-  P.push(piece(constUV(lathe([[0.235, 2.0], [0.205, 2.2], [0.2, 2.34], [0.205, 2.47]], 16, 1, 1.05), 'skin'), J.hips,
+  P.push(piece(constUV(lathe([[0.3, 1.97], [0.25, 2.12], [0.222, 2.28], [0.218, 2.4], [0.235, 2.5]], 18, 1, 1.08), 'skin'), J.hips,
     (x, y) => blend(BI.torso, BI.head, sstep(5.45, 5.75, y)), (x, y, z, nx) => 0.78 + 0.22 * (nx < 0 ? 1 : 1 - nx * 0.6)));
   // head: sculpted skull with jaw and chin, face painted from the atlas
   const sk = new THREE.SphereGeometry(0.34, 32, 24);
@@ -513,7 +631,15 @@ function buildHumanoid(pl, home) {
     }
     sk.computeVertexNormals(); }
   const headW = () => [BI.head, 1];
-  P.push(piece(regionUV(sk, 'face'), J.head, headW, (x, y, z, nx, ny) => (ny < -0.5 ? 0.82 : 1)));
+  const PH = [];
+  PH.push(piece(headUV(sk, 0, 0, HT, HFACE), J.head, headW, (x, y, z, nx, ny) => (ny < -0.5 ? 0.82 : 1)));
+  // eyeballs: glossy ellipsoids set into the sockets so only an almond-shaped front shows through the skin
+  for (const sg of [-1, 1]) {
+    const ez = sg * 0.108, eyY = 0.358;
+    const sx = Math.sqrt(0.34 * 0.34 - (ez / 0.88) ** 2 - ((eyY - 0.33) / 1.13) ** 2) * 0.98 - 0.018 + 0.02;
+    const eye = new THREE.SphereGeometry(0.042, 20, 14); eye.scale(1, 0.7, 1.32); eye.rotateZ(0.08); eye.translate(sx - 0.037, eyY, ez);
+    PH.push(piece(headUV(eye, HEYE[0], HEYE[1], HEYE[2], HEYE[3]), J.head, headW, () => 0.9));
+  }
   // nose: bridge, tip and wings
   { const ns = new THREE.SphereGeometry(0.06, 14, 12), p = ns.attributes.position;
     for (let i = 0; i < p.count; i++) {
@@ -629,7 +755,10 @@ function buildHumanoid(pl, home) {
       P.push(piece(g, j, () => [an, 1], (x, y) => 0.8 + 0.2 * sstep(0.0, 0.25, y)));
     }
   }
-  const geo = mergeSkin(P);
+  const nBody = P.reduce((n, g) => n + (g.index ? g.index.count : g.attributes.position.count), 0);
+  const nHead = PH.reduce((n, g) => n + (g.index ? g.index.count : g.attributes.position.count), 0);
+  const geo = mergeSkin(P.concat(PH));
+  geo.addGroup(0, nBody, 0); geo.addGroup(nBody, nHead, 1);
   geo.computeBoundingSphere();
   // skeleton mirrors the old group hierarchy, so the pose solver drives it unchanged
   const bones = [];
@@ -641,23 +770,10 @@ function buildHumanoid(pl, home) {
   const bHem = bone(bTorso, 0, 0.75, 0);
   const skel = new THREE.Skeleton(bones);
   const atlas = canvasTex(paintAtlas(T, home, d, C, L));
-  const mat = new THREE.MeshStandardMaterial({ map: atlas, roughnessMap: roughAtlas(), bumpMap: detailAtlas(), bumpScale: 0.05, roughness: 1, metalness: 0, vertexColors: true, skinning: true, envMapIntensity: 0.7 });
-  mat.onBeforeCompile = (sh) => {
-    // sweat: skin gets a stronger, tighter specular than cloth
-    sh.fragmentShader = sh.fragmentShader.replace('#include <aomap_fragment>',
-      `#include <aomap_fragment>
-       float sweat = texture2D(roughnessMap, vUv).r;
-       reflectedLight.directSpecular *= 1.0 + 0.8 * sweat;
-       reflectedLight.indirectSpecular *= 1.0 + 0.45 * sweat;`);
-    sh.fragmentShader = sh.fragmentShader.replace('#include <tonemapping_fragment>',
-      `float skinM = texture2D(roughnessMap, vUv).r;
-       float ndv = clamp(dot(normalize(geometryNormal), normalize(vViewPosition)), 0.0, 1.0);
-       gl_FragColor.rgb += diffuseColor.rgb * vec3(0.5, 0.16, 0.07) * skinM * (0.1 + 0.45 * pow(1.0 - ndv, 2.0));
-       gl_FragColor.rgb += vec3(0.5, 0.58, 0.72) * pow(1.0 - ndv, 3.0) * 0.32 * (1.0 - 0.45 * skinM);
-       #include <tonemapping_fragment>`);
-  };
-  mat.customProgramCacheKey = () => 'player-skin-rim-2';
-  const mesh = new THREE.SkinnedMesh(geo, mat);
+  const mat = makePlayerMat(atlas, roughAtlas(), detailAtlas(), 0.05);
+  const headTex = canvasTex(paintHead(L, C, d));
+  const headMat = makePlayerMat(headTex, headRough(), headBump(), 0.03);
+  const mesh = new THREE.SkinnedMesh(geo, [mat, headMat]);
   mesh.add(bBody);
   mesh.bind(skel);
   mesh.castShadow = true; mesh.receiveShadow = true; mesh.frustumCulled = false;
@@ -666,7 +782,7 @@ function buildHumanoid(pl, home) {
   const blob = new THREE.Mesh(new THREE.PlaneGeometry(4.4, 4.4), R.blobMat);
   blob.rotation.x = -PI / 2; blob.position.y = 0.03;
   R.scene.add(root); R.scene.add(blob);
-  return { root, mesh, skel, atlas, mat, body: bBody, hips: bHips, torso: bTorso, headG: bHead,
+  return { root, mesh, skel, atlas, mat, headMat, headTex, body: bBody, hips: bHips, torso: bTorso, headG: bHead,
     hem: bHem, armR: { sh: bShR, el: bElR }, armL: { sh: bShL, el: bElL }, legR: { hp: bHipR, kn: bKnR, ank: bAnkR }, legL: { hp: bHipL, kn: bKnL, ank: bAnkL },
     blob, stride: 0, j: { lean: 0, crouch: 0, twist: 0 } };
 }
@@ -770,6 +886,7 @@ function stepRefs(dt) {
 function disposeHumanoid(h) {
   R.scene.remove(h.root); R.scene.remove(h.blob);
   h.mesh.geometry.dispose(); h.mat.dispose(); h.atlas.dispose();
+  if (h.headMat) { h.headMat.dispose(); h.headTex.dispose(); }
   if (h.skel.dispose) h.skel.dispose();
   h.blob.geometry.dispose();
 }

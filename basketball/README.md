@@ -21,7 +21,7 @@ fonts from their CDNs. There is nothing to install.
   five, quick-sell spare cards for coins, and play Rookie to Legend
   challenges against squads built from the same card pool (wins pay 700 to
   4,000 coins plus a margin bonus; losses still pay a little). Cards show a
-  live 3D portrait of the actual player model, lit in the tier's colour, and
+  live 3D portrait of the actual player model, arms folded, lit in the tier's colour, and
   big pulls get a walkout when you open the pack. Progress saves in your
   browser.
 - **Play now**: pick your team and the CPU's, a difficulty (Rookie, Pro,
@@ -104,10 +104,15 @@ Phones and tablets get an on-screen joystick and buttons.
   per-player texture atlas: jerseys with names, numbers and side panels, long
   shorts with stripes and a team badge, fabric detail and a broadcast rim light.
   Arms use IK to dribble, shoot and catch; feet stay planted on the floor.
-- Athletic bodies: sculpted biceps, triceps, forearms, quads and calves, curled
-  fingers, and skin with a sweat sheen. Faces have eyes with lids and catchlights,
-  hair-stroke eyebrows, a sculpted nose, lips and chin, and stubble, goatees, chin
-  straps or full beards. Eleven hairstyles (shaved, buzz, fade, waves, flow, high-top,
+- Athletic bodies: a sculpted torso with chest, shoulder blades and lats, sloped
+  shoulders, a thick neck, sculpted biceps, triceps, forearms, quads and calves,
+  curled fingers, and skin with a sweat sheen. Skin is lit like skin, not plastic:
+  light wraps softly past the shadow line and picks up a warm, reddish scatter.
+  Shorts are shiny satin and hang as one piece of fabric between the legs.
+- Faces: each player has their own high-resolution face texture with pores, a
+  glossier T-zone and lips, and real 3D eyeballs (coloured iris, pupil, lash line and
+  painted lids) that catch the light, plus hair-stroke eyebrows, a sculpted nose,
+  lips and chin, and stubble, goatees, chin straps or full beards. Eleven hairstyles (shaved, buzz, fade, waves, flow, high-top,
   sponge curls, afro, locs, bun, braids) with natural hairlines.
 - Every player has their own gear, chosen from their name: compression tights on one
   or both legs, padded knee sleeves, high or crew socks, shooting sleeves,

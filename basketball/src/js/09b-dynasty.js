@@ -228,8 +228,10 @@ function renderPortrait(c) {
   P.scene.add(h.root);
   // pose: arms folded across the chest, chin up, facing the camera a little off-axis
   h.root.rotation.y = -0.32;
-  armIK(h, h.armR, 1, 0.62, 4.82, -0.52, 1);
-  armIK(h, h.armL, -1, 0.55, 4.95, 0.52, 1);
+  // folded arms set directly on the bones (an IK solve here bends the elbows back into the body):
+  // elbows out to the sides, forearms across the chest, one a touch higher and further forward
+  h.armR.sh.rotation.set(-1.0, 1.0, 1.0); h.armR.el.rotation.set(0, 0, 1.7);
+  h.armL.sh.rotation.set(0.95, -1.05, 1.08); h.armL.el.rotation.set(0, 0, 1.8);
   h.headG.rotation.set(0, 0.22, 0.06);
   h.torso.rotation.y = 0.05;
   h.root.updateMatrixWorld(true);
