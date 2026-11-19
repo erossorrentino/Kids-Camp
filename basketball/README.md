@@ -33,14 +33,13 @@ fonts from their CDNs. There is nothing to install.
 
 ## Camera
 
-The default camera is **third person**, in the style of a broadcast basketball game:
-high behind the play, looking straight down the floor at the basket in use (the one
-the offense attacks, so on defense it is the one you protect), with the lane in the
-middle of the screen and the rim at the top. It follows your player and the ball, closes
-in when the play is in the backcourt so it never shows the whole floor, and orbits round
-the near sideline to the other end when possession changes. Chevrons mark your
-teammates (the bright one is your pass target). In this mode you stay locked to your
-own player on defense. Settings also offer Broadcast (full court), Close and Skycam.
+The default camera is **third person**: it rides high behind the player you control,
+so your player sits low in the frame with the half court and the rim ahead, looking
+at the basket on offense and at the ball handler on defense. Chevrons mark your
+teammates (the bright one is your pass target). Near a baseline the camera swings
+around your player instead of dropping behind the glass, and if it ever ends up
+behind a backboard, the glass and stanchion drop out of the shot. In this mode you stay locked to your own
+player on defense. Settings also offer Broadcast (full court), Close and Skycam.
 
 ## Controls
 

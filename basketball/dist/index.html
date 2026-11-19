@@ -3510,33 +3510,51 @@ function camTargets(dt) {
   }
   return { pos, look, fov, dof };
 }
-/* Third person, broadcast-game style: high behind the play, looking straight down the floor at the basket
-   in use (the one the offense attacks, so on defense it is the one you protect). The view follows your player
-   and the ball; when possession changes it orbits round the near sideline to the other end. */
+/* Third person: over the controlled player's shoulder. Offense looks at the basket being attacked,
+   defense looks at the ball handler, loose balls and shots pull the view toward the ball. */
 function thirdPerson(dt) {
   const p = G.ctrl, b = G.ball;
   if (!p || p.z < -100) return null;
-  const O = G.teams[G.offense];
-  let s = O ? O.dir : p.team.dir;
-  if (b.state === 'shot' && b.shooter) s = b.shooter.team.dir;
-  // yaw 0 looks toward +x, -PI toward -x; the swing between them passes the near (+z) sideline
-  const want = s > 0 ? 0 : -PI;
-  if (R.tpYaw == null || R.snapCam || R.tpYaw > 0.01 || R.tpYaw < -PI - 0.01) R.tpYaw = want;
-  else R.tpYaw += (want - R.tpYaw) * (1 - Math.exp(-2.2 * dt));
-  const rim = s * CT.RIM_X;
-  let bx = b.x, bz = b.z;
-  if (b.state === 'held' && b.holder) { bx = b.holder.x; bz = b.holder.z; }
-  if (G.state === 'dead' && G.dead && G.dead.inb) { bx = G.dead.inb.x; bz = G.dead.inb.z; }
-  // focus: between your player and the ball, drawn toward the rim, never far behind half court
-  const ax = lerp(p.x, bx, 0.5);
-  let fx = ax + s * Math.min(Math.max(0, (rim - ax) * s) * 0.25, 6), fz = lerp(p.z, bz, 0.5) * 0.55;
-  fx = s * clamp(fx * s, -38, 30);
-  // in the backcourt the camera closes in and tilts down, so it frames the play instead of the whole floor
-  const bc = clamp(-(fx * s) / 26, 0, 1);
-  const D = 38 - 15 * bc, H = 27 - 3 * bc, ahead = 5 - 3 * bc, cy = Math.cos(R.tpYaw), sy = Math.sin(R.tpYaw);
-  const cx = clamp(fx - cy * D, -56, 56), cz = clamp(fz * 0.5 - sy * D, -36, 36);
-  const lift = b.state === 'shot' ? clamp(b.y - 9, 0, 9) * 0.35 : 0;
-  return { pos: V3(cx, H, cz), look: V3(fx + cy * ahead, 3.5 + lift, fz * 0.75 + sy * ahead), fov: 42 };
+  const off = p.team.idx === G.offense;
+  const hx = hoopX(p.team);
+  let tx, tz;
+  if (b.state === 'shot' && b.shooter) { tx = b.shooter.team.dir * CT.RIM_X; tz = 0; }
+  else if (b.state === 'loose') { tx = b.x; tz = b.z; }
+  else if (off) { const own = p.hasBall; tx = own ? hx : lerp(hx, b.x, 0.4); tz = own ? 0 : lerp(0, b.z, 0.4); }
+  else { const h = b.holder || (b.state === 'pass' ? b.passTo : null); tx = h ? h.x : b.x; tz = h ? h.z : b.z; }
+  if (G.state === 'dead' && G.dead) { tx = G.dead.inb.x; tz = G.dead.inb.z; if (G.dead.inb === p) { tx = 0; tz = 0; } }
+  const dx = tx - p.x, dz = tz - p.z;
+  let want = R.tpYaw == null ? Math.atan2(dz, dx) : R.tpYaw;
+  if (hyp(dx, dz) > 6) want = Math.atan2(dz, dx);
+  if (R.tpYaw == null || R.snapCam) R.tpYaw = want;
+  else R.tpYaw += angDiff(R.tpYaw, want) * (1 - Math.exp(-2.4 * dt));
+  const fx = Math.cos(R.tpYaw), fz = Math.sin(R.tpYaw);
+  // high behind the player: the controlled player sits low in frame with the half court and rim ahead.
+  // If that spot is behind a baseline, swing around the player (keeping the distance) instead of pulling in.
+  let dist = 20.5, height = 14.2, yawC = R.tpYaw;
+  const side = 0.6, lim = 41.5;
+  const fits = (y) => Math.abs(p.x - Math.cos(y) * dist) <= lim;
+  if (!fits(yawC)) {
+    let best = null, bestScore = 1e9;
+    for (let k = 1; k <= 16; k++) for (const sg of [1, -1]) {
+      const y = R.tpYaw + sg * k * 0.09;
+      if (!fits(y)) continue;
+      const cz = Math.abs(p.z - Math.sin(y) * dist);
+      const score = k * 3 + (cz > 33 ? 40 : 0) + (sg === R.tpSwing ? 0 : 2.5);
+      if (score < bestScore) { bestScore = score; best = [y, sg]; }
+    }
+    if (best) { yawC = best[0]; R.tpSwing = best[1]; }
+    else {
+      const bx = p.x - fx * dist, dmax = (p.x - Math.sign(bx) * lim) / fx;
+      if (dmax > 7) { const dd = Math.min(dist, dmax); height += (dist - dd) * 0.18; dist = dd; }
+    }
+  }
+  const cfx = Math.cos(yawC), cfz = Math.sin(yawC);
+  let cx = p.x - cfx * dist - cfz * side, cz = p.z - cfz * dist + cfx * side;
+  cx = clamp(cx, -60, 60); cz = clamp(cz, -36, 36);
+  const lift = b.state === 'shot' ? clamp(b.y - 8, 0, 8) * 0.4 : 0;
+  const ahead = 3 + 7 * clamp(dist / 20.5, 0, 1);
+  return { pos: V3(cx, height + p.y * 0.3, cz), look: V3(p.x + fx * ahead, 3.2 + lift, p.z + fz * ahead), fov: 47 + (20.5 - dist) * 0.5 };
 }
 function updateCamera(dt) {
   const t = camTargets(dt);
