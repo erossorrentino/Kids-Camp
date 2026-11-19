@@ -131,7 +131,7 @@ Phones and tablets get an on-screen joystick and buttons.
   colour of the uniform it is wearing (vertical abbreviation, logo, big score, team
   fouls with foul dashes, bonus and possession) either side of a centre block with
   the game clock, quarter and shot clock; your player's name and stamina bar at the
-  bottom centre; the vertical shot meter beside the shooter; and a live panel at the top
+  bottom centre; a curved shot meter beside the shooter; and a live panel at the top
   right with their points, rebounds, assists and FG% plus a running letter grade
   (A+ to F) for your team's play.
 - Skin with a warm subsurface-style scatter, muscle definition on the limbs,
